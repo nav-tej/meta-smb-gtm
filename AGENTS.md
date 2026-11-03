@@ -276,32 +276,26 @@ This app fetches arbitrary URLs, parses untrusted XML, and feeds third-party con
 
 ## 12. Current implementation status & next orchestration tasks
 
-### Completed & verified (`make check` → 77/77 tests passing)
-- **Meta Model API Client (`src/clients/meta.py`):** `MetaClient` using `AsyncOpenAI` (`https://api.meta.ai/v1`) with `.strip()` on credentials/model IDs, structured JSON validation with 1-retry repair (`chat_structured`), multimodal Vision screenshot analysis (`chat_vision_structured`), `generate_image` (`muse-image-1.0` on `/v1/images/generations`), `edit_image` (`muse-image-1.0` on `/v1/images/edits`), and `segment` (`sam-3.1` on `/v1/responses` parsing `<|box;...|>` into a binary PNG mask).
-- **Flow 1 — Competitor Intel (`src/services/competitor_intel.py`, `src/utils/sitemap.py`, `src/models/intel.py`, `src/api/intel.py`):**
-  - SSRF-guarded HTTP (`validate_safe_url`, `_fetch_bytes_guarded`), RFC 9309 wildcard `robots.txt` (`parse_robots_txt`), `defusedxml` `<urlset>` & `<sitemapindex>` recursion, gzip-bomb defense, marketplace profile fallback (`crawl_listing_page_fallback`), deterministic signal derivation (`derive_signals`), and Muse Spark synthesis (`POST /api/v1/analyze-competitors`).
-- **Social & Marketplace Intelligence (`src/clients/ad_library.py`, `src/services/seller_audit.py`, `src/models/seller.py`):**
-  - `MetaAdLibraryClient` querying `https://graph.facebook.com/v21.0/ads_archive` + deterministic 30d+ evergreen ad longevity signals (`summarize_ad_library_records`).
-  - `audit_seller_footprint` + `compute_seller_diagnostics` for multi-channel footprint audits (website vs. FineArtAmerica / Pixels / Saatchi Art / Etsy / FB / IG) and `analyze_social_screenshots` via Muse Spark Vision.
-- **Flow 2 — Hybrid Ad Creative Studio (`src/services/ad_creative.py`, `src/clients/comfyui.py`, `src/models/creative.py`, `src/api/creative.py`, `workflows/*.json`, `.claude/skills/comfy*`):**
-  - Bundled `comfy` CLI v1.15.0 skills (`comfy`, `comfy-fragments`, `comfy-debug`, `comfy-relay`, `comfy-director`) installed in `.claude/skills/`.
-  - End-to-end `AdCreativeService` (`POST /api/v1/generate-ads` + `GET /api/v1/creative-models`) combining `Muse Spark 1.3`, `SAM 3.1` (`/v1/responses`), `Muse Image 1.0` (`/v1/images/generations` & `/v1/images/edits`), and `ComfyUIClient` across:
-    - **Image workflows:** `krea3_scene_edit.json` (`Krea 3`), `krea2_turbo_style_ref.json` (`Krea-2 Turbo Int8`), `ideogram4_collector_card.json` (`Ideogram v4 Int8`), `flux_krea_scene_relight.json` (`FLUX.1-Krea-dev`), `placement_outpaint.json`, `upscale_4x.json`.
-    - **Video + synchronized audio workflows:** `ltx2_5_dfr_i2v.json` (`LTX-2.5 DFR 22B Int8` Image-to-Video + 2x spatial upscaler + audio) and `minimax_h3_i2v.json` (`MiniMax H3 8-Step Turbo Int8` Image-to-Video + native stereo audio).
-- **Flow 3 — Bid Advisor (`src/services/bid_advisor.py`, `src/models/bids.py`, `src/api/bids.py`):**
-  - Deterministic Python math (`compute_metrics`, `load_campaign_csv`) + Muse Spark `BidRecommendation` (`POST /api/v1/bid-advice`).
-- **Real SMB Showcase & Live Outputs:**
-  - Real artist fixtures & live Meta API outputs in `data/samples/sarabjit_singh_profile.json`, `competitor_brief_sikhiart_live.json`, `bid_advice_live.json`, `ad_creative_ek_onkar_live.json`.
-  - `scripts/demo_flow.py` (`make demo`) and `scripts/demo_sarabjit_singh.py` (`--dry-run` or live).
+### Completed & verified (`make check` → 87/87 tests passing)
+- **Meta Model API Client (`src/clients/meta.py`):** `MetaClient` using `AsyncOpenAI` (`https://api.meta.ai/v1`) with `.strip()` on credentials/model IDs, structured JSON validation with 1-retry repair (`chat_structured`), multimodal Vision screenshot analysis (`chat_vision_structured`), `generate_image` (`muse-image-1.0` on `/v1/images/generations`), `edit_image` (`muse-image-1.0` on `/v1/images/edits`), `generate_image_workflow` (`muse-image-1.0` on `/v1/responses` with `reasoning={"effort": "high"}` supporting `product_visuals`, `restore_enhance`, and `multi_image_combine` + returning `reasoning_summary`), `transcribe_audio` (`muse-voice-transcribe-1.0` on `/v1/audio/transcriptions`), and `segment` (`sam-3.1` on `/v1/responses` parsing `<|box;...|>` into a binary PNG mask).
+- **Flow 1 — Competitor Intel & Storefront Ingestion (`src/services/competitor_intel.py`, `src/utils/sitemap.py`, `src/models/intel.py`, `src/api/intel.py`):**
+  - SSRF-guarded HTTP (`validate_safe_url`, `_fetch_bytes_guarded`), RFC 9309 wildcard `robots.txt` (`parse_robots_txt`), `defusedxml` `<urlset>` & `<sitemapindex>` recursion, gzip-bomb defense, marketplace profile fallback (`crawl_listing_page_fallback`), deterministic signal derivation (`derive_signals`), verified `ResearchBrief` (`F1..Fn` citations checked by `_CitationChecker`), and Muse Spark synthesis (`POST /api/v1/analyze-competitors`).
+  - Live seller reference ingestion (`POST /api/v1/ingest-storefront`), multi-channel seller audit (`POST /api/v1/audit-seller`), Vision screenshot audit (`POST /api/v1/audit-screenshot`), and pre-verified workspace presets (`GET /api/v1/demo-presets`).
+- **Flow 2 — Two-Phase Hybrid Ad Creative Studio (`src/services/ad_creative.py`, `src/clients/comfyui.py`, `src/models/creative.py`, `src/api/creative.py`, `workflows/*.json`, `.claude/skills/comfy*`):**
+  - Two-phase reviewable creative workflow (`POST /api/v1/generate-ads` with `draft=true` -> seller edits `EditableCreativeBrief` -> Phase 2 render), plus voice-note transcription (`POST /api/v1/transcribe-voice`).
+  - Native Meta Playground workflows (`product_visuals`, `restore_enhance`, `multi_image_combine`) mirroring open-weight ComfyUI workflows (`sam3_segment.json`, `krea3_scene_edit.json`, `krea2_turbo_style_ref.json`, `ideogram4_collector_card.json`, `flux_krea_scene_relight.json`, `placement_outpaint.json`, `upscale_4x.json`, `ltx2_5_dfr_i2v.json`, `minimax_h3_i2v.json`).
+- **Flow 3 — Cited Bid Advisor (`src/services/bid_advisor.py`, `src/models/bids.py`, `src/api/bids.py`):**
+  - Deterministic Python math (`compute_metrics`, `load_campaign_csv`) + Muse Spark `BidRecommendation` (`POST /api/v1/bid-advice`) tracing budget shifts and audience plays back to `ResearchBrief` findings `F1..Fn`.
+- **Lovable-Style Customer Portal (`src/api/static/index.html` served at `GET /` and `GET /portal`):**
+  - Live interactive workspace onboarding, Step 0 storefront/marketplace/socials reference crawler (`artofsarabjitsingh.com`, `FineArtAmerica`, `Saatchi Art`, `Instagram`, `Facebook`), Step 1 cited competitor intel, Step 2 two-phase creative brief editor + 4 live `Muse Image 1.0` collector stagings (`ek_onkar_collector_room_live.webp`, `diptych_ek_onkar_kirat_karo_live.webp`, `naam_japo_restored_gallery_live.webp`, `kirat_karo_collector_room_live.webp`) + 9:16 Reel preview player, Step 3 responsive campaign table & bid advisor, and Step 4 1-click Weebly/Shopify Stripe Checkout HTML + Meta Ads CSV export.
 
-### Next orchestration priorities (for Claude / collaborating agents)
-1. **Expose Seller Audit & Vision Screenshot Routes in FastAPI (`src/api/intel.py` & `src/api/bids.py`):**
-   - Add `POST /api/v1/audit-seller` (wires `audit_seller_footprint` from `src/services/seller_audit.py`) and `POST /api/v1/analyze-screenshots` (wires `analyze_social_screenshots`).
-   - Add `POST /api/v1/bid-advice/csv` (accepts CSV upload via `load_campaign_csv` + `advise_bids`).
-2. **Unify `scripts/demo_flow.py` (`make demo`):**
-   - Ensure `make demo` runs all 3 core flows (`CompetitorIntel` + `MetaAdLibraryClient` social signals -> `AdCreativeService` with `SAM 3.1` + `Muse Image` + `FLUX.1-Krea-dev` -> `BidAdvisor`) plus `audit_seller_footprint`, writing a unified report to `outputs/demo_run/`.
-3. **Interactive Single-Page Demo UI (`src/api/static/index.html`):**
-   - Mount a clean, zero-build HTML/CSS/JS dashboard at `GET /` pre-loaded with **Art of Sarabjit Singh** and Etsy/physical-goods presets so the 3-minute hackathon video shows a polished product UI alongside the API.
-4. **Actionable "Shop Fix & Listing Export Pack" Generator:**
-   - Turn `SellerFootprintAudit` + `CreativeSet` into copy-pasteable Weebly/Shopify/Etsy listing fixes (SEO slugs, JSON-LD `VisualArtwork`/`Product` schema, Stripe payment link snippets, and Meta Ads Manager CSV import).
+### Next orchestration priorities (for Hermes in the interim & Claude at 3:30 PM PT)
+1. **For Hermes (Zero Merge-Conflict Data & Demo Script Tasks in `data/samples/` & `docs/`):**
+   - Create full multi-vertical preset fixtures in `data/samples/etsy_saffron_and_clay_Preset.json` (Etsy Physical Goods & Handmade Ceramics) so switching workspaces in the Customer Portal loads full live-formatted competitor findings, 3 product cards, and 14-day campaign metrics for the Etsy vertical too.
+   - Draft `docs/DEMO_VIDEO_SCRIPT.md` with exact timestamps (`0:00–3:00`), voiceover lines, and click sequence for the hackathon submission video.
+2. **For Claude (at 3:30 PM PT Handoff):**
+   - Wire `POST /api/v1/bid-advice/csv` (direct Meta Ads Manager CSV file upload in Step 3 of the portal).
+   - Add JSON-LD `VisualArtwork` / `Product` schema generator to Step 4 (`1-Click Launch Pack`) alongside the Stripe Checkout embed snippet.
+   - Run final end-to-end verification and git commit/push of the portal and live sample assets.
+
 

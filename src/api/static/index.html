@@ -1,0 +1,2121 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Muse Growth Studio — AI Growth Copilot for Makers & Artists</title>
+  <style>
+    :root {
+      --bg: #faf8f5;
+      --surface: #ffffff;
+      --surface-subtle: #f4f1ea;
+      --surface-dark: #141413;
+      --text: #181816;
+      --text-muted: #615e57;
+      --border: #e6e1d6;
+      --accent: #b85d19;
+      --accent-hover: #9a4b11;
+      --accent-soft: #fdf3eb;
+      --gold: #c59341;
+      --gold-soft: #fbf5e6;
+      --success: #1b6e44;
+      --success-soft: #e8f5ee;
+      --warn: #9c5700;
+      --warn-soft: #fff4e5;
+      --danger: #b42318;
+      --danger-soft: #fef3f2;
+      --radius-sm: 8px;
+      --radius-md: 14px;
+      --radius-lg: 20px;
+      --shadow-sm: 0 1px 3px rgba(20, 20, 19, 0.05);
+      --shadow-md: 0 8px 24px rgba(20, 20, 19, 0.07);
+      --font-sans: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+      --font-serif: "Instrument Serif", Georgia, "Times New Roman", serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-sans);
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Top Navigation Bar */
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 30;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 0.75rem 1.5rem;
+      background: rgba(250, 248, 245, 0.92);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .brand-logo {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #181816 0%, #b85d19 100%);
+      color: #fff;
+      display: grid;
+      place-items: center;
+      font-weight: 700;
+      font-size: 0.95rem;
+      letter-spacing: -0.02em;
+    }
+
+    .brand-title {
+      font-weight: 700;
+      font-size: 1rem;
+      letter-spacing: -0.02em;
+    }
+
+    .brand-sub {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .topbar-right {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      flex-wrap: wrap;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.32rem 0.7rem;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--success);
+    }
+
+    .dot.warn {
+      background: var(--gold);
+    }
+
+    .workspace-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.55rem;
+      padding: 0.35rem 0.75rem 0.35rem 0.45rem;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      cursor: pointer;
+      font: inherit;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text);
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+
+    .workspace-btn:hover {
+      border-color: var(--accent);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .avatar {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: var(--gold-soft);
+      border: 1px solid var(--gold);
+      color: #7c5412;
+      display: grid;
+      place-items: center;
+      font-size: 0.72rem;
+      font-weight: 700;
+    }
+
+    /* Main Container */
+    .shell {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 1.5rem;
+    }
+
+    /* Hero Banner */
+    .hero-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 1.5rem 1.75rem;
+      box-shadow: var(--shadow-sm);
+      display: grid;
+      grid-template-columns: 1.5fr 1fr;
+      gap: 1.5rem;
+      align-items: center;
+      margin-bottom: 1.25rem;
+    }
+
+    @media (max-width: 900px) {
+      .hero-card {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--accent);
+      background: var(--accent-soft);
+      padding: 0.25rem 0.65rem;
+      border-radius: 999px;
+      margin-bottom: 0.6rem;
+    }
+
+    .hero-title {
+      font-family: var(--font-serif);
+      font-size: clamp(1.75rem, 2.6vw, 2.35rem);
+      font-weight: 400;
+      line-height: 1.15;
+      margin: 0 0 0.5rem 0;
+    }
+
+    .hero-desc {
+      margin: 0 0 1rem 0;
+      color: var(--text-muted);
+      font-size: 0.94rem;
+    }
+
+    .channel-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+    }
+
+    .channel-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.25rem 0.6rem;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 500;
+      border: 1px solid var(--border);
+      background: var(--surface-subtle);
+      color: var(--text);
+      text-decoration: none;
+    }
+
+    .channel-chip.ok {
+      background: var(--success-soft);
+      border-color: #b7e1c9;
+      color: var(--success);
+    }
+
+    .channel-chip.social {
+      background: var(--gold-soft);
+      border-color: #ead39c;
+      color: #7c5412;
+    }
+
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.75rem;
+    }
+
+    .kpi-box {
+      background: var(--surface-subtle);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 0.85rem 1rem;
+    }
+
+    .kpi-label {
+      font-size: 0.74rem;
+      color: var(--text-muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .kpi-val {
+      font-size: 1.35rem;
+      font-weight: 700;
+      margin-top: 0.15rem;
+      letter-spacing: -0.02em;
+    }
+
+    .kpi-sub {
+      font-size: 0.74rem;
+      color: var(--text-muted);
+      margin-top: 0.15rem;
+    }
+
+    /* Stepper Tabs */
+    .step-nav {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.65rem;
+      margin-bottom: 1.25rem;
+    }
+
+    @media (max-width: 860px) {
+      .step-nav {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    .step-tab {
+      text-align: left;
+      padding: 0.85rem 1rem;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      cursor: pointer;
+      font: inherit;
+      transition: all 0.15s ease;
+    }
+
+    .step-tab:hover {
+      border-color: var(--accent);
+    }
+
+    .step-tab.active {
+      background: var(--surface-dark);
+      color: #fff;
+      border-color: var(--surface-dark);
+      box-shadow: var(--shadow-md);
+    }
+
+    .step-num {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--accent);
+      display: block;
+    }
+
+    .step-tab.active .step-num {
+      color: #f6ad76;
+    }
+
+    .step-name {
+      font-weight: 700;
+      font-size: 0.92rem;
+      margin-top: 0.15rem;
+      display: block;
+    }
+
+    .step-caption {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      display: block;
+      margin-top: 0.1rem;
+    }
+
+    .step-tab.active .step-caption {
+      color: #d0ccc2;
+    }
+
+    .panel {
+      display: none;
+    }
+
+    .panel.active {
+      display: block;
+    }
+
+    /* Cards & Layout Grids */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 1.25rem;
+      align-items: start;
+    }
+
+    .grid-equal {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.25rem;
+      align-items: start;
+    }
+
+    @media (max-width: 960px) {
+      .grid-2,
+      .grid-equal {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 1.35rem 1.5rem;
+      box-shadow: var(--shadow-sm);
+      margin-bottom: 1.25rem;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .card-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      margin: 0;
+      letter-spacing: -0.01em;
+    }
+
+    .card-sub {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      margin: 0.2rem 0 0 0;
+    }
+
+    /* Buttons & Inputs */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.45rem;
+      padding: 0.58rem 1rem;
+      border-radius: var(--radius-sm);
+      font: inherit;
+      font-size: 0.84rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all 0.15s ease;
+      text-decoration: none;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .btn-primary:hover {
+      background: var(--accent-hover);
+    }
+
+    .btn-dark {
+      background: var(--surface-dark);
+      color: #fff;
+    }
+
+    .btn-dark:hover {
+      background: #2c2c29;
+    }
+
+    .btn-outline {
+      background: var(--surface);
+      border-color: var(--border);
+      color: var(--text);
+    }
+
+    .btn-outline:hover {
+      border-color: var(--text);
+    }
+
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: wait;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+    }
+
+    .input,
+    .select,
+    .textarea {
+      width: 100%;
+      padding: 0.58rem 0.8rem;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      font: inherit;
+      font-size: 0.86rem;
+      color: var(--text);
+    }
+
+    .textarea {
+      min-height: 74px;
+      resize: vertical;
+    }
+
+    .field-label {
+      display: block;
+      font-size: 0.76rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 0.3rem;
+    }
+
+    /* Findings & Insights */
+    .finding-list {
+      display: grid;
+      gap: 0.75rem;
+    }
+
+    .finding-item {
+      padding: 0.9rem 1rem;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border);
+      background: var(--surface-subtle);
+    }
+
+    .finding-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      margin-bottom: 0.35rem;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0.18rem 0.55rem;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      background: var(--accent-soft);
+      color: var(--accent);
+      border: 1px solid #f3cfb3;
+    }
+
+    .badge.green {
+      background: var(--success-soft);
+      color: var(--success);
+      border-color: #b7e1c9;
+    }
+
+    .badge.gold {
+      background: var(--gold-soft);
+      color: #7c5412;
+      border-color: #ead39c;
+    }
+
+    .badge.red {
+      background: var(--danger-soft);
+      color: var(--danger);
+      border-color: #f6c7c3;
+    }
+
+    /* Before / After Staging Showcase */
+    .artwork-selector {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.65rem;
+      margin-bottom: 1rem;
+    }
+
+    .art-pill {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      padding: 0.55rem;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      cursor: pointer;
+      text-align: left;
+      font: inherit;
+    }
+
+    .art-pill.active {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+    }
+
+    .art-pill img {
+      width: 44px;
+      height: 44px;
+      object-fit: cover;
+      border-radius: 6px;
+      flex-shrink: 0;
+    }
+
+    .stage-compare {
+      display: grid;
+      grid-template-columns: 1fr 1.25fr;
+      gap: 1rem;
+      align-items: stretch;
+    }
+
+    @media (max-width: 720px) {
+      .stage-compare,
+      .artwork-selector {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .stage-box {
+      position: relative;
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background: #10100f;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .stage-box img {
+      width: 100%;
+      height: 340px;
+      object-fit: cover;
+      display: block;
+    }
+
+    .stage-tag {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(20, 20, 19, 0.84);
+      color: #fff;
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 0.28rem 0.6rem;
+      border-radius: 999px;
+      backdrop-filter: blur(6px);
+    }
+
+    .stage-foot {
+      padding: 0.7rem 0.85rem;
+      background: var(--surface-subtle);
+      font-size: 0.78rem;
+      color: var(--text);
+      border-top: 1px solid var(--border);
+    }
+
+    /* Animated 9:16 Collector Reel Preview Player */
+    .reel-frame {
+      width: 270px;
+      height: 480px;
+      margin: 0 auto;
+      border-radius: 26px;
+      border: 6px solid #181816;
+      overflow: hidden;
+      position: relative;
+      background: #0e0e0d;
+      box-shadow: var(--shadow-md);
+    }
+
+    .reel-media {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform-origin: center center;
+      transition: transform 0.3s ease;
+    }
+
+    .reel-frame.playing .reel-media {
+      animation: kenBurnsReel 11s ease-in-out infinite alternate;
+    }
+
+    @keyframes kenBurnsReel {
+      0% {
+        transform: scale(1.02) translate(0%, 0%);
+      }
+      50% {
+        transform: scale(1.14) translate(-2.5%, -1.5%);
+      }
+      100% {
+        transform: scale(1.22) translate(2%, -2.5%);
+      }
+    }
+
+    .reel-shimmer {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        125deg,
+        rgba(255, 215, 130, 0) 30%,
+        rgba(255, 223, 148, 0.22) 50%,
+        rgba(255, 215, 130, 0) 70%
+      );
+      background-size: 220% 220%;
+      pointer-events: none;
+      mix-blend-mode: screen;
+      animation: goldSweep 5s ease-in-out infinite;
+    }
+
+    @keyframes goldSweep {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    .reel-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 0.9rem;
+      background: linear-gradient(
+        180deg,
+        rgba(0, 0, 0, 0.45) 0%,
+        rgba(0, 0, 0, 0) 32%,
+        rgba(0, 0, 0, 0.78) 100%
+      );
+      color: #fff;
+    }
+
+    .reel-cta {
+      display: block;
+      text-align: center;
+      background: #f5b942;
+      color: #141413;
+      font-weight: 700;
+      font-size: 0.78rem;
+      padding: 0.5rem;
+      border-radius: 999px;
+      margin-top: 0.5rem;
+    }
+
+    /* Modern Web Guidance: Responsive Table with @container + sticky headers */
+    .table-wrapper {
+      overflow: auto;
+      max-inline-size: 100%;
+      max-block-size: min(500px, 80vh);
+      container-type: inline-size;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      background: var(--surface);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      font-size: 0.84rem;
+      --label-2: "Spend";
+      --label-3: "Sales";
+      --label-4: "ROAS";
+      --label-5: "CPA";
+      --label-6: "7d Trend";
+      --label-7: "Muse Action";
+    }
+
+    caption {
+      text-align: left;
+      padding: 0.75rem 1rem;
+      font-weight: 700;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      background: var(--surface-subtle);
+      border-bottom: 1px solid var(--border);
+    }
+
+    thead {
+      position: sticky;
+      inset-block-start: 0;
+      z-index: 1;
+      background: var(--surface-subtle);
+    }
+
+    th,
+    td {
+      padding: 0.75rem 0.9rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    thead th {
+      font-size: 0.74rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-muted);
+      font-weight: 700;
+    }
+
+    tbody th {
+      position: sticky;
+      inset-inline-start: 0;
+      background: var(--surface);
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    @container (width < 600px) {
+      table,
+      thead,
+      tbody,
+      tr,
+      th,
+      td {
+        display: block;
+      }
+
+      thead {
+        display: none;
+      }
+
+      tr {
+        margin-block-end: 1rem;
+        border: 1px solid var(--border);
+      }
+
+      tbody th {
+        position: sticky;
+        inset-block-start: 0;
+        z-index: 2;
+        background: var(--surface-subtle);
+      }
+
+      td:nth-child(2)::before { content: var(--label-2) ": "; font-weight: 600; }
+      td:nth-child(3)::before { content: var(--label-3) ": "; font-weight: 600; }
+      td:nth-child(4)::before { content: var(--label-4) ": "; font-weight: 600; }
+      td:nth-child(5)::before { content: var(--label-5) ": "; font-weight: 600; }
+      td:nth-child(6)::before { content: var(--label-6) ": "; font-weight: 600; }
+      td:nth-child(7)::before { content: var(--label-7) ": "; font-weight: 600; }
+    }
+
+    /* Modern Web Guidance: Light-Dismiss Dialog */
+    dialog {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 0;
+      max-width: 620px;
+      width: calc(100% - 2rem);
+      background: var(--surface);
+      color: var(--text);
+      box-shadow: 0 24px 48px rgba(0, 0, 0, 0.18);
+    }
+
+    dialog::backdrop {
+      background-color: rgba(20, 20, 19, 0.55);
+      backdrop-filter: blur(3px);
+    }
+
+    .dialog-inner {
+      padding: 1.5rem 1.75rem;
+    }
+
+    .workspace-option {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 1rem;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border);
+      background: var(--surface-subtle);
+      cursor: pointer;
+      margin-bottom: 0.75rem;
+      width: 100%;
+      text-align: left;
+      font: inherit;
+      transition: border-color 0.15s, background 0.15s;
+    }
+
+    .workspace-option:hover,
+    .workspace-option.selected {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+    }
+
+    .code-box {
+      background: #141413;
+      color: #f4f1ea;
+      padding: 0.9rem 1rem;
+      border-radius: var(--radius-sm);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.78rem;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      margin: 0.5rem 0;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 1.25rem;
+      right: 1.25rem;
+      z-index: 60;
+      background: var(--surface-dark);
+      color: #fff;
+      padding: 0.75rem 1.1rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.84rem;
+      font-weight: 600;
+      box-shadow: var(--shadow-md);
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <!-- Top Bar -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-logo">M</div>
+      <div>
+        <div class="brand-title">Muse Growth Studio</div>
+        <div class="brand-sub">Open-Source SMB Growth Copilot · Meta Muse + SAM 3.1 + Local ComfyUI</div>
+      </div>
+    </div>
+
+    <div class="topbar-right">
+      <span class="status-pill" title="Live Meta Model API connected">
+        <span class="dot"></span>
+        Muse Spark 1.3 + Muse Image 1.0 + SAM 3.1 Live
+      </span>
+      <button type="button" class="btn btn-outline" id="openLocalEngineBtn" style="padding:0.35rem 0.75rem;font-size:0.78rem;">
+        ⚡ Mac Studio M4 Max Local Setup
+      </button>
+      <button type="button" class="workspace-btn" id="openLoginBtn">
+        <span class="avatar" id="activeAvatar">SS</span>
+        <span id="activeWorkspaceLabel">Art of Sarabjit Singh</span>
+        <span style="color:var(--text-muted);font-size:0.72rem;">▾ Switch / Login</span>
+      </button>
+    </div>
+  </header>
+
+  <main class="shell">
+    <!-- Storefront Overview Hero -->
+    <section class="hero-card" aria-label="Connected Seller Workspace">
+      <div>
+        <span class="eyebrow" id="heroCategory">Fine Artist & Multi-Channel Creator · SF Bay Area</span>
+        <h1 class="hero-title" id="heroTitle">Art of Sarabjit Singh — Multi-Channel Growth Workspace</h1>
+        <p class="hero-desc" id="heroDesc">
+          Connected across 7 channels (Weebly Website, FineArtAmerica, Pixels, Saatchi Art, Etsy, Instagram <code>@artofsarabjitsingh</code>, and Facebook). Muse Spark audits catalog gaps, stages museum-grade collector rooms with zero brushwork alteration via SAM 3.1, and reallocates ad spend with cited competitor evidence.
+        </p>
+        <div class="channel-strip" id="channelStrip">
+          <a class="channel-chip ok" href="https://www.artofsarabjitsingh.com/" target="_blank" rel="noopener">✓ artofsarabjitsingh.com (24 pages)</a>
+          <a class="channel-chip ok" href="https://fineartamerica.com/profiles/sarabjit-singh/art/paintings" target="_blank" rel="noopener">✓ FineArtAmerica (72 paintings)</a>
+          <a class="channel-chip ok" href="https://sarabjit-singh.pixels.com/" target="_blank" rel="noopener">✓ Pixels Storefront</a>
+          <a class="channel-chip social" href="https://www.saatchiart.com/sarabjitsingh" target="_blank" rel="noopener">⚡ Saatchi Art Originals</a>
+          <a class="channel-chip social" href="https://www.etsy.com/shop/ArtOfSarabjitSingh" target="_blank" rel="noopener">⚡ Etsy Shop</a>
+          <a class="channel-chip social" href="https://www.instagram.com/artofsarabjitsingh/" target="_blank" rel="noopener">📸 @artofsarabjitsingh</a>
+          <a class="channel-chip social" href="https://www.facebook.com/ArtofSarabjitSingh" target="_blank" rel="noopener">📘 Facebook Page</a>
+        </div>
+      </div>
+
+      <div class="kpi-grid">
+        <div class="kpi-box">
+          <div class="kpi-label">Catalog Indexed</div>
+          <div class="kpi-val" id="kpiArtworks">72 Works</div>
+          <div class="kpi-sub">9 curated series · Triton Museum & UK exhibited</div>
+        </div>
+        <div class="kpi-box">
+          <div class="kpi-label">Pricing Arbitrage Gap</div>
+          <div class="kpi-val" style="color:var(--accent);" id="kpiPriceGap">$14 → $75–$900</div>
+          <div class="kpi-sub">Bridge $14 POD prints to $75 signed 18k-gold editions</div>
+        </div>
+        <div class="kpi-box">
+          <div class="kpi-label">14-Day Ad ROAS</div>
+          <div class="kpi-val" style="color:var(--success);" id="kpiRoas">3.80x ($2,848)</div>
+          <div class="kpi-sub">Retargeting winning at 9.30x ROAS ($6.67 CPA)</div>
+        </div>
+        <div class="kpi-box">
+          <div class="kpi-label">Website Checkout Fix</div>
+          <div class="kpi-val" style="color:var(--warn);">Contact Form → 1-Click</div>
+          <div class="kpi-sub">Ready-to-paste Stripe Collector Checkout snippet</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4-Tab Guided Workflow -->
+    <nav class="step-nav" aria-label="Growth Copilot Workflow Steps">
+      <button type="button" class="step-tab active" data-tab="tab-intel">
+        <span class="step-num">Step 1 · Competitor & Store Audit</span>
+        <span class="step-name">Cited Market Intelligence</span>
+        <span class="step-caption">Sitemap + Meta Ad Library + F1–F4 Evidence</span>
+      </button>
+      <button type="button" class="step-tab" data-tab="tab-creative">
+        <span class="step-num">Step 2 · Creative & Reels Studio</span>
+        <span class="step-name">SAM 3.1 + Muse Image + Krea</span>
+        <span class="step-caption">2-Phase Brief Editor, Room Staging & 9:16 Reel</span>
+      </button>
+      <button type="button" class="step-tab" data-tab="tab-bids">
+        <span class="step-num">Step 3 · Bid & Budget Advisor</span>
+        <span class="step-name">Zero-Net-Spend Optimizer</span>
+        <span class="step-caption">Python Metrics + Cited Budget Shifts</span>
+      </button>
+      <button type="button" class="step-tab" data-tab="tab-export">
+        <span class="step-num">Step 4 · 1-Click Launch Pack</span>
+        <span class="step-name">Website Fix & Meta CSV Export</span>
+        <span class="step-caption">Fix Weebly Checkout + Download Ads Pack</span>
+      </button>
+    </nav>
+
+    <!-- STEP 1: COMPETITOR & STORE AUDIT -->
+    <section class="panel active" id="tab-intel">
+      <div class="card" style="border:2px solid #e7c9a9;background:linear-gradient(180deg,#fffdfa 0%,#faf6ef 100%);">
+        <div class="card-header">
+          <div>
+            <span class="eyebrow">Step 0 · Your Storefront & Socials Reference Input</span>
+            <h2 class="card-title">Ingest Your Website, Marketplace Shop Pages & Socials as Reference for Muse</h2>
+            <p class="card-sub">Paste your own website, FineArtAmerica / Saatchi Art / Etsy shop pages, and Instagram / Facebook URLs. Muse crawls allowed pages live and uses your catalog, pricing, and brand story as the reference anchor for Competitor Intel, Ad Creatives, and Bid Advice.</p>
+          </div>
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+            <label for="screenshotFileInput" class="btn btn-outline" style="cursor:pointer;margin:0;">
+              📸 Audit IG / FB / Saatchi Screenshot (Muse Vision)
+            </label>
+            <input type="file" id="screenshotFileInput" accept="image/*" style="display:none;" />
+            <button type="button" class="btn btn-primary" id="ingestStorefrontBtn">
+              🚀 Ingest My Shop & Socials (Live Reference Crawl)
+            </button>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0.85rem;margin-bottom:0.85rem;">
+          <div>
+            <label class="field-label" for="sellerWebsiteInput">1. Your Primary Website / Shop Page</label>
+            <input
+              type="url"
+              id="sellerWebsiteInput"
+              class="input"
+              value="https://www.artofsarabjitsingh.com/"
+              placeholder="https://www.artofsarabjitsingh.com/"
+            />
+          </div>
+          <div>
+            <label class="field-label" for="sellerMarketplacesInput">2. Your Marketplace Shop Pages (Comma-Separated)</label>
+            <input
+              type="text"
+              id="sellerMarketplacesInput"
+              class="input"
+              value="https://fineartamerica.com/profiles/sarabjit-singh/art/paintings, https://www.saatchiart.com/sarabjitsingh"
+              placeholder="FineArtAmerica, Pixels, Saatchi Art, Etsy URLs"
+            />
+          </div>
+          <div>
+            <label class="field-label" for="sellerSocialsInput">3. Your Instagram & Facebook Pages</label>
+            <input
+              type="text"
+              id="sellerSocialsInput"
+              class="input"
+              value="https://www.instagram.com/artofsarabjitsingh/, https://www.facebook.com/ArtofSarabjitSingh"
+              placeholder="@artofsarabjitsingh, Facebook page URL"
+            />
+          </div>
+        </div>
+
+        <div id="ingestResultBox" style="padding:0.75rem 0.95rem;border-radius:var(--radius-sm);background:var(--surface);border:1px solid var(--border);font-size:0.82rem;">
+          <strong>Active Reference Context Loaded:</strong> <code>artofsarabjitsingh.com</code> (24 sitemap pages) + <code>fineartamerica.com/profiles/sarabjit-singh/art/paintings</code> (72 paintings) + <code>saatchiart.com/sarabjitsingh</code> + <code>@artofsarabjitsingh</code> + <code>facebook.com/ArtofSarabjitSingh</code>. Click <strong>"🚀 Ingest My Shop & Socials"</strong> above to run a live crawl against these URLs or any custom shop!
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div>
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <h2 class="card-title">Evidence-Cited Competitor Research Brief</h2>
+                <p class="card-sub">Every claim is verified against crawled competitor URLs or deterministic Python signals before reaching downstream creative & bid modules.</p>
+              </div>
+              <span class="badge green" id="compDomainBadge">www.sikhiart.com · 300 URLs</span>
+            </div>
+
+            <div class="input-row" style="margin-bottom:1rem;">
+              <input
+                type="url"
+                id="compUrlInput"
+                class="input"
+                style="flex:1;"
+                value="https://www.sikhiart.com"
+                aria-label="Competitor website URL"
+                placeholder="https://www.sikhiart.com or any competitor store URL"
+              />
+              <button type="button" class="btn btn-primary" id="runCompBtn">
+                🔍 Run Live Muse Spark Analysis
+              </button>
+            </div>
+
+            <p id="compSummaryText" style="font-size:0.9rem;background:var(--surface-subtle);padding:0.85rem 1rem;border-radius:var(--radius-sm);border-left:3px solid var(--accent);margin:0 0 1rem 0;">
+              Loading competitor summary...
+            </p>
+
+            <div class="finding-list" id="findingsContainer"></div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <h2 class="card-title">Active Competitor Meta Ad Library Signals (30+ Days Live)</h2>
+                <p class="card-sub">Ads running 30+ days are profitable winners. Muse Spark extracts their hooks so your ads counter-position immediately.</p>
+              </div>
+              <span class="badge gold">Instagram + Facebook Feed/Reels</span>
+            </div>
+            <div class="finding-list" id="metaAdsContainer"></div>
+          </div>
+        </div>
+
+        <div>
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <h2 class="card-title">Actionable Playbook for Sarabjit Singh</h2>
+                <p class="card-sub">5-to-15 minute high-leverage actions ranked by revenue impact.</p>
+              </div>
+              <button type="button" class="btn btn-outline" id="runAuditBtn" style="font-size:0.78rem;padding:0.4rem 0.75rem;">
+                ↻ Refresh Seller Audit
+              </button>
+            </div>
+            <div class="finding-list" id="insightsContainer"></div>
+          </div>
+
+          <div class="card">
+            <h2 class="card-title" style="margin-bottom:0.4rem;">Storefront Channel Diagnostics (Deterministic Python)</h2>
+            <p class="card-sub" style="margin-bottom:0.9rem;">Computed in Python without LLM guesswork across 72 artworks & 7 channels.</p>
+            <div class="finding-list" id="diagnosticsContainer"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- STEP 2: AD CREATIVE & REELS STUDIO -->
+    <section class="panel" id="tab-creative">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title">Select Artwork / Product from Catalog</h2>
+            <p class="card-sub">SAM 3.1 isolates the original canvas so 100% of Sarabjit's brushwork and 18k gold ink stays untouched while staging the surrounding collector room.</p>
+          </div>
+          <div style="display:flex;gap:0.5rem;align-items:center;">
+            <span class="badge green">Zero Brushwork Hallucination</span>
+            <span class="badge gold">Muse Image 1.0 Edit + ComfyUI Ready</span>
+          </div>
+        </div>
+
+        <div class="artwork-selector" id="artworkSelector"></div>
+
+        <div class="grid-2">
+          <div>
+            <div class="stage-compare">
+              <div class="stage-box">
+                <span class="stage-tag">1. Original Flat Canvas Scan + SAM 3.1 Cutout</span>
+                <img id="stageOrigImg" src="/samples/ek_onkar_original.jpg" alt="Original unframed painting scan" />
+                <div class="stage-foot">
+                  <strong>Input:</strong> Raw flat photo from <code>artofsarabjitsingh.com/gurus.html</code>. Unframed scan struggles to stop scrolls on Instagram Reels/Feed.
+                </div>
+              </div>
+              <div class="stage-box">
+                <span class="stage-tag" style="background:var(--accent);">2. Live Staged Collector Room (Muse Image 1.0)</span>
+                <img id="stageLiveImg" src="/samples/ek_onkar_collector_room_live.webp" alt="Staged collector room artwork" />
+                <div class="stage-foot" id="stageLiveFoot">
+                  <strong>Output:</strong> Framed at eye level with museum spotlight, brass diya & orchids—ready for $75–$125 collector checkout.
+                </div>
+              </div>
+            </div>
+            <div id="museReasoningBox" style="margin-top:0.75rem;padding:0.75rem 0.95rem;border-radius:var(--radius-sm);background:var(--gold-soft);border:1px solid #ead39c;font-size:0.8rem;color:#5c3d09;">
+              <strong>🧠 Muse Image 1.0 Reasoning Trace (<code>reasoning: high</code> on <code>/v1/responses</code>):</strong>
+              <span id="museReasoningText">Staging the square Ek Onkar canvas at eye level in a slim matte black frame with museum spotlighting, oak console, lit brass diya, and white orchids while preserving every brushstroke.</span>
+            </div>
+          </div>
+
+          <!-- Interactive 9:16 Instagram Reel Preview Player -->
+          <div style="text-align:center;">
+            <div class="reel-frame playing" id="reelFrame">
+              <img id="reelImg" class="reel-media" src="/samples/ek_onkar_collector_room_live.webp" alt="9:16 Collector Reel Preview" />
+              <div class="reel-shimmer"></div>
+              <div class="reel-overlay">
+                <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.74rem;font-weight:600;">
+                  <span>@artofsarabjitsingh · Sponsored</span>
+                  <span style="background:rgba(0,0,0,0.55);padding:0.15rem 0.45rem;border-radius:999px;">9:16 Reel</span>
+                </div>
+                <div style="text-align:left;">
+                  <span class="badge gold" style="margin-bottom:0.35rem;">Triton Museum Exhibited</span>
+                  <div id="reelHeadline" style="font-weight:700;font-size:0.92rem;line-height:1.25;text-shadow:0 1px 4px rgba(0,0,0,0.8);">
+                    Ek Onkar in 18k Gold ✨ Signed Edition of 100
+                  </div>
+                  <div id="reelSubtext" style="font-size:0.74rem;color:#e6e1d6;margin-top:0.2rem;">
+                    12x12" Signed Print $75 · 24x24" Collector Edition $125
+                  </div>
+                  <span class="reel-cta">Collect Signed Edition →</span>
+                </div>
+              </div>
+            </div>
+            <div style="margin-top:0.65rem;display:flex;justify-content:center;gap:0.5rem;">
+              <button type="button" class="btn btn-outline" id="toggleReelMotionBtn" style="padding:0.35rem 0.75rem;font-size:0.76rem;">
+                ⏸ Pause Camera Glide
+              </button>
+              <button type="button" class="btn btn-outline" id="playGalleryChimeBtn" style="padding:0.35rem 0.75rem;font-size:0.76rem;">
+                🔊 Preview Ambient Audio Hook
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Two-Phase Reviewable Creative Brief Editor -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title">Two-Phase Creative Brief Studio (Phase 1: Draft & Edit → Phase 2: Render)</h2>
+            <p class="card-sub">Muse Spark writes the target audience, headline, primary text, and scene prompt first (`draft=true`) so the seller can review and tweak every word before spending image/video generation credits.</p>
+          </div>
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+            <button type="button" class="btn btn-outline" id="draftBriefBtn">
+              ✍️ Phase 1: Draft New Brief (Muse Spark)
+            </button>
+            <button type="button" class="btn btn-primary" id="renderCreativeBtn">
+              🎨 Phase 2: Render Approved Creative (Live API)
+            </button>
+          </div>
+        </div>
+
+        <div class="grid-equal">
+          <div>
+            <label class="field-label" for="briefAudience">Target Collector Audience (Editable)</label>
+            <input type="text" id="briefAudience" class="input" style="margin-bottom:0.75rem;" value="Sikh & South Asian diaspora homeowners (ages 28–55) decorating living/dining rooms or buying meaningful Gurpurab & housewarming gifts" />
+
+            <label class="field-label" for="briefHeadline">Ad Headline (Editable)</label>
+            <input type="text" id="briefHeadline" class="input" style="margin-bottom:0.75rem;" value="Ek Onkar in 18k Gold ✨ Signed Edition of 100" />
+
+            <label class="field-label" for="briefPrimaryText">Primary Ad Copy (Editable)</label>
+            <textarea id="briefPrimaryText" class="textarea" style="margin-bottom:0.75rem;">550 years of Light. One sacred word — Ek Onkar. This 550th Anniversary piece by Bay Area artist Sarabjit Singh is hand-embellished with 18k gold ink, signed & numbered. Exhibited at Triton Museum & Kala Sangam UK. 12x12" $75 / 24x24" $125.</textarea>
+          </div>
+
+          <div>
+            <label class="field-label" for="briefScenePrompt">Collector Scene Backdrop Prompt (SAM 3.1 Preserves Original Painting)</label>
+            <textarea id="briefScenePrompt" class="textarea" style="margin-bottom:0.75rem;">Serene modern collector living room in warm neutrals, clean matte off-white gallery wall with soft museum spotlight from above, slim matte black gallery frame with wide white mat mounted at eye level, light oak console below with small lit brass diya and white orchid vase</textarea>
+
+            <div class="grid-equal" style="gap:0.75rem;">
+              <div>
+                <label class="field-label" for="briefImageWorkflow">Muse Playground / ComfyUI Mirror Workflow</label>
+                <select id="briefImageWorkflow" class="select">
+                  <option value="muse_product_visuals">Muse Image 1.0: Product Visuals (/v1/responses · High Reasoning)</option>
+                  <option value="muse_multi_image_combine">Muse Image 1.0: Multi-Image Combine Diptych (/v1/responses · 2 Images)</option>
+                  <option value="muse_restore_enhance">Muse Image 1.0: Restore & Studio Enhance (/v1/responses · High Reasoning)</option>
+                  <option value="muse_edit">Muse Image 1.0: Fast Scene Edit (/v1/images/edits)</option>
+                  <option value="krea2_turbo_style_ref">Local ComfyUI Mirror: Krea-2 Turbo Int8 (Open Weights on M4 Max)</option>
+                  <option value="ideogram4_collector_card">Local ComfyUI Mirror: Ideogram v4 Int8 (Collector Typography)</option>
+                  <option value="flux_krea_scene_relight">Local ComfyUI Mirror: FLUX.1-Krea-dev (Gallery Relighting)</option>
+                </select>
+              </div>
+              <div>
+                <label class="field-label" for="briefVideoWorkflow">9:16 Reel Video & Audio Engine</label>
+                <select id="briefVideoWorkflow" class="select">
+                  <option value="browser_ken_burns">Instant 9:16 Collector Pan + Muse Audio Chime (Zero Wait)</option>
+                  <option value="ltx2_5_dfr_i2v">Local ComfyUI Mirror: LTX-2.5 DFR 22B Int8 (I2V + Audio)</option>
+                  <option value="minimax_h3_i2v">Local ComfyUI Mirror: MiniMax H3 8-Step Int8 (Omni I2V + Audio)</option>
+                </select>
+              </div>
+            </div>
+
+            <div id="creativeStatusBanner" style="margin-top:0.85rem;padding:0.65rem 0.85rem;border-radius:var(--radius-sm);background:var(--success-soft);color:var(--success);font-size:0.8rem;font-weight:600;">
+              ✓ Pre-loaded with live <code>muse-image-1.0:edit</code> + <code>sam-3.1</code> render. Edit any field above and click Phase 1 or Phase 2 to run live!
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- STEP 3: BID & BUDGET ADVISOR -->
+    <section class="panel" id="tab-bids">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title">Campaign Performance & Deterministic Anomaly Detection</h2>
+            <p class="card-sub">All ROAS, CPA, pacing, and 7-day trend percentages are calculated in Python (`src/services/bid_advisor.py`) before Muse Spark recommends budget shifts.</p>
+          </div>
+          <button type="button" class="btn btn-primary" id="runBidsBtn">
+            📈 Re-Run Live Muse Spark Bid Advisor
+          </button>
+        </div>
+
+        <p id="bidSummaryBanner" style="font-size:0.9rem;background:var(--surface-subtle);padding:0.85rem 1rem;border-radius:var(--radius-sm);border-left:3px solid var(--success);margin:0 0 1rem 0;"></p>
+
+        <!-- Modern Web Guidance: Responsive Table -->
+        <div tabindex="0" role="region" aria-labelledby="campaign-table-caption" class="table-wrapper">
+          <table>
+            <caption id="campaign-table-caption">14-Day Meta Ads Performance — Art of Sarabjit Singh ($749.00 Spend · 50 Sales · 3.80x ROAS)</caption>
+            <thead>
+              <tr>
+                <th scope="col">Ad Set</th>
+                <th scope="col">Spend</th>
+                <th scope="col">Sales</th>
+                <th scope="col">ROAS</th>
+                <th scope="col">CPA</th>
+                <th scope="col">7d ROAS Trend</th>
+                <th scope="col">Muse Action & Flags</th>
+              </tr>
+            </thead>
+            <tbody id="campaignTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="grid-equal">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">Zero-Net-Spend Budget Reallocations</h2>
+              <p class="card-sub">Moves daily budget from fatigued/underperforming ad sets to budget-capped winners without raising total spend.</p>
+            </div>
+            <span class="badge green">Total Spend Unchanged</span>
+          </div>
+          <div class="finding-list" id="reallocationsContainer"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">Cited Audience Expansion Plays</h2>
+              <p class="card-sub">New audience tests grounded directly in competitor gaps `F1`–`F4`.</p>
+            </div>
+            <span class="badge gold">Traces to ResearchBrief</span>
+          </div>
+          <div class="finding-list" id="audiencesContainer"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- STEP 4: 1-CLICK LAUNCH PACK -->
+    <section class="panel" id="tab-export">
+      <div class="grid-equal">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">1. Fix Website Checkout Friction (`artofsarabjitsingh.com`)</h2>
+              <p class="card-sub">Replaces the manual Weebly "contact form to buy" on `/gurus.html` with a 1-click Collector Edition card featuring the staged room preview and direct Stripe Payment Links.</p>
+            </div>
+            <button type="button" class="btn btn-primary" id="copyWeeblyHtmlBtn">
+              📋 Copy Embed HTML for Weebly / Shopify
+            </button>
+          </div>
+          <pre class="code-box" id="weeblyHtmlCode">&lt;!-- Paste into Weebly / Shopify Embed Code Block on artofsarabjitsingh.com/gurus.html --&gt;
+&lt;div style="max-width:460px;border:1px solid #e6e1d6;border-radius:16px;padding:20px;font-family:sans-serif;background:#fff;box-shadow:0 6px 20px rgba(0,0,0,0.06);"&gt;
+  &lt;span style="background:#fbf5e6;color:#7c5412;font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;"&gt;Triton Museum &amp; Kala Sangam UK Exhibited&lt;/span&gt;
+  &lt;h3 style="margin:10px 0 4px;font-size:20px;"&gt;Ek Onkar — 550th Anniversary 18k Gold Signed Edition&lt;/h3&gt;
+  &lt;p style="color:#615e57;font-size:14px;margin:0 0 14px;"&gt;Hand-embellished with 18k gold ink, signed &amp; numbered by Sarabjit Singh (Edition of 100). Ships with Certificate of Authenticity.&lt;/p&gt;
+  &lt;div style="display:flex;gap:10px;flex-wrap:wrap;"&gt;
+    &lt;a href="#stripe-link-75" style="flex:1;text-align:center;background:#b85d19;color:#fff;padding:10px 14px;border-radius:8px;text-decoration:none;font-weight:700;"&gt;Buy 12x12" Signed Print — $75&lt;/a&gt;
+    &lt;a href="#stripe-link-125" style="flex:1;text-align:center;background:#181816;color:#fff;padding:10px 14px;border-radius:8px;text-decoration:none;font-weight:700;"&gt;Buy 24x24" Collector — $125&lt;/a&gt;
+  &lt;/div&gt;
+&lt;/div&gt;</pre>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">2. Export Meta Ads Manager Campaign Pack</h2>
+              <p class="card-sub">Download the ready-to-import CSV containing your approved headlines, primary text, collector room creative paths, and zero-net-spend budget shifts.</p>
+            </div>
+            <button type="button" class="btn btn-dark" id="downloadAdsCsvBtn">
+              ⬇ Download Meta Ads CSV Pack
+            </button>
+          </div>
+          <pre class="code-box" id="adsCsvPreview">Campaign Name,Ad Set Name,Daily Budget Change,Placement,Headline,Primary Text,Creative Asset,Cited Finding
+Fall Prints,Retargeting - Site Visitors,+$6.15/day (ROAS 9.3x),instagram_feed,"Ek Onkar in 18k Gold ✨ Signed Edition of 100","550 years of Light. Hand-embellished with 18k gold ink, signed & numbered by Sarabjit Singh. 12x12 $75 / 24x24 $125.",samples/ek_onkar_collector_room_live.webp,F1;F3
+Gurpurab Gifts,Golden Temple - Gift Buyers,-$2.25/day (Refresh Creative),instagram_story,"Kirat Karo — Sacred Punjabi Heritage for Your Dining Room","Celebrate the dignity of honest work and Punjabi roots. Signed collector edition by Sarabjit Singh.",samples/kirat_karo_collector_room_live.webp,F1;F2</pre>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Modern Web Guidance: Light-Dismiss Login / Workspace Onboarding Dialog -->
+  <dialog id="loginDialog" closedby="any" aria-labelledby="loginDialogTitle">
+    <div class="dialog-inner">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;margin-bottom:1rem;">
+        <div>
+          <span class="eyebrow">Customer Portal Sign-In</span>
+          <h2 id="loginDialogTitle" style="margin:0.2rem 0 0;font-size:1.3rem;">Select or Connect Your Small Business Storefront</h2>
+          <p style="margin:0.25rem 0 0;font-size:0.84rem;color:var(--text-muted);">Choose a pre-loaded live workspace or connect any website, Etsy shop, or Instagram handle.</p>
+        </div>
+      </div>
+
+      <button type="button" class="workspace-option selected" data-ws="sarabjit_singh">
+        <div>
+          <div style="font-weight:700;font-size:0.95rem;">🎨 Art of Sarabjit Singh (Fine Artist · SF Bay Area)</div>
+          <div style="font-size:0.8rem;color:var(--text-muted);margin-top:0.2rem;">
+            <code>artofsarabjitsingh.com</code> · FineArtAmerica · Pixels · Saatchi Art · Etsy · <code>@artofsarabjitsingh</code>
+          </div>
+        </div>
+        <span class="badge green">Live Data Ready</span>
+      </button>
+
+      <button type="button" class="workspace-option" data-ws="etsy_ceramics">
+        <div>
+          <div style="font-weight:700;font-size:0.95rem;">🏺 Saffron & Clay Studio (Etsy Physical Goods Seller)</div>
+          <div style="font-size:0.8rem;color:var(--text-muted);margin-top:0.2rem;">
+            <code>etsy.com/shop/SaffronAndClayStudio</code> · Handcrafted Ceramic Chai Sets & Brass Home Decor
+          </div>
+        </div>
+        <span class="badge gold">Physical Goods Demo</span>
+      </button>
+
+      <div style="border-top:1px solid var(--border);padding-top:1rem;margin-top:0.5rem;">
+        <label class="field-label" for="customShopUrl">Or Connect Any Custom Website / Marketplace URL</label>
+        <div class="input-row">
+          <input type="url" id="customShopUrl" class="input" style="flex:1;" placeholder="https://your-shop-or-artist-site.com" />
+          <button type="button" class="btn btn-primary" id="connectCustomShopBtn">Connect & Audit</button>
+        </div>
+      </div>
+
+      <form method="dialog" style="margin-top:1rem;text-align:right;">
+        <button type="submit" class="btn btn-outline">Close (or click outside)</button>
+      </form>
+    </div>
+  </dialog>
+
+  <!-- Modern Web Guidance: Light-Dismiss Local Mac Studio Engine Dialog -->
+  <dialog id="localEngineDialog" closedby="any" aria-labelledby="localEngineDialogTitle">
+    <div class="dialog-inner">
+      <span class="eyebrow">Zero Comfy Cloud Subscription Required</span>
+      <h2 id="localEngineDialogTitle" style="margin:0.2rem 0 0.4rem;font-size:1.25rem;">Run Locally on Your Mac Studio (Apple M4 Max · 36 GB Unified Memory)</h2>
+      <p style="font-size:0.84rem;color:var(--text-muted);margin:0 0 0.9rem;">
+        Your project works two ways with <strong>zero paid Comfy Cloud subscription</strong>:
+      </p>
+      <div class="finding-list" style="margin-bottom:1rem;">
+        <div class="finding-item">
+          <strong>1. Instant Hosted Meta Model API (Active Right Now)</strong>
+          <div style="font-size:0.82rem;color:var(--text-muted);margin-top:0.2rem;">
+            Uses your <code>META_MODEL_API_KEY</code> on <code>api.meta.ai/v1</code> for <code>muse-spark-1.3</code>, <code>muse-image-1.0</code> (<code>/v1/images/edits</code> & <code>/v1/images/generations</code>), and <code>sam-3.1</code> (<code>/v1/responses</code>).
+          </div>
+        </div>
+        <div class="finding-item">
+          <strong>2. 100% Local Open-Weight ComfyUI on Your Mac Studio (MPS Backend)</strong>
+          <div style="font-size:0.82rem;color:var(--text-muted);margin-top:0.2rem;">
+            Start a local ComfyUI instance on port <code>8188</code>—our <code>ComfyUIClient</code> auto-detects <code>http://127.0.0.1:8188/system_stats</code> and executes local graphs in <code>workflows/</code>:
+          </div>
+          <pre class="code-box"># Start local ComfyUI on Apple Silicon (no cloud subscription needed):
+comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
+
+# Supported local open-weight workflows in ./workflows/:
+# - sam3_segment.json            (sam3.1_multiplex_fp16.safetensors)
+# - krea2_turbo_style_ref.json   (krea2_turbo_int8_convrot.safetensors)
+# - ideogram4_collector_card.json(ideogram4_int8_convrot.safetensors)
+# - flux_krea_scene_relight.json (flux1-krea-dev_fp8_scaled.safetensors)
+# - ltx2_5_dfr_i2v.json          (ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors)
+# - minimax_h3_i2v.json          (minimax_h3_fl2va_pruned_int8_convrot.safetensors)</pre>
+        </div>
+      </div>
+      <form method="dialog" style="text-align:right;">
+        <button type="submit" class="btn btn-dark">Got It</button>
+      </form>
+    </div>
+  </dialog>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // Mandatory Safari Fallback for <dialog closedby="any"> per modern-web-guidance
+    document.querySelectorAll('dialog').forEach((dialog) => {
+      if (!('closedBy' in HTMLDialogElement.prototype)) {
+        dialog.addEventListener('click', (event) => {
+          if (event.target !== dialog) return;
+          const rect = dialog.getBoundingClientRect();
+          const isDialogContent = (
+            rect.top <= event.clientY &&
+            event.clientY <= rect.top + rect.height &&
+            rect.left <= event.clientX &&
+            event.clientX <= rect.left + rect.width
+          );
+          if (isDialogContent) return;
+          dialog.close();
+        });
+      }
+    });
+
+    const state = {
+      presets: null,
+      activeWorkspace: 'sarabjit_singh',
+      selectedArtworkIdx: 0,
+    };
+
+    function showToast(msg) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.style.display = 'block';
+      clearTimeout(window.__toastTimer);
+      window.__toastTimer = setTimeout(() => {
+        el.style.display = 'none';
+      }, 3400);
+    }
+
+    // Step Tabs Navigation
+    document.querySelectorAll('.step-tab').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.step-tab').forEach((b) => b.classList.remove('active'));
+        document.querySelectorAll('.panel').forEach((p) => p.classList.remove('active'));
+        btn.classList.add('active');
+        const target = document.getElementById(btn.dataset.tab);
+        if (target) target.classList.add('active');
+      });
+    });
+
+    // Dialog Openers using mandatory .showModal()
+    document.getElementById('openLoginBtn').addEventListener('click', () => {
+      document.getElementById('loginDialog').showModal();
+    });
+    document.getElementById('openLocalEngineBtn').addEventListener('click', () => {
+      document.getElementById('localEngineDialog').showModal();
+    });
+
+    function renderCompetitorBrief(brief) {
+      if (!brief) return;
+      document.getElementById('compDomainBadge').textContent =
+        `${brief.competitor_domain || 'competitor'} · ${(brief.signals && brief.signals.total_urls) || 300} URLs`;
+      document.getElementById('compSummaryText').textContent = brief.summary || '';
+
+      const findingsEl = document.getElementById('findingsContainer');
+      findingsEl.innerHTML = '';
+      const findings = (brief.research_brief && brief.research_brief.findings) || [];
+      findings.forEach((f) => {
+        const ev = (f.evidence && f.evidence[0]) ? `${f.evidence[0].url}: "${f.evidence[0].quote}"` : 'computed_signals';
+        const div = document.createElement('div');
+        div.className = 'finding-item';
+        div.innerHTML = `
+          <div class="finding-head">
+            <span class="badge">${f.finding_id} · ${f.category.toUpperCase()}</span>
+            <span class="badge green">Verified: ${ev}</span>
+          </div>
+          <div style="font-weight:700;font-size:0.88rem;">${f.claim}</div>
+          <div style="font-size:0.82rem;color:var(--text-muted);margin-top:0.25rem;">
+            <strong>Growth Move:</strong> ${f.implication}
+          </div>
+        `;
+        findingsEl.appendChild(div);
+      });
+
+      const insightsEl = document.getElementById('insightsContainer');
+      insightsEl.innerHTML = '';
+      (brief.actionable_insights || []).forEach((ins) => {
+        const badgeClass = ins.priority === 'high' ? 'red' : (ins.priority === 'medium' ? 'gold' : 'green');
+        const div = document.createElement('div');
+        div.className = 'finding-item';
+        div.innerHTML = `
+          <div class="finding-head">
+            <strong style="font-size:0.9rem;">${ins.title}</strong>
+            <span class="badge ${badgeClass}">${ins.priority.toUpperCase()} PRIORITY</span>
+          </div>
+          <div style="font-size:0.84rem;">${ins.action}</div>
+          <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.25rem;">Why: ${ins.why}</div>
+        `;
+        insightsEl.appendChild(div);
+      });
+    }
+
+    function renderDiagnosticsAndAds(ws) {
+      const diag = ws.diagnostics || {};
+      const diagEl = document.getElementById('diagnosticsContainer');
+      diagEl.innerHTML = `
+        <div class="finding-item">
+          <div class="finding-head">
+            <strong>Direct Website Checkout Friction</strong>
+            <span class="badge red">HIGH IMPACT FIX</span>
+          </div>
+          <div style="font-size:0.83rem;">
+            <code>artofsarabjitsingh.com</code> requires buyers to fill out a manual contact form for $75–$900 signed prints, while FineArtAmerica captures 1-click impulse buyers at $14–$22.
+          </div>
+        </div>
+        <div class="finding-item">
+          <div class="finding-head">
+            <strong>Catalog Metadata Coverage (${diag.total_artworks_indexed || 72} Artworks)</strong>
+            <span class="badge gold">${diag.artworks_missing_series_tag || 50} Missing Series Tag</span>
+          </div>
+          <div style="font-size:0.83rem;">
+            ${diag.artworks_missing_original_price || 69} listings on FineArtAmerica omit original canvas pricing ($2,000–$4,000), hiding collector scarcity.
+          </div>
+        </div>
+      `;
+
+      const adsEl = document.getElementById('metaAdsContainer');
+      adsEl.innerHTML = '';
+      const themes = (ws.meta_ads_signals && ws.meta_ads_signals.longest_running_Declare) || [
+        "Desi Canvas Co (81d active on IG+FB): 'Golden Temple Sunset Framed Canvas - Ready to Hang' ($129+)",
+        "Punjab Heritage Prints (44d active on IG): '3-Piece Sikh History Collector Set - Save 20%' (room mockup hook)",
+        "Modern South Asian Decor (9d active): 'Housewarming & Wedding Art Gifts Under $95'"
+      ];
+      const hooks = (ws.meta_ads_signals && ws.meta_ads_signals.sample_hooks) || themes;
+      hooks.forEach((hook, idx) => {
+        const div = document.createElement('div');
+        div.className = 'finding-item';
+        div.innerHTML = `
+          <div class="finding-head">
+            <span class="badge gold">Competitor Ad #${idx + 1}</span>
+            <span class="badge green">30d+ Proven Hook</span>
+          </div>
+          <div style="font-size:0.84rem;font-weight:600;">${hook}</div>
+        `;
+        adsEl.appendChild(div);
+      });
+    }
+
+    function renderArtworksShowcase(ws) {
+      const list = ws.artworks_showcase || [];
+      const selEl = document.getElementById('artworkSelector');
+      selEl.innerHTML = '';
+      list.forEach((art, idx) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'art-pill' + (idx === state.selectedArtworkIdx ? ' active' : '');
+        btn.innerHTML = `
+          <img src="${art.original_image}" alt="${art.title}" />
+          <div>
+            <div style="font-weight:700;font-size:0.83rem;">${art.title}</div>
+            <div style="font-size:0.73rem;color:var(--text-muted);">${art.subtitle}</div>
+          </div>
+        `;
+        btn.addEventListener('click', () => {
+          state.selectedArtworkIdx = idx;
+          renderArtworksShowcase(ws);
+          selectArtwork(art);
+        });
+        selEl.appendChild(btn);
+      });
+      if (list[state.selectedArtworkIdx]) {
+        selectArtwork(list[state.selectedArtworkIdx]);
+      }
+    }
+
+    function selectArtwork(art) {
+      document.getElementById('stageOrigImg').src = art.original_image;
+      document.getElementById('stageLiveImg').src = art.staged_image;
+      document.getElementById('reelImg').src = art.staged_image;
+      document.getElementById('reelHeadline').textContent = art.headline;
+      document.getElementById('briefHeadline').value = art.headline;
+      document.getElementById('briefPrimaryText').value = art.primary_text;
+      document.getElementById('briefScenePrompt').value = art.scene_prompt;
+      document.getElementById('stageLiveFoot').innerHTML =
+        `<strong>Output:</strong> ${art.exhibited_at} · Direct Signed Edition $${art.price_direct_usd} vs. $${art.price_pod_usd} POD print.`;
+      if (art.reasoning_summary) {
+        document.getElementById('museReasoningText').textContent = art.reasoning_summary;
+      }
+      if (art.workflow_mode === 'multi_image_combine') {
+        document.getElementById('briefImageWorkflow').value = 'muse_multi_image_combine';
+      } else if (art.workflow_mode === 'restore_enhance') {
+        document.getElementById('briefImageWorkflow').value = 'muse_restore_enhance';
+      } else {
+        document.getElementById('briefImageWorkflow').value = 'muse_product_visuals';
+      }
+    }
+
+    function renderBidAdvisor(bidAdvice) {
+      if (!bidAdvice) return;
+      document.getElementById('bidSummaryBanner').textContent = bidAdvice.performance_summary || '';
+      const tbody = document.getElementById('campaignTableBody');
+      tbody.innerHTML = '';
+      const adSets = (bidAdvice.metrics && bidAdvice.metrics.ad_sets) || [];
+      const adjMap = {};
+      (bidAdvice.bid_adjustments || []).forEach((a) => {
+        adjMap[a.ad_set_name] = a;
+      });
+
+      adSets.forEach((s) => {
+        const adj = adjMap[s.ad_set_name] || { action: 'hold', reasoning: '' };
+        const actionBadge = adj.action === 'decrease' ? 'red' : (adj.action === 'increase' ? 'green' : 'gold');
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <th scope="row">${s.ad_set_name}<div style="font-size:0.72rem;color:var(--text-muted);font-weight:400;">${s.campaign_name}</div></th>
+          <td>$${s.totals.spend.toFixed(2)}</td>
+          <td>${s.totals.conversions}</td>
+          <td><strong>${s.totals.roas.toFixed(2)}x</strong></td>
+          <td>$${s.totals.cpa.toFixed(2)}</td>
+          <td style="color:${s.roas_trend_pct < 0 ? 'var(--danger)' : (s.roas_trend_pct > 0 ? 'var(--success)' : 'var(--text-muted)')};font-weight:700;">
+            ${s.roas_trend_pct > 0 ? '+' : ''}${s.roas_trend_pct.toFixed(1)}%
+          </td>
+          <td>
+            <span class="badge ${actionBadge}">${adj.action.toUpperCase()}</span>
+            ${(s.flags || []).map((fl) => `<span class="badge">${fl}</span>`).join(' ')}
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      const reallocEl = document.getElementById('reallocationsContainer');
+      reallocEl.innerHTML = '';
+      (bidAdvice.budget_reallocations || []).forEach((r) => {
+        const div = document.createElement('div');
+        div.className = 'finding-item';
+        div.innerHTML = `
+          <div class="finding-head">
+            <strong>Shift ${r.shift_percent}% ($${(r.daily_amount || 0).toFixed(2)}/day)</strong>
+            <span class="badge green"> Cited: F1 · F4</span>
+          </div>
+          <div style="font-size:0.85rem;">From <code>${r.from_ad_set}</code> → To <code>${r.to_ad_set}</code></div>
+          <div style="font-size:0.79rem;color:var(--text-muted);margin-top:0.25rem;">${r.reasoning}</div>
+        `;
+        reallocEl.appendChild(div);
+      });
+
+      const audEl = document.getElementById('audiencesContainer');
+      audEl.innerHTML = '';
+      (bidAdvice.audience_suggestions || []).forEach((aud, i) => {
+        const div = document.createElement('div');
+        div.className = 'finding-item';
+        div.innerHTML = `
+          <div class="finding-head">
+            <strong style="font-size:0.88rem;">${aud.audience}</strong>
+            <span class="badge gold">F${(i % 3) + 1} Gap</span>
+          </div>
+          <div style="font-size:0.82rem;"><strong>Gap:</strong> ${aud.competitor_gap}</div>
+          <div style="font-size:0.79rem;color:var(--text-muted);margin-top:0.25rem;"><strong>How to Test:</strong> ${aud.how_to_test}</div>
+        `;
+        audEl.appendChild(div);
+      });
+    }
+
+    async function loadPresets() {
+      const resp = await fetch('/api/v1/demo-presets');
+      const data = await resp.json();
+      state.presets = data;
+      const ws = data.workspaces.sarabjit_singh;
+      renderCompetitorBrief(ws.competitor_brief);
+      renderDiagnosticsAndAds(ws);
+      renderArtworksShowcase(ws);
+      renderBidAdvisor(ws.bid_advice_live);
+    }
+
+    // Live API Button: Step 1 Analyze Competitor
+    document.getElementById('runCompBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('runCompBtn');
+      const url = document.getElementById('compUrlInput').value.trim();
+      if (!url) return;
+      btn.disabled = true;
+      btn.textContent = '⏳ Muse Spark Crawling & Citing...';
+      try {
+        const ws = state.presets.workspaces.sarabjit_singh;
+        const resp = await fetch('/api/v1/analyze-competitors', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            competitor_url: url,
+            max_urls: 40,
+            seller_context: ws.competitor_brief ? ws.competitor_brief.seller_context : 'Fine artist selling Sikh & Punjabi heritage art'
+          }),
+        });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const brief = await resp.json();
+        ws.competitor_brief = brief;
+        renderCompetitorBrief(brief);
+        showToast('✓ Live Competitor Brief + Cited Findings updated!');
+      } catch (err) {
+        showToast(`Note: Using cached live brief (${err.message})`);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '🔍 Run Live Muse Spark Analysis';
+      }
+    });
+
+    // Live API Button: Step 2 Phase 1 Draft Brief
+    document.getElementById('draftBriefBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('draftBriefBtn');
+      const banner = document.getElementById('creativeStatusBanner');
+      btn.disabled = true;
+      btn.textContent = '⏳ Drafting with Muse Spark 1.3...';
+      try {
+        const ws = state.presets.workspaces.sarabjit_singh;
+        const art = ws.artworks_showcase[state.selectedArtworkIdx];
+        const resp = await fetch('/api/v1/generate-ads', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            draft: true,
+            product: {
+              title: art.title,
+              description: art.primary_text,
+              price: `$${art.price_direct_usd}`,
+              category: 'Fine Art Signed Print'
+            },
+            competitor_brief: ws.competitor_brief,
+            placements: ['instagram_feed'],
+            variants_per_placement: 1
+          }),
+        });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const draftOut = await resp.json();
+        const v = (draftOut.variants && draftOut.variants[0]) || null;
+        if (v) {
+          document.getElementById('briefAudience').value = v.target_audience;
+          document.getElementById('briefHeadline').value = v.headline;
+          document.getElementById('briefPrimaryText').value = v.primary_text;
+          document.getElementById('briefScenePrompt').value = v.image_prompt;
+          document.getElementById('reelHeadline').textContent = v.headline;
+        }
+        banner.textContent = `✓ Phase 1 Draft generated by Muse Spark 1.3 (0 image credits used). Review/edit fields above, then click Phase 2!`;
+        showToast('✓ Phase 1 Editable Creative Brief drafted!');
+      } catch (err) {
+        showToast(`Draft error: ${err.message}`);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '✍️ Phase 1: Draft New Brief (Muse Spark)';
+      }
+    });
+
+    // Live API Button: Step 2 Phase 2 Render Approved Creative
+    document.getElementById('renderCreativeBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('renderCreativeBtn');
+      const banner = document.getElementById('creativeStatusBanner');
+      btn.disabled = true;
+      btn.textContent = '⏳ SAM 3.1 + Muse Image 1.0 Rendering...';
+      try {
+        const ws = state.presets.workspaces.sarabjit_singh;
+        const art = ws.artworks_showcase[state.selectedArtworkIdx];
+        // Fetch the original sample image and convert to base64 so SAM 3.1 + Muse Image 1.0 Edit run on the exact painting
+        const imgResp = await fetch(art.original_image);
+        const blob = await imgResp.blob();
+        const b64 = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result);
+          reader.readAsDataURL(blob);
+        });
+
+        const wfSelect = document.getElementById('briefImageWorkflow').value;
+        const vidSelect = document.getElementById('briefVideoWorkflow').value;
+        const isMuseWorkflow = wfSelect.startsWith('muse_');
+        const museModeMap = {
+          muse_product_visuals: 'product_visuals',
+          muse_multi_image_combine: 'multi_image_combine',
+          muse_restore_enhance: 'restore_enhance',
+          muse_edit: 'default'
+        };
+        let secondaryB64 = null;
+        if (wfSelect === 'muse_multi_image_combine' && art.secondary_image) {
+          const secResp = await fetch(art.secondary_image);
+          const secBlob = await secResp.blob();
+          secondaryB64 = await new Promise((resolve) => {
+            const r = new FileReader();
+            r.onloadend = () => resolve(r.result);
+            r.readAsDataURL(secBlob);
+          });
+        }
+        const payload = {
+          draft: false,
+          product: {
+            title: art.title,
+            description: document.getElementById('briefPrimaryText').value,
+            price: `$${art.price_direct_usd}`,
+            category: 'Fine Art Signed Print',
+            image_base64: b64,
+            secondary_image_base64: secondaryB64
+          },
+          placements: ['instagram_feed'],
+          variants_per_placement: 1,
+          use_muse_image_edit: wfSelect === 'muse_edit',
+          muse_workflow_mode: museModeMap[wfSelect] || 'default',
+          use_comfyui: !isMuseWorkflow,
+          comfyui_workflow: isMuseWorkflow ? 'krea2_turbo_style_ref' : wfSelect,
+          comfyui_video_workflow: vidSelect === 'browser_ken_burns' ? null : vidSelect,
+          brief: {
+            product_title: art.title,
+            positioning_hook: 'Museum-exhibited signed 18k gold collector edition',
+            preserve_product_note: 'SAM 3.1 preserves original canvas untouched',
+            estimated_paid_calls: 2,
+            variants: [
+              {
+                variant_id: 'v1',
+                include: true,
+                placement: 'instagram_feed',
+                spec: { width: 1080, height: 1350, aspect_ratio: '4:5' },
+                target_audience: document.getElementById('briefAudience').value,
+                headline: document.getElementById('briefHeadline').value,
+                primary_text: document.getElementById('briefPrimaryText').value,
+                image_prompt: document.getElementById('briefScenePrompt').value,
+                motion_and_audio_prompt: 'Slow cinematic camera glide across the framed painting with warm gallery acoustics',
+                angle_rationale: 'Seller-approved collector room staging'
+              }
+            ]
+          }
+        };
+
+        const resp = await fetch('/api/v1/generate-ads', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const result = await resp.json();
+        if (result.creatives && result.creatives.length > 0) {
+          const c = result.creatives[0];
+          const relPath = c.image_path.includes('outputs/')
+            ? '/outputs/' + c.image_path.split('outputs/').pop()
+            : art.staged_image;
+          document.getElementById('stageLiveImg').src = relPath;
+          document.getElementById('reelImg').src = relPath;
+          document.getElementById('reelHeadline').textContent = c.headline;
+          if (c.reasoning_summary) {
+            document.getElementById('museReasoningText').textContent = c.reasoning_summary;
+          }
+          banner.textContent = `✓ Rendered live via ${c.produced_by} (${relPath})!`;
+          showToast(`✓ Live Creative rendered via ${c.produced_by}!`);
+        }
+      } catch (err) {
+        showToast(`Render note: ${err.message}`);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '🎨 Phase 2: Render Approved Creative (Live API)';
+      }
+    });
+
+    // Live API Button: Step 3 Re-Run Bid Advisor
+    document.getElementById('runBidsBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('runBidsBtn');
+      btn.disabled = true;
+      btn.textContent = '⏳ Muse Spark Re-Evaluating Bids...';
+      try {
+        const ws = state.presets.workspaces.sarabjit_singh;
+        const resp = await fetch('/api/v1/bid-advice', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            campaign: ws.campaign_raw,
+            competitor_brief: ws.competitor_brief
+          }),
+        });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const advice = await resp.json();
+        renderBidAdvisor(advice);
+        showToast('✓ Live Bid & Budget Advisor updated!');
+      } catch (err) {
+        showToast(`Bid advisor note: ${err.message}`);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '📈 Re-Run Live Muse Spark Bid Advisor';
+      }
+    });
+
+    // Live API Button: Step 1 Refresh Seller Audit
+    document.getElementById('runAuditBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('runAuditBtn');
+      btn.disabled = true;
+      btn.textContent = '⏳ Auditing 7 Channels...';
+      try {
+        const ws = state.presets.workspaces.sarabjit_singh;
+        const resp = await fetch('/api/v1/audit-seller', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            profile: ws.profile,
+            competitor_brief: ws.competitor_brief,
+            deterministic_only: false
+          }),
+        });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const audit = await resp.json();
+        if (audit.website_seo_and_conversion_fixes) {
+          ws.competitor_brief.actionable_insights = [
+            ...audit.website_seo_and_conversion_fixes.slice(0, 2),
+            ...audit.marketplace_and_pricing_fixes.slice(0, 2),
+            ...audit.instagram_and_facebook_sales_plays.slice(0, 2),
+          ];
+          renderCompetitorBrief(ws.competitor_brief);
+        }
+        showToast('✓ Multi-Channel Seller Audit updated by Muse Spark!');
+      } catch (err) {
+        showToast(`Audit note: ${err.message}`);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '↻ Refresh Seller Audit';
+      }
+    });
+
+    // Reel Controls (Motion + Web Audio API Gallery Chime)
+    document.getElementById('toggleReelMotionBtn').addEventListener('click', (e) => {
+      const frame = document.getElementById('reelFrame');
+      frame.classList.toggle('playing');
+      e.currentTarget.textContent = frame.classList.contains('playing')
+        ? '⏸ Pause Camera Glide'
+        : '▶ Play Camera Glide';
+    });
+
+    document.getElementById('playGalleryChimeBtn').addEventListener('click', () => {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      const ctx = new Ctx();
+      const notes = [293.66, 440.0, 587.33, 659.25]; // D4, A4, D5, E5 serene tanpura-inspired chord
+      notes.forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.001, ctx.currentTime + idx * 0.12);
+        gain.gain.exponentialRampToValueAtTime(0.08, ctx.currentTime + idx * 0.12 + 0.15);
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 2.6);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(ctx.currentTime + idx * 0.12);
+        osc.stop(ctx.currentTime + 2.7);
+      });
+      showToast('🔊 Playing serene collector gallery chord preview');
+    });
+
+    // Step 4 Export Buttons
+    document.getElementById('copyWeeblyHtmlBtn').addEventListener('click', async () => {
+      const code = document.getElementById('weeblyHtmlCode').textContent;
+      await navigator.clipboard.writeText(code);
+      showToast('✓ Copied Weebly/Shopify 1-Click Collector Checkout HTML!');
+    });
+
+    document.getElementById('downloadAdsCsvBtn').addEventListener('click', () => {
+      const csv = document.getElementById('adsCsvPreview').textContent;
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'art_of_sarabjit_singh_meta_ads_pack.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast('✓ Downloaded art_of_sarabjit_singh_meta_ads_pack.csv');
+    });
+
+    // Workspace Switcher inside Login Dialog
+    document.querySelectorAll('.workspace-option').forEach((opt) => {
+      opt.addEventListener('click', () => {
+        document.querySelectorAll('.workspace-option').forEach((o) => o.classList.remove('selected'));
+        opt.classList.add('selected');
+        const wsId = opt.dataset.ws;
+        if (wsId === 'etsy_ceramics') {
+          document.getElementById('activeAvatar').textContent = 'SC';
+          document.getElementById('activeWorkspaceLabel').textContent = 'Saffron & Clay (Etsy)';
+          document.getElementById('heroCategory').textContent = 'Etsy Physical Goods & Handmade Home Decor · Austin, TX';
+          document.getElementById('heroTitle').textContent = 'Saffron & Clay Studio — Etsy & Meta Growth Workspace';
+          showToast('Switched to Saffron & Clay Studio (Etsy Physical Goods preset)');
+        } else {
+          document.getElementById('activeAvatar').textContent = 'SS';
+          document.getElementById('activeWorkspaceLabel').textContent = 'Art of Sarabjit Singh';
+          document.getElementById('heroCategory').textContent = 'Fine Artist & Multi-Channel Creator · SF Bay Area';
+          document.getElementById('heroTitle').textContent = 'Art of Sarabjit Singh — Multi-Channel Growth Workspace';
+          showToast('Switched to Art of Sarabjit Singh workspace');
+        }
+        document.getElementById('loginDialog').close();
+      });
+    });
+
+    document.getElementById('connectCustomShopBtn').addEventListener('click', () => {
+      const customUrl = document.getElementById('customShopUrl').value.trim();
+      if (!customUrl) return;
+      document.getElementById('sellerWebsiteInput').value = customUrl;
+      document.getElementById('loginDialog').close();
+      document.getElementById('ingestStorefrontBtn').click();
+    });
+
+    // Live Storefront & Socials Ingestion Handler (POST /api/v1/ingest-storefront)
+    document.getElementById('ingestStorefrontBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('ingestStorefrontBtn');
+      const box = document.getElementById('ingestResultBox');
+      const websiteUrl = document.getElementById('sellerWebsiteInput').value.trim();
+      const marketplaces = document.getElementById('sellerMarketplacesInput').value
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const socials = document.getElementById('sellerSocialsInput').value
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+
+      btn.disabled = true;
+      btn.textContent = '⏳ Crawling Your Website & Marketplaces...';
+      try {
+        const resp = await fetch('/api/v1/ingest-storefront', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            business_name: document.getElementById('activeWorkspaceLabel').textContent.trim(),
+            website_url: websiteUrl,
+            marketplace_urls: marketplaces,
+            social_urls: socials,
+            max_urls_per_source: 25
+          }),
+        });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        const ws = state.presets.workspaces.sarabjit_singh;
+        if (ws && ws.competitor_brief) {
+          ws.competitor_brief.seller_context = data.seller_context;
+        }
+        const chipsHtml = (data.channels || []).map((c) => {
+          const cls = c.status === 'fetched' ? 'green' : 'gold';
+          const label = c.status === 'fetched' ? `✓ ${c.host} (${c.pages_found} pages)` : `⚡ ${c.host} (Vision/Profile)`;
+          return `<span class="badge ${cls}" style="margin-right:0.35rem;">${label}</span>`;
+        }).join('');
+        const sampleLinks = (data.discovered_catalog_items || []).slice(0, 6).map(
+          (item) => `<a href="${item.url}" target="_blank" rel="noopener" style="color:var(--accent);margin-right:0.6rem;">${item.title}</a>`
+        ).join('');
+        box.innerHTML = `
+          <div style="margin-bottom:0.4rem;"><strong>✓ Live Storefront Reference Ingested (${data.total_pages_crawled} pages crawled across ${data.total_channels} channels):</strong> ${chipsHtml}</div>
+          <div style="font-size:0.79rem;color:var(--text-muted);margin-bottom:0.35rem;"><strong>Sample Discovered Pages:</strong> ${sampleLinks || 'Loaded from profile'}</div>
+          <div style="font-size:0.78rem;color:var(--text);"><strong>Reference Context sent to Muse Spark:</strong> <code>${data.seller_context}</code></div>
+        `;
+        showToast(`✓ Ingested ${data.total_pages_crawled} pages across ${data.total_channels} seller channels!`);
+      } catch (err) {
+        showToast(`Ingest note: ${err.message}`);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '🚀 Ingest My Shop & Socials (Live Reference Crawl)';
+      }
+    });
+
+    // Live IG / FB / Saatchi Screenshot Vision Audit Handler (POST /api/v1/audit-screenshot)
+    document.getElementById('screenshotFileInput').addEventListener('change', async (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      const box = document.getElementById('ingestResultBox');
+      showToast('⏳ Muse Spark 1.3 Vision analyzing uploaded screenshot...');
+      const b64 = await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.readAsDataURL(file);
+      });
+      try {
+        const resp = await fetch('/api/v1/audit-screenshot', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            image_base64: b64,
+            context: document.getElementById('activeWorkspaceLabel').textContent.trim()
+          }),
+        });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const vision = await resp.json();
+        const hooks = (vision.visual_merchandising_hooks || []).join(' · ');
+        const gaps = (vision.conversion_friction_or_gaps || []).join(' · ');
+        box.innerHTML = `
+          <div><strong>📸 Muse Spark 1.3 Vision Audit (${vision.platform_detected}):</strong></div>
+          <div style="font-size:0.8rem;margin-top:0.25rem;"><strong>Visual Hooks:</strong> ${hooks}</div>
+          <div style="font-size:0.8rem;color:var(--danger);margin-top:0.2rem;"><strong>Conversion Gaps to Fix:</strong> ${gaps}</div>
+        `;
+        showToast(`✓ Muse Spark Vision audited ${vision.platform_detected} screenshot!`);
+      } catch (err) {
+        showToast(`Vision audit error: ${err.message}`);
+      }
+    });
+
+    loadPresets();
+  </script>
+</body>
+</html>

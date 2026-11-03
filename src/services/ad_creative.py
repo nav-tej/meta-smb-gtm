@@ -160,11 +160,26 @@ async def segment_product(
     *,
     prompt: str = "artwork canvas painting product foreground",
     meta_client: MetaClient | None = None,
+    comfy_client: ComfyUIClient | None = None,
+    prefer_local_comfy: bool = False,
     output_dir: Path | None = None,
 ) -> tuple[bytes, str]:
-    """Segment the seller's product/painting via SAM 3.1 and save the cutout mask."""
-    client = meta_client or get_meta_client()
+    """Segment the seller's product/painting via SAM 3.1 (local ComfyUI or Meta API)."""
     out_dir = output_dir or Path(get_settings().output_dir)
+    if prefer_local_comfy and comfy_client is not None:
+        try:
+            art_name = await comfy_client.upload_image(image_bytes, filename="artwork_input.png")
+            masks = await comfy_client.run_workflow(
+                "sam3_segment",
+                {"1": {"image": art_name}, "3": {"text": prompt}},
+            )
+            if masks:
+                mask_path = _save_artifact(masks[0], prefix="sam3-mask-local", output_dir=out_dir)
+                return masks[0], mask_path
+        except ComfyUIError as err:
+            logger.warning("Local ComfyUI sam3_segment failed, falling back to Meta API: %s", err)
+
+    client = meta_client or get_meta_client()
     mask_bytes = await client.segment(image_bytes, prompt=prompt)
     mask_path = _save_artifact(mask_bytes, prefix="sam3-mask", output_dir=out_dir)
     return mask_bytes, mask_path
@@ -393,6 +408,17 @@ class AdCreativeService:
             http_client=self._http,
             resolver=self._resolver,
         )
+        secondary_bytes: bytes | None = None
+        if request.product.secondary_image_url or request.product.secondary_image_base64:
+            secondary_bytes = await load_product_image(
+                ProductInfo(
+                    title="secondary",
+                    image_url=request.product.secondary_image_url,
+                    image_base64=request.product.secondary_image_base64,
+                ),
+                http_client=self._http,
+                resolver=self._resolver,
+            )
 
         mask_bytes: bytes | None = None
         mask_path: str | None = None
@@ -425,10 +451,20 @@ class AdCreativeService:
         for angle in brief.variants:
             if not angle.include:
                 continue
-            if request.use_muse_image_edit and artwork_bytes is not None:
+            reasoning_summary = ""
+            if request.muse_workflow_mode != "default":
+                ref_imgs = [b for b in (artwork_bytes, secondary_bytes) if b is not None]
+                muse_bytes, reasoning_summary = await meta.generate_image_workflow(
+                    prompt=angle.image_prompt,
+                    reference_images=ref_imgs,
+                    reasoning_effort="high",
+                )
+                muse_producer = f"{meta.image_model}:{request.muse_workflow_mode}"
+            elif request.use_muse_image_edit and artwork_bytes is not None:
+                ref_imgs = [b for b in (artwork_bytes, secondary_bytes) if b is not None]
                 muse_bytes = await meta.edit_image(
                     prompt=angle.image_prompt,
-                    reference_images=[artwork_bytes],
+                    reference_images=ref_imgs,
                 )
                 muse_producer = f"{meta.image_model}:edit"
             else:
@@ -455,6 +491,7 @@ class AdCreativeService:
                     headline=angle.headline,
                     primary_text=angle.primary_text,
                     produced_by=muse_producer,
+                    reasoning_summary=reasoning_summary,
                 )
             )
 

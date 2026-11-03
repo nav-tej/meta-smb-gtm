@@ -9,6 +9,12 @@ from pydantic import BaseModel, Field, model_validator
 from src.models.intel import CompetitorBrief
 
 Placement = Literal["facebook_feed", "instagram_feed", "instagram_story", "reels_cover"]
+MuseWorkflowMode = Literal[
+    "default",
+    "product_visuals",
+    "restore_enhance",
+    "multi_image_combine",
+]
 
 
 class ProductInfo(BaseModel):
@@ -18,6 +24,14 @@ class ProductInfo(BaseModel):
     image_base64: str | None = Field(
         default=None,
         description="Optional base64-encoded product/artwork photo bytes when uploading directly.",
+    )
+    secondary_image_url: str | None = Field(
+        default=None,
+        description="Optional second product/style image URL for multi_image_combine workflows.",
+    )
+    secondary_image_base64: str | None = Field(
+        default=None,
+        description="Optional second base64 image for multi_image_combine diptych workflows.",
     )
     price: str | None = None
     brand_notes: str = Field(default="", max_length=1000)
@@ -115,6 +129,13 @@ class GenerateAdsRequest(BaseModel):
             "(muse-image-1.0) to restage the seller's artwork/product photo directly."
         ),
     )
+    muse_workflow_mode: MuseWorkflowMode = Field(
+        default="default",
+        description=(
+            "Native Meta Model API Playground workflow mode on /v1/responses "
+            "(product_visuals, restore_enhance, multi_image_combine) mirroring ComfyUI hub graphs."
+        ),
+    )
 
     @model_validator(mode="after")
     def _check_phase(self) -> GenerateAdsRequest:
@@ -170,6 +191,10 @@ class Creative(BaseModel):
     primary_text: str
     produced_by: str = Field(description="Model or workflow that produced the creative.")
     media_type: Literal["image", "video"] = "image"
+    reasoning_summary: str = Field(
+        default="",
+        description="Reasoning summary returned by muse-image-1.0 (/v1/responses) when used.",
+    )
 
 
 class CreativeSet(BaseModel):

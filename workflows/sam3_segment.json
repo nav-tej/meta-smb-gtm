@@ -1,0 +1,32 @@
+{
+  "_meta": {
+    "title": "SAM 3.1 artwork segmentation (open weights, core ComfyUI)",
+    "description": "Text-prompted mask of the seller's artwork/product. Wiring copied from ComfyUI's bundled blueprint 'Image Segmentation (SAM3)'. Fill node 1 image and node 3 text. Weights: https://huggingface.co/Comfy-Org/sam3.1/resolve/main/checkpoints/sam3.1_multiplex_fp16.safetensors -> models/checkpoints/.",
+    "template_source": "ComfyUI blueprints/Image Segmentation (SAM3).json"
+  },
+  "1": {"class_type": "LoadImage", "inputs": {"image": "artwork_input.png"}},
+  "2": {
+    "class_type": "CheckpointLoaderSimple",
+    "inputs": {"ckpt_name": "sam3.1_multiplex_fp16.safetensors"}
+  },
+  "3": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {"text": "painting", "clip": ["2", 1]}
+  },
+  "4": {
+    "class_type": "SAM3_Detect",
+    "inputs": {
+      "model": ["2", 0],
+      "image": ["1", 0],
+      "conditioning": ["3", 0],
+      "threshold": 0.5,
+      "refine_iterations": 2,
+      "individual_masks": false
+    }
+  },
+  "5": {"class_type": "MaskToImage", "inputs": {"mask": ["4", 0]}},
+  "6": {
+    "class_type": "SaveImage",
+    "inputs": {"images": ["5", 0], "filename_prefix": "meta_smb_sam3_mask"}
+  }
+}

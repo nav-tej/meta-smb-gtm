@@ -27,6 +27,12 @@ _SAFE_NAME_RE = re.compile(r"^[a-zA-Z0-9_-]+$")
 DEFAULT_TIMEOUT = httpx.Timeout(90.0, connect=5.0)
 
 SUPPORTED_COMFY_WORKFLOWS: dict[str, dict[str, str]] = {
+    "sam3_segment": {
+        "model": "SAM 3.1 Multiplex FP16 (sam3.1_multiplex_fp16.safetensors)",
+        "media_type": "image",
+        "template_source": "ComfyUI blueprints/Image Segmentation (SAM3).json",
+        "description": "Local open-weight SAM 3.1 text-prompted artwork/product segmentation",
+    },
     "krea3_scene_edit": {
         "model": "Krea 3",
         "media_type": "image",

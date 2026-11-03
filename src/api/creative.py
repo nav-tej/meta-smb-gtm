@@ -1,15 +1,25 @@
 """Ad Creative Studio routes (Flow 2)."""
 
+import base64
+import binascii
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends
-from pydantic import Field
+from pydantic import BaseModel, Field
 
 from src.clients.comfyui import SUPPORTED_COMFY_WORKFLOWS, discover_comfy_cli
+from src.clients.meta import MetaAPIError, get_meta_client
 from src.models.creative import CreativeSet, EditableCreativeBrief, GenerateAdsRequest
 from src.services.ad_creative import AdCreativeService
 
 router = APIRouter(tags=["creative"])
+
+
+class VoiceNoteRequest(BaseModel):
+    audio_base64: str = Field(
+        min_length=4, description="Base64-encoded WAV/MP3/WebM audio bytes from seller voice note."
+    )
+    filename: str = Field(default="voice_note.wav", max_length=120)
 
 
 def get_ad_creative_service() -> AdCreativeService:
@@ -21,14 +31,44 @@ async def list_creative_models() -> dict[str, Any]:
     """Return available Meta + ComfyUI workflows (Krea 3, LTX-2.5 DFR, MiniMax H3) and CLI info."""
     return {
         "meta_models": {
-            "brief_and_vision": "muse-spark-1.3",
+            "brief_and_vision": "muse-spark-1.3 (/v1/chat/completions)",
+            "deep_reasoning": "muse-wonder-1.0 (/v1/responses)",
             "segmentation": "sam-3.1 (/v1/responses)",
             "image_generation": "muse-image-1.0 (/v1/images/generations)",
             "image_edit": "muse-image-1.0 (/v1/images/edits)",
+            "image_workflows": {
+                "product_visuals": (
+                    "muse-image-1.0 (/v1/responses, reasoning=high) — "
+                    "Product campaign visuals (mirrors ComfyUI Ideogram 4 / FLUX)"
+                ),
+                "restore_enhance": (
+                    "muse-image-1.0 (/v1/responses, reasoning=high) — "
+                    "Studio detail & resolution restoration (mirrors 4x-UltraSharp / Relight)"
+                ),
+                "multi_image_combine": (
+                    "muse-image-1.0 (/v1/responses, reasoning=high) — "
+                    "Multi-image diptych/bundle/style-ref combine (mirrors Krea-2 Style Ref)"
+                ),
+            },
+            "audio_transcription": "muse-voice-transcribe-1.0 (/v1/audio/transcriptions)",
         },
         "comfyui_workflows": SUPPORTED_COMFY_WORKFLOWS,
         "comfy_cli": discover_comfy_cli(),
     }
+
+
+@router.post("/transcribe-voice")
+async def transcribe_voice(request: VoiceNoteRequest) -> dict[str, str]:
+    """Transcribe a seller's spoken voice note into text via `muse-voice-transcribe-1.0`."""
+    raw = request.audio_base64.strip()
+    if "," in raw and raw.startswith("data:"):
+        raw = raw.split(",", 1)[1]
+    try:
+        audio_bytes = base64.b64decode(raw, validate=True)
+    except binascii.Error as err:
+        raise MetaAPIError(f"Invalid base64 audio payload: {err}") from err
+    transcript = await get_meta_client().transcribe_audio(audio_bytes, filename=request.filename)
+    return {"transcript": transcript, "model": "muse-voice-transcribe-1.0"}
 
 
 GenerateAdsResponse = Annotated[CreativeSet | EditableCreativeBrief, Field(discriminator="kind")]

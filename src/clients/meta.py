@@ -426,6 +426,109 @@ class MetaClient:
 
         return await self._extract_image_bytes(response.json())
 
+    async def generate_image_workflow(
+        self,
+        prompt: str,
+        *,
+        reference_images: Sequence[bytes] = (),
+        reasoning_effort: str = "high",
+    ) -> tuple[bytes, str]:
+        """Run a reasoning-guided Muse Image 1.0 workflow on `POST /v1/responses`.
+
+        Supports all 3 Meta Model API Playground image workflows (and mirrors ComfyUI hub graphs
+        with zero Comfy Cloud subscription):
+        - Product visuals (`0` or `1` reference image + scene staging prompt)
+        - Restore image (`1` reference image + studio detail & lighting restoration prompt)
+        - Multi-Image combine (`2+` reference images combined into a diptych or styled room)
+
+        Returns `(image_bytes, reasoning_summary)`.
+        """
+        api_key = self._require_api_key()
+        content_blocks: list[dict[str, str]] = [{"type": "input_text", "text": prompt}]
+        for img in reference_images:
+            content_blocks.append({"type": "input_image", "image_url": _to_data_uri(img)})
+
+        payload: dict[str, Any] = {
+            "model": self._image_model,
+            "reasoning": {"effort": reasoning_effort},
+            "input": [{"role": "user", "content": content_blocks}],
+        }
+        started = time.monotonic()
+        try:
+            response = await self._http_client.post(
+                f"{self._base_url}/responses",
+                headers={"Authorization": f"Bearer {api_key}"},
+                json=payload,
+            )
+        except httpx.HTTPError as err:
+            raise MetaAPIError(
+                f"Muse Image workflow transport error: {type(err).__name__}"
+            ) from err
+        logger.info(
+            "Meta API call: image-workflow %s (refs=%d, effort=%s) -> HTTP %s in %.1fs",
+            self._image_model,
+            len(reference_images),
+            reasoning_effort,
+            response.status_code,
+            time.monotonic() - started,
+        )
+
+        if response.status_code != 200:
+            raise MetaAPIError(f"Muse Image workflow error (status={response.status_code}).")
+
+        body = response.json()
+        output_items = body.get("output") if isinstance(body, dict) else None
+        if not isinstance(output_items, list):
+            raise MetaAPIError("Muse Image workflow response missing 'output' array.")
+
+        reasoning_parts: list[str] = []
+        image_b64: str | None = None
+        for item in output_items:
+            if not isinstance(item, dict):
+                continue
+            if item.get("type") == "reasoning":
+                for summary_block in item.get("summary") or []:
+                    if isinstance(summary_block, dict) and isinstance(
+                        summary_block.get("text"), str
+                    ):
+                        reasoning_parts.append(summary_block["text"].strip())
+            elif item.get("type") == "image_generation_call" and isinstance(
+                item.get("result"), str
+            ):
+                image_b64 = item["result"]
+
+        if not image_b64:
+            raise MetaAPIError("Muse Image workflow response did not include an image result.")
+        return base64.b64decode(image_b64), "\n".join(reasoning_parts)
+
+    async def transcribe_audio(
+        self,
+        audio_bytes: bytes,
+        *,
+        filename: str = "voice_note.wav",
+        model: str = "muse-voice-transcribe-1.0",
+    ) -> str:
+        """Transcribe seller voice notes via `muse-voice-transcribe-1.0`."""
+        api_key = self._require_api_key()
+        try:
+            response = await self._http_client.post(
+                f"{self._base_url}/audio/transcriptions",
+                headers={"Authorization": f"Bearer {api_key}"},
+                files={"file": (filename, audio_bytes, "audio/wav")},
+                data={"model": model},
+            )
+        except httpx.HTTPError as err:
+            raise MetaAPIError(
+                f"Muse Voice Transcribe transport error: {type(err).__name__}"
+            ) from err
+        if response.status_code != 200:
+            raise MetaAPIError(f"Muse Voice Transcribe error (status={response.status_code}).")
+        body = response.json()
+        text = body.get("text") if isinstance(body, dict) else None
+        if not isinstance(text, str):
+            raise MetaAPIError("Muse Voice Transcribe response missing 'text'.")
+        return text.strip()
+
     async def _extract_image_bytes(self, body: Any) -> bytes:
         items = body.get("data") if isinstance(body, dict) else None
         if not isinstance(items, list) or not items:

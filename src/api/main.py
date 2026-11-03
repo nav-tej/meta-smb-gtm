@@ -1,9 +1,11 @@
 """FastAPI app entry point. All feature routers are mounted under /api/v1."""
 
 import logging
+from pathlib import Path
 
 from fastapi import APIRouter, FastAPI, Request, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from src.api import bids, creative, intel
 from src.clients.comfyui import ComfyUIError
@@ -18,6 +20,12 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 API_PREFIX = "/api/v1"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+STATIC_DIR = Path(__file__).resolve().parent / "static"
+SAMPLES_DIR = REPO_ROOT / "data" / "samples"
+OUTPUTS_DIR = REPO_ROOT / "outputs"
+OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
+STATIC_DIR.mkdir(parents=True, exist_ok=True)
 
 app = FastAPI(
     title="Meta SMB GTM",
@@ -31,6 +39,13 @@ health_router = APIRouter(tags=["health"])
 @health_router.get("/health")
 async def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/", include_in_schema=False)
+@app.get("/portal", include_in_schema=False)
+async def customer_portal() -> FileResponse:
+    """Serve the Lovable-style SMB Customer Growth Portal."""
+    return FileResponse(STATIC_DIR / "index.html")
 
 
 @app.exception_handler(MetaAPIError)
@@ -64,3 +79,10 @@ app.include_router(health_router, prefix=API_PREFIX)
 app.include_router(intel.router, prefix=API_PREFIX)
 app.include_router(creative.router, prefix=API_PREFIX)
 app.include_router(bids.router, prefix=API_PREFIX)
+
+if SAMPLES_DIR.is_dir():
+    app.mount("/samples", StaticFiles(directory=str(SAMPLES_DIR)), name="samples")
+if OUTPUTS_DIR.is_dir():
+    app.mount("/outputs", StaticFiles(directory=str(OUTPUTS_DIR)), name="outputs")
+if STATIC_DIR.is_dir():
+    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")

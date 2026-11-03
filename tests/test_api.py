@@ -177,3 +177,63 @@ def test_analyze_competitors_accepts_url_list(
 
 def test_analyze_competitors_requires_url_or_list(client: TestClient) -> None:
     assert client.post("/api/v1/analyze-competitors", json={}).status_code == 422
+
+
+def test_customer_portal_serves_lovable_ui(client: TestClient) -> None:
+    resp = client.get("/")
+    assert resp.status_code == 200
+    assert "Muse Growth Studio" in resp.text
+    assert 'closedby="any"' in resp.text
+
+    portal_resp = client.get("/portal")
+    assert portal_resp.status_code == 200
+
+
+def test_demo_presets_returns_sarabjit_singh_workspace(client: TestClient) -> None:
+    resp = client.get("/api/v1/demo-presets")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["active_workspace"] == "sarabjit_singh"
+    ws = body["workspaces"]["sarabjit_singh"]
+    assert ws["name"] == "Art of Sarabjit Singh"
+    assert len(ws["artworks_showcase"]) == 4
+    modes = [item["workflow_mode"] for item in ws["artworks_showcase"]]
+    assert "multi_image_combine" in modes
+    assert "restore_enhance" in modes
+    findings = ws["competitor_brief"]["research_brief"]["findings"]
+    assert [f["finding_id"] for f in findings] == ["F1", "F2", "F3", "F4"]
+
+
+def test_audit_seller_deterministic_only(client: TestClient) -> None:
+    presets = client.get("/api/v1/demo-presets").json()
+    profile = presets["workspaces"]["sarabjit_singh"]["profile"]
+    resp = client.post(
+        "/api/v1/audit-seller",
+        json={"profile": profile, "deterministic_only": True},
+    )
+    assert resp.status_code == 200
+    diag = resp.json()
+    assert diag["total_platforms"] == 7
+    assert diag["total_artworks_indexed"] == 72
+    assert diag["has_direct_checkout_gap"] is True
+
+
+def test_ingest_storefront_handles_social_and_marketplace_channels(client: TestClient) -> None:
+    resp = client.post(
+        "/api/v1/ingest-storefront",
+        json={
+            "business_name": "Art of Sarabjit Singh",
+            "website_url": "",
+            "marketplace_urls": ["https://www.saatchiart.com/sarabjitsingh"],
+            "social_urls": [
+                "https://www.instagram.com/artofsarabjitsingh/",
+                "https://www.facebook.com/ArtofSarabjitSingh",
+            ],
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["business_name"] == "Art of Sarabjit Singh"
+    assert body["total_channels"] == 3
+    assert all(c["status"] == "vision_or_manual" for c in body["channels"])
+    assert "Art of Sarabjit Singh" in body["seller_context"]
