@@ -11,7 +11,12 @@ from pydantic import ValidationError
 
 from src.models.intel import CompetitorIntelRequest
 from src.services.competitor_intel import SitemapError, collect_entries
-from src.utils.sitemap import HostRateLimiter, extract_page_metadata, parse_robots_txt
+from src.utils.sitemap import (
+    HostRateLimiter,
+    extract_ld_json_price,
+    extract_page_metadata,
+    parse_robots_txt,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures"
 FAA = "https://fineartamerica.com"
@@ -211,3 +216,61 @@ async def test_profile_slug_matches_artwork_urls_ignoring_hyphens() -> None:
         )
 
     assert [e.loc for e in entries] == [f"{FAA}/featured/lotus-jane-doe-smith.html"]
+
+
+def test_child_sitemaps_ranked_by_path_not_host() -> None:
+    from src.services.competitor_intel import _prioritize_child_sitemaps
+
+    base = "https://www.sikhiart.com"
+    children = [
+        f"{base}/attachment-sitemap.xml",
+        f"{base}/page-sitemap.xml",
+        f"{base}/post-sitemap.xml",
+        f"{base}/post_tag-sitemap.xml",
+        f"{base}/product-sitemap.xml",
+    ]
+    assert _prioritize_child_sitemaps(children) == [
+        f"{base}/product-sitemap.xml",
+        f"{base}/post-sitemap.xml",
+        f"{base}/page-sitemap.xml",
+        f"{base}/attachment-sitemap.xml",
+        f"{base}/post_tag-sitemap.xml",
+    ]
+
+
+def _ld(payload: str) -> str:
+    return f'<script type="application/ld+json">{payload}</script>'
+
+
+def test_ld_json_price_range_from_woocommerce_aggregate_offer() -> None:
+    html = "<title>Hari Singh Nalwa</title>" + _ld(
+        '{"@graph":[{"@type":"BreadcrumbList"},{"@type":"Product","name":"Print",'
+        '"offers":{"@type":"AggregateOffer","lowPrice":"59.99","highPrice":"2499.99",'
+        '"priceCurrency":"USD"}}]}'
+    )
+    assert extract_ld_json_price(html) == "$59.99 - $2499.99"
+    assert extract_page_metadata(html).price_hint == "$59.99 - $2499.99"
+
+
+def test_ld_json_single_price_other_currency_and_bad_json() -> None:
+    html = _ld("{not json") + _ld(
+        '{"@type":["Product"],"offers":[{"@type":"Offer","price":"120","priceCurrency":"cad"}]}'
+    )
+    assert extract_ld_json_price(html) == "CAD 120"
+    assert extract_ld_json_price(_ld('{"@type":"Product","offers":{"price":"0.00"}}')) is None
+
+
+def test_meta_price_tag_wins_over_ld_json() -> None:
+    html = '<meta property="og:price:amount" content="17.08">' + _ld(
+        '{"@type":"Product","offers":{"lowPrice":5.25,"highPrice":113}}'
+    )
+    assert extract_page_metadata(html).price_hint == "$17.08"
+
+
+def test_meta_price_without_currency_uses_ld_json_currency() -> None:
+    html = (
+        '<meta property="product:price:amount" content="1,332,741.00">'
+        '<meta property="product:price:amount" content="INR">'
+        + _ld('{"@type":"Product","offers":{"price":"1332741.00","priceCurrency":"INR"}}')
+    )
+    assert extract_page_metadata(html).price_hint == "INR 1,332,741.00"

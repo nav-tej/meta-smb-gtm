@@ -1,0 +1,83 @@
+{
+  "source_url": "https://www.saatchiart.com/gurdishpannu",
+  "captured": "2026-11-03",
+  "notes": "Gurdish Pannu (Jalandhar, Punjab): Punjabi folk and Sikh heritage paintings, including Darbar Sahib. Saatchi Art returns HTTP 403 to our crawler (robots.txt included), so no Saatchi page was fetched: those entries are public artwork URLs from a web search, titled from their URL slugs, with no prices. The gallerist.in listing was fetched normally (robots.txt allows it).",
+  "crawl": {
+    "mode": "url list",
+    "saatchi_urls_from_search": 11,
+    "saatchi_artworks_after_dedupe": 10,
+    "fetched_hosts": [
+      "gallerist.in"
+    ],
+    "blocked_hosts": {
+      "www.saatchiart.com": "HTTP 403 (bot protection)"
+    }
+  },
+  "summary": {
+    "entries": 11,
+    "buckets": {
+      "products": 11
+    },
+    "with_description": 1,
+    "with_price": 1
+  },
+  "entries": [
+    {
+      "loc": "https://www.saatchiart.com/art/Painting-Darbar-Sahib-Punjabi-Painting/459918/10810485/view",
+      "title": "Darbar Sahib Punjabi Painting (Painting)",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://www.saatchiart.com/art/Painting-Mirza-Sahiba-Punjabi-Culture-Painting/459918/4135474/view",
+      "title": "Mirza Sahiba Punjabi Culture Painting (Painting)",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://www.saatchiart.com/art/Painting-Punjabi-Folk-Art-The-Music-Of-Harmony-Ucha-Dar-Babbe-Nanak-Da/459918/4132931/view",
+      "title": "Punjabi Folk Art The Music Of Harmony Ucha Dar Babbe Nanak Da (Painting)",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://www.saatchiart.com/art/Painting-Punjabi-Painting-Shaguna-Di-Raat/459918/9178591/view",
+      "title": "Punjabi Painting Shaguna Di Raat (Painting)",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://www.saatchiart.com/art/Painting-Heritage-of-Punjab-Village-Life/459918/13096607/view",
+      "title": "Heritage of Punjab Village Life (Painting)",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://www.saatchiart.com/art/Painting-The-Beauty-Of-Punjab-Punjabi-Folk-Art-Painting/459918/4133430/view",
+      "title": "The Beauty Of Punjab Punjabi Folk Art Painting (Painting)",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://www.saatchiart.com/art/Painting-The-Love-story-of-Heer-Ranjha-Punjabi-Folk-Art/459918/4135470/view",
+      "title": "The Love story of Heer Ranjha Punjabi Folk Art (Painting)",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://www.saatchiart.com/art/Painting-Keema-Malki-Punjabi-Painting/459918/9077711/view",
+      "title": "Keema Malki Punjabi Painting (Painting)",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://www.saatchiart.com/art/Painting-Mother-Child-Love-Maa-Putt-da-Piyaar-Punjabi-cultural-Art/459918/4133392/view",
+      "title": "Mother Child Love Maa Putt da Piyaar Punjabi cultural Art (Painting)",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://www.saatchiart.com/art/Digital-Punjabi-Dhol-Painting/459918/9264259/view",
+      "title": "Punjabi Dhol Painting (Digital)",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://gallerist.in/products/the-golden-temple-amritsar",
+      "title": "Buy The Golden Temple Amritsar Painting at Lowest Price By Artist Gurdish Pannu",
+      "description": "The Golden Temple Amritsar Painting/Artwork For Sale By Artist Gurdish Pannu at Lowest Price in India . Shop Now! Free Shipping",
+      "price_hint": "INR 1,332,741.00",
+      "bucket": "products"
+    }
+  ]
+}

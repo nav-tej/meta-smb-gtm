@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import re
 import sys
 import textwrap
 from collections.abc import Sequence
@@ -104,9 +105,9 @@ def show_competitor(signals: CompetitorSignals, entries: list[SitemapEntry], sou
     para(f"Source: {source}")
     products = [e for e in entries if e.bucket in {"products", "listings"}]
     prices = sorted(
-        float(e.price_hint.lstrip("$").replace(",", ""))
+        float(amount.replace(",", ""))
         for e in products
-        if e.price_hint and e.price_hint.startswith("$")
+        for amount in re.findall(r"\$([\d,]+(?:\.\d+)?)", e.price_hint or "")
     )
     print()
     table(

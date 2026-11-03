@@ -1,0 +1,628 @@
+{
+  "source_url": "https://fineartamerica.com/profiles/manjot-singh-sachdeva/art/photographs",
+  "captured": "2026-11-03",
+  "notes": "Manjot Singh Sachdeva: Golden Temple photography on Fine Art America. manjot-singh-sachdeva.pixels.com (including its robots.txt) redirects to the Fine Art America profile, so the profile was crawled under fineartamerica.com's robots.txt.",
+  "crawl": {
+    "mode": "page links / url list",
+    "sitemaps": [],
+    "max_urls": 300,
+    "title_fetches": 40,
+    "seconds_between_requests": 1.0
+  },
+  "summary": {
+    "entries": 105,
+    "buckets": {
+      "collections": 33,
+      "products": 72
+    },
+    "with_description": 40,
+    "with_price": 40
+  },
+  "entries": [
+    {
+      "loc": "https://fineartamerica.com/profiles/manjot-singh-sachdeva",
+      "title": "Manjot Singh Sachdeva",
+      "bucket": "collections"
+    },
+    {
+      "loc": "https://fineartamerica.com/profiles/manjot-singh-sachdeva/shop",
+      "title": "Shop",
+      "bucket": "collections"
+    },
+    {
+      "loc": "https://fineartamerica.com/profiles/manjot-singh-sachdeva/shop/throw+pillows",
+      "title": "Throw Pillows",
+      "bucket": "collections"
+    },
+    {
+      "loc": "https://fineartamerica.com/profiles/manjot-singh-sachdeva/shop/fleece+blankets",
+      "title": "Fleece Blankets",
+      "bucket": "collections"
+    },
+    {
+      "loc": "https://fineartamerica.com/profiles/manjot-singh-sachdeva/shop/duvet+covers",
+      "title": "Duvet Covers",
+      "bucket": "collections"
+    },
+    {
+      "loc": "https://fineartamerica.com/profiles/manjot-singh-sachdeva/shop/shower+curtains",
+      "title": "Shower Curtains",
+      "bucket": "collections"
+    },
+    {
+      "loc": "https://fineartamerica.com/profiles/manjot-singh-sachdeva/shop/bath+towels",
+      "title": "Bath Towels",
+      "bucket": "collections"
+    },
+    {
+      "loc": "https://fineartamerica.com/profiles/manjot-singh-sachdeva/shop/hand+towels",
+      "title": "Hand Towels",
+      "bucket": "collections"
+    },
+    {
+      "loc": "https://fineartamerica.com/profiles/manjot-singh-sachdeva/shop/coffee+mugs",
+      "title": "Coffee Mugs",
+      "bucket": "collections"
+    },
+    {
+      "loc": "https://fineartamerica.com/profiles/manjot-singh-sachdeva/shop/tshirts",
+      "title": "Men's T-Shirts",
+      "bucket": "collections"
+    },
+    {
+      "loc": "https://fineartamerica.com/profiles/manjot-singh-sachdeva/shop/tank+tops",
+      "title": "Men's Tank Tops",
+      "bucket": "collections"
+    },
+    {
+      "loc": "https://fineartamerica.com/profiles/manjot-singh-sachdeva/shop/womens+tshirts",
+      "title": "Women's T-Shirts",
+      "bucket": "collections"
+    },
+    {
+      "loc": "https://fineartamerica.com/profiles/manjot-singh-sachdeva/shop/womens+tank+tops",
+      "title": "Women's Tank Tops",
+      "bucket": "collections"
+    },
+    {
+      "loc": "https://fineartamerica.com/profiles/manjot-singh-sachdeva/shop/long+sleeve+tshirts",
+      "title": "Long Sleeve T-Shirts",
+      "bucket": "collections"
+    },
+    {
+      "loc": "https://fineartamerica.com/profiles/manjot-singh-sachdeva/shop/sweatshirts",
+      "title": "Sweatshirts",
+      "bucket": "collections"
+    },
+    {
+      "loc": "https://fineartamerica.com/profiles/manjot-singh-sachdeva/shop/kids+tshirts",
+      "title": "Kid's T-Shirts",
+      "bucket": "collections"
+    },
+    {
+      "loc": "https://fineartamerica.com/profiles/manjot-singh-sachdeva/shop/baby+one+pieces",
+      "title": "Baby One-Pieces",
+      "bucket": "collections"
+    },
+    {
+      "loc": "https://fineartamerica.com/profiles/manjot-singh-sachdeva/shop/iphone+cases",
+      "title": "iPhone Cases",
+      "bucket": "collections"
+    },
+    {
+      "loc": "https://fineartamerica.com/profiles/manjot-singh-sachdeva/shop/galaxy+cases",
+      "title": "Galaxy Cases",
+      "bucket": "collections"
+    },
+    {
+      "loc": "https://fineartamerica.com/profiles/manjot-singh-sachdeva/shop/portable+battery+chargers",
+      "title": "Portable Battery Chargers",
+      "bucket": "collections"
+    },
+    {
+      "loc": "https://fineartamerica.com/profiles/manjot-singh-sachdeva/shop/greeting+cards",
+      "title": "Greeting Cards",
+      "bucket": "collections"
+    },
+    {
+      "loc": "https://fineartamerica.com/profiles/manjot-singh-sachdeva/shop/spiral+notebooks",
+      "title": "Notebooks",
+      "bucket": "collections"
+    },
+    {
+      "loc": "https://fineartamerica.com/profiles/manjot-singh-sachdeva/shop/stickers",
+      "title": "Stickers",
+      "bucket": "collections"
+    },
+    {
+      "loc": "https://fineartamerica.com/profiles/manjot-singh-sachdeva/shop/yoga+mats",
+      "title": "Yoga Mats",
+      "bucket": "collections"
+    },
+    {
+      "loc": "https://fineartamerica.com/profiles/manjot-singh-sachdeva/shop/tote+bags",
+      "title": "Tote Bags",
+      "bucket": "collections"
+    },
+    {
+      "loc": "https://fineartamerica.com/profiles/manjot-singh-sachdeva/shop/weekender+tote+bags",
+      "title": "Weekender Tote Bags",
+      "bucket": "collections"
+    },
+    {
+      "loc": "https://fineartamerica.com/profiles/manjot-singh-sachdeva/shop/pouches",
+      "title": "Zip Pouches",
+      "bucket": "collections"
+    },
+    {
+      "loc": "https://fineartamerica.com/profiles/manjot-singh-sachdeva/shop/puzzles",
+      "title": "Jigsaw Puzzles",
+      "bucket": "collections"
+    },
+    {
+      "loc": "https://fineartamerica.com/profiles/manjot-singh-sachdeva/shop/beach+towels",
+      "title": "Beach Towels",
+      "bucket": "collections"
+    },
+    {
+      "loc": "https://fineartamerica.com/profiles/manjot-singh-sachdeva/shop/round+beach+towels",
+      "title": "Round Beach Towels",
+      "bucket": "collections"
+    },
+    {
+      "loc": "https://fineartamerica.com/profiles/manjot-singh-sachdeva/art/paintings",
+      "title": "Paintings",
+      "bucket": "collections"
+    },
+    {
+      "loc": "https://fineartamerica.com/profiles/manjot-singh-sachdeva/art/digital+art",
+      "title": "Digital Art",
+      "bucket": "collections"
+    },
+    {
+      "loc": "https://fineartamerica.com/profiles/manjot-singh-sachdeva/art/mixed+media",
+      "title": "Mixed Media",
+      "bucket": "collections"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/northern-shoveler-manjot-singh-sachdeva.html",
+      "title": "Northern Shoveler Photograph by Manjot Singh Sachdeva - Fine Art America",
+      "description": "Northern Shoveler is a photograph by Manjot Singh Sachdeva which was uploaded on November 2nd, 2015. The photograph may be purchased as wall art, home decor, apparel, phone cases, greeting cards, and more. All products are produced on-demand and shipped worldwide within 2 - 3 business days.",
+      "price_hint": "$20.45",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/golden-temple-manjot-singh-sachdeva.html",
+      "title": "Golden Temple Photograph by Manjot Singh Sachdeva - Fine Art America",
+      "description": "Golden Temple is a photograph by Manjot Singh Sachdeva which was uploaded on October 23rd, 2012. The photograph may be purchased as wall art, home decor, apparel, phone cases, greeting cards, and more. All products are produced on-demand and shipped worldwide within 2 - 3 business days.",
+      "price_hint": "$22.05",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/2-gate-way-of-india-manjot-singh-sachdeva.html",
+      "title": "Gate Way Of India #2 Photograph by Manjot Singh Sachdeva - Fine Art America",
+      "description": "Gate Way Of India #2 is a photograph by Manjot Singh Sachdeva which was uploaded on September 17th, 2015. The photograph may be purchased as wall art, home decor, apparel, phone cases, greeting cards, and more. All products are produced on-demand and shipped worldwide within 2 - 3 business days.",
+      "price_hint": "$20.45",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/explorer-the-nature-manjot-singh-sachdeva.html",
+      "title": "Explorer The Nature Photograph by Manjot Singh Sachdeva - Fine Art America",
+      "description": "Explorer The Nature is a photograph by Manjot Singh Sachdeva which was uploaded on February 17th, 2013. The photograph may be purchased as wall art, home decor, apparel, phone cases, greeting cards, and more. All products are produced on-demand and shipped worldwide within 2 - 3 business days.",
+      "price_hint": "$14.85",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/halle-berry-manjot-singh-sachdeva.html",
+      "title": "Halle Berry Photograph by Manjot Singh Sachdeva - Fine Art America",
+      "description": "Halle Berry is a photograph by Manjot Singh Sachdeva which was uploaded on October 11th, 2015. The photograph may be purchased as wall art, home decor, apparel, phone cases, greeting cards, and more. All products are produced on-demand and shipped worldwide within 2 - 3 business days.",
+      "price_hint": "$20.45",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/relax-with-nature-manjot-singh-sachdeva.html",
+      "title": "Relax With Nature Photograph by Manjot Singh Sachdeva - Fine Art America",
+      "description": "Relax With Nature is a photograph by Manjot Singh Sachdeva which was uploaded on September 22nd, 2015. The photograph may be purchased as wall art, home decor, apparel, phone cases, greeting cards, and more. All products are produced on-demand and shipped worldwide within 2 - 3 business days.",
+      "price_hint": "$20.45",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/dance-to-express-your-thoughts-manjot-singh-sachdeva.html",
+      "title": "Dance To Express Your Thoughts Photograph by Manjot Singh Sachdeva - Fine Art America",
+      "description": "Dance To Express Your Thoughts is a photograph by Manjot Singh Sachdeva which was uploaded on September 27th, 2015. The photograph may be purchased as wall art, home decor, apparel, phone cases, greeting cards, and more. All products are produced on-demand and shipped worldwide within 2 - 3 business",
+      "price_hint": "$20.45",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/amazing-flowers-manjot-singh-sachdeva.html",
+      "title": "Amazing Flowers Photograph by Manjot Singh Sachdeva - Fine Art America",
+      "description": "Amazing Flowers is a photograph by Manjot Singh Sachdeva which was uploaded on December 11th, 2012. The photograph may be purchased as wall art, home decor, apparel, phone cases, greeting cards, and more. All products are produced on-demand and shipped worldwide within 2 - 3 business days.",
+      "price_hint": "$15.65",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/harrison-ford-manjot-singh-sachdeva.html",
+      "title": "Harrison Ford Photograph by Manjot Singh Sachdeva - Fine Art America",
+      "description": "Harrison Ford is a photograph by Manjot Singh Sachdeva which was uploaded on October 18th, 2015. The photograph may be purchased as wall art, home decor, apparel, phone cases, greeting cards, and more. All products are produced on-demand and shipped worldwide within 2 - 3 business days.",
+      "price_hint": "$20.45",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/the-purple-heron-manjot-singh-sachdeva.html",
+      "title": "The Purple Heron Photograph by Manjot Singh Sachdeva - Fine Art America",
+      "description": "The Purple Heron is a photograph by Manjot Singh Sachdeva which was uploaded on October 28th, 2015. The photograph may be purchased as wall art, home decor, apparel, phone cases, greeting cards, and more. All products are produced on-demand and shipped worldwide within 2 - 3 business days.",
+      "price_hint": "$20.45",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/pattern-or-abstract-manjot-singh-sachdeva.html",
+      "title": "Pattern Or Abstract Photograph by Manjot Singh Sachdeva - Fine Art America",
+      "description": "Pattern Or Abstract is a photograph by Manjot Singh Sachdeva which was uploaded on October 19th, 2015. The photograph may be purchased as wall art, home decor, apparel, phone cases, greeting cards, and more. All products are produced on-demand and shipped worldwide within 2 - 3 business days.",
+      "price_hint": "$20.45",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/sparrow-hawk-manjot-singh-sachdeva.html",
+      "title": "Sparrow Hawk Photograph by Manjot Singh Sachdeva - Fine Art America",
+      "description": "Sparrow Hawk is a photograph by Manjot Singh Sachdeva which was uploaded on September 23rd, 2015. The photograph may be purchased as wall art, home decor, apparel, phone cases, greeting cards, and more. All products are produced on-demand and shipped worldwide within 2 - 3 business days.",
+      "price_hint": "$20.45",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/dusky-horned-owl-manjot-singh-sachdeva.html",
+      "title": "Dusky Horned Owl Photograph by Manjot Singh Sachdeva - Fine Art America",
+      "description": "Dusky Horned Owl is a photograph by Manjot Singh Sachdeva which was uploaded on October 21st, 2015. The photograph may be purchased as wall art, home decor, apparel, phone cases, greeting cards, and more. All products are produced on-demand and shipped worldwide within 2 - 3 business days.",
+      "price_hint": "$20.45",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/bliss-is-god-manjot-singh-sachdeva.html",
+      "title": "Bliss Is God Photograph by Manjot Singh Sachdeva - Fine Art America",
+      "description": "Bliss Is God is a photograph by Manjot Singh Sachdeva which was uploaded on October 22nd, 2015. The photograph may be purchased as wall art, home decor, apparel, phone cases, greeting cards, and more. All products are produced on-demand and shipped worldwide within 2 - 3 business days.",
+      "price_hint": "$20.45",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/calm-nature-as-fantasy-manjot-singh-sachdeva.html",
+      "title": "Calm Nature As Fantasy Photograph by Manjot Singh Sachdeva - Fine Art America",
+      "description": "Calm Nature As Fantasy is a photograph by Manjot Singh Sachdeva which was uploaded on February 3rd, 2013. The photograph may be purchased as wall art, home decor, apparel, phone cases, greeting cards, and more. All products are produced on-demand and shipped worldwide within 2 - 3 business days.",
+      "price_hint": "$14.05",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/golden-orioles-manjot-singh-sachdeva.html",
+      "title": "Golden Orioles Photograph by Manjot Singh Sachdeva - Fine Art America",
+      "description": "Golden Orioles is a photograph by Manjot Singh Sachdeva which was uploaded on June 1st, 2017. The photograph may be purchased as wall art, home decor, apparel, phone cases, greeting cards, and more. All products are produced on-demand and shipped worldwide within 2 - 3 business days.",
+      "price_hint": "$18.04",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/coffee-souffles-with-caramels-manjot-singh-sachdeva.html",
+      "title": "Coffee Souffles With Caramels Photograph by Manjot Singh Sachdeva - Fine Art America",
+      "description": "Coffee Souffles With Caramels is a photograph by Manjot Singh Sachdeva which was uploaded on October 14th, 2015. The photograph may be purchased as wall art, home decor, apparel, phone cases, greeting cards, and more. All products are produced on-demand and shipped worldwide within 2 - 3 business da",
+      "price_hint": "$20.45",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/the-divine-light-manjot-singh-sachdeva.html",
+      "title": "The Divine Light Photograph by Manjot Singh Sachdeva - Fine Art America",
+      "description": "The Divine Light is a photograph by Manjot Singh Sachdeva which was uploaded on October 25th, 2015. The photograph may be purchased as wall art, home decor, apparel, phone cases, greeting cards, and more. All products are produced on-demand and shipped worldwide within 2 - 3 business days.",
+      "price_hint": "$20.45",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/thoughtful-manjot-singh-sachdeva.html",
+      "title": "Thoughtful Photograph by Manjot Singh Sachdeva - Fine Art America",
+      "description": "Thoughtful is a photograph by Manjot Singh Sachdeva which was uploaded on October 1st, 2015. The photograph may be purchased as wall art, home decor, apparel, phone cases, greeting cards, and more. All products are produced on-demand and shipped worldwide within 2 - 3 business days.",
+      "price_hint": "$20.45",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/travelling-with-moon-manjot-singh-sachdeva.html",
+      "title": "Travelling With Moon Photograph by Manjot Singh Sachdeva - Fine Art America",
+      "description": "Travelling With Moon is a photograph by Manjot Singh Sachdeva which was uploaded on October 8th, 2015. The photograph may be purchased as wall art, home decor, apparel, phone cases, greeting cards, and more. All products are produced on-demand and shipped worldwide within 2 - 3 business days.",
+      "price_hint": "$20.45",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/the-purple-swamphen-manjot-singh-sachdeva.html",
+      "title": "The Purple Swamphen Photograph by Manjot Singh Sachdeva - Fine Art America",
+      "description": "The Purple Swamphen is a photograph by Manjot Singh Sachdeva which was uploaded on February 26th, 2013. The photograph may be purchased as wall art, home decor, apparel, phone cases, greeting cards, and more. All products are produced on-demand and shipped worldwide within 2 - 3 business days.",
+      "price_hint": "$14.05",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/deciduous-manjot-singh-sachdeva.html",
+      "title": "Deciduous Photograph by Manjot Singh Sachdeva - Fine Art America",
+      "description": "Deciduous is a photograph by Manjot Singh Sachdeva which was uploaded on October 2nd, 2015. The photograph may be purchased as wall art, home decor, apparel, phone cases, greeting cards, and more. All products are produced on-demand and shipped worldwide within 2 - 3 business days.",
+      "price_hint": "$20.45",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/god-made-art-in-flowers-manjot-singh-sachdeva.html",
+      "title": "God Made Art in Flowers Photograph by Manjot Singh Sachdeva - Fine Art America",
+      "description": "God Made Art in Flowers is a photograph by Manjot Singh Sachdeva which was uploaded on September 5th, 2015. The photograph may be purchased as wall art, home decor, apparel, phone cases, greeting cards, and more. All products are produced on-demand and shipped worldwide within 2 - 3 business days.",
+      "price_hint": "$22.05",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/snake-bird-or-darter-manjot-singh-sachdeva.html",
+      "title": "Snake Bird Or Darter Photograph by Manjot Singh Sachdeva - Fine Art America",
+      "description": "Snake Bird Or Darter is a photograph by Manjot Singh Sachdeva which was uploaded on September 9th, 2015. The photograph may be purchased as wall art, home decor, apparel, phone cases, greeting cards, and more. All products are produced on-demand and shipped worldwide within 2 - 3 business days.",
+      "price_hint": "$20.45",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/sir-roger-moore-manjot-singh-sachdeva.html",
+      "title": "Sir Roger Moore Photograph by Manjot Singh Sachdeva - Fine Art America",
+      "description": "Sir Roger Moore is a photograph by Manjot Singh Sachdeva which was uploaded on October 15th, 2015. The photograph may be purchased as wall art, home decor, apparel, phone cases, greeting cards, and more. All products are produced on-demand and shipped worldwide within 2 - 3 business days.",
+      "price_hint": "$20.45",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/celebrations-with-blue-lagon-manjot-singh-sachdeva.html",
+      "title": "Celebrations With Blue Lagon Photograph by Manjot Singh Sachdeva - Fine Art America",
+      "description": "Celebrations With Blue Lagon is a photograph by Manjot Singh Sachdeva which was uploaded on August 10th, 2015. The photograph may be purchased as wall art, home decor, apparel, phone cases, greeting cards, and more. All products are produced on-demand and shipped worldwide within 2 - 3 business days",
+      "price_hint": "$20.45",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/whitney-houston-manjot-singh-sachdeva.html",
+      "title": "Whitney Houston Photograph by Manjot Singh Sachdeva - Fine Art America",
+      "description": "Whitney Houston is a photograph by Manjot Singh Sachdeva which was uploaded on October 14th, 2015. The photograph may be purchased as wall art, home decor, apparel, phone cases, greeting cards, and more. All products are produced on-demand and shipped worldwide within 2 - 3 business days.",
+      "price_hint": "$20.45",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/tiger-aggression-manjot-singh-sachdeva.html",
+      "title": "Tiger Aggression Photograph by Manjot Singh Sachdeva - Fine Art America",
+      "description": "Tiger Aggression is a photograph by Manjot Singh Sachdeva which was uploaded on October 10th, 2015. The photograph may be purchased as wall art, home decor, apparel, phone cases, greeting cards, and more. All products are produced on-demand and shipped worldwide within 2 - 3 business days.",
+      "price_hint": "$20.45",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/gentle-blooms-manjot-singh-sachdeva.html",
+      "title": "Gentle Blooms Photograph by Manjot Singh Sachdeva - Fine Art America",
+      "description": "Gentle Blooms is a photograph by Manjot Singh Sachdeva which was uploaded on September 6th, 2015. The photograph may be purchased as wall art, home decor, apparel, phone cases, greeting cards, and more. All products are produced on-demand and shipped worldwide within 2 - 3 business days.",
+      "price_hint": "$20.45",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/it-is-my-home-manjot-singh-sachdeva.html",
+      "title": "It is my Home Photograph by Manjot Singh Sachdeva - Fine Art America",
+      "description": "It is my Home is a photograph by Manjot Singh Sachdeva which was uploaded on February 18th, 2013. The photograph may be purchased as wall art, home decor, apparel, phone cases, greeting cards, and more. All products are produced on-demand and shipped worldwide within 2 - 3 business days.",
+      "price_hint": "$18.05",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/the-real-world-manjot-singh-sachdeva.html",
+      "title": "The Real World Photograph by Manjot Singh Sachdeva - Fine Art America",
+      "description": "The Real World is a photograph by Manjot Singh Sachdeva which was uploaded on August 10th, 2015. The photograph may be purchased as wall art, home decor, apparel, phone cases, greeting cards, and more. All products are produced on-demand and shipped worldwide within 2 - 3 business days.",
+      "price_hint": "$20.45",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/always-alert-tiger-manjot-singh-sachdeva.html",
+      "title": "Always Alert - Tiger Photograph by Manjot Singh Sachdeva - Fine Art America",
+      "description": "Always Alert - Tiger is a photograph by Manjot Singh Sachdeva which was uploaded on August 8th, 2015. The photograph may be purchased as wall art, home decor, apparel, phone cases, greeting cards, and more. All products are produced on-demand and shipped worldwide within 2 - 3 business days.",
+      "price_hint": "$20.45",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/flower-grows-in-rain-manjot-singh-sachdeva.html",
+      "title": "Flower grows in rain Photograph by Manjot Singh Sachdeva - Fine Art America",
+      "description": "Flower grows in rain is a photograph by Manjot Singh Sachdeva which was uploaded on August 15th, 2013. The photograph may be purchased as wall art, home decor, apparel, phone cases, greeting cards, and more. All products are produced on-demand and shipped worldwide within 2 - 3 business days.",
+      "price_hint": "$14.05",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/morning-mist-at-wetland-of-harike-manjot-singh-sachdeva.html",
+      "title": "Morning Mist At Wetland Of Harike Photograph by Manjot Singh Sachdeva - Fine Art America",
+      "description": "Morning Mist At Wetland Of Harike is a photograph by Manjot Singh Sachdeva which was uploaded on November 14th, 2015. The photograph may be purchased as wall art, home decor, apparel, phone cases, greeting cards, and more. All products are produced on-demand and shipped worldwide within 2 - 3 busine",
+      "price_hint": "$20.45",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/hovering-of-white-pied-kingfisher-manjot-singh-sachdeva.html",
+      "title": "Hovering Of White Pied Kingfisher Photograph by Manjot Singh Sachdeva - Fine Art America",
+      "description": "Hovering Of White Pied Kingfisher is a photograph by Manjot Singh Sachdeva which was uploaded on November 12th, 2015. The photograph may be purchased as wall art, home decor, apparel, phone cases, greeting cards, and more. All products are produced on-demand and shipped worldwide within 2 - 3 busine",
+      "price_hint": "$24.45",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/black-neck-stork-manjot-singh-sachdeva.html",
+      "title": "Black Neck Stork Photograph by Manjot Singh Sachdeva - Fine Art America",
+      "description": "Black Neck Stork is a photograph by Manjot Singh Sachdeva which was uploaded on September 14th, 2015. The photograph may be purchased as wall art, home decor, apparel, phone cases, greeting cards, and more. All products are produced on-demand and shipped worldwide within 2 - 3 business days.",
+      "price_hint": "$20.45",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/painted-stork-with-chicks-manjot-singh-sachdeva.html",
+      "title": "Painted Stork With Chicks Photograph by Manjot Singh Sachdeva - Fine Art America",
+      "description": "Painted Stork With Chicks is a photograph by Manjot Singh Sachdeva which was uploaded on October 24th, 2012. The photograph may be purchased as wall art, home decor, apparel, phone cases, greeting cards, and more. All products are produced on-demand and shipped worldwide within 2 - 3 business days.",
+      "price_hint": "$22.05",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/voice-less-than-fireworks-manjot-singh-sachdeva.html",
+      "title": "Voice Less Than Fireworks Photograph by Manjot Singh Sachdeva - Fine Art America",
+      "description": "Voice Less Than Fireworks is a photograph by Manjot Singh Sachdeva which was uploaded on August 15th, 2015. The photograph may be purchased as wall art, home decor, apparel, phone cases, greeting cards, and more. All products are produced on-demand and shipped worldwide within 2 - 3 business days.",
+      "price_hint": "$20.45",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/roar-of-the-asiatic-lion-manjot-singh-sachdeva.html",
+      "title": "Roar Of The Asiatic Lion Photograph by Manjot Singh Sachdeva - Fine Art America",
+      "description": "Roar Of The Asiatic Lion is a photograph by Manjot Singh Sachdeva which was uploaded on September 1st, 2015. The photograph may be purchased as wall art, home decor, apparel, phone cases, greeting cards, and more. All products are produced on-demand and shipped worldwide within 2 - 3 business days.",
+      "price_hint": "$22.05",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/spread-light-manjot-singh-sachdeva.html",
+      "title": "Spread Light Photograph by Manjot Singh Sachdeva - Fine Art America",
+      "description": "Spread Light is a photograph by Manjot Singh Sachdeva which was uploaded on December 20th, 2015. The photograph may be purchased as wall art, home decor, apparel, phone cases, greeting cards, and more. All products are produced on-demand and shipped worldwide within 2 - 3 business days.",
+      "price_hint": "$22.05",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/royal-bengal-tiger-manjot-singh-sachdeva.html",
+      "title": "Royal Bengal Tiger Manjot Singh Sachdeva",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/butterfly-collect-juice-manjot-singh-sachdeva.html",
+      "title": "Butterfly Collect Juice Manjot Singh Sachdeva",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/woman-a-struggler-manjot-singh-sachdeva.html",
+      "title": "Woman A Struggler Manjot Singh Sachdeva",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/egret-with-fish-manjot-singh-sachdeva.html",
+      "title": "Egret With Fish Manjot Singh Sachdeva",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/autumn-morning-manjot-singh-sachdeva.html",
+      "title": "Autumn Morning Manjot Singh Sachdeva",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/greater-painted-snipe-manjot-singh-sachdeva.html",
+      "title": "Greater Painted Snipe Manjot Singh Sachdeva",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/halloween-manjot-singh-sachdeva.html",
+      "title": "Halloween Manjot Singh Sachdeva",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/morning-glory-manjot-singh-sachdeva.html",
+      "title": "Morning Glory Manjot Singh Sachdeva",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/tweet-louder-manjot-singh-sachdeva.html",
+      "title": "Tweet Louder Manjot Singh Sachdeva",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/tomorrows-flower-manjot-singh-sachdeva.html",
+      "title": "Tomorrows Flower Manjot Singh Sachdeva",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/explore-the-nature-manjot-singh-sachdeva.html",
+      "title": "Explore The Nature Manjot Singh Sachdeva",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/flower-always-a-giver-manjot-singh-sachdeva.html",
+      "title": "Flower Always A Giver Manjot Singh Sachdeva",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/deciduous-i-manjot-singh-sachdeva.html",
+      "title": "Deciduous I Manjot Singh Sachdeva",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/burning-desire-manjot-singh-sachdeva.html",
+      "title": "Burning Desire Manjot Singh Sachdeva",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/tiger-love-water-manjot-singh-sachdeva.html",
+      "title": "Tiger Love Water Manjot Singh Sachdeva",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/sun-set-in-rainy-days-manjot-singh-sachdeva.html",
+      "title": "Sun Set In Rainy Days Manjot Singh Sachdeva",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/pond-heron-with-fish-manjot-singh-sachdeva.html",
+      "title": "Pond Heron With Fish Manjot Singh Sachdeva",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/the-baoli-sahib-a-temple-manjot-singh-sachdeva.html",
+      "title": "The Baoli Sahib A Temple Manjot Singh Sachdeva",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/little-owl-or-spotted-owlet-manjot-singh-sachdeva.html",
+      "title": "Little Owl Or Spotted Owlet Manjot Singh Sachdeva",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/priceless-pearls-manjot-singh-sachdeva.html",
+      "title": "Priceless Pearls Manjot Singh Sachdeva",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/abandoned-land-manjot-singh-sachdeva.html",
+      "title": "Abandoned Land Manjot Singh Sachdeva",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/memories-manjot-singh-sachdeva.html",
+      "title": "Memories Manjot Singh Sachdeva",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/friendship-is-one-soul-dwell-in-to-two-bodies-manjot-singh-sachdeva.html",
+      "title": "Friendship Is One Soul Dwell In To Two Bodies Manjot Singh Sachdeva",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/coffee-time-manjot-singh-sachdeva.html",
+      "title": "Coffee Time Manjot Singh Sachdeva",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/fight-for-female-manjot-singh-sachdeva.html",
+      "title": "Fight For Female Manjot Singh Sachdeva",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/orange-splash-manjot-singh-sachdeva.html",
+      "title": "Orange Splash Manjot Singh Sachdeva",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/mountain-landscape-manjot-singh-sachdeva.html",
+      "title": "Mountain Landscape Manjot Singh Sachdeva",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/father-and-child-manjot-singh-sachdeva.html",
+      "title": "Father And Child Manjot Singh Sachdeva",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/nature-in-whitness-manjot-singh-sachdeva.html",
+      "title": "Nature In Whitness Manjot Singh Sachdeva",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/walk-with-nature-manjot-singh-sachdeva.html",
+      "title": "Walk With Nature Manjot Singh Sachdeva",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/flow-of-art-manjot-singh-sachdeva.html",
+      "title": "Flow Of Art Manjot Singh Sachdeva",
+      "bucket": "products"
+    },
+    {
+      "loc": "https://fineartamerica.com/featured/3-golden-temple-manjot-singh-sachdeva.html",
+      "title": "3 Golden Temple Manjot Singh Sachdeva",
+      "bucket": "products"
+    }
+  ]
+}

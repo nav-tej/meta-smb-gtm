@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import html
 import ipaddress
+import json
 import logging
 import re
 import socket
@@ -33,6 +34,8 @@ logger = logging.getLogger(__name__)
 
 MAX_SITEMAP_BYTES = 10 * 1024 * 1024  # 10 MB cap (raw and gzip-decompressed)
 MAX_HTML_HEAD_BYTES = 64 * 1024  # 64 KB cap when reading <head>/<title>
+# Product pages: WooCommerce and Fine Art America emit schema.org offers late in the body
+MAX_PRODUCT_PAGE_BYTES = 512 * 1024
 MAX_LISTING_FALLBACK_BYTES = 256 * 1024  # 256 KB cap for no-sitemap shop page fallback
 MAX_REDIRECTS = 5
 DEFAULT_REQUEST_TIMEOUT = httpx.Timeout(15.0, connect=5.0)
@@ -58,6 +61,10 @@ _ANCHOR_RE = re.compile(
     re.IGNORECASE | re.DOTALL,
 )
 _HTML_TAG_RE = re.compile(r"<[^>]+>")
+_LD_JSON_RE = re.compile(
+    r"<script[^>]+application/ld\+json[^>]*>(.*?)</script>", re.IGNORECASE | re.DOTALL
+)
+_ZERO_AMOUNT_RE = re.compile(r"0+(?:\.0+)?")
 _PRICE_TEXT_RE = re.compile(r"(?:USD\s*\$|\$|£|€)\s?\d{1,5}(?:,\d{3})*(?:\.\d{2})?")
 
 
@@ -621,6 +628,56 @@ def parse_sitemap(
     return doc.entries
 
 
+def _format_price(amount: str, currency: str | None) -> str:
+    symbol = "$" if currency in {None, "", "USD"} else f"{currency} "
+    return f"{symbol}{amount}".strip()
+
+
+def _ld_json_nodes(node: object) -> list[dict[str, object]]:
+    if isinstance(node, list):
+        return [found for item in node for found in _ld_json_nodes(item)]
+    if not isinstance(node, dict):
+        return []
+    return [node, *(found for value in node.values() for found in _ld_json_nodes(value))]
+
+
+def _ld_json_product_offers(html_text: str) -> list[dict[str, object]]:
+    found: list[dict[str, object]] = []
+    for match in _LD_JSON_RE.finditer(html_text):
+        try:
+            data = json.loads(match.group(1))
+        except ValueError:
+            continue
+        for node in _ld_json_nodes(data):
+            types = node.get("@type")
+            if "Product" not in (types if isinstance(types, list) else [types]):
+                continue
+            offers = node.get("offers")
+            found += [
+                o for o in (offers if isinstance(offers, list) else [offers]) if isinstance(o, dict)
+            ]
+    return found
+
+
+def extract_ld_json_price(html_text: str) -> str | None:
+    """Price (or 'low - high' range) from schema.org Product offers in JSON-LD, if present."""
+    for offer in _ld_json_product_offers(html_text):
+        currency = offer.get("priceCurrency")
+        currency = str(currency).upper() if currency else None
+        amounts = [
+            str(offer[key])
+            for key in ("lowPrice", "highPrice", "price")
+            if offer.get(key) not in (None, "") and not _ZERO_AMOUNT_RE.fullmatch(str(offer[key]))
+        ]
+        if not amounts:
+            continue
+        low, high = amounts[0], amounts[1] if len(amounts) > 1 else amounts[0]
+        if low == high or "price" in offer and "lowPrice" not in offer:
+            return _format_price(low, currency)
+        return f"{_format_price(low, currency)} - {_format_price(high, currency)}"
+    return None
+
+
 @dataclass(slots=True)
 class PageMetadata:
     title: str | None = None
@@ -662,7 +719,7 @@ def extract_page_metadata(html_text: str) -> PageMetadata:
             continue
         if prop in {"product:price:amount", "og:price:amount"} and not meta_amount:
             # Marketplaces publish 0.00 for works that aren't for sale in that format
-            if re.fullmatch(r"0+(?:\.0+)?", content.replace(",", "")) is None:
+            if not _ZERO_AMOUNT_RE.fullmatch(content.replace(",", "")):
                 meta_amount = content
         elif prop in {"product:price:currency", "og:price:currency"} and not meta_currency:
             meta_currency = content.upper()
@@ -674,11 +731,20 @@ def extract_page_metadata(html_text: str) -> PageMetadata:
             og_desc = " ".join(content.split())[:300]
 
     final_title = title or og_title
-    price_hint: str | None = None
-    if meta_amount:
-        symbol = "$" if meta_currency in {None, "", "USD"} else f"{meta_currency} "
-        price_hint = f"{symbol}{meta_amount}".strip()
-    else:
+    if meta_amount and not meta_currency:
+        # Some stores mislabel the currency tag (gallerist.in sends a second ...:amount = "INR")
+        meta_currency = next(
+            (
+                str(offer["priceCurrency"]).upper()
+                for offer in _ld_json_product_offers(html_text)
+                if offer.get("priceCurrency")
+            ),
+            None,
+        )
+    price_hint = _format_price(meta_amount, meta_currency) if meta_amount else None
+    if price_hint is None:
+        price_hint = extract_ld_json_price(html_text)
+    if price_hint is None:
         haystack = " ".join(part for part in (final_title, meta_desc) if part)
         price_match = _PRICE_TEXT_RE.search(haystack)
         if price_match:
@@ -693,13 +759,14 @@ async def fetch_page_metadata(
     *,
     resolver: ResolverFn | None = None,
     rate_limiter: HostRateLimiter | None = None,
+    max_bytes: int = MAX_HTML_HEAD_BYTES,
 ) -> PageMetadata:
-    """Politely fetch the first 64 KB of `url` and return its title, price hint, and description."""
+    """Politely fetch the start of `url` and return its title, price hint, and description."""
     try:
         status, snippet_bytes, _ = await _fetch_bytes_guarded(
             url,
             client,
-            max_bytes=MAX_HTML_HEAD_BYTES,
+            max_bytes=max_bytes,
             truncate_on_limit=True,
             resolver=resolver,
             rate_limiter=rate_limiter,

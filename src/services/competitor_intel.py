@@ -38,6 +38,8 @@ from src.models.intel import (
 )
 from src.utils.sitemap import (
     DEFAULT_REQUEST_TIMEOUT,
+    MAX_HTML_HEAD_BYTES,
+    MAX_PRODUCT_PAGE_BYTES,
     HostRateLimiter,
     ParsedSitemap,
     ResolverFn,
@@ -161,7 +163,11 @@ def _prioritize_child_sitemaps(urls: list[str]) -> list[str]:
     """Order child sitemaps in `<sitemapindex>` so products, collections, and blogs come first."""
 
     def _rank(sitemap_url: str) -> tuple[int, str]:
-        lower = sitemap_url.lower()
+        # Path only, minus the word "sitemap": a host like sikhiart.com would match "art", and
+        # "sitemap" itself contains "item", which ranked every child as a product sitemap
+        lower = urlparse(sitemap_url).path.lower().replace("sitemap", "")
+        if any(k in lower for k in ("attachment", "tag", "author", "image", "video")):
+            return (4, lower)
         if any(k in lower for k in ("product", "listing", "featured", "art", "item")):
             return (0, lower)
         if any(k in lower for k in ("collection", "category", "shop")):
@@ -336,6 +342,11 @@ async def _enrich_titles(
                 client,
                 resolver=resolver,
                 rate_limiter=rate_limiter,
+                max_bytes=(
+                    MAX_PRODUCT_PAGE_BYTES
+                    if item.bucket in {"products", "listings"}
+                    else MAX_HTML_HEAD_BYTES
+                ),
             )
             if metadata.title:
                 item.title = metadata.title
