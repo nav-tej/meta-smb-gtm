@@ -95,8 +95,8 @@
       "platform": "instagram",
       "url": "https://www.instagram.com/artofsarabjitsingh/",
       "role": "social",
-      "fetch_status": "not_attempted",
-      "notes": "Listed on the About page. Meta property, same automated-collection terms as Facebook."
+      "fetch_status": "robots_disallowed",
+      "notes": "Handle confirmed by the seller and linked from artofsarabjitsingh.com/about.html. Not fetched: instagram.com/robots.txt disallows all crawlers (User-agent: * / Disallow: /) and prohibits automated collection without written permission. Bio, post and follower counts need to be entered by hand or pulled through an authorized Meta API."
     }
   ],
   "series": [
