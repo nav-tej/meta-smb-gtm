@@ -6,6 +6,7 @@ overridden. Services must call this module rather than instantiating OpenAI clie
 
 from __future__ import annotations
 
+import base64
 import json
 import logging
 import re
@@ -36,6 +37,23 @@ def _strip_code_fences(raw_text: str) -> str:
     stripped = raw_text.strip()
     match = _CODE_FENCE_RE.match(stripped)
     return match.group(1).strip() if match else stripped
+
+
+def _detect_image_mime(image_bytes: bytes) -> str:
+    """Detect PNG/JPEG/WEBP MIME type from header magic bytes (AGENTS.md section 10)."""
+    if image_bytes.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    if image_bytes.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+    if len(image_bytes) >= 12 and image_bytes[:4] == b"RIFF" and image_bytes[8:12] == b"WEBP":
+        return "image/webp"
+    raise MetaAPIError("Unsupported image format; expected PNG, JPEG, or WEBP bytes.")
+
+
+def _to_data_uri(image_bytes: bytes) -> str:
+    mime = _detect_image_mime(image_bytes)
+    encoded = base64.b64encode(image_bytes).decode("ascii")
+    return f"data:{mime};base64,{encoded}"
 
 
 def _inject_schema_instruction(
@@ -69,15 +87,23 @@ class MetaClient:
         api_key: str | None = None,
         base_url: str | None = None,
         spark_model: str | None = None,
+        image_model: str | None = None,
+        sam_model: str | None = None,
         http_client: httpx.AsyncClient | None = None,
         openai_client: AsyncOpenAI | None = None,
     ) -> None:
         cfg = settings or get_settings()
         self._api_key = (api_key if api_key is not None else cfg.meta_model_api_key).strip()
-        self._base_url = (base_url if base_url is not None else cfg.meta_model_api_base_url).strip()
+        self._base_url = (
+            (base_url if base_url is not None else cfg.meta_model_api_base_url).strip().rstrip("/")
+        )
         self._spark_model = (
             spark_model if spark_model is not None else cfg.muse_spark_model
         ).strip()
+        self._image_model = (
+            image_model if image_model is not None else cfg.muse_image_model
+        ).strip()
+        self._sam_model = (sam_model if sam_model is not None else cfg.sam_model).strip()
         self._owns_http_client = http_client is None and openai_client is None
         self._http_client = http_client or httpx.AsyncClient(timeout=DEFAULT_TIMEOUT)
         self._openai: AsyncOpenAI | None = openai_client
@@ -86,15 +112,27 @@ class MetaClient:
     def spark_model(self) -> str:
         return self._spark_model
 
-    def _get_openai(self) -> AsyncOpenAI:
-        if self._openai is not None:
-            return self._openai
+    @property
+    def image_model(self) -> str:
+        return self._image_model
+
+    @property
+    def sam_model(self) -> str:
+        return self._sam_model
+
+    def _require_api_key(self) -> str:
         if not self._api_key:
             raise MetaAPIError(
                 "META_MODEL_API_KEY is missing. Set it in your environment or .env file."
             )
+        return self._api_key
+
+    def _get_openai(self) -> AsyncOpenAI:
+        if self._openai is not None:
+            return self._openai
+        api_key = self._require_api_key()
         self._openai = AsyncOpenAI(
-            api_key=self._api_key,
+            api_key=api_key,
             base_url=self._base_url,
             http_client=self._http_client,
             max_retries=1,
@@ -159,6 +197,39 @@ class MetaClient:
             f"{last_validation_err}"
         ) from last_validation_err
 
+    async def chat_vision_structured(
+        self,
+        *,
+        system_prompt: str,
+        user_prompt: str,
+        images: Sequence[bytes],
+        response_model: type[ModelT],
+        model: str | None = None,
+        temperature: float = 0.2,
+    ) -> ModelT:
+        """Send multimodal text + images (e.g. IG/FB/Marketplace screenshots) to Muse Spark."""
+        if not images:
+            raise MetaAPIError("At least one image is required for vision analysis.")
+
+        content_parts: list[dict[str, Any]] = [{"type": "text", "text": user_prompt}]
+        for img_bytes in images:
+            if len(img_bytes) > 10 * 1024 * 1024:
+                raise MetaAPIError("Uploaded image exceeds 10 MB safety limit.")
+            content_parts.append(
+                {"type": "image_url", "image_url": {"url": _to_data_uri(img_bytes)}}
+            )
+
+        messages: list[ChatCompletionMessageParam] = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": content_parts},  # type: ignore[typeddict-item]
+        ]
+        return await self.chat_structured(
+            messages=messages,
+            response_model=response_model,
+            model=model,
+            temperature=temperature,
+        )
+
     async def _create_chat_completion(
         self,
         *,
@@ -190,16 +261,94 @@ class MetaClient:
         return content
 
     async def generate_image(
-        self, prompt: str, reference_image: bytes | None = None
-    ) -> bytes:  # pragma: no cover - Flow 2 stub
-        """Generate an ad creative image via Muse Image (implemented in Flow 2)."""
-        raise NotImplementedError("generate_image is part of Flow 2 (ad_creative).")
+        self,
+        prompt: str,
+        reference_image: bytes | None = None,
+        *,
+        mask_image: bytes | None = None,
+        size: str = "1024x1024",
+    ) -> bytes:
+        """Generate an ad creative image via Muse Image (`muse-image-1.0`)."""
+        api_key = self._require_api_key()
+        payload: dict[str, Any] = {
+            "model": self._image_model,
+            "prompt": prompt,
+            "size": size,
+            "response_format": "b64_json",
+        }
+        if reference_image is not None:
+            payload["image"] = _to_data_uri(reference_image)
+        if mask_image is not None:
+            payload["mask"] = _to_data_uri(mask_image)
 
-    async def segment(
-        self, image: bytes, prompt: str | None = None
-    ) -> bytes:  # pragma: no cover - Flow 2 stub
-        """Segment a product cutout via SAM 3.1 (implemented in Flow 2)."""
-        raise NotImplementedError("segment is part of Flow 2 (ad_creative).")
+        try:
+            response = await self._http_client.post(
+                f"{self._base_url}/images/generations",
+                headers={"Authorization": f"Bearer {api_key}"},
+                json=payload,
+            )
+        except httpx.HTTPError as err:
+            raise MetaAPIError(f"Muse Image transport error: {type(err).__name__}") from err
+
+        if response.status_code != 200:
+            raise MetaAPIError(f"Muse Image error (status={response.status_code}).")
+
+        body = response.json()
+        items = body.get("data") if isinstance(body, dict) else None
+        if not isinstance(items, list) or not items:
+            raise MetaAPIError("Muse Image returned no image data.")
+
+        first = items[0]
+        if isinstance(first, dict) and isinstance(first.get("b64_json"), str):
+            return base64.b64decode(first["b64_json"])
+        if isinstance(first, dict) and isinstance(first.get("url"), str):
+            img_resp = await self._http_client.get(first["url"])
+            if img_resp.status_code != 200:
+                raise MetaAPIError("Failed to download generated Muse Image URL.")
+            return img_resp.content
+        raise MetaAPIError("Muse Image response missing 'b64_json' or 'url'.")
+
+    async def segment(self, image: bytes, prompt: str | None = None) -> bytes:
+        """Segment a product/artwork cutout mask via SAM 3.1 (`sam-3.1`)."""
+        api_key = self._require_api_key()
+        if len(image) > 10 * 1024 * 1024:
+            raise MetaAPIError("Image exceeds 10 MB segmentation limit.")
+
+        payload: dict[str, Any] = {
+            "model": self._sam_model,
+            "image": _to_data_uri(image),
+            "prompt": prompt or "artwork canvas product foreground",
+            "response_format": "b64_json",
+        }
+        try:
+            response = await self._http_client.post(
+                f"{self._base_url}/images/segmentations",
+                headers={"Authorization": f"Bearer {api_key}"},
+                json=payload,
+            )
+        except httpx.HTTPError as err:
+            raise MetaAPIError(f"SAM 3.1 transport error: {type(err).__name__}") from err
+
+        if response.status_code != 200:
+            raise MetaAPIError(f"SAM 3.1 segmentation error (status={response.status_code}).")
+
+        content_type = response.headers.get("content-type", "").lower()
+        if content_type.startswith("image/"):
+            return response.content
+
+        body = response.json()
+        mask_b64 = (
+            body.get("mask_b64")
+            or body.get("b64_json")
+            or (
+                body.get("data", [{}])[0].get("b64_json")
+                if isinstance(body.get("data"), list) and body.get("data")
+                else None
+            )
+        )
+        if not isinstance(mask_b64, str) or not mask_b64:
+            raise MetaAPIError("SAM 3.1 response did not contain mask bytes.")
+        return base64.b64decode(mask_b64)
 
 
 _shared_client: MetaClient | None = None

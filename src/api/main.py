@@ -6,6 +6,7 @@ from fastapi import APIRouter, FastAPI, Request, status
 from fastapi.responses import JSONResponse
 
 from src.api import bids, creative, intel
+from src.clients.comfyui import ComfyUIError
 from src.clients.meta import MetaAPIError
 from src.utils.sitemap import SitemapError
 
@@ -33,6 +34,15 @@ async def meta_api_error_handler(request: Request, exc: MetaAPIError) -> JSONRes
     return JSONResponse(
         status_code=status.HTTP_502_BAD_GATEWAY,
         content={"detail": f"Muse model request failed: {exc}"},
+    )
+
+
+@app.exception_handler(ComfyUIError)
+async def comfyui_error_handler(request: Request, exc: ComfyUIError) -> JSONResponse:
+    logger.error("ComfyUI failure on %s: %s", request.url.path, exc)
+    return JSONResponse(
+        status_code=status.HTTP_502_BAD_GATEWAY,
+        content={"detail": f"ComfyUI workflow failed: {exc}"},
     )
 
 

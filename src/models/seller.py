@@ -7,6 +7,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from src.models.intel import ActionableInsight
+
 FetchStatus = Literal["fetched", "partial", "access_denied", "robots_disallowed", "not_attempted"]
 
 
@@ -94,3 +96,49 @@ class SellerProfile(BaseModel):
             f"Sells on: {', '.join(live)}. Price points: {prices}. "
             f"{len(self.artworks)} artworks in this snapshot."
         )
+
+
+class ScreenshotAnalysis(BaseModel):
+    """Multimodal Muse Spark Vision findings from IG, FB, Marketplace, or shop screenshots."""
+
+    platform_detected: str = Field(min_length=1)
+    visual_merchandising_hooks: list[str] = Field(default_factory=list)
+    pricing_and_offer_signals: list[str] = Field(default_factory=list)
+    copy_and_seo_keywords: list[str] = Field(default_factory=list)
+    conversion_friction_or_gaps: list[str] = Field(default_factory=list)
+    actionable_insights: list[ActionableInsight] = Field(default_factory=list)
+
+
+class SellerDiagnostics(BaseModel):
+    """Deterministic Python diagnostics across a seller's website, marketplaces, and social."""
+
+    total_platforms: int = Field(ge=0)
+    crawlable_platforms: list[str] = Field(default_factory=list)
+    blocked_or_social_platforms: list[str] = Field(default_factory=list)
+    total_artworks_indexed: int = Field(ge=0)
+    artworks_missing_original_price: int = Field(ge=0)
+    artworks_missing_series_tag: int = Field(ge=0)
+    lowest_pod_print_usd: float | None = None
+    highest_direct_edition_usd: float | None = None
+    has_direct_checkout_gap: bool = False
+
+
+class SellerFootprintAuditLLM(BaseModel):
+    """Muse Spark structured recommendations for fixing a seller's multi-channel presence."""
+
+    executive_summary: str = Field(min_length=1)
+    website_seo_and_conversion_fixes: list[ActionableInsight] = Field(min_length=1, max_length=6)
+    marketplace_and_pricing_fixes: list[ActionableInsight] = Field(min_length=1, max_length=6)
+    instagram_and_facebook_sales_plays: list[ActionableInsight] = Field(min_length=1, max_length=6)
+
+
+class SellerFootprintAudit(BaseModel):
+    """Complete own-site + marketplace + IG/FB growth audit for an SMB seller."""
+
+    seller_name: str
+    business_name: str
+    diagnostics: SellerDiagnostics
+    executive_summary: str
+    website_seo_and_conversion_fixes: list[ActionableInsight] = Field(default_factory=list)
+    marketplace_and_pricing_fixes: list[ActionableInsight] = Field(default_factory=list)
+    instagram_and_facebook_sales_plays: list[ActionableInsight] = Field(default_factory=list)

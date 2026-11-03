@@ -1,0 +1,34 @@
+{
+  "data": [
+    {
+      "id": "ad_901122",
+      "page_name": "Desi Canvas Co",
+      "ad_delivery_start_time": "2026-08-14T10:00:00+0000",
+      "publisher_platforms": ["instagram", "facebook"],
+      "ad_creative_link_titles": ["Golden Temple Sunset Framed Canvas - Ready to Hang"],
+      "ad_creative_bodies": [
+        "Transform your living room for Gurpurab & Diwali. Ready-to-hang museum-grade canvas prints with free 3-day US shipping. Starting at $129."
+      ]
+    },
+    {
+      "id": "ad_901189",
+      "page_name": "Punjab Heritage Prints",
+      "ad_delivery_start_time": "2026-09-20T15:30:00+0000",
+      "publisher_platforms": ["instagram"],
+      "ad_creative_link_titles": ["3-Piece Sikh History Collector Set - Save 20%"],
+      "ad_creative_bodies": [
+        "See how it looks above your sofa before you buy. Hand-numbered archival giclee prints celebrating Punjab's timeless artistry."
+      ]
+    },
+    {
+      "id": "ad_902044",
+      "page_name": "Modern South Asian Decor",
+      "ad_delivery_start_time": "2026-10-25T09:00:00+0000",
+      "publisher_platforms": ["facebook", "instagram"],
+      "ad_creative_link_titles": ["Housewarming & Wedding Art Gifts Under $95"],
+      "ad_creative_bodies": [
+        "Generic mass-printed posters fade. Gift museum-quality South Asian wall art with gift note included."
+      ]
+    }
+  ]
+}

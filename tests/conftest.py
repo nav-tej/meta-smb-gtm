@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterator
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
 import pytest
 
-from src.config import Settings
+import src.clients.meta as meta_module
+from src.config import Settings, get_settings
 from src.models.bids import AdSetDailyPerformance, CampaignPerformance
 from src.models.intel import CompetitorBrief
 
@@ -66,6 +68,20 @@ def chat_completion(content: str) -> dict[str, Any]:
             }
         ],
     }
+
+
+@pytest.fixture(autouse=True)
+def _never_use_real_meta_key(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    """Tests must never spend Muse credits, even with a real key in .env.
+
+    An empty env var wins over .env (python-dotenv doesn't override set variables).
+    Tests that need a key set a fake one and mock the API with respx.
+    """
+    monkeypatch.setenv("META_MODEL_API_KEY", "")
+    monkeypatch.setattr(meta_module, "_shared_client", None)
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
 
 
 @pytest.fixture

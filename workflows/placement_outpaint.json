@@ -1,0 +1,87 @@
+{
+  "1": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "base_creative.png"
+    }
+  },
+  "2": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "flux1-fill-dev.safetensors",
+      "weight_dtype": "fp8_e4m3fn"
+    }
+  },
+  "3": {
+    "class_type": "DualCLIPLoader",
+    "inputs": {
+      "clip_name1": "t5xxl_fp8_e4m3fn.safetensors",
+      "clip_name2": "clip_l.safetensors",
+      "type": "flux"
+    }
+  },
+  "4": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "ae.safetensors"
+    }
+  },
+  "5": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "Seamless warm gallery interior continuation, natural shadows, uncluttered space for ad copy",
+      "clip": ["3", 0]
+    }
+  },
+  "6": {
+    "class_type": "ImagePadForOutpaint",
+    "inputs": {
+      "image": ["1", 0],
+      "left": 0,
+      "top": 280,
+      "right": 0,
+      "bottom": 280,
+      "feathering": 32
+    }
+  },
+  "7": {
+    "class_type": "InpaintModelConditioning",
+    "inputs": {
+      "positive": ["5", 0],
+      "negative": ["5", 0],
+      "vae": ["4", 0],
+      "pixels": ["6", 0],
+      "mask": ["6", 1],
+      "noise_mask": true
+    }
+  },
+  "8": {
+    "class_type": "KSampler",
+    "inputs": {
+      "seed": 108,
+      "steps": 20,
+      "cfg": 1.0,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "denoise": 1.0,
+      "model": ["2", 0],
+      "positive": ["7", 0],
+      "negative": ["7", 1],
+      "latent_image": ["7", 2]
+    }
+  },
+  "9": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": ["8", 0],
+      "vae": ["4", 0]
+    }
+  },
+  "10": {
+    "class_type": "SaveImage",
+    "inputs": {
+      "filename_prefix": "meta_smb_outpaint",
+      "images": ["9", 0]
+    }
+  }
+}

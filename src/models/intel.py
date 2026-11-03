@@ -30,6 +30,27 @@ class SitemapEntry(BaseModel):
     bucket: UrlBucket = "other"
 
 
+class SocialAdSummary(BaseModel):
+    """Normalized summary of an active Facebook/Instagram ad from the Meta Ad Library."""
+
+    ad_id: str
+    page_name: str
+    platforms: list[str] = Field(default_factory=list)
+    days_running: int = Field(default=0, ge=0)
+    headline: str = ""
+    body_excerpt: str = ""
+
+
+class SocialCompetitorSignals(BaseModel):
+    """Deterministic metrics computed in Python from Meta Ad Library IG/FB ads."""
+
+    query: str
+    total_active_ads: int = Field(default=0, ge=0)
+    proven_30d_winners_count: int = Field(default=0, ge=0)
+    platform_counts: dict[str, int] = Field(default_factory=dict)
+    top_longevity_ads: list[SocialAdSummary] = Field(default_factory=list)
+
+
 class CompetitorSignals(BaseModel):
     """Deterministic metrics computed in Python from crawled competitor URLs."""
 
@@ -44,6 +65,7 @@ class CompetitorSignals(BaseModel):
     publishing_cadence_per_week: float | None = Field(default=None, ge=0)
     detected_price_hints: list[str] = Field(default_factory=list)
     seasonal_themes: list[str] = Field(default_factory=list)
+    social_signals: SocialCompetitorSignals | None = None
 
 
 class ActionableInsight(BaseModel):

@@ -9,10 +9,12 @@ import respx
 from fastapi.testclient import TestClient
 
 from src.api.bids import get_bid_advisor_service
+from src.api.creative import get_ad_creative_service
 from src.api.intel import get_competitor_intel_service
 from src.api.main import app
 from src.clients.meta import MetaClient
 from src.config import Settings
+from src.models.creative import Creative, CreativeSet, GenerateAdsRequest
 from src.models.intel import CompetitorBrief, CompetitorIntelRequest
 from src.services.bid_advisor import BidAdvisorService
 from src.utils.sitemap import SitemapError
@@ -82,12 +84,44 @@ def test_analyze_competitors_unreadable_site(client: TestClient) -> None:
     assert "No competitor URLs" in response.json()["detail"]
 
 
-def test_generate_ads_not_implemented_yet(client: TestClient, brief_json: dict[str, Any]) -> None:
+def test_generate_ads_returns_creative_set(client: TestClient, brief_json: dict[str, Any]) -> None:
+    class FakeCreativeService:
+        async def generate(self, req: GenerateAdsRequest) -> CreativeSet:
+            return CreativeSet(
+                product_title=req.product.title,
+                positioning_hook="Hand-signed 18k gold giclee",
+                creatives=[
+                    Creative(
+                        placement="facebook_feed",
+                        image_path="outputs/ek-onkar-muse.png",
+                        prompt="Sunlit collector wall",
+                        headline="Signed 18k Gold Giclee",
+                        primary_text="Exhibited at Triton & Fowler Museums.",
+                        produced_by="muse-image-1.0",
+                    ),
+                    Creative(
+                        placement="facebook_feed",
+                        image_path="outputs/ek-onkar-krea.png",
+                        prompt="Sunlit collector wall",
+                        headline="Signed 18k Gold Giclee",
+                        primary_text="Exhibited at Triton & Fowler Museums.",
+                        produced_by="comfyui:flux_krea_scene_relight",
+                    ),
+                ],
+            )
+
+    app.dependency_overrides[get_ad_creative_service] = lambda: FakeCreativeService()
     response = client.post(
         "/api/v1/generate-ads",
-        json={"product": {"title": "Sunset Pier print"}, "competitor_brief": brief_json},
+        json={"product": {"title": "Ek Onkar 24x24"}, "competitor_brief": brief_json},
     )
-    assert response.status_code == 501
+    assert response.status_code == 200
+    body = response.json()
+    assert body["product_title"] == "Ek Onkar 24x24"
+    assert [c["produced_by"] for c in body["creatives"]] == [
+        "muse-image-1.0",
+        "comfyui:flux_krea_scene_relight",
+    ]
 
 
 @respx.mock
