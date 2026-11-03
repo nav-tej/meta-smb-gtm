@@ -64,9 +64,12 @@ The user is a solo seller, not a marketer. Every output should be something they
 Model IDs and endpoint shapes have been **verified live** against `https://api.meta.ai/v1`:
 - **`GET /v1/models`** returns: `muse-spark-1.3`, `muse-image-1.0`, `sam-3.1`, `muse-wonder-1.0`, `muse-voice-transcribe-1.0`, `muse-spark-1.3-contributor`, `muse-spark-1.2`, `muse-spark-1.1`.
 - **`muse-spark-1.3` (`POST /v1/chat/completions`):** Text & Vision structured JSON output (`response_format={"type": "json_object"}`).
-- **`muse-image-1.0` (`POST /v1/images/generations` & `POST /v1/images/edits`):**
+- **`muse-image-1.0` (`POST /v1/images/generations`, `POST /v1/images/edits`, & `POST /v1/responses`):**
   - `/v1/images/generations` takes `{"model": "muse-image-1.0", "prompt": "...", "size": "1024x1024"}` (rejects `"image"` key with HTTP 400).
   - `/v1/images/edits` takes `{"model": "muse-image-1.0", "prompt": "...", "images": [{"image_url": "data:image/...;base64,..."}]}` to restage an existing product/artwork photo.
+  - `/v1/responses` takes `{"model": "muse-image-1.0", "reasoning": {"effort": "high"}, "input": [{"role": "user", "content": [{"type": "input_text", "text": "..."}, {"type": "input_image", "image_url": "data:..."}, ...]}]}` and returns both a `reasoning` summary trace and an `image_generation_call` base64 result (`MetaClient.generate_image_workflow()`). Powers all 3 Meta Model API Playground workflows (*Product visuals*, *Restore image*, *Multi-Image combine*) with zero Comfy Cloud subscription.
+- **`muse-voice-transcribe-1.0` (`POST /v1/audio/transcriptions`):**
+  - Accepts multipart `file` + `model="muse-voice-transcribe-1.0"` and returns `{"text": "..."}` (`MetaClient.transcribe_audio()`).
 - **`sam-3.1` (`POST /v1/responses`):**
   - `/v1/images/segmentations` returns 404; `/v1/images/edits` returns `"The model sam-3.1 is not available on this endpoint. Use /v1/responses."`
   - `/v1/responses` takes `{"model": "sam-3.1", "input": [{"role": "user", "content": [{"type": "input_text", "text": "..."}, {"type": "input_image", "image_url": "data:..."}]}]}` and returns `<|box;x1=...;y1=...;x2=...;y2=...;w=...;h=...|><|mask;...|>` inside `output[*].content[*].text`.
@@ -137,23 +140,24 @@ Generated images go in `outputs/` (gitignored). Never commit generated images ex
 src/
   config.py              # Settings loaded from env (single source of config)
   main.py                # Uvicorn entry point re-exporting src.api.main:app
-  api/                   # FastAPI app + routers (/api/v1/*). Thin.
-    main.py              # App factory, router registration, error handlers, /health
-    intel.py             # POST /api/v1/analyze-competitors
-    creative.py          # POST /api/v1/generate-ads
-    bids.py              # POST /api/v1/bid-advice
+  api/                   # FastAPI app + routers (/api/v1/*) + Customer Portal static UI
+    main.py              # App factory, GET / & /portal, /samples mount, error handlers, /health
+    intel.py             # POST /analyze-competitors, /ingest-storefront, /audit-seller, /audit-screenshot, GET /demo-presets
+    creative.py          # POST /generate-ads (Phase 1 draft & Phase 2 render), POST /transcribe-voice
+    bids.py              # POST /bid-advice (JSON) & POST /bid-advice/csv (Meta Ads Manager CSV)
+    static/index.html    # Lovable-style Customer Portal (Muse Growth Studio)
   services/
     competitor_intel.py  # Flow 1: Sitemap + profile/URL-list crawl -> CompetitorBrief
-    ad_creative.py       # Flow 2: SAM 3.1 + Muse Spark + Muse Image + ComfyUI FLUX.1-Krea
-    bid_advisor.py       # Flow 3: Deterministic ad metrics + Muse Spark -> BidRecommendation
+    ad_creative.py       # Flow 2: SAM 3.1 + Muse Spark + Muse Image (/v1/responses) + ComfyUI
+    bid_advisor.py       # Flow 3: Deterministic ad metrics + CSV parser + Muse Spark -> BidRecommendation
     seller_audit.py      # Multi-channel seller website/marketplace/social + Vision screenshot audit
   clients/
-    meta.py              # Meta Model API wrapper (Muse Spark text/vision, Muse Image, SAM 3.1)
+    meta.py              # Meta Model API wrapper (Muse Spark text/vision, Muse Image, Voice, SAM 3.1)
     comfyui.py           # ComfyUI HTTP API wrapper (/upload/image, /prompt, /history, /view)
     ad_library.py        # Meta Ad Library Graph API client (/ads_archive IG/FB ad longevity)
   models/
-    intel.py             # CompetitorBrief, CompetitorSignals, SocialCompetitorSignals, etc.
-    creative.py          # GenerateAdsRequest, CreativeBrief, Creative, CreativeSet
+    intel.py             # CompetitorBrief, CompetitorSignals, ResearchBrief, Evidence, etc.
+    creative.py          # GenerateAdsRequest, EditableCreativeBrief, Creative, CreativeSet
     bids.py              # CampaignPerformance, PerformanceMetrics, BidRecommendation
     seller.py            # SellerProfile, SellerDiagnostics, SellerFootprintAudit, ScreenshotAnalysis
   utils/
@@ -161,9 +165,12 @@ src/
 scripts/
   demo_flow.py           # Printable CLI report (make demo; supports --live and --skip-llm)
   demo_sarabjit_singh.py # Full 4-stage closed-loop E2E runner (--dry-run offline or --live)
-tests/                   # 69 offline pytest tests mirroring src/. Fixtures in tests/fixtures/
-workflows/               # ComfyUI API-format JSON: flux_krea_scene_relight, placement_outpaint, upscale_4x
-data/samples/            # Real demo snapshots (Art of Sarabjit Singh profile, campaign, competitor, Meta ads)
+docs/
+  CLAUDE_HANDOFF_330PM.md # 3:30 PM PT multi-agent handoff brief for Claude & Hermes
+  DEMO_VIDEO_SCRIPT.md    # 3-minute hackathon pitch & click script for http://localhost:8000/
+tests/                   # 92 offline pytest tests mirroring src/. Fixtures in tests/fixtures/
+workflows/               # 9 ComfyUI API-format JSON templates (sam3, krea3, krea2, ideogram4, ltx2.5, minimax_h3)
+data/samples/            # Real demo snapshots + 6 live Muse Image 1.0 WebP visuals + CSV export
 outputs/                 # Generated artifacts, gitignored
 ```
 
@@ -274,28 +281,41 @@ This app fetches arbitrary URLs, parses untrusted XML, and feeds third-party con
 
 ---
 
-## 12. Current implementation status & next orchestration tasks
+## 12. Current implementation status & next orchestration tasks (Claude & Hermes)
 
-### Completed & verified (`make check` → 87/87 tests passing)
+### Completed & verified (`make check` → 92/92 tests passing, 0 ruff errors)
 - **Meta Model API Client (`src/clients/meta.py`):** `MetaClient` using `AsyncOpenAI` (`https://api.meta.ai/v1`) with `.strip()` on credentials/model IDs, structured JSON validation with 1-retry repair (`chat_structured`), multimodal Vision screenshot analysis (`chat_vision_structured`), `generate_image` (`muse-image-1.0` on `/v1/images/generations`), `edit_image` (`muse-image-1.0` on `/v1/images/edits`), `generate_image_workflow` (`muse-image-1.0` on `/v1/responses` with `reasoning={"effort": "high"}` supporting `product_visuals`, `restore_enhance`, and `multi_image_combine` + returning `reasoning_summary`), `transcribe_audio` (`muse-voice-transcribe-1.0` on `/v1/audio/transcriptions`), and `segment` (`sam-3.1` on `/v1/responses` parsing `<|box;...|>` into a binary PNG mask).
 - **Flow 1 — Competitor Intel & Storefront Ingestion (`src/services/competitor_intel.py`, `src/utils/sitemap.py`, `src/models/intel.py`, `src/api/intel.py`):**
   - SSRF-guarded HTTP (`validate_safe_url`, `_fetch_bytes_guarded`), RFC 9309 wildcard `robots.txt` (`parse_robots_txt`), `defusedxml` `<urlset>` & `<sitemapindex>` recursion, gzip-bomb defense, marketplace profile fallback (`crawl_listing_page_fallback`), deterministic signal derivation (`derive_signals`), verified `ResearchBrief` (`F1..Fn` citations checked by `_CitationChecker`), and Muse Spark synthesis (`POST /api/v1/analyze-competitors`).
-  - Live seller reference ingestion (`POST /api/v1/ingest-storefront`), multi-channel seller audit (`POST /api/v1/audit-seller`), Vision screenshot audit (`POST /api/v1/audit-screenshot`), and pre-verified workspace presets (`GET /api/v1/demo-presets`).
+  - Live seller reference ingestion (`POST /api/v1/ingest-storefront`, verified live on `artofsarabjitsingh.com` + `fineartamerica.com` + `saatchiart.com` + `@artofsarabjitsingh` + `facebook.com`), multi-channel seller audit (`POST /api/v1/audit-seller`), Vision screenshot audit (`POST /api/v1/audit-screenshot`), and two full workspace presets (`GET /api/v1/demo-presets` returning `sarabjit_singh` Fine Artist and `etsy_ceramics` Physical Goods).
 - **Flow 2 — Two-Phase Hybrid Ad Creative Studio (`src/services/ad_creative.py`, `src/clients/comfyui.py`, `src/models/creative.py`, `src/api/creative.py`, `workflows/*.json`, `.claude/skills/comfy*`):**
   - Two-phase reviewable creative workflow (`POST /api/v1/generate-ads` with `draft=true` -> seller edits `EditableCreativeBrief` -> Phase 2 render), plus voice-note transcription (`POST /api/v1/transcribe-voice`).
   - Native Meta Playground workflows (`product_visuals`, `restore_enhance`, `multi_image_combine`) mirroring open-weight ComfyUI workflows (`sam3_segment.json`, `krea3_scene_edit.json`, `krea2_turbo_style_ref.json`, `ideogram4_collector_card.json`, `flux_krea_scene_relight.json`, `placement_outpaint.json`, `upscale_4x.json`, `ltx2_5_dfr_i2v.json`, `minimax_h3_i2v.json`).
-- **Flow 3 — Cited Bid Advisor (`src/services/bid_advisor.py`, `src/models/bids.py`, `src/api/bids.py`):**
-  - Deterministic Python math (`compute_metrics`, `load_campaign_csv`) + Muse Spark `BidRecommendation` (`POST /api/v1/bid-advice`) tracing budget shifts and audience plays back to `ResearchBrief` findings `F1..Fn`.
+  - **6 Live `Muse Image 1.0` WebP Visuals in `data/samples/`:**
+    1. `ek_onkar_collector_room_live.webp` (*Ek Onkar* collector living room — `product_visuals`)
+    2. `diptych_ek_onkar_kirat_karo_live.webp` (*Ek Onkar + Kirat Karo* 2-Piece Collector Diptych — `multi_image_combine`)
+    3. `naam_japo_restored_gallery_live.webp` (*Naam Japo* studio-restored & oak-framed — `restore_enhance`)
+    4. `kirat_karo_collector_room_live.webp` (*Kirat Karo* brushed-brass dining room — `product_visuals`)
+    5. `etsy_chai_set_product_visual_live.webp` (*Saffron & Clay* stoneware & hammered brass chai set — `product_visuals`)
+    6. `etsy_diwali_gift_box_live.webp` (*Saffron & Clay* brass diya + marigold linen gift box — `multi_image_combine`)
+- **Flow 3 — Cited Bid Advisor & CSV Upload (`src/services/bid_advisor.py`, `src/models/bids.py`, `src/api/bids.py`):**
+  - Deterministic Python math (`compute_metrics`, `load_campaign_csv`) + Muse Spark `BidRecommendation` (`POST /api/v1/bid-advice` and `POST /api/v1/bid-advice/csv`) tracing budget shifts and audience plays back to `ResearchBrief` findings `F1..Fn`. Sample Meta Ads Manager export ready in `data/samples/sarabjit_singh_ads_export.csv`.
 - **Lovable-Style Customer Portal (`src/api/static/index.html` served at `GET /` and `GET /portal`):**
-  - Live interactive workspace onboarding, Step 0 storefront/marketplace/socials reference crawler (`artofsarabjitsingh.com`, `FineArtAmerica`, `Saatchi Art`, `Instagram`, `Facebook`), Step 1 cited competitor intel, Step 2 two-phase creative brief editor + 4 live `Muse Image 1.0` collector stagings (`ek_onkar_collector_room_live.webp`, `diptych_ek_onkar_kirat_karo_live.webp`, `naam_japo_restored_gallery_live.webp`, `kirat_karo_collector_room_live.webp`) + 9:16 Reel preview player, Step 3 responsive campaign table & bid advisor, and Step 4 1-click Weebly/Shopify Stripe Checkout HTML + Meta Ads CSV export.
+  - Live interactive workspace switcher (`Art of Sarabjit Singh` Fine Artist vs. `Saffron & Clay Studio` Etsy Physical Goods vs. custom storefront onboarding), Step 0 storefront/marketplace/socials reference crawler, Step 1 cited competitor intel + Vision screenshot dropzone, Step 2 two-phase creative brief editor + 6 live `Muse Image 1.0` stagings + High-Reasoning trace badge + 9:16 Reel preview player, Step 3 responsive campaign table + 1-click CSV upload, and Step 4 1-click Weebly/Shopify Stripe Checkout HTML + **Google Rich-Snippet JSON-LD (`VisualArtwork` + `Product`) Schema** + Meta Ads CSV export.
+- **Documentation & Demo Script (`docs/`):**
+  - `docs/CLAUDE_HANDOFF_330PM.md`: Complete handoff brief and copy-paste prompt.
+  - `docs/DEMO_VIDEO_SCRIPT.md`: Timestamped 3-minute hackathon pitch and click sequence.
 
-### Next orchestration priorities (for Hermes in the interim & Claude at 3:30 PM PT)
-1. **For Hermes (Zero Merge-Conflict Data & Demo Script Tasks in `data/samples/` & `docs/`):**
-   - Create full multi-vertical preset fixtures in `data/samples/etsy_saffron_and_clay_Preset.json` (Etsy Physical Goods & Handmade Ceramics) so switching workspaces in the Customer Portal loads full live-formatted competitor findings, 3 product cards, and 14-day campaign metrics for the Etsy vertical too.
-   - Draft `docs/DEMO_VIDEO_SCRIPT.md` with exact timestamps (`0:00–3:00`), voiceover lines, and click sequence for the hackathon submission video.
-2. **For Claude (at 3:30 PM PT Handoff):**
-   - Wire `POST /api/v1/bid-advice/csv` (direct Meta Ads Manager CSV file upload in Step 3 of the portal).
-   - Add JSON-LD `VisualArtwork` / `Product` schema generator to Step 4 (`1-Click Launch Pack`) alongside the Stripe Checkout embed snippet.
-   - Run final end-to-end verification and git commit/push of the portal and live sample assets.
+### Multi-Agent Coordination Rules & Next Tasks for Claude & Hermes
+- **Environment topology:**
+  - **Primary Mac (`localhost:8000`):** Runs the live FastAPI Customer Portal (`uvicorn src.api.main:app --reload`), Claude Code, and Antigravity.
+  - **Secondary Mac Studio (Hermes):** Hermes runs on a separate Mac Studio and syncs via `https://github.com/nav-tej/meta-smb-gtm.git` (`origin/main`). Always run `git pull --rebase origin main` before starting work and `make check` before pushing.
+- **Next Tasks for Claude:**
+  1. Walk through `docs/DEMO_VIDEO_SCRIPT.md` on `http://localhost:8000/` and verify every click path (Workspace Switcher, Step 0 Live Crawl, Step 1 Cited Brief, Step 2 Phase 1 Draft -> Phase 2 Render, Step 3 CSV Upload with `data/samples/sarabjit_singh_ads_export.csv`, Step 4 Checkout + JSON-LD copy).
+  2. Optional UI/UX polish or README/submission write-up enhancements for the Cerebral Valley judging rubric (Impact 30%, Meta AI Tooling 25%, Demo 25%, Technical Depth 20%).
+- **Next Tasks for Hermes (on the separate Mac Studio):**
+  1. Pull `origin/main` (`c16c354`+) and run `make check` (`92 passed`).
+  2. If local ComfyUI (`http://127.0.0.1:8188`) is running on the Mac Studio, execute `workflows/ltx2_5_dfr_i2v.json` or `workflows/minimax_h3_i2v.json` on `data/samples/ek_onkar_collector_room_live.webp` to drop an optional real `.mp4` video reel asset into `data/samples/` without touching `src/api/static/index.html`.
+  3. Expand `README.md` with architecture diagrams, quickstart screenshots, and sample API curl commands so judges inspecting the GitHub repo see the full pipeline immediately.
 
 
