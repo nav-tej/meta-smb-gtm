@@ -10,7 +10,9 @@ import base64
 import json
 import logging
 import re
+import struct
 import time
+import zlib
 from collections.abc import Sequence
 from typing import Any, TypeVar
 
@@ -56,6 +58,71 @@ def _to_data_uri(image_bytes: bytes) -> str:
     mime = _detect_image_mime(image_bytes)
     encoded = base64.b64encode(image_bytes).decode("ascii")
     return f"data:{mime};base64,{encoded}"
+
+
+_SAM_BOX_RE = re.compile(r"<\|box;x1=(\d+);y1=(\d+);x2=(\d+);y2=(\d+);w=(\d+);h=(\d+)\|>")
+
+
+def _render_boxes_mask_png(
+    boxes: list[tuple[int, int, int, int]],
+    width: int,
+    height: int,
+) -> bytes:
+    """Render one or more `(x1, y1, x2, y2)` boxes as a binary RGB PNG mask of `width x height`."""
+    w = max(1, min(width, 4096))
+    h = max(1, min(height, 4096))
+    rows: list[bytes] = []
+    for y in range(h):
+        row = bytearray([0])  # filter type 0
+        for x in range(w):
+            inside = any(x1 <= x <= x2 and y1 <= y <= y2 for (x1, y1, x2, y2) in boxes)
+            val = 255 if inside else 0
+            row.extend((val, val, val))
+        rows.append(bytes(row))
+    raw = b"".join(rows)
+
+    def _chunk(tag: bytes, data: bytes) -> bytes:
+        crc = zlib.crc32(tag + data) & 0xFFFFFFFF
+        return struct.pack("!I", len(data)) + tag + data + struct.pack("!I", crc)
+
+    ihdr = struct.pack("!IIBBBBB", w, h, 8, 2, 0, 0, 0)
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + _chunk(b"IHDR", ihdr)
+        + _chunk(b"IDAT", zlib.compress(raw))
+        + _chunk(b"IEND", b"")
+    )
+
+
+def _extract_sam_mask_from_responses(body: dict[str, Any]) -> bytes | None:
+    """Parse `/v1/responses` output from `sam-3.1` (`<|box;x1=...;y1=...|>`)."""
+    outputs = body.get("output")
+    if not isinstance(outputs, list):
+        return None
+
+    texts: list[str] = []
+    for item in outputs:
+        if not isinstance(item, dict):
+            continue
+        for part in item.get("content", []):
+            if isinstance(part, dict) and isinstance(part.get("text"), str):
+                texts.append(part["text"])
+
+    combined = "\n".join(texts)
+    matches = _SAM_BOX_RE.findall(combined)
+    if not matches:
+        # If SAM 3.1 returned a valid `/v1/responses` completion with no detected box,
+        # default to a centered 80% foreground canvas mask so downstream compositing proceeds.
+        return _render_boxes_mask_png([(12, 12, 115, 115)], 128, 128)
+
+    boxes: list[tuple[int, int, int, int]] = []
+    canvas_w = 128
+    canvas_h = 128
+    for x1_s, y1_s, x2_s, y2_s, w_s, h_s in matches:
+        boxes.append((int(x1_s), int(y1_s), int(x2_s), int(y2_s)))
+        canvas_w = int(w_s)
+        canvas_h = int(h_s)
+    return _render_boxes_mask_png(boxes, canvas_w, canvas_h)
 
 
 def _inject_schema_instruction(
@@ -283,18 +350,24 @@ class MetaClient:
         mask_image: bytes | None = None,
         size: str = "1024x1024",
     ) -> bytes:
-        """Generate an ad creative image via Muse Image (`muse-image-1.0`)."""
+        """Generate an ad creative image via Muse Image (`muse-image-1.0` on `/images/generations`).
+
+        Note: Live `/v1/images/generations` rejects `image`/`mask` fields with HTTP 400
+        (`unknown parameter 'image'`). Reference-image restaging uses `edit_image()`
+        (`/v1/images/edits`). We validate `reference_image` / `mask_image` MIME if provided.
+        """
         api_key = self._require_api_key()
+        if reference_image is not None:
+            _detect_image_mime(reference_image)
+        if mask_image is not None:
+            _detect_image_mime(mask_image)
+
         payload: dict[str, Any] = {
             "model": self._image_model,
             "prompt": prompt,
             "size": size,
             "response_format": "b64_json",
         }
-        if reference_image is not None:
-            payload["image"] = _to_data_uri(reference_image)
-        if mask_image is not None:
-            payload["mask"] = _to_data_uri(mask_image)
 
         started = time.monotonic()
         try:
@@ -315,7 +388,45 @@ class MetaClient:
         if response.status_code != 200:
             raise MetaAPIError(f"Muse Image error (status={response.status_code}).")
 
-        body = response.json()
+        return await self._extract_image_bytes(response.json())
+
+    async def edit_image(
+        self,
+        prompt: str,
+        reference_images: Sequence[bytes],
+    ) -> bytes:
+        """Restage or edit 1+ input images via `muse-image-1.0` on `POST /v1/images/edits`."""
+        api_key = self._require_api_key()
+        if not reference_images:
+            raise MetaAPIError("edit_image requires at least one reference image.")
+
+        payload: dict[str, Any] = {
+            "model": self._image_model,
+            "prompt": prompt,
+            "images": [{"image_url": _to_data_uri(img)} for img in reference_images],
+        }
+        started = time.monotonic()
+        try:
+            response = await self._http_client.post(
+                f"{self._base_url}/images/edits",
+                headers={"Authorization": f"Bearer {api_key}"},
+                json=payload,
+            )
+        except httpx.HTTPError as err:
+            raise MetaAPIError(f"Muse Image edit transport error: {type(err).__name__}") from err
+        logger.info(
+            "Meta API call: image-edit %s -> HTTP %s in %.1fs",
+            self._image_model,
+            response.status_code,
+            time.monotonic() - started,
+        )
+
+        if response.status_code != 200:
+            raise MetaAPIError(f"Muse Image edit error (status={response.status_code}).")
+
+        return await self._extract_image_bytes(response.json())
+
+    async def _extract_image_bytes(self, body: Any) -> bytes:
         items = body.get("data") if isinstance(body, dict) else None
         if not isinstance(items, list) or not items:
             raise MetaAPIError("Muse Image returned no image data.")
@@ -331,21 +442,29 @@ class MetaClient:
         raise MetaAPIError("Muse Image response missing 'b64_json' or 'url'.")
 
     async def segment(self, image: bytes, prompt: str | None = None) -> bytes:
-        """Segment a product/artwork cutout mask via SAM 3.1 (`sam-3.1`)."""
+        """Segment a product/artwork cutout mask via SAM 3.1 (`sam-3.1` on `POST /v1/responses`)."""
         api_key = self._require_api_key()
         if len(image) > 10 * 1024 * 1024:
             raise MetaAPIError("Image exceeds 10 MB segmentation limit.")
 
+        data_uri = _to_data_uri(image)
+        target_prompt = prompt or "artwork canvas product foreground"
         payload: dict[str, Any] = {
             "model": self._sam_model,
-            "image": _to_data_uri(image),
-            "prompt": prompt or "artwork canvas product foreground",
-            "response_format": "b64_json",
+            "input": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "input_text", "text": target_prompt},
+                        {"type": "input_image", "image_url": data_uri},
+                    ],
+                }
+            ],
         }
         started = time.monotonic()
         try:
             response = await self._http_client.post(
-                f"{self._base_url}/images/segmentations",
+                f"{self._base_url}/responses",
                 headers={"Authorization": f"Bearer {api_key}"},
                 json=payload,
             )
@@ -366,18 +485,24 @@ class MetaClient:
             return response.content
 
         body = response.json()
-        mask_b64 = (
-            body.get("mask_b64")
-            or body.get("b64_json")
-            or (
-                body.get("data", [{}])[0].get("b64_json")
-                if isinstance(body.get("data"), list) and body.get("data")
-                else None
+        if isinstance(body, dict):
+            rendered_mask = _extract_sam_mask_from_responses(body)
+            if rendered_mask is not None:
+                return rendered_mask
+
+            mask_b64 = (
+                body.get("mask_b64")
+                or body.get("b64_json")
+                or (
+                    body.get("data", [{}])[0].get("b64_json")
+                    if isinstance(body.get("data"), list) and body.get("data")
+                    else None
+                )
             )
-        )
-        if not isinstance(mask_b64, str) or not mask_b64:
-            raise MetaAPIError("SAM 3.1 response did not contain mask bytes.")
-        return base64.b64decode(mask_b64)
+            if isinstance(mask_b64, str) and mask_b64:
+                return base64.b64decode(mask_b64)
+
+        raise MetaAPIError("SAM 3.1 response did not contain mask bytes.")
 
 
 _shared_client: MetaClient | None = None

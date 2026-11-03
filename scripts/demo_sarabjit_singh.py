@@ -313,9 +313,24 @@ def _mock_transport(spark_bid_template: dict[str, object]) -> httpx.MockTranspor
                     ],
                 },
             )
-        if url.endswith("/images/segmentations"):
-            return httpx.Response(200, json={"mask_b64": DEMO_PNG_B64})
-        if url.endswith("/images/generations"):
+        if url.endswith("/responses") or url.endswith("/images/segmentations"):
+            return httpx.Response(
+                200,
+                json={
+                    "output": [
+                        {
+                            "type": "message",
+                            "content": [
+                                {
+                                    "type": "output_text",
+                                    "text": "<0f>0<|box;x1=16;y1=16;x2=112;y2=112;w=128;h=128|>",
+                                }
+                            ],
+                        }
+                    ]
+                },
+            )
+        if url.endswith("/images/generations") or url.endswith("/images/edits"):
             return httpx.Response(200, json={"data": [{"b64_json": DEMO_PNG_B64}]})
         if url.endswith("/system_stats"):
             return httpx.Response(200, json={"system": {"os": "darwin"}})
@@ -409,7 +424,9 @@ async def run_demo(
         ):
             print(f"  - [{fix.priority.upper()}] {fix.title}: {fix.action}")
 
-        print("\n=== 2. AD CREATIVE STUDIO: SAM 3.1 + Muse Spark + Muse Image + FLUX.1-Krea ===")
+        print(
+            "\n=== 2. AD CREATIVE STUDIO: SAM 3.1 + Muse Spark + Muse Image + Krea 3 + LTX-2.5 ==="
+        )
         creative_service = AdCreativeService(
             meta_client=meta_client,
             comfy_client=comfy_client,
@@ -429,13 +446,17 @@ async def run_demo(
                 placements=["instagram_feed", "reels_cover"],
                 variants_per_placement=2,
                 use_comfyui=True,
-                comfyui_workflow="flux_krea_scene_relight",
+                comfyui_workflow="krea3_scene_edit",
+                comfyui_video_workflow="ltx2_5_dfr_i2v",
             )
         )
         print(f"Positioning Hook: {creative_set.positioning_hook}")
         print(f"SAM 3.1 Mask Saved: {creative_set.mask_path}")
         for c in creative_set.creatives:
-            print(f"  - [{c.placement}] ({c.produced_by}) '{c.headline}' -> {c.image_path}")
+            print(
+                f"  - [{c.placement}] ({c.produced_by} | {c.media_type}) "
+                f"'{c.headline}' -> {c.image_path}"
+            )
 
         print("\n=== 3. BID ADVISOR: Deterministic Metrics + Muse Spark 1.3 ===")
         bid_service = BidAdvisorService(meta_client=meta_client)

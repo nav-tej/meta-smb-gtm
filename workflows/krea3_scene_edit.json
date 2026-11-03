@@ -1,0 +1,68 @@
+{
+  "_meta": {
+    "title": "Krea 3 Collector Scene Restaging + SAM 3.1 Artwork Preservation",
+    "description": "Uses Krea 3 (Krea3ImageNode from ComfyUI template api_krea3_image_edit) to restage and relight the room around the artwork, then composites the original painting pixels through the SAM 3.1 mask so zero brushwork is altered.",
+    "template_source": "api_krea3_image_edit"
+  },
+  "1": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "artwork_input.png"
+    }
+  },
+  "2": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "sam3_mask.png"
+    }
+  },
+  "3": {
+    "class_type": "ImageToMask",
+    "inputs": {
+      "image": ["2", 0],
+      "channel": "red"
+    }
+  },
+  "4": {
+    "class_type": "Krea3ImageNode",
+    "inputs": {
+      "model": "Krea 3",
+      "prompt": "Warm sunlit California collector living room wall with museum track lighting, walnut credenza below, architectural digest interior photography",
+      "image": ["1", 0],
+      "aspect_ratio": "4:5",
+      "resolution": "1K",
+      "speed": "fast"
+    }
+  },
+  "5": {
+    "class_type": "ImageScale",
+    "inputs": {
+      "image": ["4", 0],
+      "upscale_method": "lanczos",
+      "width": 1080,
+      "height": 1350,
+      "crop": "center"
+    }
+  },
+  "6": {
+    "class_type": "ImageCompositeMasked",
+    "inputs": {
+      "destination": ["5", 0],
+      "source": ["1", 0],
+      "mask": ["3", 0],
+      "x": 0,
+      "y": 0,
+      "resize_source": false
+    }
+  },
+  "7": {
+    "class_type": "SaveImageAdvanced",
+    "inputs": {
+      "images": ["6", 0],
+      "filename_prefix": "meta_smb_krea3_scene",
+      "format": "png",
+      "bit_depth": "8-bit",
+      "color_profile": "sRGB"
+    }
+  }
+}

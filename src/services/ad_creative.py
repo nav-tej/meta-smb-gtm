@@ -30,8 +30,11 @@ from src.models.creative import (
     Creative,
     CreativeBrief,
     CreativeSet,
+    EditableCreativeBrief,
+    EditableCreativeVariant,
     GenerateAdsRequest,
     Placement,
+    PlacementSpec,
     ProductInfo,
 )
 from src.models.intel import CompetitorBrief
@@ -55,6 +58,15 @@ PLACEMENT_MUSE_SIZE: dict[Placement, str] = {
     "reels_cover": "1024x1792",
 }
 
+PLACEMENT_ASPECT_RATIO: dict[Placement, str] = {
+    "facebook_feed": "1:1",
+    "instagram_feed": "4:5",
+    "instagram_story": "9:16",
+    "reels_cover": "9:16",
+}
+
+VIDEO_WORKFLOWS = {"ltx2_5_dfr_i2v", "minimax_h3_i2v"}
+
 CREATIVE_BRIEF_SYSTEM_PROMPT = (
     "You are a direct-response creative director for independent artists and handmade shop "
     "owners advertising on Instagram and Facebook.\n\n"
@@ -65,7 +77,9 @@ CREATIVE_BRIEF_SYSTEM_PROMPT = (
     "surrounding collector room, gallery wall, frame, lighting, and atmosphere—NEVER instruct "
     "an image model to redraw or alter the artwork itself.\n\n"
     "Write plain, emotionally resonant ad copy (`headline` and `primary_text`) tailored to "
-    "each requested placement, exploiting the competitor gaps in <untrusted_competitor_data>."
+    "each requested placement, exploiting the competitor gaps in <untrusted_competitor_data>. "
+    "For every angle, describe its `target_audience` in plain words (who they are, what they "
+    "care about, why now); the seller reviews and edits these before any image is made."
 )
 
 
@@ -126,11 +140,18 @@ async def load_product_image(
             await client.aclose()
 
 
-def _save_artifact(image_bytes: bytes, *, prefix: str, output_dir: Path) -> str:
+def _save_artifact(
+    media_bytes: bytes,
+    *,
+    prefix: str,
+    output_dir: Path,
+    extension: str = "png",
+) -> str:
     output_dir.mkdir(parents=True, exist_ok=True)
     token = uuid.uuid4().hex[:8]
-    dest = output_dir / f"{_slugify(prefix)}-{token}.png"
-    dest.write_bytes(image_bytes)
+    ext = extension.lstrip(".") or "png"
+    dest = output_dir / f"{_slugify(prefix)}-{token}.{ext}"
+    dest.write_bytes(media_bytes)
     return str(dest)
 
 
@@ -181,6 +202,7 @@ async def _run_comfyui_krea_variant(
     workflow_name: str,
     placement: Placement,
     scene_prompt: str,
+    motion_and_audio_prompt: str = "",
     headline: str,
     primary_text: str,
     artwork_bytes: bytes | None,
@@ -188,11 +210,30 @@ async def _run_comfyui_krea_variant(
     base_creative_bytes: bytes,
     comfy_client: ComfyUIClient,
     output_dir: Path,
-) -> list[Creative]:
-    """Run an open-weight ComfyUI workflow (`flux_krea_scene_relight` or `placement_outpaint`)."""
+) -> tuple[list[Creative], bytes | None]:
+    """Run a ComfyUI workflow (`krea3_scene_edit`, `ltx2_5_dfr_i2v`, `minimax_h3_i2v`, etc.)."""
     width, height = PLACEMENT_DIMENSIONS[placement]
+    aspect = PLACEMENT_ASPECT_RATIO[placement]
+    is_video = workflow_name in VIDEO_WORKFLOWS
+    video_prompt = motion_and_audio_prompt.strip() or (
+        f"Slow cinematic camera glide across {scene_prompt}, "
+        "catching fine brushwork and warm gallery acoustics"
+    )
 
-    if workflow_name == "flux_krea_scene_relight" and artwork_bytes and mask_bytes:
+    if workflow_name == "krea3_scene_edit" and artwork_bytes and mask_bytes:
+        art_name = await comfy_client.upload_image(artwork_bytes, filename="artwork_input.png")
+        mask_name = await comfy_client.upload_image(mask_bytes, filename="sam3_mask.png")
+        node_inputs = {
+            "1": {"image": art_name},
+            "2": {"image": mask_name},
+            "4": {"prompt": scene_prompt, "aspect_ratio": aspect},
+            "5": {"width": width, "height": height},
+        }
+    elif (
+        workflow_name in {"flux_krea_scene_relight", "krea2_turbo_style_ref"}
+        and artwork_bytes
+        and mask_bytes
+    ):
         art_name = await comfy_client.upload_image(artwork_bytes, filename="artwork_input.png")
         mask_name = await comfy_client.upload_image(mask_bytes, filename="sam3_mask.png")
         node_inputs = {
@@ -200,6 +241,33 @@ async def _run_comfyui_krea_variant(
             "2": {"image": mask_name},
             "6": {"text": scene_prompt},
             "7": {"width": width, "height": height},
+        }
+    elif workflow_name == "ideogram4_collector_card" and artwork_bytes and mask_bytes:
+        art_name = await comfy_client.upload_image(artwork_bytes, filename="artwork_input.png")
+        mask_name = await comfy_client.upload_image(mask_bytes, filename="sam3_mask.png")
+        node_inputs = {
+            "1": {"image": art_name},
+            "2": {"image": mask_name},
+            "6": {"text": f"{scene_prompt} — Collector plaque: '{headline}'"},
+            "7": {"width": width, "height": height},
+            "8": {"width": width, "height": height},
+        }
+    elif workflow_name == "ltx2_5_dfr_i2v":
+        base_name = await comfy_client.upload_image(
+            base_creative_bytes, filename="base_creative.png"
+        )
+        node_inputs = {
+            "1": {"image": base_name},
+            "8": {"text": video_prompt},
+            "9": {"width": width, "height": height},
+        }
+    elif workflow_name == "minimax_h3_i2v":
+        base_name = await comfy_client.upload_image(
+            base_creative_bytes, filename="base_creative.png"
+        )
+        node_inputs = {
+            "1": {"image": base_name},
+            "7": {"prompt": video_prompt, "width": width, "height": height},
         }
     elif workflow_name == "placement_outpaint":
         base_name = await comfy_client.upload_image(
@@ -219,23 +287,69 @@ async def _run_comfyui_krea_variant(
 
     rendered_list = await comfy_client.run_workflow(workflow_name, node_inputs)
     creatives: list[Creative] = []
-    for img_bytes in rendered_list:
+    first_bytes: bytes | None = rendered_list[0] if rendered_list else None
+    for media_bytes in rendered_list:
         saved_path = _save_artifact(
-            img_bytes,
+            media_bytes,
             prefix=f"{placement}-{workflow_name}",
             output_dir=output_dir,
+            extension="mp4" if is_video else "png",
         )
         creatives.append(
             Creative(
                 placement=placement,
                 image_path=saved_path,
-                prompt=scene_prompt,
+                prompt=video_prompt if is_video else scene_prompt,
                 headline=headline,
                 primary_text=primary_text,
                 produced_by=f"comfyui:{workflow_name}",
+                media_type="video" if is_video else "image",
             )
         )
-    return creatives
+    return creatives, first_bytes
+
+
+def placement_spec(placement: Placement) -> PlacementSpec:
+    width, height = PLACEMENT_DIMENSIONS[placement]
+    return PlacementSpec(width=width, height=height, aspect_ratio=PLACEMENT_ASPECT_RATIO[placement])
+
+
+def to_editable_brief(brief: CreativeBrief, request: GenerateAdsRequest) -> EditableCreativeBrief:
+    """Turn Muse Spark's angles into reviewable variants, capped per placement.
+
+    Muse Spark may return more angles than requested; each variant costs a Muse Image call.
+    """
+    counts: dict[Placement, int] = dict.fromkeys(request.placements, 0)
+    variants: list[EditableCreativeVariant] = []
+    for angle in brief.angles:
+        if counts.get(angle.placement, request.variants_per_placement) >= (
+            request.variants_per_placement
+        ):
+            continue
+        counts[angle.placement] += 1
+        variants.append(
+            EditableCreativeVariant(
+                variant_id=f"v{len(variants) + 1}",
+                placement=angle.placement,
+                spec=placement_spec(angle.placement),
+                target_audience=angle.target_audience,
+                headline=angle.headline,
+                primary_text=angle.primary_text,
+                image_prompt=angle.scene_prompt,
+                motion_and_audio_prompt=angle.motion_and_audio_prompt,
+                angle_rationale=angle.angle_rationale,
+            )
+        )
+    if not variants:
+        raise MetaAPIError("Muse Spark returned no creative angles for the requested placements.")
+    has_image = bool(request.product.image_url or request.product.image_base64)
+    return EditableCreativeBrief(
+        product_title=request.product.title,
+        positioning_hook=brief.positioning_hook,
+        preserve_product_note=brief.preserve_product_note,
+        variants=variants,
+        estimated_paid_calls=len(variants) + (1 if has_image else 0),
+    )
 
 
 class AdCreativeService:
@@ -256,7 +370,20 @@ class AdCreativeService:
         self._resolver = resolver
         self._output_dir = output_dir
 
+    async def draft(self, request: GenerateAdsRequest) -> EditableCreativeBrief:
+        """Phase 1: one Muse Spark call, no images. Returns the plan for the seller to edit."""
+        assert request.competitor_brief is not None  # enforced by GenerateAdsRequest
+        brief = await write_brief(
+            product=request.product,
+            competitor_brief=request.competitor_brief,
+            placements=request.placements,
+            variants_per_placement=request.variants_per_placement,
+            meta_client=self._meta or get_meta_client(),
+        )
+        return to_editable_brief(brief, request)
+
     async def generate(self, request: GenerateAdsRequest) -> CreativeSet:
+        """Generate creatives from `request.brief` if given (phase 2), else write one first."""
         meta = self._meta or get_meta_client()
         comfy = self._comfy or get_comfyui_client()
         out_dir = self._output_dir or Path(get_settings().output_dir)
@@ -277,31 +404,42 @@ class AdCreativeService:
                 output_dir=out_dir,
             )
 
-        brief = await write_brief(
-            product=request.product,
-            competitor_brief=request.competitor_brief,
-            placements=request.placements,
-            variants_per_placement=request.variants_per_placement,
-            meta_client=meta,
-        )
+        if request.brief is not None:
+            brief = request.brief
+        else:
+            assert request.competitor_brief is not None  # enforced by GenerateAdsRequest
+            brief = to_editable_brief(
+                await write_brief(
+                    product=request.product,
+                    competitor_brief=request.competitor_brief,
+                    placements=request.placements,
+                    variants_per_placement=request.variants_per_placement,
+                    meta_client=meta,
+                ),
+                request,
+            )
 
         comfy_live = request.use_comfyui and await comfy.is_reachable()
         creatives: list[Creative] = []
-        images_per_placement: dict[Placement, int] = dict.fromkeys(request.placements, 0)
 
-        for angle in brief.angles:
-            # Each Muse Image call is billed; Muse Spark may return more angles than requested
-            if images_per_placement.get(angle.placement, request.variants_per_placement) >= (
-                request.variants_per_placement
-            ):
+        for angle in brief.variants:
+            if not angle.include:
                 continue
-            images_per_placement[angle.placement] += 1
-            muse_bytes = await meta.generate_image(
-                prompt=angle.scene_prompt,
-                reference_image=artwork_bytes,
-                mask_image=mask_bytes,
-                size=PLACEMENT_MUSE_SIZE[angle.placement],
-            )
+            if request.use_muse_image_edit and artwork_bytes is not None:
+                muse_bytes = await meta.edit_image(
+                    prompt=angle.image_prompt,
+                    reference_images=[artwork_bytes],
+                )
+                muse_producer = f"{meta.image_model}:edit"
+            else:
+                muse_bytes = await meta.generate_image(
+                    prompt=angle.image_prompt,
+                    reference_image=artwork_bytes,
+                    mask_image=mask_bytes,
+                    size=PLACEMENT_MUSE_SIZE[angle.placement],
+                )
+                muse_producer = meta.image_model
+
             muse_path = _save_artifact(
                 muse_bytes,
                 prefix=f"{request.product.title}-{angle.placement}-muse",
@@ -310,20 +448,24 @@ class AdCreativeService:
             creatives.append(
                 Creative(
                     placement=angle.placement,
+                    variant_id=angle.variant_id,
+                    target_audience=angle.target_audience,
                     image_path=muse_path,
-                    prompt=angle.scene_prompt,
+                    prompt=angle.image_prompt,
                     headline=angle.headline,
                     primary_text=angle.primary_text,
-                    produced_by=meta.image_model,
+                    produced_by=muse_producer,
                 )
             )
 
             if comfy_live:
+                hero_for_video = muse_bytes
                 try:
-                    variant_creatives = await _run_comfyui_krea_variant(
+                    variant_creatives, first_variant_bytes = await _run_comfyui_krea_variant(
                         workflow_name=request.comfyui_workflow,
                         placement=angle.placement,
-                        scene_prompt=angle.scene_prompt,
+                        scene_prompt=angle.image_prompt,
+                        motion_and_audio_prompt=angle.motion_and_audio_prompt,
                         headline=angle.headline,
                         primary_text=angle.primary_text,
                         artwork_bytes=artwork_bytes,
@@ -333,10 +475,39 @@ class AdCreativeService:
                         output_dir=out_dir,
                     )
                     creatives.extend(variant_creatives)
+                    if (
+                        variant_creatives
+                        and variant_creatives[0].media_type == "image"
+                        and first_variant_bytes is not None
+                    ):
+                        hero_for_video = first_variant_bytes
                 except ComfyUIError as err:
                     logger.warning(
                         "Skipping optional ComfyUI variant (%s): %s", request.comfyui_workflow, err
                     )
+
+                if request.comfyui_video_workflow:
+                    try:
+                        video_creatives, _ = await _run_comfyui_krea_variant(
+                            workflow_name=request.comfyui_video_workflow,
+                            placement=angle.placement,
+                            scene_prompt=angle.image_prompt,
+                            motion_and_audio_prompt=angle.motion_and_audio_prompt,
+                            headline=angle.headline,
+                            primary_text=angle.primary_text,
+                            artwork_bytes=artwork_bytes,
+                            mask_bytes=mask_bytes,
+                            base_creative_bytes=hero_for_video,
+                            comfy_client=comfy,
+                            output_dir=out_dir,
+                        )
+                        creatives.extend(video_creatives)
+                    except ComfyUIError as err:
+                        logger.warning(
+                            "Skipping optional ComfyUI video variant (%s): %s",
+                            request.comfyui_video_workflow,
+                            err,
+                        )
 
         return CreativeSet(
             product_title=request.product.title,

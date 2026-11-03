@@ -12,6 +12,7 @@ import copy
 import json
 import logging
 import re
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +25,60 @@ logger = logging.getLogger(__name__)
 WORKFLOWS_DIR = Path(__file__).resolve().parents[2] / "workflows"
 _SAFE_NAME_RE = re.compile(r"^[a-zA-Z0-9_-]+$")
 DEFAULT_TIMEOUT = httpx.Timeout(90.0, connect=5.0)
+
+SUPPORTED_COMFY_WORKFLOWS: dict[str, dict[str, str]] = {
+    "krea3_scene_edit": {
+        "model": "Krea 3",
+        "media_type": "image",
+        "template_source": "api_krea3_image_edit",
+        "description": "Targeted regional collector scene restaging & relighting + SAM 3.1 mask",
+    },
+    "krea2_turbo_style_ref": {
+        "model": "Krea-2 Turbo Int8 (krea2_turbo_int8_convrot.safetensors)",
+        "media_type": "image",
+        "template_source": "image_krea2_turbo_int8_image_style_reference",
+        "description": "Open-weight 8-step MMDiT style-referenced collector scene + SAM 3.1 mask",
+    },
+    "ideogram4_collector_card": {
+        "model": "Ideogram v4 Int8 (ideogram4_int8_convrot.safetensors)",
+        "media_type": "image",
+        "template_source": "image_ideogram4_t2i_int8",
+        "description": "Open-weight Ideogram v4 collector framing with plaque typography",
+    },
+    "flux_krea_scene_relight": {
+        "model": "FLUX.1-Krea-dev (flux1-krea-dev.safetensors)",
+        "media_type": "image",
+        "template_source": "flux1_krea_dev",
+        "description": "Open-weight FLUX.1-Krea-dev collector scene relighting + SAM 3.1 mask",
+    },
+    "placement_outpaint": {
+        "model": "FLUX.1-Fill-dev (flux1-fill-dev.safetensors)",
+        "media_type": "image",
+        "template_source": "flux1_fill_dev",
+        "description": "Aspect-ratio outpaint for 1:1, 4:5, and 9:16 Meta ad placements",
+    },
+    "upscale_4x": {
+        "model": "4x-UltraSharp.pth",
+        "media_type": "image",
+        "template_source": "upscale_4x",
+        "description": "4x high-DPI creative upscale",
+    },
+    "ltx2_5_dfr_i2v": {
+        "model": (
+            "LTX-2.5 DFR 22B Int8 "
+            "(ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors)"
+        ),
+        "media_type": "video",
+        "template_source": "video_ltx2_5_dfr_i2v",
+        "description": "Open-weight LTX-2.5 Diffusion Fidelity Rendering I2V + spatial x2 + audio",
+    },
+    "minimax_h3_i2v": {
+        "model": "MiniMax H3 8-Step Turbo Int8 (minimax_h3_fl2va_pruned_int8_convrot.safetensors)",
+        "media_type": "video",
+        "template_source": "video_minimax_h3_i2v",
+        "description": "Open-weight MiniMax H3 omni-modal I2V + native stereo audio in one pass",
+    },
+}
 
 
 class ComfyUIError(Exception):
@@ -192,16 +247,19 @@ class ComfyUIClient:
         for node_output in outputs_meta.values():
             if not isinstance(node_output, dict):
                 continue
-            images = node_output.get("images")
-            if not isinstance(images, list):
-                continue
-            for img_ref in images:
-                if not isinstance(img_ref, dict) or not img_ref.get("filename"):
+            media_items: list[Any] = []
+            for key in ("images", "videos", "gifs"):
+                bucket = node_output.get(key)
+                if isinstance(bucket, list):
+                    media_items.extend(bucket)
+
+            for media_ref in media_items:
+                if not isinstance(media_ref, dict) or not media_ref.get("filename"):
                     continue
                 params = {
-                    "filename": str(img_ref["filename"]),
-                    "subfolder": str(img_ref.get("subfolder", "")),
-                    "type": str(img_ref.get("type", "output")),
+                    "filename": str(media_ref["filename"]),
+                    "subfolder": str(media_ref.get("subfolder", "")),
+                    "type": str(media_ref.get("type", "output")),
                 }
                 try:
                     view_resp = await self._http_client.get(
@@ -217,8 +275,30 @@ class ComfyUIClient:
                 rendered.append(view_resp.content)
 
         if not rendered:
-            raise ComfyUIError("ComfyUI workflow completed but produced zero output images.")
+            raise ComfyUIError("ComfyUI workflow completed but produced zero output artifacts.")
         return rendered
+
+
+def discover_comfy_cli() -> dict[str, Any]:
+    """Inspect local `comfy` CLI binary and installed `.claude/skills/comfy*` skills."""
+    comfy_bin = shutil.which("comfy") or (
+        str(Path.home() / ".local" / "bin" / "comfy")
+        if (Path.home() / ".local" / "bin" / "comfy").is_file()
+        else None
+    )
+    project_skills_dir = WORKFLOWS_DIR.parent / ".claude" / "skills"
+    installed_skills = sorted(p.parent.name for p in project_skills_dir.glob("comfy*/SKILL.md"))
+    gallery_dir = WORKFLOWS_DIR / "gallery"
+    gallery_templates = (
+        sorted(p.stem for p in gallery_dir.glob("*.json")) if gallery_dir.is_dir() else []
+    )
+    return {
+        "comfy_cli_available": comfy_bin is not None,
+        "comfy_cli_path": comfy_bin,
+        "installed_skills": installed_skills,
+        "workflows_supported": list(SUPPORTED_COMFY_WORKFLOWS.keys()),
+        "gallery_templates_cached": gallery_templates,
+    }
 
 
 _shared_comfy_client: ComfyUIClient | None = None

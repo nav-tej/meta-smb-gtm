@@ -59,15 +59,17 @@ The user is a solo seller, not a marketer. Every output should be something they
 | Tests | pytest, pytest-asyncio, respx | No live network in tests. |
 | Lint / format | ruff | Config in `pyproject.toml`. |
 
-### Meta Model API: things to verify, not assume
+### Meta Model API: verified endpoints & model IDs (2026-11-03)
 
-The exact model ID strings, the image generation endpoint shape, and how SAM 3.1 is exposed (dedicated endpoint vs. chat with image input) have **not been verified** yet. Model IDs live in env vars (`MUSE_SPARK_MODEL`, `MUSE_IMAGE_MODEL`, `SAM_MODEL`) so they can be fixed without code changes.
-
-**Before implementing any Meta API call:**
-
-1. List models: `curl -s https://api.meta.ai/v1/models -H "Authorization: Bearer $META_MODEL_API_KEY"`
-2. Check the hackathon docs for the image and segmentation request/response format.
-3. Update `.env.example` and this section with what you confirmed. Do not guess an endpoint or a parameter and ship it.
+Model IDs and endpoint shapes have been **verified live** against `https://api.meta.ai/v1`:
+- **`GET /v1/models`** returns: `muse-spark-1.3`, `muse-image-1.0`, `sam-3.1`, `muse-wonder-1.0`, `muse-voice-transcribe-1.0`, `muse-spark-1.3-contributor`, `muse-spark-1.2`, `muse-spark-1.1`.
+- **`muse-spark-1.3` (`POST /v1/chat/completions`):** Text & Vision structured JSON output (`response_format={"type": "json_object"}`).
+- **`muse-image-1.0` (`POST /v1/images/generations` & `POST /v1/images/edits`):**
+  - `/v1/images/generations` takes `{"model": "muse-image-1.0", "prompt": "...", "size": "1024x1024"}` (rejects `"image"` key with HTTP 400).
+  - `/v1/images/edits` takes `{"model": "muse-image-1.0", "prompt": "...", "images": [{"image_url": "data:image/...;base64,..."}]}` to restage an existing product/artwork photo.
+- **`sam-3.1` (`POST /v1/responses`):**
+  - `/v1/images/segmentations` returns 404; `/v1/images/edits` returns `"The model sam-3.1 is not available on this endpoint. Use /v1/responses."`
+  - `/v1/responses` takes `{"model": "sam-3.1", "input": [{"role": "user", "content": [{"type": "input_text", "text": "..."}, {"type": "input_image", "image_url": "data:..."}]}]}` and returns `<|box;x1=...;y1=...;x2=...;y2=...;w=...;h=...|><|mask;...|>` inside `output[*].content[*].text`.
 
 All Meta API access goes through **one client module** (`src/clients/meta.py`). Services never construct their own `OpenAI(...)` client.
 
@@ -134,25 +136,36 @@ Generated images go in `outputs/` (gitignored). Never commit generated images ex
 ```
 src/
   config.py              # Settings loaded from env (single source of config)
-  api/                   # FastAPI app + routers. Thin.
-    main.py              # App factory, router registration, /health
+  main.py                # Uvicorn entry point re-exporting src.api.main:app
+  api/                   # FastAPI app + routers (/api/v1/*). Thin.
+    main.py              # App factory, router registration, error handlers, /health
+    intel.py             # POST /api/v1/analyze-competitors
+    creative.py          # POST /api/v1/generate-ads
+    bids.py              # POST /api/v1/bid-advice
   services/
-    competitor_intel.py  # Flow 1
-    ad_creative.py       # Flow 2
-    bid_advisor.py       # Flow 3
+    competitor_intel.py  # Flow 1: Sitemap + profile/URL-list crawl -> CompetitorBrief
+    ad_creative.py       # Flow 2: SAM 3.1 + Muse Spark + Muse Image + ComfyUI FLUX.1-Krea
+    bid_advisor.py       # Flow 3: Deterministic ad metrics + Muse Spark -> BidRecommendation
+    seller_audit.py      # Multi-channel seller website/marketplace/social + Vision screenshot audit
   clients/
-    meta.py              # Meta Model API wrapper (Muse Spark, Muse Image, SAM)
-    comfyui.py           # ComfyUI HTTP API wrapper
-  models/                # Pydantic models, one module per domain
+    meta.py              # Meta Model API wrapper (Muse Spark text/vision, Muse Image, SAM 3.1)
+    comfyui.py           # ComfyUI HTTP API wrapper (/upload/image, /prompt, /history, /view)
+    ad_library.py        # Meta Ad Library Graph API client (/ads_archive IG/FB ad longevity)
+  models/
+    intel.py             # CompetitorBrief, CompetitorSignals, SocialCompetitorSignals, etc.
+    creative.py          # GenerateAdsRequest, CreativeBrief, Creative, CreativeSet
+    bids.py              # CampaignPerformance, PerformanceMetrics, BidRecommendation
+    seller.py            # SellerProfile, SellerDiagnostics, SellerFootprintAudit, ScreenshotAnalysis
   utils/
-    sitemap.py           # Sitemap discovery + parsing
-tests/                   # Mirrors src/. Fixtures in tests/fixtures/
-workflows/               # ComfyUI workflow JSON (API format)
-data/samples/            # Demo data (create when needed): sample CSVs, product photos
+    sitemap.py           # SSRF-guarded fetch, RFC 9309 robots.txt, defusedxml + HTML metadata
+scripts/
+  demo_flow.py           # Printable CLI report (make demo; supports --live and --skip-llm)
+  demo_sarabjit_singh.py # Full 4-stage closed-loop E2E runner (--dry-run offline or --live)
+tests/                   # 69 offline pytest tests mirroring src/. Fixtures in tests/fixtures/
+workflows/               # ComfyUI API-format JSON: flux_krea_scene_relight, placement_outpaint, upscale_4x
+data/samples/            # Real demo snapshots (Art of Sarabjit Singh profile, campaign, competitor, Meta ads)
 outputs/                 # Generated artifacts, gitignored
 ```
-
-The service and client modules currently contain docstrings and TODO outlines only. Implementation is the next phase.
 
 ---
 
@@ -258,3 +271,37 @@ This app fetches arbitrary URLs, parses untrusted XML, and feeds third-party con
 - **Commits:** small, imperative subject (`Add sitemap index recursion`), body says why. Run `make check` first.
 - **Ask, don't guess,** on anything that changes the demo story or the Meta tooling usage. Those are 50% of the score.
 - **Local models (Qwen/Hermes):** if your context is small, read sections 2, 4 (the flow you're on), 6, and 7 at minimum.
+
+---
+
+## 12. Current implementation status & next orchestration tasks
+
+### Completed & verified (`make check` → 77/77 tests passing)
+- **Meta Model API Client (`src/clients/meta.py`):** `MetaClient` using `AsyncOpenAI` (`https://api.meta.ai/v1`) with `.strip()` on credentials/model IDs, structured JSON validation with 1-retry repair (`chat_structured`), multimodal Vision screenshot analysis (`chat_vision_structured`), `generate_image` (`muse-image-1.0` on `/v1/images/generations`), `edit_image` (`muse-image-1.0` on `/v1/images/edits`), and `segment` (`sam-3.1` on `/v1/responses` parsing `<|box;...|>` into a binary PNG mask).
+- **Flow 1 — Competitor Intel (`src/services/competitor_intel.py`, `src/utils/sitemap.py`, `src/models/intel.py`, `src/api/intel.py`):**
+  - SSRF-guarded HTTP (`validate_safe_url`, `_fetch_bytes_guarded`), RFC 9309 wildcard `robots.txt` (`parse_robots_txt`), `defusedxml` `<urlset>` & `<sitemapindex>` recursion, gzip-bomb defense, marketplace profile fallback (`crawl_listing_page_fallback`), deterministic signal derivation (`derive_signals`), and Muse Spark synthesis (`POST /api/v1/analyze-competitors`).
+- **Social & Marketplace Intelligence (`src/clients/ad_library.py`, `src/services/seller_audit.py`, `src/models/seller.py`):**
+  - `MetaAdLibraryClient` querying `https://graph.facebook.com/v21.0/ads_archive` + deterministic 30d+ evergreen ad longevity signals (`summarize_ad_library_records`).
+  - `audit_seller_footprint` + `compute_seller_diagnostics` for multi-channel footprint audits (website vs. FineArtAmerica / Pixels / Saatchi Art / Etsy / FB / IG) and `analyze_social_screenshots` via Muse Spark Vision.
+- **Flow 2 — Hybrid Ad Creative Studio (`src/services/ad_creative.py`, `src/clients/comfyui.py`, `src/models/creative.py`, `src/api/creative.py`, `workflows/*.json`, `.claude/skills/comfy*`):**
+  - Bundled `comfy` CLI v1.15.0 skills (`comfy`, `comfy-fragments`, `comfy-debug`, `comfy-relay`, `comfy-director`) installed in `.claude/skills/`.
+  - End-to-end `AdCreativeService` (`POST /api/v1/generate-ads` + `GET /api/v1/creative-models`) combining `Muse Spark 1.3`, `SAM 3.1` (`/v1/responses`), `Muse Image 1.0` (`/v1/images/generations` & `/v1/images/edits`), and `ComfyUIClient` across:
+    - **Image workflows:** `krea3_scene_edit.json` (`Krea 3`), `krea2_turbo_style_ref.json` (`Krea-2 Turbo Int8`), `ideogram4_collector_card.json` (`Ideogram v4 Int8`), `flux_krea_scene_relight.json` (`FLUX.1-Krea-dev`), `placement_outpaint.json`, `upscale_4x.json`.
+    - **Video + synchronized audio workflows:** `ltx2_5_dfr_i2v.json` (`LTX-2.5 DFR 22B Int8` Image-to-Video + 2x spatial upscaler + audio) and `minimax_h3_i2v.json` (`MiniMax H3 8-Step Turbo Int8` Image-to-Video + native stereo audio).
+- **Flow 3 — Bid Advisor (`src/services/bid_advisor.py`, `src/models/bids.py`, `src/api/bids.py`):**
+  - Deterministic Python math (`compute_metrics`, `load_campaign_csv`) + Muse Spark `BidRecommendation` (`POST /api/v1/bid-advice`).
+- **Real SMB Showcase & Live Outputs:**
+  - Real artist fixtures & live Meta API outputs in `data/samples/sarabjit_singh_profile.json`, `competitor_brief_sikhiart_live.json`, `bid_advice_live.json`, `ad_creative_ek_onkar_live.json`.
+  - `scripts/demo_flow.py` (`make demo`) and `scripts/demo_sarabjit_singh.py` (`--dry-run` or live).
+
+### Next orchestration priorities (for Claude / collaborating agents)
+1. **Expose Seller Audit & Vision Screenshot Routes in FastAPI (`src/api/intel.py` & `src/api/bids.py`):**
+   - Add `POST /api/v1/audit-seller` (wires `audit_seller_footprint` from `src/services/seller_audit.py`) and `POST /api/v1/analyze-screenshots` (wires `analyze_social_screenshots`).
+   - Add `POST /api/v1/bid-advice/csv` (accepts CSV upload via `load_campaign_csv` + `advise_bids`).
+2. **Unify `scripts/demo_flow.py` (`make demo`):**
+   - Ensure `make demo` runs all 3 core flows (`CompetitorIntel` + `MetaAdLibraryClient` social signals -> `AdCreativeService` with `SAM 3.1` + `Muse Image` + `FLUX.1-Krea-dev` -> `BidAdvisor`) plus `audit_seller_footprint`, writing a unified report to `outputs/demo_run/`.
+3. **Interactive Single-Page Demo UI (`src/api/static/index.html`):**
+   - Mount a clean, zero-build HTML/CSS/JS dashboard at `GET /` pre-loaded with **Art of Sarabjit Singh** and Etsy/physical-goods presets so the 3-minute hackathon video shows a polished product UI alongside the API.
+4. **Actionable "Shop Fix & Listing Export Pack" Generator:**
+   - Turn `SellerFootprintAudit` + `CreativeSet` into copy-pasteable Weebly/Shopify/Etsy listing fixes (SEO slugs, JSON-LD `VisualArtwork`/`Product` schema, Stripe payment link snippets, and Meta Ads Manager CSV import).
+

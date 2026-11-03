@@ -1,0 +1,102 @@
+{
+  "_meta": {
+    "title": "Krea-2 Turbo Int8 Open-Weight Style Reference + SAM 3.1 Composite",
+    "description": "Open-weight Krea-2 Turbo Int8 Convrot workflow (from ComfyUI template image_krea2_turbo_int8_image_style_reference) using krea2_turbo_int8_convrot.safetensors, qwen3vl_4b_fp8_scaled.safetensors (type krea2), and qwen_image_vae.safetensors.",
+    "template_source": "image_krea2_turbo_int8_image_style_reference"
+  },
+  "1": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "artwork_input.png"
+    }
+  },
+  "2": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "sam3_mask.png"
+    }
+  },
+  "3": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "krea2_turbo_int8_convrot.safetensors",
+      "weight_dtype": "default"
+    }
+  },
+  "4": {
+    "class_type": "CLIPLoader",
+    "inputs": {
+      "clip_name": "qwen3vl_4b_fp8_scaled.safetensors",
+      "type": "krea2",
+      "device": "default"
+    }
+  },
+  "5": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "qwen_image_vae.safetensors"
+    }
+  },
+  "6": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "Luxury collector gallery wall in a sunlit Bay Area home, warm oak floors, museum lighting",
+      "clip": ["4", 0]
+    }
+  },
+  "7": {
+    "class_type": "EmptyLatentImage",
+    "inputs": {
+      "width": 1080,
+      "height": 1350,
+      "batch_size": 1
+    }
+  },
+  "8": {
+    "class_type": "KSampler",
+    "inputs": {
+      "model": ["3", 0],
+      "positive": ["6", 0],
+      "negative": ["6", 0],
+      "latent_image": ["7", 0],
+      "seed": 42,
+      "steps": 8,
+      "cfg": 2.0,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "denoise": 1.0
+    }
+  },
+  "9": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": ["8", 0],
+      "vae": ["5", 0]
+    }
+  },
+  "10": {
+    "class_type": "ImageToMask",
+    "inputs": {
+      "image": ["2", 0],
+      "channel": "red"
+    }
+  },
+  "11": {
+    "class_type": "ImageCompositeMasked",
+    "inputs": {
+      "destination": ["9", 0],
+      "source": ["1", 0],
+      "mask": ["10", 0],
+      "x": 0,
+      "y": 0,
+      "resize_source": false
+    }
+  },
+  "12": {
+    "class_type": "SaveImage",
+    "inputs": {
+      "images": ["11", 0],
+      "filename_prefix": "meta_smb_krea2_turbo"
+    }
+  }
+}

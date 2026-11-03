@@ -108,9 +108,24 @@ async def test_hybrid_muse_plus_open_weight_flux_krea_creative_pipeline(
 ) -> None:
     b64_png = base64.b64encode(TINY_PNG).decode("ascii")
 
-    # 1. SAM 3.1 segmentation endpoint
-    sam_route = respx.post("https://api.meta.ai/v1/images/segmentations").mock(
-        return_value=httpx.Response(200, json={"mask_b64": b64_png})
+    # 1. SAM 3.1 segmentation endpoint (/v1/responses)
+    sam_route = respx.post("https://api.meta.ai/v1/responses").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "output": [
+                    {
+                        "type": "message",
+                        "content": [
+                            {
+                                "type": "output_text",
+                                "text": "<0f>0<|box;x1=32;y1=32;x2=95;y2=95;w=128;h=128|>",
+                            }
+                        ],
+                    }
+                ]
+            },
+        )
     )
 
     # 2. Muse Spark 1.3 creative brief endpoint
@@ -354,3 +369,178 @@ async def test_muse_image_calls_capped_at_variants_per_placement(
 
     assert image_route.call_count == 1
     assert [c.placement for c in result.creatives] == ["facebook_feed"]
+
+
+@respx.mock
+async def test_krea3_ltx2_5_dfr_and_minimax_h3_video_creative_pipeline(
+    competitor_brief: CompetitorBrief, tmp_path: Path
+) -> None:
+    b64_png = base64.b64encode(TINY_PNG).decode("ascii")
+    fake_mp4 = b"\x00\x00\x00\x18ftypmp42\x00\x00\x00\x00mp42isom"
+
+    respx.post("https://api.meta.ai/v1/responses").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "output": [
+                    {
+                        "type": "message",
+                        "content": [
+                            {
+                                "type": "output_text",
+                                "text": "<0f>0<|box;x1=16;y1=16;x2=111;y2=111;w=128;h=128|>",
+                            }
+                        ],
+                    }
+                ]
+            },
+        )
+    )
+    respx.post("https://api.meta.ai/v1/chat/completions").mock(
+        return_value=_chat_completion(
+            {
+                "positioning_hook": "Museum-exhibited 18k gold giclee",
+                "preserve_product_note": "SAM 3.1 preserves painting pixels.",
+                "angles": [
+                    {
+                        "placement": "reels_cover",
+                        "scene_prompt": "Warm sunlit California collector living room wall",
+                        "motion_and_audio_prompt": (
+                            "Slow cinematic dolly glide toward framed painting, warm gallery audio"
+                        ),
+                        "headline": "Ek Onkar — Hand-Signed 18k Gold Edition ($75)",
+                        "primary_text": "Exhibited at UCLA Fowler Museum & de Young Museum.",
+                        "angle_rationale": "9:16 Reels video hook.",
+                    }
+                ],
+            }
+        )
+    )
+    edit_route = respx.post("https://api.meta.ai/v1/images/edits").mock(
+        return_value=httpx.Response(200, json={"data": [{"b64_json": b64_png}]})
+    )
+
+    respx.get("http://127.0.0.1:8188/system_stats").mock(
+        return_value=httpx.Response(200, json={"system": {"os": "darwin"}})
+    )
+    respx.post("http://127.0.0.1:8188/upload/image").mock(
+        side_effect=[
+            httpx.Response(200, json={"name": "art.png"}),
+            httpx.Response(200, json={"name": "mask.png"}),
+            httpx.Response(200, json={"name": "hero_frame.png"}),
+        ]
+    )
+    comfy_prompt_route = respx.post("http://127.0.0.1:8188/prompt").mock(
+        side_effect=[
+            httpx.Response(200, json={"prompt_id": "krea3-job"}),
+            httpx.Response(200, json={"prompt_id": "ltx25-job"}),
+        ]
+    )
+    respx.get("http://127.0.0.1:8188/history/krea3-job").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "krea3-job": {
+                    "outputs": {
+                        "7": {
+                            "images": [
+                                {"filename": "krea3_out.png", "subfolder": "", "type": "output"}
+                            ]
+                        }
+                    }
+                }
+            },
+        )
+    )
+    respx.get("http://127.0.0.1:8188/history/ltx25-job").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "ltx25-job": {
+                    "outputs": {
+                        "14": {
+                            "videos": [
+                                {"filename": "ltx25_reel.mp4", "subfolder": "", "type": "output"}
+                            ]
+                        }
+                    }
+                }
+            },
+        )
+    )
+    respx.get("http://127.0.0.1:8188/view").mock(
+        side_effect=[
+            httpx.Response(200, content=TINY_PNG),
+            httpx.Response(200, content=fake_mp4),
+        ]
+    )
+
+    async with httpx.AsyncClient() as http_client:
+        meta_client = MetaClient(api_key="test-meta-key", http_client=http_client)
+        comfy_client = ComfyUIClient(
+            base_url="http://127.0.0.1:8188",
+            http_client=http_client,
+            poll_interval_seconds=0.0,
+        )
+        service = AdCreativeService(
+            meta_client=meta_client,
+            comfy_client=comfy_client,
+            http_client=http_client,
+            output_dir=tmp_path,
+        )
+        result = await service.generate(
+            GenerateAdsRequest(
+                product=ProductInfo(
+                    title="Ek Onkar (18k Gold Edition)",
+                    image_base64=b64_png,
+                    price="$75",
+                ),
+                competitor_brief=competitor_brief,
+                placements=["reels_cover"],
+                variants_per_placement=1,
+                use_comfyui=True,
+                comfyui_workflow="krea3_scene_edit",
+                comfyui_video_workflow="ltx2_5_dfr_i2v",
+                use_muse_image_edit=True,
+            )
+        )
+
+    assert edit_route.called
+    assert comfy_prompt_route.call_count == 2
+    assert len(result.creatives) == 3
+    assert result.creatives[0].produced_by == "muse-image-1.0:edit"
+    assert result.creatives[1].produced_by == "comfyui:krea3_scene_edit"
+    assert result.creatives[1].media_type == "image"
+    assert result.creatives[2].produced_by == "comfyui:ltx2_5_dfr_i2v"
+    assert result.creatives[2].media_type == "video"
+    assert result.creatives[2].image_path.endswith(".mp4")
+
+    krea3_graph = json.loads(comfy_prompt_route.calls[0].request.content)["prompt"]
+    assert krea3_graph["4"]["class_type"] == "Krea3ImageNode"
+    assert krea3_graph["4"]["inputs"]["aspect_ratio"] == "9:16"
+    ltx_graph = json.loads(comfy_prompt_route.calls[1].request.content)["prompt"]
+    assert (
+        ltx_graph["2"]["inputs"]["unet_name"]
+        == "ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors"
+    )
+    assert ltx_graph["9"]["inputs"]["width"] == 1080
+    assert ltx_graph["9"]["inputs"]["height"] == 1920
+
+
+def test_comfy_cli_discovery_and_new_workflow_templates() -> None:
+    from src.clients.comfyui import (
+        SUPPORTED_COMFY_WORKFLOWS,
+        discover_comfy_cli,
+        load_workflow_template,
+    )
+
+    info = discover_comfy_cli()
+    assert "krea3_scene_edit" in info["workflows_supported"]
+    assert "ltx2_5_dfr_i2v" in info["workflows_supported"]
+    assert "minimax_h3_i2v" in info["workflows_supported"]
+    assert "ideogram4_collector_card" in info["workflows_supported"]
+    assert "krea2_turbo_style_ref" in info["workflows_supported"]
+
+    for wf_name in SUPPORTED_COMFY_WORKFLOWS:
+        graph = load_workflow_template(wf_name)
+        assert isinstance(graph, dict) and len(graph) >= 3
