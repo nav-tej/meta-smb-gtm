@@ -1,0 +1,17 @@
+[project]
+name = "meta-smb-gtm"
+version = "0.1.0"
+description = "AI growth-ops copilot for SMB sellers, built on Meta's Muse models"
+license = { text = "AGPL-3.0-only" }
+requires-python = ">=3.11"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "ASYNC"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
