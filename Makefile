@@ -1,4 +1,4 @@
-.PHONY: setup dev lint format test check
+.PHONY: setup dev lint format test check demo
 
 PY := .venv/bin
 
@@ -21,3 +21,6 @@ test:
 check: lint
 	$(PY)/ruff format --check .
 	$(PY)/pytest
+
+demo:
+	$(PY)/python scripts/demo_flow.py

@@ -1,9 +1,15 @@
 """Flow 1: Competitor Intel service.
 
-Discovers and crawls a competitor's public sitemap(s) (including `<sitemapindex>` files and
-gzipped sitemaps, with polite HTML fallback), extracts product/content URLs and page titles,
-computes deterministic recency/cadence signals in Python, and sends URL+title batches to
-Muse Spark (`muse-spark-1.3` via `src.clients.meta`) to produce a structured `CompetitorBrief`.
+Collects a competitor's URLs in one of three ways, then computes deterministic signals in
+Python and sends URL+title batches to Muse Spark to produce a structured `CompetitorBrief`:
+
+- Site root (`shop.example.com`): crawl its public sitemap(s), with an HTML listing fallback.
+- Profile or shop page on a marketplace (`fineartamerica.com/profiles/<artist>/...`): read that
+  page's links and keep the ones belonging to the artist. Site-wide sitemaps are skipped because
+  they describe the whole marketplace, not one seller.
+- A pasted list of URLs, alone or alongside either of the above.
+
+robots.txt is honored in every mode.
 """
 
 from __future__ import annotations
@@ -11,6 +17,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 from collections import Counter
 from datetime import UTC, datetime, timedelta
 from urllib.parse import urlparse
@@ -52,6 +59,12 @@ logger = logging.getLogger(__name__)
 MAX_SITEMAP_DEPTH = 3
 MAX_CHILD_SITEMAPS = 25
 DEFAULT_TITLE_CONCURRENCY = 8
+MAX_PROFILE_PAGE_LINKS = 1000
+_GENERIC_PROFILE_SEGMENTS = frozenset(
+    {"profiles", "profile", "shop", "shops", "store", "stores", "people", "artist", "artists",
+     "users", "user", "u", "art", "gallery", "galleries", "collections", "collection",
+     "category", "categories"}
+)  # fmt: skip
 
 _PRIORITY_BUCKETS = ("products", "listings", "collections", "blogs", "pages", "other")
 _SEASONAL_KEYWORDS = (
@@ -318,18 +331,20 @@ async def _enrich_titles(
 
     async def _worker(item: SitemapEntry) -> None:
         async with semaphore:
-            html_title, price_hint = await fetch_page_metadata(
+            metadata = await fetch_page_metadata(
                 item.loc,
                 client,
                 resolver=resolver,
                 rate_limiter=rate_limiter,
             )
-            if html_title:
-                item.title = html_title
+            if metadata.title:
+                item.title = metadata.title
             elif not item.title:
                 item.title = slug_to_title(item.loc)
-            if price_hint and not item.price_hint:
-                item.price_hint = price_hint
+            if metadata.price_hint and not item.price_hint:
+                item.price_hint = metadata.price_hint
+            if metadata.description:
+                item.description = metadata.description
 
     await asyncio.gather(*(_worker(entry) for entry in targets))
 
@@ -357,31 +372,56 @@ def _entries_from_pasted_urls(pasted_urls: list[str], max_urls: int) -> list[Sit
     return result
 
 
-async def _crawl_with_sitemaps(
-    domain: str,
-    *,
-    pasted_urls: list[str] | None,
-    fetch_titles: bool,
-    max_urls: int | None,
-    max_title_fetches: int,
-    http_client: httpx.AsyncClient | None,
-    resolver: ResolverFn | None,
-    rate_limiter: HostRateLimiter | None,
-) -> tuple[list[SitemapEntry], list[str]]:
-    """Internal single-pass discovery + crawl returning `(entries, discovered_sitemaps)`."""
-    cap = max_urls if max_urls is not None else get_settings().crawler_max_urls
-    normalized_url = normalize_competitor_url(domain)
-    client = http_client or get_crawler_http_client()
-    limiter = rate_limiter or HostRateLimiter()
+def _is_profile_url(url: str) -> bool:
+    """A URL with a path (not a site root, not a sitemap) points at one seller's page."""
+    return urlparse(url).path.strip("/") != "" and not _looks_like_sitemap_url(url)
 
+
+def _profile_scope(profile_url: str) -> tuple[str, str]:
+    """Return `(base_path, slug)`, e.g. `('/profiles/sarabjit-singh', 'sarabjit-singh')`."""
+    segments = [seg for seg in urlparse(profile_url).path.lower().split("/") if seg]
+    for idx, segment in enumerate(segments):
+        if segment not in _GENERIC_PROFILE_SEGMENTS:
+            return "/" + "/".join(segments[: idx + 1]), segment
+    return "/" + "/".join(segments), ""
+
+
+def _scope_profile_links(profile_url: str, links: list[SitemapEntry]) -> list[SitemapEntry]:
+    """Keep the links on a profile page that belong to that seller.
+
+    Marketplaces like Fine Art America put the artist slug in artwork URLs but also show other
+    artists' promos on the same page, so when any artwork carries the slug, only those are kept.
+    Shop pages like Etsy's don't use the slug in listing URLs; there every listing is kept.
+    """
+    base_path, slug = _profile_scope(profile_url)
+    under_profile = [e for e in links if urlparse(e.loc).path.lower().startswith(base_path)]
+    seen = {e.loc for e in under_profile}
+    products = [e for e in links if e.bucket in {"products", "listings"} and e.loc not in seen]
+    # Compare without punctuation: profile "gurinderpreet-kaur" vs artwork "...-gurinder-preet-kaur"
+    squashed_slug = re.sub(r"[^a-z0-9]", "", slug)
+    with_slug = [
+        e
+        for e in products
+        if squashed_slug and squashed_slug in re.sub(r"[^a-z0-9]", "", urlparse(e.loc).path.lower())
+    ]
+    return under_profile + (with_slug or products)
+
+
+async def _sitemap_entries(
+    normalized_url: str,
+    client: httpx.AsyncClient,
+    *,
+    cap: int,
+    resolver: ResolverFn | None,
+    rate_limiter: HostRateLimiter,
+) -> tuple[list[SitemapEntry], list[str], RobotsPolicy]:
     robots, seed_sitemaps, prefetched_docs = await _discover_seed_sitemaps_and_docs(
         normalized_url,
         client,
         max_urls=cap,
         resolver=resolver,
-        rate_limiter=limiter,
+        rate_limiter=rate_limiter,
     )
-
     entries: list[SitemapEntry] = []
     if seed_sitemaps:
         entries = await _crawl_sitemap_tree(
@@ -390,11 +430,9 @@ async def _crawl_with_sitemaps(
             robots=robots,
             max_urls=cap,
             resolver=resolver,
-            rate_limiter=limiter,
+            rate_limiter=rate_limiter,
             prefetched_docs=prefetched_docs,
         )
-
-    # Fallback for Etsy / FineArtAmerica shop profile pages that lack a per-shop sitemap
     if not entries and not _looks_like_sitemap_url(normalized_url):
         entries = await crawl_listing_page_fallback(
             normalized_url,
@@ -402,20 +440,112 @@ async def _crawl_with_sitemaps(
             robots=robots,
             max_urls=min(cap, 200),
             resolver=resolver,
-            rate_limiter=limiter,
+            rate_limiter=rate_limiter,
         )
+    return entries, seed_sitemaps, robots
+
+
+async def _profile_entries(
+    profile_url: str,
+    client: httpx.AsyncClient,
+    *,
+    cap: int,
+    resolver: ResolverFn | None,
+    rate_limiter: HostRateLimiter,
+) -> tuple[list[SitemapEntry], RobotsPolicy]:
+    origin = extract_origin(profile_url)
+    robots = await fetch_robots_policy(origin, client, resolver=resolver, rate_limiter=rate_limiter)
+    if not robots.is_allowed(profile_url):
+        raise SitemapError(
+            f"robots.txt at {origin} disallows '{profile_url}'. Try the seller's main profile "
+            "page, or paste their listing URLs instead."
+        )
+    links = await crawl_listing_page_fallback(
+        profile_url,
+        client,
+        robots=robots,
+        max_urls=MAX_PROFILE_PAGE_LINKS,
+        resolver=resolver,
+        rate_limiter=rate_limiter,
+        require_path_prefix=urlparse(profile_url).path.rstrip("/"),
+    )
+    if not links:
+        raise SitemapError(
+            f"Could not read seller links from '{profile_url}'. The page may not exist or may "
+            "redirect elsewhere; check the profile URL or paste listing URLs instead."
+        )
+    return _scope_profile_links(profile_url, links)[:cap], robots
+
+
+async def _robots_allowed(
+    entries: list[SitemapEntry],
+    client: httpx.AsyncClient,
+    robots_by_origin: dict[str, RobotsPolicy],
+    *,
+    resolver: ResolverFn | None,
+    rate_limiter: HostRateLimiter,
+) -> list[SitemapEntry]:
+    allowed: list[SitemapEntry] = []
+    for entry in entries:
+        origin = extract_origin(entry.loc)
+        if origin not in robots_by_origin:
+            robots_by_origin[origin] = await fetch_robots_policy(
+                origin, client, resolver=resolver, rate_limiter=rate_limiter
+            )
+        if robots_by_origin[origin].is_allowed(entry.loc):
+            allowed.append(entry)
+        else:
+            logger.info("Skipping %s: disallowed by robots.txt", entry.loc)
+    return allowed
+
+
+async def collect_entries(
+    competitor_url: str | None,
+    *,
+    pasted_urls: list[str] | None = None,
+    fetch_titles: bool = True,
+    max_urls: int | None = None,
+    max_title_fetches: int = 40,
+    http_client: httpx.AsyncClient | None = None,
+    resolver: ResolverFn | None = None,
+    rate_limiter: HostRateLimiter | None = None,
+) -> tuple[list[SitemapEntry], list[str]]:
+    """Collect competitor URLs from a site root, a profile page, and/or pasted URLs.
+
+    Returns `(entries, sitemaps_crawled)`. Raises SitemapError if nothing usable is found.
+    """
+    cap = max_urls if max_urls is not None else get_settings().crawler_max_urls
+    client = http_client or get_crawler_http_client()
+    limiter = rate_limiter or HostRateLimiter()
+    robots_by_origin: dict[str, RobotsPolicy] = {}
+    entries: list[SitemapEntry] = []
+    sitemaps: list[str] = []
+
+    if competitor_url:
+        normalized_url = normalize_competitor_url(competitor_url)
+        if _is_profile_url(normalized_url):
+            entries, robots = await _profile_entries(
+                normalized_url, client, cap=cap, resolver=resolver, rate_limiter=limiter
+            )
+        else:
+            entries, sitemaps, robots = await _sitemap_entries(
+                normalized_url, client, cap=cap, resolver=resolver, rate_limiter=limiter
+            )
+        robots_by_origin[extract_origin(normalized_url)] = robots
 
     if pasted_urls:
         existing = {e.loc for e in entries}
-        for pasted_entry in _entries_from_pasted_urls(pasted_urls, cap):
-            if pasted_entry.loc not in existing and len(entries) < cap:
-                existing.add(pasted_entry.loc)
-                entries.append(pasted_entry)
+        extra = [e for e in _entries_from_pasted_urls(pasted_urls, cap) if e.loc not in existing]
+        entries += await _robots_allowed(
+            extra, client, robots_by_origin, resolver=resolver, rate_limiter=limiter
+        )
+        entries = entries[:cap]
 
     if not entries:
+        source = f"'{competitor_url}'" if competitor_url else "the pasted URLs"
         raise SitemapError(
-            f"No competitor URLs could be discovered from '{domain}' "
-            "(checked sitemaps and landing page links)."
+            f"No competitor URLs could be discovered from {source} "
+            "(checked sitemaps, page links, and robots.txt)."
         )
 
     if fetch_titles:
@@ -426,8 +556,7 @@ async def _crawl_with_sitemaps(
             resolver=resolver,
             rate_limiter=limiter,
         )
-
-    return entries, seed_sitemaps
+    return entries, sitemaps
 
 
 async def crawl(
@@ -441,8 +570,8 @@ async def crawl(
     resolver: ResolverFn | None = None,
     rate_limiter: HostRateLimiter | None = None,
 ) -> list[SitemapEntry]:
-    """Crawl a competitor's sitemaps (or fallback listing page / pasted URLs)."""
-    entries, _ = await _crawl_with_sitemaps(
+    """Crawl a competitor site root or profile page (plus any pasted URLs)."""
+    entries, _ = await collect_entries(
         domain,
         pasted_urls=pasted_urls,
         fetch_titles=fetch_titles,
@@ -553,6 +682,8 @@ def _format_entry_batch_payload(batch: list[SitemapEntry]) -> str:
             row["lastmod"] = entry.lastmod.date().isoformat()
         if entry.price_hint:
             row["price_hint"] = entry.price_hint
+        if entry.description:
+            row["description"] = entry.description[:300]
         rows.append(row)
     return json.dumps(rows, ensure_ascii=False)
 
@@ -686,7 +817,7 @@ async def build_brief(
 
 
 async def analyze_competitor(
-    competitor_url: str,
+    competitor_url: str | None,
     seller_context: str = "",
     *,
     pasted_urls: list[str] | None = None,
@@ -700,12 +831,14 @@ async def analyze_competitor(
     resolver: ResolverFn | None = None,
     now: datetime | None = None,
 ) -> CompetitorBrief:
-    """End-to-end pipeline: discover -> crawl -> derive signals -> Muse Spark brief."""
-    normalized_url = normalize_competitor_url(competitor_url)
-    domain = urlparse(normalized_url).hostname or normalized_url
+    """End-to-end pipeline: collect URLs -> derive signals -> Muse Spark brief.
 
-    entries, discovered_sitemaps = await _crawl_with_sitemaps(
-        normalized_url,
+    Pass a site root, a seller profile URL, a list of `pasted_urls`, or a URL plus a list.
+    """
+    normalized_url = normalize_competitor_url(competitor_url) if competitor_url else ""
+
+    entries, discovered_sitemaps = await collect_entries(
+        normalized_url or None,
         pasted_urls=pasted_urls,
         fetch_titles=fetch_titles,
         max_urls=max_urls,
@@ -714,6 +847,8 @@ async def analyze_competitor(
         resolver=resolver,
         rate_limiter=HostRateLimiter(),
     )
+    hosts = Counter(urlparse(e.loc).hostname or "" for e in entries)
+    domain = urlparse(normalized_url).hostname if normalized_url else hosts.most_common(1)[0][0]
     signals = derive_signals(
         entries,
         competitor_domain=domain,
@@ -773,6 +908,7 @@ __all__ = [
     "analyze_competitor",
     "analyze_url_batches",
     "build_brief",
+    "collect_entries",
     "crawl",
     "derive_signals",
     "discover_sitemaps",

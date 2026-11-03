@@ -305,11 +305,11 @@ async def test_sitemap_index_recursion_and_multi_batch_spark_calls() -> None:
 
 
 @respx.mock
-async def test_crawl_falls_back_to_shop_listing_html_when_no_sitemap() -> None:
+async def test_crawl_shop_url_reads_listing_page_not_sitemaps() -> None:
     etsy_html = (FIXTURES / "etsy_shop_page.html").read_text(encoding="utf-8")
     respx.get("https://www.etsy.com/robots.txt").mock(return_value=httpx.Response(404))
-    respx.get("https://www.etsy.com/sitemap.xml").mock(return_value=httpx.Response(404))
-    respx.get("https://www.etsy.com/sitemap_index.xml").mock(return_value=httpx.Response(404))
+    # A shop URL is a profile page: Etsy's site-wide sitemaps must not be crawled
+    sitemap_route = respx.get(url__regex=r"https://www\.etsy\.com/sitemap.*")
     respx.get("https://www.etsy.com/shop/SunlitStudioPrints").mock(
         return_value=httpx.Response(200, text=etsy_html)
     )
@@ -322,6 +322,7 @@ async def test_crawl_falls_back_to_shop_listing_html_when_no_sitemap() -> None:
             resolver=_public_resolver,
         )
 
+    assert not sitemap_route.called
     assert len(entries) == 2
     assert entries[0].bucket == "listings"
     assert entries[0].price_hint == "$34.00"

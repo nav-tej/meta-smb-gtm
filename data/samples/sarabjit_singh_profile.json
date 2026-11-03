@@ -1,0 +1,1380 @@
+{
+  "snapshot_date": "2026-11-03",
+  "name": "Sarabjit Singh",
+  "business_name": "Art of Sarabjit Singh",
+  "location": "San Francisco Bay Area, California",
+  "bio": "Sarabjit Singh is a visual award-winning artist living in the San Francisco Bay Area for over three decades. Her work is influenced by her Sikh roots and experiences as a first-generation immigrant. Acrylics on canvas, paper, wood, and walls are her medium of choice; bright and bold colors depict the vivacious character of the people and events in her artwork. A part of the sale of her art goes to charitable causes.",
+  "artist_statement": "Colors, like the notes of music, have always fascinated me. I want the colors of my artwork to enchant, heal, and connect the viewer to the stories that each piece of work has to tell.",
+  "mediums": [
+    "acrylic on canvas",
+    "acrylic on paper",
+    "watercolor",
+    "oil on canvas",
+    "murals",
+    "epoxy resin functional art",
+    "digital"
+  ],
+  "themes": [
+    "Sikh history and heritage",
+    "Guru Nanak Dev",
+    "Punjabi village life",
+    "women's empowerment",
+    "goddess series",
+    "Sikh identity",
+    "abstract and space",
+    "landscapes and florals",
+    "public murals"
+  ],
+  "platforms": [
+    {
+      "platform": "own_website",
+      "url": "https://www.artofsarabjitsingh.com/",
+      "role": "portfolio and direct sales (contact form)",
+      "fetch_status": "fetched",
+      "notes": "All 24 pages in its sitemap.xml fetched; Weebly site, robots.txt allows."
+    },
+    {
+      "platform": "fineartamerica",
+      "url": "https://fineartamerica.com/profiles/sarabjit-singh/art/paintings",
+      "role": "print-on-demand marketplace",
+      "fetch_status": "partial",
+      "notes": "Profile and paintings page 1 (72 of 150 paintings). robots.txt allows /profiles/*/art/paintings exactly; ?page=2+ falls under Disallow /profiles/*/art/*.",
+      "collections": [
+        "Public Art",
+        "Art of Punjab",
+        "Sikhs- 225 years of Milestones and Global footprints",
+        "Sikh Art",
+        "Gurpurab",
+        "Singhs and Kaurs",
+        "Goddess",
+        "Buddha",
+        "Photographs",
+        "Sikh Murals",
+        "Covid period Art",
+        "Empowering women",
+        "Abstracts",
+        "Sikh Greeting Cards",
+        "Sikh Digital",
+        "Floral",
+        "Landscapes",
+        "Animals",
+        "Seascapes",
+        "Private",
+        "Greeting cards"
+      ]
+    },
+    {
+      "platform": "pixels",
+      "url": "https://sarabjit-singh.pixels.com/",
+      "role": "print-on-demand storefront (Fine Art America network)",
+      "fetch_status": "fetched",
+      "notes": "Home page plus its 24 featured artwork pages (/featured/ is allowed; /art/* is disallowed)."
+    },
+    {
+      "platform": "saatchi_art",
+      "url": "https://www.saatchiart.com/sarabjitsingh",
+      "role": "originals and prints marketplace",
+      "fetch_status": "access_denied",
+      "notes": "HTTP 403 Access Denied (bot protection), including robots.txt. Not bypassed."
+    },
+    {
+      "platform": "etsy",
+      "url": "https://www.etsy.com/shop/ArtOfSarabjitSingh",
+      "role": "marketplace shop",
+      "fetch_status": "access_denied",
+      "notes": "Listed on the About page. HTTP 403 bot challenge. Not bypassed."
+    },
+    {
+      "platform": "facebook",
+      "url": "https://www.facebook.com/ArtofSarabjitSingh",
+      "role": "social page",
+      "fetch_status": "robots_disallowed",
+      "notes": "robots.txt disallows all crawlers and prohibits automated collection without written permission."
+    },
+    {
+      "platform": "instagram",
+      "url": "https://www.instagram.com/artofsarabjitsingh/",
+      "role": "social",
+      "fetch_status": "not_attempted",
+      "notes": "Listed on the About page. Meta property, same automated-collection terms as Facebook."
+    }
+  ],
+  "series": [
+    {
+      "name": "Guru Nanak Dev 550th Anniversary",
+      "source_url": "https://www.artofsarabjitsingh.com/gurus.html",
+      "summary": "Six works commemorating the 550th birth anniversary of Guru Nanak Dev (2019). Shown at Kala Sangam Gallery (Bradford, UK), Faiz Art Festival (Lahore), Sikhlens (LA) and the first contemporary Sikh art exhibition at Triton Museum.",
+      "works": [
+        "Ek Onkar",
+        "Kirat Karo",
+        "Wand Chakho (Sharing)",
+        "Naam Japo (Meditation)",
+        "Women",
+        "Udasis (Travels)"
+      ],
+      "original_format": "24x24\" acrylic on canvas; Naam Japo original sold",
+      "direct_sale_offers": [
+        {
+          "product": "Limited edition giclee print",
+          "size": "12x12\"",
+          "price_usd": 75,
+          "edition_size": 100,
+          "notes": "18k gold ink embellished, hand signed, certificate of authenticity, free first-class US shipping"
+        },
+        {
+          "product": "Limited edition giclee print",
+          "size": "24x24\"",
+          "price_usd": 125,
+          "edition_size": 100,
+          "notes": "Ek Onkar and series page price"
+        },
+        {
+          "product": "Limited edition giclee print",
+          "size": "24x24\"",
+          "price_usd": 150,
+          "edition_size": 100,
+          "notes": "Naam Japo page price"
+        },
+        {
+          "product": "Limited edition canvas print",
+          "size": "24x24\"",
+          "price_usd": 900,
+          "edition_size": 10,
+          "notes": "Ek Onkar; free US shipping"
+        }
+      ]
+    },
+    {
+      "name": "Sikhs: 225 Years of Milestones and Global Footprints",
+      "source_url": "https://www.artofsarabjitsingh.com/sikh-art.html",
+      "summary": "Historical series of 10 artworks on Sikh history and diaspora; The Flying Sikhs is award-winning.",
+      "works": [
+        "Maharaja Ranjit Singh",
+        "The Flying Sikhs",
+        "Sikh soldiers in WW1 France",
+        "The Half and Halves",
+        "Komagata Maru in troubled waters",
+        "The Burning Punjab 1947"
+      ],
+      "original_format": "28x36\" acrylic on canvas"
+    },
+    {
+      "name": "Empowering Women",
+      "source_url": "https://www.artofsarabjitsingh.com/women.html",
+      "summary": "10 works on women's achievements, each paired with a short poem.",
+      "works": [
+        "Dancin to the tune",
+        "Fountain of love",
+        "Old but bold",
+        "The queen",
+        "She is shakti!",
+        "Woman of the future",
+        "Sports Arena",
+        "A lady of words",
+        "Woman of elements"
+      ],
+      "original_format": "16x20\" acrylic on canvas; The Queen original sold"
+    },
+    {
+      "name": "Goddess",
+      "source_url": "https://www.artofsarabjitsingh.com/goddess-art.html",
+      "summary": "In every woman there is a goddess waiting to emerge.",
+      "works": [
+        "Mother Goddess",
+        "Goddess of 21st century",
+        "Goddess of the Universe",
+        "Goddess of Adventure",
+        "Goddess of Love",
+        "Mai Bhago Warrior Goddess"
+      ],
+      "original_format": "Mai Bhago original sold"
+    },
+    {
+      "name": "Singhs and Kaurs",
+      "source_url": "https://www.artofsarabjitsingh.com/sikh-identity.html",
+      "summary": "Shows how to recognise Sikhs (turbans, patkas, uncut hair) for western audiences unfamiliar with them."
+    },
+    {
+      "name": "Sikh Women",
+      "source_url": "https://www.artofsarabjitsingh.com/sikh-women.html",
+      "summary": "Historic Sikh women as role models.",
+      "works": [
+        "Sophia Duleep Singh",
+        "Mata Bhag Kaur (Mai Bhago)",
+        "Mata Sahib Kaur"
+      ]
+    },
+    {
+      "name": "Abstract Art",
+      "source_url": "https://www.artofsarabjitsingh.com/abstract-art.html",
+      "summary": "Acrylic explorations of color evoking landscapes, seascapes and outer space; marketed as soothing, healing art."
+    },
+    {
+      "name": "Functional Art",
+      "source_url": "https://www.artofsarabjitsingh.com/functional-art.html",
+      "summary": "Redwood and epoxy resin side tables, mosaic and resin benches, concrete and mosaics."
+    },
+    {
+      "name": "Portraits",
+      "source_url": "https://www.artofsarabjitsingh.com/portraits.html",
+      "summary": "Commissioned portraits in watercolor and acrylic."
+    }
+  ],
+  "artworks": [
+    {
+      "title": "A lady of words",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/a-lady-of-words-sarabjit-singh.html"
+      },
+      "print_from_usd": 18.0,
+      "original_price_usd": null,
+      "series": "Empowering Women"
+    },
+    {
+      "title": "Banda Singh Bahadur",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/banda-singh-bahadur-sarabjit-singh.html",
+        "pixels": "https://sarabjit-singh.pixels.com/featured/banda-singh-bahadur-sarabjit-singh.html"
+      },
+      "print_from_usd": 18.0,
+      "original_price_usd": null,
+      "medium": "Acrylic On Canvas",
+      "description": "At 15 years he became an ascetic, and was known as 'Madho Das'. He established a monastery at Nāndeḍ, on the bank of the river Godāvarī, where in September 1708 he was visited by, and became a disciple of, Guru Gobind Singh, who gave him the new name of Banda Singh Bahadur. With the blessing and authority of Guru Gobind Singh, he assembled a fighting force and led the struggle against the Mughal Empire. His first major action was the sack of the Mughal provincial capital, Samana, in November 1709. He established his authority in Punjab, and abolished the zamindari system, granting property rights to the tillers of the land. He was captured by the Mughals and tortured to death in 1716. A really brave saint soldier. I was commissioned to paint this picture. I tried to visualize the image of Banda Singh as he was fighting the Muslim rulers, did rough sketches till I was satisfied with the outcome. I wanted to portray his bravery along with his spirituality. So I took the help of the colors to convey the depth of meaning in this moment plucked from history and frozen on my canvas. For me it is priceless as for any true Sikh Art lover. I hope my version of Banda Singh will inspire everyone to fight against injustice without sacrificing their spiritual values. This artwork is going to be part of 'Contemporary Color, Theory and Use' by Steven Bleicher. This will be a college-level textbook for art and design students.",
+      "comment_count": 18,
+      "product_starting_prices_usd": {
+        "Canvas Print": 47.0,
+        "Framed Print": 73.0,
+        "Art Print": 22.0,
+        "Poster": 22.0,
+        "Metal Print": 71.0,
+        "Acrylic Print": 111.0,
+        "Wood Print": 113.0,
+        "Tapestry": 68.0,
+        "Throw Pillow": 30.0,
+        "Tote Bag": 34.0,
+        "Greeting Card": 5.25,
+        "Spiral Notebook": 19.0,
+        "iPhone Case": 28.0,
+        "Men's Clothing": 28.0,
+        "Women's Clothing": 28.0
+      },
+      "uploaded": "2015-01-07",
+      "series": "Sikhs: 225 Years of Milestones and Global Footprints"
+    },
+    {
+      "title": "Children Exploring Nature Mural",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/1-harmony-sarabjit-singh.html"
+      },
+      "print_from_usd": null,
+      "original_price_usd": null,
+      "series": null
+    },
+    {
+      "title": "Colorful Abstract Face with Jewelry",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/colorful-abstract-face-with-jewelry-sarabjit-singh.html"
+      },
+      "print_from_usd": 18.0,
+      "original_price_usd": null,
+      "series": null
+    },
+    {
+      "title": "Colorful Painted Rabbit Sculpture",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/1-june-bloom-sarabjit-singh.html"
+      },
+      "print_from_usd": null,
+      "original_price_usd": null,
+      "series": null
+    },
+    {
+      "title": "Colorful Street Utility Box Art",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/global-family-sarabjit-singh.html"
+      },
+      "print_from_usd": null,
+      "original_price_usd": null,
+      "series": null
+    },
+    {
+      "title": "Colorful Sun Sculpture in Park",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/haappy-face-sarabjit-singh.html"
+      },
+      "print_from_usd": null,
+      "original_price_usd": null,
+      "series": null
+    },
+    {
+      "title": "Corona and Gaia",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/corona-and-gaia-sarabjit-singh.html"
+      },
+      "print_from_usd": 18.0,
+      "original_price_usd": null,
+      "series": null
+    },
+    {
+      "title": "Dancing To The Tune",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/dancing-to-the-tune-sarabjit-singh.html"
+      },
+      "print_from_usd": 18.0,
+      "original_price_usd": null,
+      "series": "Empowering Women"
+    },
+    {
+      "title": "Daughters of the land of Five Rivers",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/daughters-of-the-land-of-five-rivers-sarabjit-singh.html"
+      },
+      "print_from_usd": 18.0,
+      "original_price_usd": null,
+      "series": null
+    },
+    {
+      "title": "Embracing Freedom",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/embracing-freedom-sarabjit-singh.html"
+      },
+      "print_from_usd": null,
+      "original_price_usd": null,
+      "series": null
+    },
+    {
+      "title": "Family",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/family-sarabjit-singh.html"
+      },
+      "print_from_usd": 14.0,
+      "original_price_usd": null,
+      "series": null
+    },
+    {
+      "title": "Fields",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/fields-sarabjit-singh.html",
+        "pixels": "https://sarabjit-singh.pixels.com/featured/fields-sarabjit-singh.html"
+      },
+      "print_from_usd": 18.0,
+      "original_price_usd": null,
+      "medium": "Oil On Canvas",
+      "description": "All SALES will benefit the FARMERS Movement. This is an oil on canvas 16x20\" and depicts the lush fields of Punjab. The farmers harvesting their crops and the buffaloes grazing. This is the rustic and simple life of the farmers of Punjab. Punjab is the only state in India with a majority of the Sikh population. The term Punjab comprises two words: \"punj meaning five and ab meaning water, thus the land of five rivers.\" The Greeks referred to Punjab as Pentapotamia, an inland delta of five converging rivers. In Avesta, the sacred text of Zoroastrians, the Punjab region is associated with the ancient hapta hendu or Sapta Sindhu, the Land of Seven Rivers.Historically, the Punjab region has been the gateway to the Indian Subcontinent for most foreign invaders. Agriculture is one of the largest industry in Punjab, and its been labeled the \"bread basket of India.\"",
+      "comment_count": 8,
+      "product_starting_prices_usd": {
+        "Canvas Print": 47.0,
+        "Framed Print": 73.0,
+        "Art Print": 22.0,
+        "Poster": 22.0,
+        "Metal Print": 71.0,
+        "Acrylic Print": 111.0,
+        "Wood Print": 113.0,
+        "Tapestry": 63.0,
+        "Throw Pillow": 30.0,
+        "Shower Curtain": 79.0,
+        "Tote Bag": 34.0,
+        "Greeting Card": 5.25,
+        "Spiral Notebook": 19.0,
+        "iPhone Case": 28.0,
+        "Men's Clothing": 28.0,
+        "Women's Clothing": 28.0
+      },
+      "uploaded": "2012-11-16",
+      "series": null
+    },
+    {
+      "title": "Goddess of Adventure",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/goddess-of-adventure-sarabjit-singh.html"
+      },
+      "print_from_usd": 14.0,
+      "original_price_usd": null,
+      "series": "Goddess"
+    },
+    {
+      "title": "Goddess of love",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/goddess-of-love-sarabjit-singh.html"
+      },
+      "print_from_usd": 14.0,
+      "original_price_usd": null,
+      "series": "Goddess"
+    },
+    {
+      "title": "Goddess of peace",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/goddess-of-peace-sarabjit-singh.html"
+      },
+      "print_from_usd": 14.0,
+      "original_price_usd": null,
+      "series": "Goddess"
+    },
+    {
+      "title": "Golden Temple",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/golden-temple-sarabjit-singh.html",
+        "pixels": "https://sarabjit-singh.pixels.com/featured/golden-temple-sarabjit-singh.html"
+      },
+      "print_from_usd": 18.0,
+      "original_price_usd": null,
+      "medium": "Acrylic",
+      "description": "This is a painting of the Golden Temple built in 1574 in Punjab India. The city was founded in 1574 by the fourth Sikh guru, Guru Ram Das. The Harmandir Sahib (Golden Temple) was designed by the fifth guru, Guru Arjan, who had the cornerstone laid by the Muslim Sufi saint Sai Hazrat Mian Mir on 28 December 1588. Guru Arjan completed the Adi Granth, the holy scripture of Sikhism, in 1604 and installed it in the Gurdwara. There are four doors to get into the Golden Temple, which symbolize the openness of the Sikhs towards all people and religions.Its exterior is plated with gold leaf.The temple runs one of the largest free kitchens in the world, serving 100,000 people on average daily. The meal consists of flat bread and lentil soup. If you wish to have an original version of the Golden temple or any other painting feel free to commission me. Please contact me via email.",
+      "comment_count": 18,
+      "product_starting_prices_usd": {
+        "Canvas Print": 47.0,
+        "Framed Print": 73.0,
+        "Art Print": 22.0,
+        "Poster": 22.0,
+        "Metal Print": 71.0,
+        "Acrylic Print": 111.0,
+        "Wood Print": 113.0,
+        "Tapestry": 68.0,
+        "Greeting Card": 6.25,
+        "iPhone Case": 28.0
+      },
+      "uploaded": "2012-11-15",
+      "series": "Golden Temple"
+    },
+    {
+      "title": "Golden Temple at day",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/golden-temple-at-day-sarabjit-singh.html",
+        "pixels": "https://sarabjit-singh.pixels.com/featured/golden-temple-at-day-sarabjit-singh.html"
+      },
+      "print_from_usd": 14.0,
+      "original_price_usd": null,
+      "medium": "Acrylic On Canvas",
+      "description": "This is Golden Temple, one of the most holy places of the Sikh religion. The temple was designed by the fifth guru of the Sikhs, Guru Arjan. There are four doors to get into the temple, which symbolize the openness of the Sikhs towards all people and religions.Its exterior is plated with gold. The temple runs one of the largest free kitchens in the world, serving 100,000 people on average daily. The meal consists of flat bread and lentil soup",
+      "comment_count": 3,
+      "product_starting_prices_usd": {
+        "Canvas Print": 42.0,
+        "Framed Print": 68.0,
+        "Art Print": 17.0,
+        "Poster": 17.0,
+        "Metal Print": 66.0,
+        "Acrylic Print": 106.0,
+        "Wood Print": 108.0,
+        "Greeting Card": 5.25,
+        "iPhone Case": 28.0,
+        "Men's Clothing": 33.0,
+        "Women's Clothing": 33.0
+      },
+      "uploaded": "2015-11-18",
+      "series": "Golden Temple"
+    },
+    {
+      "title": "Golden Temple at night",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/golden-temple-at-night-sarabjit-singh.html",
+        "pixels": "https://sarabjit-singh.pixels.com/featured/golden-temple-at-night-sarabjit-singh.html"
+      },
+      "print_from_usd": 14.0,
+      "original_price_usd": null,
+      "medium": "Acrylic On Canvas",
+      "description": "This is Golden Temple, one of the most holy places of the Sikh religion. The temple was designed by the fifth guru of the Sikhs, Guru Arjan. There are four doors to get into the temple, which symbolize the openness of the Sikhs towards all people and religions.Its exterior is plated with gold. The temple runs one of the largest free kitchens in the world, serving 100,000 people on average daily. The meal consists of flat bread and lentil soup",
+      "comment_count": 3,
+      "product_starting_prices_usd": {
+        "Canvas Print": 42.0,
+        "Framed Print": 68.0,
+        "Art Print": 17.0,
+        "Poster": 17.0,
+        "Metal Print": 66.0,
+        "Acrylic Print": 106.0,
+        "Wood Print": 108.0,
+        "Greeting Card": 5.25,
+        "iPhone Case": 28.0,
+        "Men's Clothing": 33.0,
+        "Women's Clothing": 33.0
+      },
+      "uploaded": "2015-11-18",
+      "series": "Golden Temple"
+    },
+    {
+      "title": "Guru Gobind Singh",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/guru-gobind-singh-sarabjit-singh.html"
+      },
+      "print_from_usd": 18.0,
+      "original_price_usd": null,
+      "series": null
+    },
+    {
+      "title": "Guru Gobind Singh #2",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/2-guru-gobind-singh-sarabjit-singh.html"
+      },
+      "print_from_usd": 18.0,
+      "original_price_usd": null,
+      "series": null
+    },
+    {
+      "title": "Harmandir Sahib",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/harmandir-sahib-sarabjit-singh.html",
+        "pixels": "https://sarabjit-singh.pixels.com/featured/harmandir-sahib-sarabjit-singh.html"
+      },
+      "print_from_usd": 14.0,
+      "original_price_usd": null,
+      "medium": "Acrylic On Canvas",
+      "description": "This is Golden Temple, or ' Harmandir Sahib' one of the most holy places of the Sikh religion. The temple was designed by the fifth guru of the Sikhs, Guru Arjan. There are four doors to get into the temple, which symbolize the openness of the Sikhs towards all people and religions.Its exterior is plated with gold. The temple runs one of the largest free kitchens in the world, serving 100,000 people on average daily. The meal consists of flat bread and lentil soup.",
+      "comment_count": 3,
+      "product_starting_prices_usd": {
+        "Canvas Print": 42.0,
+        "Framed Print": 68.0,
+        "Art Print": 17.0,
+        "Poster": 17.0,
+        "Metal Print": 66.0,
+        "Acrylic Print": 106.0,
+        "Wood Print": 108.0,
+        "iPhone Case": 28.0
+      },
+      "uploaded": "2015-11-24",
+      "series": "Golden Temple"
+    },
+    {
+      "title": "Himalayas",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/himalayas-sarabjit-singh.html"
+      },
+      "print_from_usd": 14.0,
+      "original_price_usd": null,
+      "series": null
+    },
+    {
+      "title": "Humming To The Tune",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/humming-to-the-tune-sarabjit-singh.html"
+      },
+      "print_from_usd": null,
+      "original_price_usd": null,
+      "series": "Empowering Women"
+    },
+    {
+      "title": "In space-2",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/in-space-2-sarabjit-singh.html"
+      },
+      "print_from_usd": 18.0,
+      "original_price_usd": null,
+      "series": null
+    },
+    {
+      "title": "Iris garden",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/iris-garden-sarabjit-singh.html"
+      },
+      "print_from_usd": 14.0,
+      "original_price_usd": null,
+      "series": null
+    },
+    {
+      "title": "Komagata Maru in troubled waters",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/komagata-maru-in-troubled-waters-sarabjit-singh.html",
+        "pixels": "https://sarabjit-singh.pixels.com/featured/komagata-maru-in-troubled-waters-sarabjit-singh.html"
+      },
+      "print_from_usd": 18.0,
+      "original_price_usd": null,
+      "medium": "Acrylic On Canvas",
+      "description": "Komagata Maru in Troubled Waters On May 23rd, 1914 Komagata Maru a steam liner carrying 376 passengers mainly from Punjab, India (all British subjects) arrived in Vancouver, British Columbia. Canada's exclusion laws allowed only people who \"come from the country of their birth or citizenship by a continuous journey and or through tickets purchased before leaving the country of their birth or nationality.\" These regulations came at a time when Canada was accepting massive numbers of immigrants (over 400,000 in 1913 alone) almost all of whom came from Europe. On July 23, 1914, the Komagata Maru passengers were forced to leave Canada. This was evidence that Indians were not treated as equals under the British Empire. The passengers proceeded to stage a peaceful protest upon returning to India, but they were fired upon by the British, and many died, others were arrested.",
+      "comment_count": 1,
+      "product_starting_prices_usd": {
+        "Canvas Print": 47.0,
+        "Framed Print": 74.0,
+        "Art Print": 22.0,
+        "Poster": 22.0,
+        "Metal Print": 71.0,
+        "Acrylic Print": 111.0,
+        "Wood Print": 113.0,
+        "Tapestry": 63.0,
+        "Tote Bag": 34.0,
+        "Greeting Card": 5.25,
+        "Spiral Notebook": 19.0,
+        "iPhone Case": 28.0,
+        "Men's Clothing": 28.0,
+        "Women's Clothing": 28.0
+      },
+      "uploaded": "2015-10-25",
+      "series": "Sikhs: 225 Years of Milestones and Global Footprints"
+    },
+    {
+      "title": "Liberty for Angel Island",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/liberty-for-angel-island-sarabjit-singh.html"
+      },
+      "print_from_usd": 18.0,
+      "original_price_usd": null,
+      "series": null
+    },
+    {
+      "title": "Like a rose",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/like-a-rose-sarabjit-singh.html"
+      },
+      "print_from_usd": 14.0,
+      "original_price_usd": null,
+      "series": null
+    },
+    {
+      "title": "Maharaja Ranjit Singh",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/maharaja-ranjit-singh-sarabjit-singh.html",
+        "pixels": "https://sarabjit-singh.pixels.com/featured/maharaja-ranjit-singh-sarabjit-singh.html"
+      },
+      "print_from_usd": 18.0,
+      "original_price_usd": null,
+      "medium": "Acrylic On Canvas",
+      "description": "Maharaja Ranjit Singh Maharaja Ranjit Singh or 'The Lion of Punjab' (1780-1839) as he was known was the first Sikh Emperor. In1801 he became The Maharaja of Punjab at the age of 20. The Sikh Empire, also known as Punjab was a secular state under Ranjit Singh; the Sikhs were generally not known to force either those in their employ or the inhabitants of the country they ruled to convert to Sikhism. He was the first Asian ruler to modernize his army to European standards and was well known for filling the leadership positions in his kingdom (Darbar)with men of various religions. People were recognized and promoted on their ability and not their religion.There was no ferocity in his disposition and he never punished a criminal with death even under circumstances of aggravated offence. Maharaja Ranjit Singh is remembered for uniting the Punjab as a strong nation and his possession of the Koh-i-Noor diamond, which was given to him by Shuja Shah Durrani of Afghanistan.His most lasting legacy was the golden beautification of the Harmandir Sahib, the most revered Gurudwara(temple) of the Sikhs, with marble and gold, from which the popular name of the \"Golden Temple\" is derived. The respect shown by those who worked for the Maharajah is best highlighted, by a Muslim, Fakir Azizuddin (His foreign Minister), who when meeting with the British Governor-General George Eden, replied to the question of which of the Maharajah's eyes was missing,(he had lost one eye to smallpox) \"The Maharajah is like the sun and the sun has only one eye. The splendor and luminosity of his single eye is so much that I have never dared to look at his other eye.\" In a land and time when being blinded disqualified one from ruling, having the sight of only one eye was never a problem for Ranjit Singh, who remarked that it gave him the ability to see things more acutely.",
+      "comment_count": 11,
+      "product_starting_prices_usd": {
+        "Canvas Print": 47.0,
+        "Framed Print": 74.0,
+        "Art Print": 22.0,
+        "Poster": 22.0,
+        "Metal Print": 71.0,
+        "Acrylic Print": 111.0,
+        "Wood Print": 113.0,
+        "Tapestry": 68.0,
+        "Tote Bag": 34.0,
+        "Greeting Card": 5.25,
+        "Spiral Notebook": 19.0,
+        "iPhone Case": 28.0,
+        "Men's Clothing": 28.0,
+        "Women's Clothing": 28.0
+      },
+      "uploaded": "2015-08-12",
+      "series": "Sikhs: 225 Years of Milestones and Global Footprints"
+    },
+    {
+      "title": "Mai Bhago",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/mai-bhago-sarabjit-singh.html",
+        "pixels": "https://sarabjit-singh.pixels.com/featured/mai-bhago-sarabjit-singh.html"
+      },
+      "print_from_usd": 14.0,
+      "original_price_usd": null,
+      "medium": "Acrylic On Paper",
+      "description": "This painting is a part of my series \"Goddess' a tribute to the women past and present known and unknown who have shown the strength and focused purpose to do small things, bigs things insignificant daily chores too as part of a job and shine and show character that impacts one and all. Mai Bhago was born at the village of Jhabal Kalan in present day Amritsar, Punjab. Her blood boiled at the timidity of 40 sikh deserters, she was distressed to hear in 1705 that some of the Sikhs of her village neighborhood who had gone to Anandpur Sahib to fight for Guru Gobind Singh Ji (against the Mughal army) had deserted him under adverse conditions.Through a subtle mix of taunting insults, and hardcore professional wrestling-style pump-up speeches, Mai Bhago made these sikh deserters realize that they had a job to do, and they just needed to get out there and do it. She killed several enemy soldiers on the battlefield, and is considered to be a 'saint warrior' by the Sikhs for over 300 years. She was the sole survivor of the battle of Muktsar (fought on 29 December 1705) and thereafter joined the service of her Guru as one of his bodyguards. you can read more about her here:http://www.sikhchannel.tv/sikh-history-mai-bhago-ji/",
+      "comment_count": 15,
+      "product_starting_prices_usd": {
+        "Canvas Print": 42.0,
+        "Framed Print": 68.0,
+        "Art Print": 17.0,
+        "Poster": 17.0,
+        "Metal Print": 66.0,
+        "Acrylic Print": 106.0,
+        "Wood Print": 108.0,
+        "Tapestry": 63.0,
+        "Throw Pillow": 30.0,
+        "Tote Bag": 34.0,
+        "Greeting Card": 5.25,
+        "Spiral Notebook": 19.0,
+        "iPhone Case": 28.0,
+        "Men's Clothing": 28.0,
+        "Women's Clothing": 28.0
+      },
+      "uploaded": "2015-03-31",
+      "series": "Goddess",
+      "original_sold": true
+    },
+    {
+      "title": "Majestic Banff",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/majestic-banff-sarabjit-singh.html"
+      },
+      "print_from_usd": 18.0,
+      "original_price_usd": null,
+      "series": null
+    },
+    {
+      "title": "Mata Sahib Kaur",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/mata-sahib-kaur-sarabjit-singh.html",
+        "pixels": "https://sarabjit-singh.pixels.com/featured/mata-sahib-kaur-sarabjit-singh.html"
+      },
+      "print_from_usd": 18.0,
+      "original_price_usd": null,
+      "medium": "Acrylic On Paper",
+      "description": "Mata Sahib Kaur Ji, who is also called Mata Sahib Devan Ji, was born on the 1st November 1681 in a village called Rohtas, District Jehlum, in West Panjab, (now in Pakistan). She was born to Mata Jasdevi Ji and Bhai Rama Ji, in-house of Kumrav Kshatriyas. Her father, who was an ardent devotee of Guru Gobind Singh Ji, influenced her to the extent that she wanted to devote her whole life in the service of the Guru Sahib. She earned the distinction of being called the Mother of the Khalsa; by instilling the first Amrit with the sweet patasas (candy) that balances its fierceness. This artwork was part of a touring exhibition in the UK July 2018 as a fundraiser for the movie \"Motherhood\".",
+      "comment_count": 4,
+      "product_starting_prices_usd": {
+        "Canvas Print": 47.0,
+        "Framed Print": 73.0,
+        "Art Print": 22.0,
+        "Poster": 22.0,
+        "Metal Print": 71.0,
+        "Acrylic Print": 111.0,
+        "Wood Print": 113.0,
+        "Greeting Card": 6.25,
+        "iPhone Case": 28.0
+      },
+      "uploaded": "2018-06-12",
+      "series": null
+    },
+    {
+      "title": "Mother Goddess",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/mother-goddess-sarabjit-singh.html",
+        "pixels": "https://sarabjit-singh.pixels.com/featured/mother-goddess-sarabjit-singh.html"
+      },
+      "print_from_usd": 14.0,
+      "original_price_usd": null,
+      "medium": "Acrylic",
+      "description": "This is from the series 'The Goddess'. In this series I'm trying to show that through the ages the females in different cultures all over the world have been labeled as 'the fair sex', 'the weaker sex' and given many other negative labels too. I wish to portray the everyday woman and girls in our present day world that are trying to make a difference. We should support them and give them a chance to rise and shine and consider them as equal to men. In this spirit I call the women and girls in this series 'Goddess'.This here is a painting of a mother. The love that any mother showers on her kids is beyond measure and for that I give her the title ' Goddess'.",
+      "comment_count": 4,
+      "product_starting_prices_usd": {
+        "Canvas Print": 42.0,
+        "Framed Print": 68.0,
+        "Art Print": 17.0,
+        "Poster": 17.0,
+        "Metal Print": 66.0,
+        "Acrylic Print": 106.0,
+        "Wood Print": 108.0,
+        "Tote Bag": 34.0,
+        "Greeting Card": 6.25,
+        "iPhone Case": 28.0
+      },
+      "uploaded": "2013-09-08",
+      "series": "Goddess"
+    },
+    {
+      "title": "My Universe",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/my-universe-sarabjit-singh.html"
+      },
+      "print_from_usd": 14.0,
+      "original_price_usd": null,
+      "series": null
+    },
+    {
+      "title": "New San Francisco Bay Bridge",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/new-san-francisco-bay-bridge-sarabjit-singh.html",
+        "pixels": "https://sarabjit-singh.pixels.com/featured/new-san-francisco-bay-bridge-sarabjit-singh.html"
+      },
+      "print_from_usd": 14.0,
+      "original_price_usd": null,
+      "medium": "Acrylic On Canvas",
+      "description": "New San Francisco Bay bridge.",
+      "comment_count": 2,
+      "product_starting_prices_usd": {
+        "Canvas Print": 62.0,
+        "Framed Print": 80.0,
+        "Art Print": 17.0,
+        "Poster": 17.0,
+        "Metal Print": 68.0,
+        "Acrylic Print": 108.0,
+        "Wood Print": 110.0,
+        "Throw Pillow": 30.0,
+        "Tote Bag": 34.0,
+        "Greeting Card": 30.0,
+        "iPhone Case": 28.0
+      },
+      "uploaded": "2013-12-18",
+      "series": null
+    },
+    {
+      "title": "Old N Bold",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/old-n-bold-sarabjit-singh.html"
+      },
+      "print_from_usd": 18.0,
+      "original_price_usd": null,
+      "series": "Empowering Women"
+    },
+    {
+      "title": "Om Flower",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/om-flower-sarabjit-singh.html"
+      },
+      "print_from_usd": null,
+      "original_price_usd": null,
+      "series": null
+    },
+    {
+      "title": "One with nature",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/one-with-nature-sarabjit-singh.html"
+      },
+      "print_from_usd": 14.0,
+      "original_price_usd": null,
+      "series": null
+    },
+    {
+      "title": "Palominos All",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/palominos-all-sarabjit-singh.html"
+      },
+      "print_from_usd": 14.0,
+      "original_price_usd": null,
+      "series": null
+    },
+    {
+      "title": "Paternal Family",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/paternal-family-sarabjit-singh.html"
+      },
+      "print_from_usd": 14.0,
+      "original_price_usd": null,
+      "series": null
+    },
+    {
+      "title": "Pilgrims",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/pilgrims-sarabjit-singh.html",
+        "pixels": "https://sarabjit-singh.pixels.com/featured/pilgrims-sarabjit-singh.html"
+      },
+      "print_from_usd": 14.0,
+      "original_price_usd": null,
+      "medium": "Oil On Canvas",
+      "description": "This is picture about the sikh pilgrims going to celebrate Gurupurab( First Guru's Birthday) at a Gurudwara (Temple) and stopping on the way on a cold winter night in Punjab. The original is done in oil paints on canvas.",
+      "comment_count": 4,
+      "product_starting_prices_usd": {
+        "Canvas Print": 42.0,
+        "Framed Print": 68.0,
+        "Art Print": 17.0,
+        "Poster": 17.0,
+        "Metal Print": 66.0,
+        "Acrylic Print": 106.0,
+        "Wood Print": 108.0,
+        "Throw Pillow": 30.0,
+        "Tote Bag": 34.0,
+        "Greeting Card": 30.0,
+        "iPhone Case": 28.0,
+        "Men's Clothing": 28.0,
+        "Women's Clothing": 28.0
+      },
+      "uploaded": "2013-11-14",
+      "series": null
+    },
+    {
+      "title": "Pink Bougainvillea",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/pink-bougainvillea-sarabjit-singh.html",
+        "pixels": "https://sarabjit-singh.pixels.com/featured/pink-bougainvillea-sarabjit-singh.html"
+      },
+      "print_from_usd": 14.0,
+      "original_price_usd": null,
+      "medium": "Digital Photograph",
+      "description": "I took this photograph of Bougainvillea from my garden , it reminds me of spring. Please enjoy.",
+      "comment_count": 5,
+      "product_starting_prices_usd": {
+        "Canvas Print": 42.0,
+        "Framed Print": 68.0,
+        "Art Print": 17.0,
+        "Poster": 17.0,
+        "Metal Print": 66.0,
+        "Acrylic Print": 106.0,
+        "Wood Print": 108.0,
+        "Throw Pillow": 30.0,
+        "Tote Bag": 34.0,
+        "Greeting Card": 30.0,
+        "iPhone Case": 28.0
+      },
+      "uploaded": "2015-02-07",
+      "series": null
+    },
+    {
+      "title": "Pretty Petunias",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/pretty-petunias-sarabjit-singh.html"
+      },
+      "print_from_usd": 14.0,
+      "original_price_usd": null,
+      "series": null
+    },
+    {
+      "title": "Punjabi farmer",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/punjabi-farmer-sarabjit-singh.html",
+        "pixels": "https://sarabjit-singh.pixels.com/featured/punjabi-farmer-sarabjit-singh.html"
+      },
+      "print_from_usd": 14.0,
+      "original_price_usd": null,
+      "medium": "Acrylic On Canvas",
+      "description": "All SALES OF This print will support the FARMERS in India. Agriculture is the main industry in India's state of Punjab. It has been called the \"breadbasket of India\". 85% of the land is agricultural. This particular painting is 4x8ft. mural painted with acrylics on canvas. It was done as part of a backdrop for a Vaisakhi(Harvest celebration) festival show here in California. The painting was also a part of my solo Sikh art exhibition held in San Jose State College, California.",
+      "comment_count": 8,
+      "product_starting_prices_usd": {
+        "Canvas Print": 65.0,
+        "Framed Print": 83.0,
+        "Art Print": 17.0,
+        "Poster": 17.0,
+        "Metal Print": 71.0,
+        "Acrylic Print": 111.0,
+        "Wood Print": 113.0,
+        "Tapestry": 63.0,
+        "Throw Pillow": 30.0,
+        "Tote Bag": 34.0,
+        "Greeting Card": 53.0,
+        "Spiral Notebook": 19.0,
+        "iPhone Case": 28.0,
+        "Men's Clothing": 28.0,
+        "Women's Clothing": 28.0
+      },
+      "uploaded": "2015-07-03",
+      "series": null
+    },
+    {
+      "title": "Purple Pegasus",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/purple-pegasus-sarabjit-singh.html"
+      },
+      "print_from_usd": 18.0,
+      "original_price_usd": null,
+      "series": null
+    },
+    {
+      "title": "Queen",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/queen-sarabjit-singh.html",
+        "pixels": "https://sarabjit-singh.pixels.com/featured/queen-sarabjit-singh.html"
+      },
+      "print_from_usd": 18.0,
+      "original_price_usd": null,
+      "medium": "Acrylic On Canvas",
+      "description": "You are a Queen Think no less Plan your journey, It may be tough But you can do it all. 'Queen' or Rani is the same thing, only Rani was the term used by people in India for the Queen. Queen here represents the heights that women have achieved in years gone by and in the present day and age. These days the mention of 'Queen' we can only think of the Queen of England, but women now can become heads of their government in their countries or heads of states or CEO's. This painting is part of my series on empowering women, specially in parts of the world where they need all the encouragement and help and positive attitude of the society they belong to. This series encourages them to be whoever they choose to be in life and let no one stop them. You can see updates on the series on my FB page at: https://www.facebook.com/Art-of-Sarabjit-Singh-138236121534608",
+      "comment_count": 6,
+      "product_starting_prices_usd": {
+        "Canvas Print": 47.0,
+        "Framed Print": 73.0,
+        "Art Print": 22.0,
+        "Poster": 22.0,
+        "Metal Print": 71.0,
+        "Acrylic Print": 111.0,
+        "Wood Print": 113.0,
+        "Throw Pillow": 30.0,
+        "Tote Bag": 34.0,
+        "Greeting Card": 6.25,
+        "Spiral Notebook": 17.0,
+        "iPhone Case": 28.0
+      },
+      "uploaded": "2016-08-08",
+      "series": "Empowering Women",
+      "original_sold": true
+    },
+    {
+      "title": "Rooster",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/rooster-sarabjit-singh.html"
+      },
+      "print_from_usd": 18.0,
+      "original_price_usd": null,
+      "series": null
+    },
+    {
+      "title": "Sea Of Solitude",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/sea-of-solitude-sarabjit-singh.html"
+      },
+      "print_from_usd": 14.0,
+      "original_price_usd": 2000.0,
+      "series": null
+    },
+    {
+      "title": "She is Shakti",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/she-is-shakti-sarabjit-singh.html"
+      },
+      "print_from_usd": 18.0,
+      "original_price_usd": null,
+      "series": "Empowering Women"
+    },
+    {
+      "title": "Sikh boys",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/sikh-boys-sarabjit-singh.html"
+      },
+      "print_from_usd": 18.0,
+      "original_price_usd": null,
+      "series": "Singhs and Kaurs"
+    },
+    {
+      "title": "Sikh soldiers in France WW1",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/sikh-soldiers-in-france-ww1-sarabjit-singh.html",
+        "pixels": "https://sarabjit-singh.pixels.com/featured/sikh-soldiers-in-france-ww1-sarabjit-singh.html"
+      },
+      "print_from_usd": 18.0,
+      "original_price_usd": null,
+      "medium": "Acrylic On Canvas",
+      "description": "This painting is part of my series 'Sikhs: 225 years of milestones and global footprints', a tribute to the valiant men who fought and sacrificed their lives.During the British Raj in India, almost 138,000 Indian troops fought in Belgium and France during World War I, many of them Sikhs. More than one quarter of these soldiers became casualties. They fought with dedication and loyalty for a cause that was not even theirs.",
+      "comment_count": 8,
+      "product_starting_prices_usd": {
+        "Canvas Print": 47.0,
+        "Framed Print": 74.0,
+        "Art Print": 22.0,
+        "Poster": 22.0,
+        "Metal Print": 71.0,
+        "Acrylic Print": 111.0,
+        "Wood Print": 113.0,
+        "Shower Curtain": 84.0,
+        "Tote Bag": 34.0,
+        "Greeting Card": 5.25,
+        "Spiral Notebook": 19.0,
+        "iPhone Case": 28.0,
+        "Men's Clothing": 28.0,
+        "Women's Clothing": 28.0
+      },
+      "uploaded": "2015-08-30",
+      "series": "Sikhs: 225 Years of Milestones and Global Footprints"
+    },
+    {
+      "title": "Sikhs in Africa",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/sikhs-in-africa-sarabjit-singh.html",
+        "pixels": "https://sarabjit-singh.pixels.com/featured/sikhs-in-africa-sarabjit-singh.html"
+      },
+      "print_from_usd": 18.0,
+      "original_price_usd": null,
+      "medium": "Acrylic On Canvas",
+      "description": "Sikh in Africa The Uganda railway was named the 'Lunatic Express' and dates back to the colonial times. Its entire 660 mile length actually lay in what would become Kenya. Construction on the project began in 1896 at the port city of Mombasa in British East Africa and it was completed in 1901 at the line's terminus, in Kisumu on the eastern shore of Lake Victoria. Construction was carried out mainly by labourers from British India. Nearly 32,000 (many from Punjab) were brought in due to lack of indigenous labour. They were a competent group of engineers, artisans and laborers who were already well accustomed to the tropical conditions. Approximately 2500 men lost their lives to disease, man- eating lions and hostile local tribes. Most of the surviving Indians returned home, 6,724 decided to remain after the line's completion, creating a community of Indian East Africans.",
+      "comment_count": 8,
+      "product_starting_prices_usd": {
+        "Canvas Print": 47.0,
+        "Framed Print": 74.0,
+        "Art Print": 22.0,
+        "Poster": 22.0,
+        "Metal Print": 71.0,
+        "Acrylic Print": 111.0,
+        "Wood Print": 113.0,
+        "Tapestry": 68.0,
+        "Tote Bag": 34.0,
+        "Greeting Card": 5.25,
+        "Spiral Notebook": 19.0,
+        "iPhone Case": 28.0,
+        "Men's Clothing": 28.0,
+        "Women's Clothing": 28.0
+      },
+      "uploaded": "2015-10-25",
+      "series": "Sikhs: 225 Years of Milestones and Global Footprints"
+    },
+    {
+      "title": "Singhs and Kaurs-3",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/singhs-and-kaurs-3-sarabjit-singh.html"
+      },
+      "print_from_usd": 18.0,
+      "original_price_usd": null,
+      "series": "Singhs and Kaurs"
+    },
+    {
+      "title": "Singhs and Kaurs-7",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/singhs-and-kaurs-7-sarabjit-singh.html"
+      },
+      "print_from_usd": 18.0,
+      "original_price_usd": null,
+      "series": "Singhs and Kaurs"
+    },
+    {
+      "title": "Sports arena",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/sports-arena-sarabjit-singh.html"
+      },
+      "print_from_usd": 18.0,
+      "original_price_usd": null,
+      "series": "Empowering Women"
+    },
+    {
+      "title": "Stripe Buddies",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/stripe-buddies-sarabjit-singh.html"
+      },
+      "print_from_usd": 14.0,
+      "original_price_usd": null,
+      "series": null
+    },
+    {
+      "title": "Surfing Kaur",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/surfing-kaur-sarabjit-singh.html"
+      },
+      "print_from_usd": null,
+      "original_price_usd": null,
+      "series": "Singhs and Kaurs"
+    },
+    {
+      "title": "Sweet Dreams in the land of Five Rivers",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/sweet-dreams-in-the-land-of-five-rivers-sarabjit-singh.html",
+        "pixels": "https://sarabjit-singh.pixels.com/featured/sweet-dreams-in-the-land-of-five-rivers-sarabjit-singh.html"
+      },
+      "print_from_usd": 22.0,
+      "original_price_usd": null,
+      "medium": "Mixed Media",
+      "description": "A vibrant scene depicts a woman and her children resting under a colorful quilt, which is the map of undivided India/Punjab, blending into an abstract landscape with rivers and fields. The sky transitions from a starry night to a bright sunrise, adding dynamic energy to the scene. This artwork depicts a mother's love for her kids, even though now it has been divided by Governments into two (one part in Pakistan and the other in India). A mother's love knows no boundaries as her kids move from Punjab to other Global continents and yet are tied to her through bonds of culture, traditions, food, and more. They can feel the love of their ancestors in their blood and DNA. This is the story of all who belonged to this part of the rich land called Punjab and are settled in various parts of the world. It is the story of those who can relate to sleeping under the sky in the open. It is the story of the land of Five Rivers- Jhelum, Ravi, Beas, Chenab, and Sutlej; of the land, the lush corn, wheat fields, and the cotton and yellow mustard fields. It is the story of the feeding bowl of India and the world, to an extent. It is the story of the Roots of the People of Punjab settled all over the Globe. The print won't do justice to the original piece of artwork as it's a diptych 3ft x x4ft. and studded with glass crystals and semi-precious stones and covered in layers of liquid glass (resin). This picture was taken before the resin layers, as the glare from the resin distorts the picture. I hope it adorns a Museum, as it truly is inspired by our collective journeys and my heart.",
+      "comment_count": 2,
+      "product_starting_prices_usd": {
+        "Canvas Print": 70.0,
+        "Framed Print": 79.0,
+        "Art Print": 27.0,
+        "Poster": 27.0,
+        "Metal Print": 76.0,
+        "Acrylic Print": 116.0,
+        "Wood Print": 118.0,
+        "Tapestry": 48.0,
+        "Throw Pillow": 30.0,
+        "Shower Curtain": 79.0,
+        "Tote Bag": 34.0,
+        "Greeting Card": 5.25,
+        "Spiral Notebook": 19.0,
+        "iPhone Case": 28.0,
+        "Men's Clothing": 35.0,
+        "Women's Clothing": 35.0
+      },
+      "uploaded": "2025-02-18",
+      "series": "Sikhs: 225 Years of Milestones and Global Footprints"
+    },
+    {
+      "title": "Swimming around the Golden Temple",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/swimming-around-the-golden-temple-sarabjit-singh.html"
+      },
+      "print_from_usd": 22.0,
+      "original_price_usd": null,
+      "series": "Golden Temple"
+    },
+    {
+      "title": "The Burning Punjab-1947",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/the-burning-punjab-1947-sarabjit-singh.html",
+        "pixels": "https://sarabjit-singh.pixels.com/featured/the-burning-punjab-1947-sarabjit-singh.html"
+      },
+      "print_from_usd": 18.0,
+      "original_price_usd": null,
+      "medium": "Acrylic On Canvas",
+      "description": "The Burning Punjab- 1947 This scene recreates the agony and suffering that millions suffered during the partition of the British Indian Empire. It led to the creation of the sovereign states of the Dominion of Pakistan (which later split into Pakistan and Bangladesh) and the Union of India (later Republic of India) on 15 August 1947. In the riots which preceded the partition, it is estimated that around 200,000 at the low end to a million and a half at the high end people lost their lives; nearly 14 million Hindus, Sikhs and Muslims were displaced during the partition. It was the largest mass migration in human history. Punjab before the partition of India, included the present-day federal states of Pakistan Punjab and Indian Punjab, as well as a number of semi-autonomous princely states of that time. Violence extended broadly and viciously during this political partition. Collective violence raged in the form of loot, capture of property , abduction and rape of women.",
+      "comment_count": 6,
+      "product_starting_prices_usd": {
+        "Canvas Print": 47.0,
+        "Framed Print": 74.0,
+        "Art Print": 22.0,
+        "Poster": 22.0,
+        "Metal Print": 71.0,
+        "Acrylic Print": 111.0,
+        "Wood Print": 113.0,
+        "Throw Pillow": 28.0,
+        "Tote Bag": 34.0,
+        "Greeting Card": 5.25,
+        "Spiral Notebook": 19.0,
+        "iPhone Case": 28.0,
+        "Men's Clothing": 28.0,
+        "Women's Clothing": 28.0
+      },
+      "uploaded": "2015-10-25",
+      "series": "Sikhs: 225 Years of Milestones and Global Footprints"
+    },
+    {
+      "title": "The Dhol Player",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/the-dhol-player-sarabjit-singh.html",
+        "pixels": "https://sarabjit-singh.pixels.com/featured/the-dhol-player-sarabjit-singh.html"
+      },
+      "print_from_usd": 14.0,
+      "original_price_usd": null,
+      "medium": "Acrylic",
+      "description": "This is from the series 'Sikh Art'. Here the Sikh couple are celebrating the harvesting of their crop. 'Vaisakhi\" or 'Baisakhi' as its called is celebrated in April in Punjab. The Sikhs can trace their origin from this state.",
+      "comment_count": 19,
+      "product_starting_prices_usd": {
+        "Canvas Print": 65.0,
+        "Framed Print": 83.0,
+        "Art Print": 17.0,
+        "Poster": 17.0,
+        "Metal Print": 71.0,
+        "Acrylic Print": 111.0,
+        "Wood Print": 113.0,
+        "Tapestry": 68.0,
+        "Throw Pillow": 30.0,
+        "Tote Bag": 34.0,
+        "Greeting Card": 30.0,
+        "iPhone Case": 28.0,
+        "Men's Clothing": 28.0,
+        "Women's Clothing": 28.0
+      },
+      "uploaded": "2013-09-09",
+      "series": "Sikhs: 225 Years of Milestones and Global Footprints"
+    },
+    {
+      "title": "The first Guru",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/the-first-guru-sarabjit-singh.html",
+        "pixels": "https://sarabjit-singh.pixels.com/featured/the-first-guru-sarabjit-singh.html"
+      },
+      "print_from_usd": 14.0,
+      "original_price_usd": 4000.0,
+      "medium": "Acrylic On Canvas",
+      "description": "The original is a mural 8ftx 4ft, Acrylic on canvas. It depicts the first Guru of the Sikhs- Guru Nanak Dev (April 1469 22 September 1539). He founded and formalized the 3 pillars of Sikhism-1. Meditation on the name of God. 2)To earn honestly and accept both pains and pleasures as GOD's gifts and blessings. 3)Lastly the Sikhs were asked to share their wealth.This spirit of Sharing and Giving is an important message from Guru Nanak.One is to stay truthful at all times and, fear none but the Eternal Super Soul. Live a life founded on decency immersed in Dharam - life controlled by high spiritual, moral and social values.",
+      "comment_count": 18,
+      "product_starting_prices_usd": {
+        "Canvas Print": 65.0,
+        "Framed Print": 83.0,
+        "Art Print": 17.0,
+        "Poster": 17.0,
+        "Metal Print": 71.0,
+        "Acrylic Print": 111.0,
+        "Wood Print": 113.0,
+        "Greeting Card": 6.25
+      },
+      "uploaded": "2012-12-28",
+      "series": null
+    },
+    {
+      "title": "The Flying Sikhs",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/the-flying-sikhs-sarabjit-singh.html",
+        "pixels": "https://sarabjit-singh.pixels.com/featured/the-flying-sikhs-sarabjit-singh.html"
+      },
+      "print_from_usd": 18.0,
+      "original_price_usd": null,
+      "medium": "Acrylic On Canvas",
+      "description": "The Flying Sikhs is part of my series 'Sikhs 225 years of Milestones and Global footprints' and debuted at Sikhlents Film and Art Festival in 2015. It was selected for the 2015 Juried Open Art Exhibition out of 734 worldwide entries; it won Special merit award in Light Space & Time Online Art Gallery! This painting of the 3 flying Sikhs from left to right- Hardit Singh Malik, Mahinder Singh Pujji and Meher Singh is a humble tribute to the countless other Sikh pilots from the great wars, now deceased, that have been forgotten now. The plane is a Camel Sopwith that Hardit Sikh flew. Flying Sikhs is a testimony to the brave and selfless contributions these unsung heroes made to the war efforts across the world. The history of the Sikhs who flew in the Royal Flying Corps, the Royal Air Force and the Indian Air Force has been forgotten, yet their bravery was recognized by both the military and the public during the dark days of the Blitz and the brutal Japanese invasion from the East. Hardit Singh Malik was the first ever Indian pilot to try to enlist as a pilot in WWI, the only Indian pilot to miraculously survive the war and later become PM of Patiala and High Commissioner to both Canada and France. Sikh pilots Mahinder Singh Pujji DFC, had a brilliant record for bravery. He saved a 300 strong battalion of lost American soldiers that were given up for dead in the dense Burmese forests. Mehar Singh was one of the most celebrated fighter pilots of the Second World War. A pilot par excellence and a dare-devil. Air Chief Marshal Arjan Singh DFC, Manmohan Singh, Prithpal Singh and Air Marshal Shivdev Singh led pilots in the Burmese front in the Second World War and later led the Indo-Pak and Indo-China air assaults. These handful of men represent countless other Sikh pilots from the great wars.",
+      "comment_count": 18,
+      "product_starting_prices_usd": {
+        "Canvas Print": 47.0,
+        "Framed Print": 74.0,
+        "Art Print": 22.0,
+        "Poster": 22.0,
+        "Metal Print": 71.0,
+        "Acrylic Print": 111.0,
+        "Wood Print": 113.0,
+        "Shower Curtain": 84.0,
+        "Greeting Card": 5.25,
+        "Spiral Notebook": 19.0,
+        "iPhone Case": 28.0,
+        "Men's Clothing": 28.0,
+        "Women's Clothing": 28.0
+      },
+      "uploaded": "2015-08-12",
+      "series": "Sikhs: 225 Years of Milestones and Global Footprints"
+    },
+    {
+      "title": "The Global Family",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/the-global-family-sarabjit-singh.html",
+        "pixels": "https://sarabjit-singh.pixels.com/featured/the-global-family-sarabjit-singh.html"
+      },
+      "print_from_usd": 18.0,
+      "original_price_usd": null,
+      "medium": "Acrylic On Canvas",
+      "description": "The Global Family This artwork is part of a movie:https://kaurfilms.com/tag/drawn-together/ And part of a School Textbook in Europe. We are living in a multicultural society today, but our differences are sometimes the cause of pain and anguish. Ignorance about other cultures and lack of compassion can result in hurting others. With the advances in technology if we strive to learn and educate ourselves and everyone around us about each other then we can make this world a happier and healthier place for all. With understanding will come tolerance in our hearts. We are a global family, let us strive for peace. Together we can do it.",
+      "comment_count": 5,
+      "product_starting_prices_usd": {
+        "Canvas Print": 47.0,
+        "Framed Print": 74.0,
+        "Art Print": 22.0,
+        "Poster": 22.0,
+        "Metal Print": 71.0,
+        "Acrylic Print": 111.0,
+        "Wood Print": 113.0,
+        "Tote Bag": 34.0,
+        "Greeting Card": 5.25,
+        "Spiral Notebook": 19.0,
+        "iPhone Case": 28.0,
+        "Men's Clothing": 28.0,
+        "Women's Clothing": 28.0
+      },
+      "uploaded": "2015-10-25",
+      "series": null
+    },
+    {
+      "title": "The Half and halves",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/the-half-and-halves-sarabjit-singh.html"
+      },
+      "print_from_usd": 18.0,
+      "original_price_usd": null,
+      "series": "Sikhs: 225 Years of Milestones and Global Footprints"
+    },
+    {
+      "title": "The Ride",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/the-ride-sarabjit-singh.html"
+      },
+      "print_from_usd": 14.0,
+      "original_price_usd": null,
+      "series": null
+    },
+    {
+      "title": "The Sikh groom",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/the-sikh-groom-sarabjit-singh.html"
+      },
+      "print_from_usd": 14.0,
+      "original_price_usd": null,
+      "series": null
+    },
+    {
+      "title": "Vasakhi in a Punjab village",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/vasakhi-in-a-punjab-village-sarabjit-singh.html"
+      },
+      "print_from_usd": 14.0,
+      "original_price_usd": 3000.0,
+      "series": null
+    },
+    {
+      "title": "Vibrant Animal-Inspired Wall Mural",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/harmony-sarabjit-singh.html"
+      },
+      "print_from_usd": null,
+      "original_price_usd": null,
+      "series": null
+    },
+    {
+      "title": "Women of the future",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/women-of-the-future-sarabjit-singh.html"
+      },
+      "print_from_usd": 18.0,
+      "original_price_usd": null,
+      "series": "Empowering Women"
+    },
+    {
+      "title": "Yogi ji's Sikhs",
+      "urls": {
+        "fineartamerica": "https://fineartamerica.com/featured/yogi-jis-sikhs-sarabjit-singh.html"
+      },
+      "print_from_usd": 18.0,
+      "original_price_usd": null,
+      "series": null
+    }
+  ],
+  "catalog_notes": [
+    "Fine Art America lists 150 paintings; this snapshot has the 72 on page 1.",
+    "print_from_usd is the lowest print price shown on the Fine Art America listing tile.",
+    "product_starting_prices_usd are 'from' prices on each Pixels artwork page.",
+    "Saatchi Art (originals) and Etsy blocked automated access, so original prices there are missing."
+  ],
+  "exhibitions": [
+    "2026 Sutter County Museum, Yuba City (solo)",
+    "2026 Olive Hyde Gallery, Fremont",
+    "2026 Works Gallery, San Jose",
+    "2026 Stanford University Center for South Asia, Poetry & Art Mehfil",
+    "2025 SALA (South Asian Literature and Arts) Festival",
+    "2024 Fowler Museum, UCLA: I Will Meet You Yet Again: Contemporary Sikh Art",
+    "2024 Sikh Art: Sikh Museum Initiative, UK",
+    "2022 de Young Museum, 'Pictures of People'",
+    "2019 Kala Sangam Gallery, Bradford, UK",
+    "2019 Faiz Art Festival, Lahore",
+    "2019 Triton Museum, 'Expressions of Divinity'",
+    "2013 Scope Art Fair, New York",
+    "2008 San Jose Museum of Art"
+  ],
+  "awards": [
+    "2025 The Ride: SAC 2nd place, Artist of the Month",
+    "2021 La Raiz Magazine Art Prize for 'Yogi ji's Sikhs'",
+    "2021 Santa Clara City Chalk Art Mural, 2nd place",
+    "2020 Silicon Valley Guru Nanak Community Heroes",
+    "2020 California Legislature Assembly certificate of recognition",
+    "2020 and 2016 Artist of the Month, Fine Arts League of Cupertino"
+  ],
+  "public_art": [
+    "City of Sunnyvale Sun sculpture, Fairwood Park (2024)",
+    "Year of the Rabbit sculpture, Rotary Cupertino (2023)",
+    "San Francisco Hearts, 150 years of SF General Hospital (2021-22)",
+    "City of Cupertino mural, Blackberry Farm (2021)",
+    "City of Santa Clara street mural 'The Global Family' and utility box art (2016)"
+  ]
+}

@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, Field, model_validator
 
 UrlBucket = Literal[
     "products",
@@ -25,6 +25,7 @@ class SitemapEntry(BaseModel):
     changefreq: str | None = None
     priority: float | None = None
     title: str | None = None
+    description: str | None = None
     price_hint: str | None = None
     bucket: UrlBucket = "other"
 
@@ -118,15 +119,29 @@ class CompetitorBriefLLMOutput(BaseModel):
 
 
 class CompetitorIntelRequest(BaseModel):
-    """Service/API input parameters for running a Competitor Intel analysis."""
+    """Service/API input parameters for running a Competitor Intel analysis.
 
-    competitor_url: str = Field(min_length=1)
+    `competitor_url` may be a site root (sitemap crawl) or a seller's profile/shop page.
+    `pasted_urls` (also accepted as `urls`) adds specific pages, or is the only input.
+    """
+
+    competitor_url: str | None = Field(default=None, min_length=1)
     seller_context: str = ""
-    pasted_urls: list[str] = Field(default_factory=list)
+    pasted_urls: list[str] = Field(
+        default_factory=list,
+        max_length=500,
+        validation_alias=AliasChoices("pasted_urls", "urls"),
+    )
     batch_size: int = Field(default=100, ge=1, le=500)
     max_batches: int = Field(default=5, ge=1, le=20)
     max_urls: int | None = Field(default=None, ge=1, le=10_000)
     fetch_titles: bool = True
+
+    @model_validator(mode="after")
+    def _require_a_source(self) -> CompetitorIntelRequest:
+        if not self.competitor_url and not any(u.strip() for u in self.pasted_urls):
+            raise ValueError("Provide competitor_url, a list of urls, or both.")
+        return self
 
 
 class CompetitorBrief(BaseModel):

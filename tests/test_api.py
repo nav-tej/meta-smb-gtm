@@ -123,3 +123,23 @@ def test_bid_advice_meta_failure_is_502(client: TestClient, bid_payload: dict[st
 def test_bid_advice_rejects_empty_campaign(client: TestClient, bid_payload: dict[str, Any]) -> None:
     bid_payload["campaign"]["rows"] = []
     assert client.post("/api/v1/bid-advice", json=bid_payload).status_code == 422
+
+
+def test_analyze_competitors_accepts_url_list(
+    client: TestClient, competitor_brief: CompetitorBrief
+) -> None:
+    fake = FakeIntelService(brief=competitor_brief)
+    app.dependency_overrides[get_competitor_intel_service] = lambda: fake
+
+    response = client.post(
+        "/api/v1/analyze-competitors",
+        json={"urls": ["https://fineartamerica.com/featured/harvest-festival-jane-doe.html"]},
+    )
+
+    assert response.status_code == 200
+    assert fake.requests[0].competitor_url is None
+    assert len(fake.requests[0].pasted_urls) == 1
+
+
+def test_analyze_competitors_requires_url_or_list(client: TestClient) -> None:
+    assert client.post("/api/v1/analyze-competitors", json={}).status_code == 422

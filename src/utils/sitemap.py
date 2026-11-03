@@ -14,7 +14,6 @@ import logging
 import re
 import socket
 import time
-import urllib.robotparser
 import zlib
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
@@ -75,18 +74,81 @@ class ParsedSitemap:
     entries: list[SitemapEntry] = field(default_factory=list)
 
 
+@dataclass(frozen=True, slots=True)
+class RobotsRule:
+    allow: bool
+    pattern: re.Pattern[str]
+    length: int
+
+
 @dataclass(slots=True)
 class RobotsPolicy:
-    """Parsed `robots.txt` directives for a competitor origin."""
+    """Parsed `robots.txt` directives for a competitor origin.
+
+    Matching follows RFC 9309 (`*` and `$` wildcards, longest match wins, Allow wins ties).
+    `urllib.robotparser` treats `*` literally, so rules like `/profiles/*/art/*` would be ignored.
+    """
 
     sitemap_urls: list[str] = field(default_factory=list)
-    parser: urllib.robotparser.RobotFileParser | None = None
+    rules: list[RobotsRule] = field(default_factory=list)
     user_agent: str = "*"
 
     def is_allowed(self, url: str) -> bool:
-        if self.parser is None:
-            return True
-        return self.parser.can_fetch(self.user_agent, url)
+        parsed = urlparse(url)
+        target = (parsed.path or "/") + (f"?{parsed.query}" if parsed.query else "")
+        best: RobotsRule | None = None
+        for rule in self.rules:
+            if not rule.pattern.match(target):
+                continue
+            if best is None or (rule.length, rule.allow) > (best.length, best.allow):
+                best = rule
+        return best is None or best.allow
+
+
+def _compile_robots_pattern(path_pattern: str) -> re.Pattern[str]:
+    anchored = path_pattern.endswith("$")
+    body = path_pattern[:-1] if anchored else path_pattern
+    regex = ".*".join(re.escape(part) for part in body.split("*"))
+    return re.compile(regex + ("$" if anchored else ""))
+
+
+def parse_robots_txt(text: str, user_agent: str) -> RobotsPolicy:
+    """Parse robots.txt, applying the group for our product token if present, else `*`."""
+    token = user_agent.split("/", 1)[0].strip().lower()
+    groups: list[tuple[list[str], list[RobotsRule]]] = []
+    sitemap_urls: list[str] = []
+    agents: list[str] = []
+    rules: list[RobotsRule] = []
+    in_rules = False
+
+    for raw_line in text.splitlines():
+        line = raw_line.split("#", 1)[0].strip()
+        if ":" not in line:
+            continue
+        key, value = (part.strip() for part in line.split(":", 1))
+        key = key.lower()
+        if key == "sitemap":
+            if value.startswith(("http://", "https://")) and value not in sitemap_urls:
+                sitemap_urls.append(value)
+        elif key == "user-agent":
+            if in_rules:
+                groups.append((agents, rules))
+                agents, rules, in_rules = [], [], False
+            agents.append(value.lower())
+        elif key in {"allow", "disallow"}:
+            in_rules = True
+            if agents and value:
+                rules.append(RobotsRule(key == "allow", _compile_robots_pattern(value), len(value)))
+    if agents:
+        groups.append((agents, rules))
+
+    specific = [rs for names, rs in groups if token in names]
+    chosen = specific or [rs for names, rs in groups if "*" in names]
+    return RobotsPolicy(
+        sitemap_urls=sitemap_urls,
+        rules=[rule for rs in chosen for rule in rs],
+        user_agent=user_agent,
+    )
 
 
 class HostRateLimiter:
@@ -371,20 +433,7 @@ async def fetch_robots_policy(
     if status != 200 or not body:
         return RobotsPolicy(user_agent=ua)
 
-    text = body.decode("utf-8", errors="replace")
-    sitemap_urls: list[str] = []
-    seen: set[str] = set()
-    for line in text.splitlines():
-        stripped = line.strip()
-        if stripped.lower().startswith("sitemap:"):
-            candidate = stripped.split(":", 1)[1].strip()
-            if candidate.startswith(("http://", "https://")) and candidate not in seen:
-                seen.add(candidate)
-                sitemap_urls.append(candidate)
-
-    rp = urllib.robotparser.RobotFileParser()
-    rp.parse(text.splitlines())
-    return RobotsPolicy(sitemap_urls=sitemap_urls, parser=rp, user_agent=ua)
+    return parse_robots_txt(body.decode("utf-8", errors="replace"), ua)
 
 
 def _local_name(tag: str) -> str:
@@ -572,8 +621,21 @@ def parse_sitemap(
     return doc.entries
 
 
+@dataclass(slots=True)
+class PageMetadata:
+    title: str | None = None
+    price_hint: str | None = None
+    description: str | None = None
+
+
 def extract_html_metadata(html_text: str) -> tuple[str | None, str | None]:
     """Extract `(page_title, price_hint)` from an HTML `<head>` / top-of-page snippet."""
+    metadata = extract_page_metadata(html_text)
+    return metadata.title, metadata.price_hint
+
+
+def extract_page_metadata(html_text: str) -> PageMetadata:
+    """Extract title, price hint, and meta description from an HTML `<head>` snippet."""
     title: str | None = None
     title_match = _TITLE_RE.search(html_text)
     if title_match:
@@ -585,6 +647,7 @@ def extract_html_metadata(html_text: str) -> tuple[str | None, str | None]:
     meta_currency: str | None = None
     og_title: str | None = None
     meta_desc: str | None = None
+    og_desc: str | None = None
 
     for tag_match in _META_TAG_RE.finditer(html_text):
         attrs: dict[str, str] = {}
@@ -598,13 +661,17 @@ def extract_html_metadata(html_text: str) -> tuple[str | None, str | None]:
         if not content:
             continue
         if prop in {"product:price:amount", "og:price:amount"} and not meta_amount:
-            meta_amount = content
+            # Marketplaces publish 0.00 for works that aren't for sale in that format
+            if re.fullmatch(r"0+(?:\.0+)?", content.replace(",", "")) is None:
+                meta_amount = content
         elif prop in {"product:price:currency", "og:price:currency"} and not meta_currency:
             meta_currency = content.upper()
         elif prop == "og:title" and not og_title:
             og_title = " ".join(content.split())[:200]
         elif prop == "description" and not meta_desc:
-            meta_desc = content[:300]
+            meta_desc = " ".join(content.split())[:300]
+        elif prop == "og:description" and not og_desc:
+            og_desc = " ".join(content.split())[:300]
 
     final_title = title or og_title
     price_hint: str | None = None
@@ -617,7 +684,7 @@ def extract_html_metadata(html_text: str) -> tuple[str | None, str | None]:
         if price_match:
             price_hint = price_match.group(0).strip()
 
-    return final_title, price_hint
+    return PageMetadata(title=final_title, price_hint=price_hint, description=meta_desc or og_desc)
 
 
 async def fetch_page_metadata(
@@ -626,8 +693,8 @@ async def fetch_page_metadata(
     *,
     resolver: ResolverFn | None = None,
     rate_limiter: HostRateLimiter | None = None,
-) -> tuple[str | None, str | None]:
-    """Politely fetch the first 64 KB of `url` and return `(title, price_hint)`."""
+) -> PageMetadata:
+    """Politely fetch the first 64 KB of `url` and return its title, price hint, and description."""
     try:
         status, snippet_bytes, _ = await _fetch_bytes_guarded(
             url,
@@ -639,13 +706,12 @@ async def fetch_page_metadata(
         )
     except SitemapError as err:
         logger.debug("Skipping metadata fetch for %s: %s", url, err)
-        return None, None
+        return PageMetadata()
 
     if status != 200 or not snippet_bytes:
-        return None, None
+        return PageMetadata()
 
-    text = snippet_bytes.decode("utf-8", errors="replace")
-    return extract_html_metadata(text)
+    return extract_page_metadata(snippet_bytes.decode("utf-8", errors="replace"))
 
 
 async def crawl_listing_page_fallback(
@@ -656,8 +722,13 @@ async def crawl_listing_page_fallback(
     max_urls: int = 200,
     resolver: ResolverFn | None = None,
     rate_limiter: HostRateLimiter | None = None,
+    require_path_prefix: str | None = None,
 ) -> list[SitemapEntry]:
-    """Fallback for Etsy/FineArtAmerica shop pages without a dedicated per-shop sitemap."""
+    """Fallback for Etsy/FineArtAmerica shop pages without a dedicated per-shop sitemap.
+
+    With `require_path_prefix`, returns nothing if the page redirected elsewhere (marketplaces
+    send unknown profiles to a directory page whose links would be mistaken for the seller's).
+    """
     if robots is not None and not robots.is_allowed(shop_url):
         return []
 
@@ -670,6 +741,9 @@ async def crawl_listing_page_fallback(
         rate_limiter=rate_limiter,
     )
     if status != 200 or not raw_bytes:
+        return []
+    if require_path_prefix and not urlparse(final_url).path.startswith(require_path_prefix):
+        logger.info("%s redirected to %s; ignoring its links", shop_url, final_url)
         return []
 
     html_text = raw_bytes.decode("utf-8", errors="replace")
