@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import json
 
 import httpx
@@ -124,3 +125,70 @@ async def test_missing_api_key_raises_meta_api_error() -> None:
                 messages=[{"role": "user", "content": "Hello"}],
                 response_model=_SampleOutput,
             )
+
+
+@respx.mock
+async def test_generate_image_workflow_returns_bytes_and_reasoning_summary() -> None:
+    fake_img = b"\x89PNG\r\n\x1a\nmuse-diptych"
+    route = respx.post("https://api.meta.ai/v1/responses").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "id": "resp-123",
+                "output": [
+                    {
+                        "type": "reasoning",
+                        "summary": [
+                            {
+                                "type": "summary_text",
+                                "text": "Balanced 2-piece diptych over walnut console.",
+                            }
+                        ],
+                    },
+                    {
+                        "type": "image_generation_call",
+                        "result": base64.b64encode(fake_img).decode("ascii"),
+                    },
+                ],
+            },
+        )
+    )
+
+    async with httpx.AsyncClient() as http_client:
+        client = MetaClient(api_key="test-key", http_client=http_client)
+        img_bytes, summary = await client.generate_image_workflow(
+            prompt="Combine these two paintings side by side.",
+            reference_images=[b"\x89PNG\r\n\x1a\nAAA", b"\x89PNG\r\n\x1a\nBBB"],
+            reasoning_effort="high",
+        )
+
+    assert img_bytes == fake_img
+    assert summary == "Balanced 2-piece diptych over walnut console."
+    assert route.called
+    req_body = json.loads(route.calls[0].request.content.decode("utf-8"))
+    assert req_body["model"] == "muse-image-1.0"
+    assert req_body["reasoning"] == {"effort": "high"}
+    content_blocks = req_body["input"][0]["content"]
+    assert len(content_blocks) == 3
+    assert content_blocks[1]["type"] == "input_image"
+    assert content_blocks[2]["type"] == "input_image"
+
+
+@respx.mock
+async def test_transcribe_audio_returns_text() -> None:
+    route = respx.post("https://api.meta.ai/v1/audio/transcriptions").mock(
+        return_value=httpx.Response(
+            200,
+            json={"text": "Promote our Diwali diptych bundle to Bay Area collectors."},
+        )
+    )
+
+    async with httpx.AsyncClient() as http_client:
+        client = MetaClient(api_key="test-key", http_client=http_client)
+        transcript = await client.transcribe_audio(
+            audio_bytes=b"RIFF....WAVEfmt ",
+            filename="brief.wav",
+        )
+
+    assert transcript == "Promote our Diwali diptych bundle to Bay Area collectors."
+    assert route.called

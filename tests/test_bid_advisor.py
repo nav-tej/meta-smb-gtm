@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from collections.abc import AsyncIterator
 from datetime import date
+from pathlib import Path
 
 import httpx
 import pytest
@@ -13,7 +14,7 @@ from src.clients.meta import MetaAPIError, MetaClient
 from src.config import Settings
 from src.models.bids import AdSetDailyPerformance, BidAdviceRequest, CampaignPerformance
 from src.models.intel import CompetitorBrief, Evidence, ResearchFinding
-from src.services.bid_advisor import BidAdvisorService, compute_metrics
+from src.services.bid_advisor import BidAdvisorService, compute_metrics, load_campaign_csv
 from tests.conftest import (
     INTEREST,
     META_BASE_URL,
@@ -273,3 +274,15 @@ async def test_advise_traces_audiences_to_research_findings(
     assert "https://example-prints.com/products/sunset-pier" in untrusted
     assert result.audience_suggestions[0].finding_ids == ["F1"]
     assert result.research_brief[0].evidence[0].price == "$120.00"
+
+
+def test_load_campaign_csv_parses_sarabjit_singh_ads_export() -> None:
+    sample_csv = Path("data/samples/sarabjit_singh_ads_export.csv").read_text(encoding="utf-8")
+    campaign = load_campaign_csv(sample_csv, account_name="Art of Sarabjit Singh")
+    assert campaign.account_name == "Art of Sarabjit Singh"
+    assert len(campaign.rows) == 8
+    metrics = compute_metrics(campaign)
+    assert len(metrics.ad_sets) == 4
+    by_name = {m.ad_set_name: m for m in metrics.ad_sets}
+    assert "high_roas" in by_name["Retargeting - Site Visitors"].flags
+    assert "low_roas_material_spend" in by_name["Empowering Women - Broad"].flags

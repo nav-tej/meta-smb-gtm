@@ -1252,9 +1252,15 @@
             <h2 class="card-title">Campaign Performance & Deterministic Anomaly Detection</h2>
             <p class="card-sub">All ROAS, CPA, pacing, and 7-day trend percentages are calculated in Python (`src/services/bid_advisor.py`) before Muse Spark recommends budget shifts.</p>
           </div>
-          <button type="button" class="btn btn-primary" id="runBidsBtn">
-            📈 Re-Run Live Muse Spark Bid Advisor
-          </button>
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+            <label for="csvFileInput" class="btn btn-outline" style="cursor:pointer;margin:0;">
+              📂 Upload Meta Ads CSV Export
+            </label>
+            <input type="file" id="csvFileInput" accept=".csv,text/csv" style="display:none;" />
+            <button type="button" class="btn btn-primary" id="runBidsBtn">
+              📈 Re-Run Live Muse Spark Bid Advisor
+            </button>
+          </div>
         </div>
 
         <p id="bidSummaryBanner" style="font-size:0.9rem;background:var(--surface-subtle);padding:0.85rem 1rem;border-radius:var(--radius-sm);border-left:3px solid var(--success);margin:0 0 1rem 0;"></p>
@@ -1343,6 +1349,49 @@
 Fall Prints,Retargeting - Site Visitors,+$6.15/day (ROAS 9.3x),instagram_feed,"Ek Onkar in 18k Gold ✨ Signed Edition of 100","550 years of Light. Hand-embellished with 18k gold ink, signed & numbered by Sarabjit Singh. 12x12 $75 / 24x24 $125.",samples/ek_onkar_collector_room_live.webp,F1;F3
 Gurpurab Gifts,Golden Temple - Gift Buyers,-$2.25/day (Refresh Creative),instagram_story,"Kirat Karo — Sacred Punjabi Heritage for Your Dining Room","Celebrate the dignity of honest work and Punjabi roots. Signed collector edition by Sarabjit Singh.",samples/kirat_karo_collector_room_live.webp,F1;F2</pre>
         </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title">3. Google Rich-Snippet JSON-LD (`VisualArtwork` + `Product`) & Marketplace Listing SEO Fix</h2>
+            <p class="card-sub">Fixes missing original prices, series tags, and `"for Your Home"` collector search phrases across `artofsarabjitsingh.com`, FineArtAmerica, and Saatchi Art (`F1–F3`).</p>
+          </div>
+          <button type="button" class="btn btn-outline" id="copyJsonLdBtn">
+            📋 Copy JSON-LD Schema Snippet
+          </button>
+        </div>
+        <pre class="code-box" id="jsonLdCode">&lt;script type="application/ld+json"&gt;
+{
+  "@context": "https://schema.org",
+  "@type": ["VisualArtwork", "Product"],
+  "name": "Ek Onkar — Guru Nanak 550th Anniversary Signed 18k Gold Painting Print for Your Home",
+  "artist": {
+    "@type": "Person",
+    "name": "Sarabjit Singh",
+    "url": "https://www.artofsarabjitsingh.com/"
+  },
+  "artMedium": "Acrylic and 18k Gold Ink on Canvas / Hand-Signed Archival Giclee",
+  "artEdition": "Limited Edition of 100",
+  "image": "https://www.artofsarabjitsingh.com/uploads/ek_onkar_collector_room.webp",
+  "offers": [
+    {
+      "@type": "Offer",
+      "name": "12x12 Signed 18k Gold Collector Print",
+      "price": "75.00",
+      "priceCurrency": "USD",
+      "availability": "https://schema.org/InStock"
+    },
+    {
+      "@type": "Offer",
+      "name": "24x24 Signed 18k Gold Collector Edition",
+      "price": "125.00",
+      "priceCurrency": "USD",
+      "availability": "https://schema.org/InStock"
+    }
+  ]
+}
+&lt;/script&gt;</pre>
       </div>
     </section>
   </main>
@@ -1993,25 +2042,81 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
       showToast('✓ Downloaded art_of_sarabjit_singh_meta_ads_pack.csv');
     });
 
+    document.getElementById('copyJsonLdBtn').addEventListener('click', async () => {
+      const code = document.getElementById('jsonLdCode').textContent;
+      await navigator.clipboard.writeText(code);
+      showToast('✓ Copied Google Rich-Snippet JSON-LD VisualArtwork + Product Schema!');
+    });
+
+    // Live CSV Upload Handler in Step 3 (POST /api/v1/bid-advice/csv)
+    document.getElementById('csvFileInput').addEventListener('change', async (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      const csvText = await file.text();
+      showToast('⏳ Parsing Meta Ads CSV & computing anomalies...');
+      try {
+        const ws = state.presets.workspaces[state.activeWorkspace] || state.presets.workspaces.sarabjit_singh;
+        const resp = await fetch('/api/v1/bid-advice/csv', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            csv_text: csvText,
+            competitor_brief: ws.competitor_brief,
+            account_name: ws.name,
+            currency: 'USD'
+          }),
+        });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const result = await resp.json();
+        if (result.metrics) {
+          renderBidAdvisor(result);
+        } else if (result.ad_sets) {
+          ws.bid_advice_live.metrics = result;
+          renderBidAdvisor(ws.bid_advice_live);
+        }
+        showToast('✓ Campaign table & bid recommendations updated from uploaded CSV!');
+      } catch (err) {
+        showToast(`CSV upload error: ${err.message}`);
+      }
+    });
+
+    function activateWorkspace(wsId) {
+      state.activeWorkspace = wsId;
+      state.selectedArtworkIdx = 0;
+      const ws = state.presets.workspaces[wsId] || state.presets.workspaces.sarabjit_singh;
+      document.getElementById('activeAvatar').textContent = ws.avatar_initials || 'SS';
+      document.getElementById('activeWorkspaceLabel').textContent = ws.name;
+      document.getElementById('heroCategory').textContent = `${ws.category} · ${ws.location}`;
+      document.getElementById('heroTitle').textContent = `${ws.name} — Multi-Channel Growth Workspace`;
+      if (wsId === 'etsy_ceramics') {
+        document.getElementById('sellerWebsiteInput').value = 'https://www.saffronandclay.com/';
+        document.getElementById('sellerMarketplacesInput').value = 'https://www.etsy.com/shop/SaffronAndClayStudio';
+        document.getElementById('sellerSocialsInput').value = 'https://www.instagram.com/saffronandclay/, https://www.facebook.com/SaffronAndClayStudio';
+        document.getElementById('compUrlInput').value = 'https://www.eastfork.com';
+        document.getElementById('kpiArtworks').textContent = '48 SKUs';
+        document.getElementById('kpiPriceGap').textContent = '$28 → $54–$115';
+      } else {
+        document.getElementById('sellerWebsiteInput').value = 'https://www.artofsarabjitsingh.com/';
+        document.getElementById('sellerMarketplacesInput').value = 'https://fineartamerica.com/profiles/sarabjit-singh/art/paintings, https://www.saatchiart.com/sarabjitsingh';
+        document.getElementById('sellerSocialsInput').value = 'https://www.instagram.com/artofsarabjitsingh/, https://www.facebook.com/ArtofSarabjitSingh';
+        document.getElementById('compUrlInput').value = 'https://www.sikhiart.com';
+        document.getElementById('kpiArtworks').textContent = '72 Works';
+        document.getElementById('kpiPriceGap').textContent = '$14 → $75–$900';
+      }
+      renderCompetitorBrief(ws.competitor_brief);
+      renderDiagnosticsAndAds(ws);
+      renderArtworksShowcase(ws);
+      renderBidAdvisor(ws.bid_advice_live);
+    }
+
     // Workspace Switcher inside Login Dialog
     document.querySelectorAll('.workspace-option').forEach((opt) => {
       opt.addEventListener('click', () => {
         document.querySelectorAll('.workspace-option').forEach((o) => o.classList.remove('selected'));
         opt.classList.add('selected');
         const wsId = opt.dataset.ws;
-        if (wsId === 'etsy_ceramics') {
-          document.getElementById('activeAvatar').textContent = 'SC';
-          document.getElementById('activeWorkspaceLabel').textContent = 'Saffron & Clay (Etsy)';
-          document.getElementById('heroCategory').textContent = 'Etsy Physical Goods & Handmade Home Decor · Austin, TX';
-          document.getElementById('heroTitle').textContent = 'Saffron & Clay Studio — Etsy & Meta Growth Workspace';
-          showToast('Switched to Saffron & Clay Studio (Etsy Physical Goods preset)');
-        } else {
-          document.getElementById('activeAvatar').textContent = 'SS';
-          document.getElementById('activeWorkspaceLabel').textContent = 'Art of Sarabjit Singh';
-          document.getElementById('heroCategory').textContent = 'Fine Artist & Multi-Channel Creator · SF Bay Area';
-          document.getElementById('heroTitle').textContent = 'Art of Sarabjit Singh — Multi-Channel Growth Workspace';
-          showToast('Switched to Art of Sarabjit Singh workspace');
-        }
+        activateWorkspace(wsId);
+        showToast(`Switched to ${state.presets.workspaces[wsId].name} workspace`);
         document.getElementById('loginDialog').close();
       });
     });

@@ -6,16 +6,17 @@ CompetitorBrief into bid, budget, pause, and audience recommendations. Muse Spar
 arithmetic: budget-shift amounts are computed here from the percentage it picks.
 
 Recommends only; never writes to a live ad account. See AGENTS.md, section 4, "Flow 3".
-
-TODO: load_csv(file) -> CampaignPerformance for the Ads Manager export upload.
 """
 
 from __future__ import annotations
 
+import csv
+import io
 import json
 import logging
 from collections import defaultdict
 from collections.abc import Sequence
+from datetime import date
 
 from openai.types.chat import ChatCompletionMessageParam
 
@@ -95,6 +96,63 @@ def _pct_change(early: float | None, late: float | None) -> float | None:
     if early is None or late is None or early == 0:
         return None
     return round((late - early) / early * 100, 1)
+
+
+def _pick_col(row: dict[str, str], candidates: tuple[str, ...]) -> str | None:
+    lower_map = {k.strip().lower(): (v or "").strip() for k, v in row.items() if k}
+    for cand in candidates:
+        if cand in lower_map and lower_map[cand] != "":
+            return lower_map[cand]
+    return None
+
+
+def load_campaign_csv(
+    csv_text: str,
+    *,
+    account_name: str = "SMB Ad Account",
+    currency: str = "USD",
+) -> CampaignPerformance:
+    """Parse a Meta Ads Manager CSV export (or standard daily CSV) into `CampaignPerformance`."""
+    reader = csv.DictReader(io.StringIO(csv_text.strip()))
+    parsed_rows: list[AdSetDailyPerformance] = []
+    for raw_row in reader:
+        day_str = _pick_col(raw_row, ("day", "date", "reporting starts", "date_start"))
+        camp_str = _pick_col(raw_row, ("campaign_name", "campaign name", "campaign"))
+        adset_str = _pick_col(raw_row, ("ad_set_name", "ad set name", "adset_name", "ad set"))
+        impr_str = _pick_col(raw_row, ("impressions",))
+        clicks_str = _pick_col(raw_row, ("clicks", "link clicks", "clicks (all)"))
+        conv_str = _pick_col(raw_row, ("conversions", "purchases", "results"))
+        spend_str = _pick_col(raw_row, ("spend", "amount spent (usd)", "amount spent", "spend_usd"))
+        if not (
+            day_str and camp_str and adset_str and impr_str is not None and spend_str is not None
+        ):
+            continue
+
+        val_str = _pick_col(
+            raw_row,
+            ("conversion_value", "purchase conversion value", " purchases conversion value"),
+        )
+        freq_str = _pick_col(raw_row, ("frequency",))
+        budget_str = _pick_col(raw_row, ("daily_budget", "budget", "ad set budget"))
+
+        parsed_rows.append(
+            AdSetDailyPerformance(
+                day=date.fromisoformat(day_str[:10]),
+                campaign_name=camp_str,
+                ad_set_name=adset_str,
+                impressions=int(float(impr_str)),
+                clicks=int(float(clicks_str or "0")),
+                conversions=int(float(conv_str or "0")),
+                spend=float(spend_str),
+                conversion_value=float(val_str) if val_str is not None else None,
+                frequency=float(freq_str) if freq_str is not None else None,
+                daily_budget=float(budget_str) if budget_str is not None else None,
+            )
+        )
+
+    if not parsed_rows:
+        raise ValueError("CSV contained no valid Meta Ads daily performance rows.")
+    return CampaignPerformance(account_name=account_name, currency=currency, rows=parsed_rows)
 
 
 def _trend(early: PeriodTotals | None, late: PeriodTotals | None, attr: str) -> float | None:

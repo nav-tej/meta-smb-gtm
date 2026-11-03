@@ -237,3 +237,44 @@ def test_ingest_storefront_handles_social_and_marketplace_channels(client: TestC
     assert body["total_channels"] == 3
     assert all(c["status"] == "vision_or_manual" for c in body["channels"])
     assert "Art of Sarabjit Singh" in body["seller_context"]
+
+
+def test_demo_presets_includes_etsy_ceramics_workspace(client: TestClient) -> None:
+    resp = client.get("/api/v1/demo-presets")
+    assert resp.status_code == 200
+    body = resp.json()
+    etsy = body["workspaces"]["etsy_ceramics"]
+    assert "Saffron & Clay Studio" in etsy["name"]
+    assert len(etsy["artworks_showcase"]) == 2
+    assert etsy["artworks_showcase"][0]["workflow_mode"] == "product_visuals"
+    findings = etsy["competitor_brief"]["research_brief"]["findings"]
+    assert [f["finding_id"] for f in findings] == ["F1", "F2"]
+
+
+@respx.mock
+@pytest.mark.usefixtures("real_bid_service")
+def test_bid_advice_csv_endpoint(
+    client: TestClient, brief_json: dict[str, Any], spark_bid_content: str
+) -> None:
+    respx.post(f"{META_BASE_URL}/chat/completions").mock(
+        return_value=httpx.Response(200, json=chat_completion(spark_bid_content))
+    )
+    csv_text = (
+        "day,campaign_name,ad_set_name,daily_budget,impressions,clicks,conversions,"
+        "conversion_value,spend,frequency\n"
+        "2026-10-01,Q4,Prospecting - Lookalike 1%,50.0,10000,150,3,135.0,45.0,1.2\n"
+        "2026-10-01,Q4,Interest - Wall Art & Home Decor,30.0,8000,90,1,45.0,29.0,1.5\n"
+        "2026-10-01,Q4,Retargeting - Site Visitors 30d,15.0,2500,80,3,135.0,15.0,2.1\n"
+    )
+    response = client.post(
+        "/api/v1/bid-advice/csv",
+        json={
+            "csv_text": csv_text,
+            "account_name": "Art of Sarabjit Singh",
+            "competitor_brief": brief_json,
+            "seller_goal": "Scale retargeting ROAS.",
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["metrics"]["account_totals"]["spend"] == 89.0

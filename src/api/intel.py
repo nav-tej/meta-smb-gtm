@@ -471,8 +471,175 @@ async def get_demo_presets() -> dict[str, Any]:
                 "category": "Etsy Physical Goods & Handmade Home Decor",
                 "location": "Austin, TX · Etsy Star Seller",
                 "avatar_initials": "SC",
-                "website_url": "https://www.etsy.com/shop/SaffronAndClayStudio",
+                "website_url": "https://www.saffronandclay.com/",
+                "marketplace_urls": "https://www.etsy.com/shop/SaffronAndClayStudio",
                 "instagram_handle": "@saffronandclay",
+                "diagnostics": {
+                    "total_platforms": 4,
+                    "total_artworks_indexed": 48,
+                    "artworks_missing_series_tag": 14,
+                    "artworks_missing_original_price": 6,
+                    "has_direct_checkout_gap": False,
+                },
+                "competitor_brief": {
+                    "competitor_domain": "www.eastfork.com",
+                    "summary": (
+                        "Competitor sells modern minimalist ceramic mug sets ($44-$160) but has "
+                        "zero South Asian heritage brass/stoneware chai sets or ready-to-gift "
+                        "Diwali/Wedding host boxes under $65."
+                    ),
+                    "research_brief": {
+                        "competitor_domain": "www.eastfork.com",
+                        "pages_fetched": 18,
+                        "findings": [
+                            {
+                                "finding_id": "F1",
+                                "category": "pricing",
+                                "claim": (
+                                    "Competitor 2-mug sets start at $88 with $12 shipping; no "
+                                    "sub-$58 gift-boxed chai set exists in their catalog."
+                                ),
+                                "implication": (
+                                    "Position the $54 2-Piece Stoneware & Hammered Brass Chai Set "
+                                    "with free gift wrap as the #1 housewarming & wedding gift."
+                                ),
+                                "confidence": "high",
+                                "evidence": [
+                                    {
+                                        "url": "computed_signals",
+                                        "quote": "detected_price_hints: $44 - $160",
+                                    }
+                                ],
+                            },
+                            {
+                                "finding_id": "F2",
+                                "category": "catalog_gap",
+                                "claim": (
+                                    "Zero brass diya + block-printed linen bundles for Diwali, "
+                                    "Gurpurab, or South Asian wedding registry shoppers."
+                                ),
+                                "implication": (
+                                    "Launch the $68 Heirloom Brass Diya + Marigold Linen Runner "
+                                    "Gift Box on Instagram Reels and Etsy Ads."
+                                ),
+                                "confidence": "high",
+                                "evidence": [
+                                    {
+                                        "url": "https://www.eastfork.com/sitemap.xml",
+                                        "quote": "collections=6, zero heritage gift bundles",
+                                    }
+                                ],
+                            },
+                        ],
+                    },
+                    "actionable_insights": [
+                        {
+                            "title": "Bundle Chai Cups + Whole Cardamom Spice Tin",
+                            "action": (
+                                "Create a $54 2-cup Gift Box SKU on Shopify & Etsy with 1-click "
+                                "gift note checkout."
+                            ),
+                            "why": "Competitors charge $88+ for 2 mugs with no gift packaging.",
+                            "priority": "high",
+                        },
+                        {
+                            "title": "Run 9:16 Pouring-Chai Reel on Instagram",
+                            "action": (
+                                "Use the Muse Image 1.0 travertine chai set visual as the hero "
+                                "frame for a 9:16 Reel targeting wedding/housewarming buyers."
+                            ),
+                            "why": "30d+ competitor ads use warm kitchen countertop lighting.",
+                            "priority": "high",
+                        },
+                    ],
+                },
+                "meta_ads_signals": {
+                    "sample_hooks": [
+                        (
+                            "Artisan Table Co (62d active on IG): "
+                            "'Hand-Thrown Mug Duo — Free Gift Box'"
+                        ),
+                        (
+                            "Jaipur Living Decor (39d active on IG+FB): "
+                            "'Block-Printed Table Runners 20% Off'"
+                        ),
+                    ]
+                },
+                "bid_advice_live": _read_sample_json("bid_advice_live.json"),
+                "campaign_raw": _read_sample_json("sarabjit_singh_campaign.json"),
+                "artworks_showcase": [
+                    {
+                        "id": "chai_set",
+                        "title": "1. Product Visuals: Stoneware & Brass Masala Chai Set",
+                        "subtitle": (
+                            "Muse Image 1.0 Product Visuals (/v1/responses · High Reasoning)"
+                        ),
+                        "workflow_mode": "product_visuals",
+                        "series": "Heirloom Kitchen & Chai Rituals",
+                        "medium": "Hand-thrown speckled stoneware + hammered solid brass",
+                        "price_pod_usd": 28.0,
+                        "price_direct_usd": 54.0,
+                        "price_large_usd": 98.0,
+                        "original_image": "/samples/etsy_chai_set_product_visual_live.webp",
+                        "staged_image": "/samples/etsy_chai_set_product_visual_live.webp",
+                        "mask_image": "/samples/etsy_chai_set_product_visual_live.webp",
+                        "exhibited_at": (
+                            "Etsy Star Seller · 4.9★ (410+ Reviews) · Ships from Austin, TX"
+                        ),
+                        "headline": "Handcrafted Stoneware & Brass Chai Duo ✨ $54 Gift Box",
+                        "primary_text": (
+                            "Elevate your daily chai ritual. Hand-thrown speckled stoneware paired "
+                            "with a hammered brass tumbler and saffron block-printed napkin. "
+                            "Ready-to-gift box $54."
+                        ),
+                        "scene_prompt": (
+                            "Handcrafted speckled stoneware and hammered brass masala chai cup set "
+                            "on a warm sunlit travertine countertop with whole green cardamom "
+                            "pods, cinnamon sticks, and a block-printed saffron linen napkin"
+                        ),
+                        "reasoning_summary": (
+                            "**Composing sunlit chai ritual product shot** — Pairing the speckled "
+                            "stoneware cup and hammered brass tumbler on warm travertine with "
+                            "cardamom pods, cinnamon sticks, and a saffron block-printed napkin."
+                        ),
+                    },
+                    {
+                        "id": "diwali_gift_box",
+                        "title": "2. Multi-Image Bundle: Heirloom Brass Diya + Linen Runner Box",
+                        "subtitle": (
+                            "Muse Image 1.0 Holiday Gift Bundle (/v1/responses · High Reasoning)"
+                        ),
+                        "workflow_mode": "multi_image_combine",
+                        "series": "Festive Host & Housewarming Gift Boxes",
+                        "medium": "Solid sand-cast brass diya + hand-block-printed marigold linen",
+                        "price_pod_usd": 34.0,
+                        "price_direct_usd": 68.0,
+                        "price_large_usd": 115.0,
+                        "original_image": "/samples/etsy_diwali_gift_box_live.webp",
+                        "secondary_image": "/samples/etsy_chai_set_product_visual_live.webp",
+                        "staged_image": "/samples/etsy_diwali_gift_box_live.webp",
+                        "mask_image": "/samples/etsy_diwali_gift_box_live.webp",
+                        "exhibited_at": (
+                            "#1 Bestseller for Housewarming, Wedding & Festive Gifting"
+                        ),
+                        "headline": "Heirloom Brass Diya & Marigold Linen Gift Box ✨ $68",
+                        "primary_text": (
+                            "Unbox warmth and heritage. Includes our hand-carved solid brass diya "
+                            'and 72" marigold hand-block-printed linen table runner in a keepsake '
+                            "kraft gift box."
+                        ),
+                        "scene_prompt": (
+                            "Heirloom hand-carved brass diya oil lamp paired with a block-printed "
+                            "marigold linen table runner in a luxury kraft gift box with dried "
+                            "jasmine flowers, warm golden hour lighting"
+                        ),
+                        "reasoning_summary": (
+                            "**Staging luxury kraft gift bundle** — Presenting the folded marigold "
+                            "block-printed linen runner inside a ribboned kraft box beside the "
+                            "carved brass diya and jasmine buds in golden-hour light."
+                        ),
+                    },
+                ],
             },
         },
     }
