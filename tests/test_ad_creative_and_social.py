@@ -309,3 +309,48 @@ async def test_comfyui_rejects_path_traversal_and_invalid_image_rejected() -> No
     with pytest.raises(MetaAPIError, match="Unsupported image format"):
         await client.segment(b"not-an-image")
     await client.aclose()
+
+
+@respx.mock
+async def test_muse_image_calls_capped_at_variants_per_placement(
+    competitor_brief: CompetitorBrief, tmp_path: Path
+) -> None:
+    angle = {
+        "placement": "facebook_feed",
+        "scene_prompt": "Gallery wall",
+        "headline": "Golden Temple print",
+        "primary_text": "Hand-signed.",
+    }
+    respx.post("https://api.meta.ai/v1/chat/completions").mock(
+        return_value=_chat_completion(
+            {
+                "positioning_hook": "Heritage prints",
+                "preserve_product_note": "Keep artwork untouched.",
+                "angles": [angle, angle, angle, {**angle, "placement": "reels_cover"}],
+            }
+        )
+    )
+    image_route = respx.post("https://api.meta.ai/v1/images/generations").mock(
+        return_value=httpx.Response(
+            200, json={"data": [{"b64_json": base64.b64encode(TINY_PNG).decode("ascii")}]}
+        )
+    )
+
+    async with httpx.AsyncClient() as http_client:
+        service = AdCreativeService(
+            meta_client=MetaClient(api_key="test-meta-key", http_client=http_client),
+            http_client=http_client,
+            output_dir=tmp_path,
+        )
+        result = await service.generate(
+            GenerateAdsRequest(
+                product=ProductInfo(title="Golden Temple"),
+                competitor_brief=competitor_brief,
+                placements=["facebook_feed"],
+                variants_per_placement=1,
+                use_comfyui=False,
+            )
+        )
+
+    assert image_route.call_count == 1
+    assert [c.placement for c in result.creatives] == ["facebook_feed"]

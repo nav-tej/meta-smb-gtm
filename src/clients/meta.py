@@ -10,6 +10,7 @@ import base64
 import json
 import logging
 import re
+import time
 from collections.abc import Sequence
 from typing import Any, TypeVar
 
@@ -24,7 +25,8 @@ logger = logging.getLogger(__name__)
 
 ModelT = TypeVar("ModelT", bound=BaseModel)
 
-DEFAULT_TIMEOUT = httpx.Timeout(60.0, connect=10.0)
+# Generous read timeout: a timed-out call may still be billed, and we never auto-retry it
+DEFAULT_TIMEOUT = httpx.Timeout(120.0, connect=10.0)
 _CODE_FENCE_RE = re.compile(r"^\s*```(?:json)?\s*(.*?)\s*```\s*$", re.DOTALL | re.IGNORECASE)
 
 
@@ -135,7 +137,8 @@ class MetaClient:
             api_key=api_key,
             base_url=self._base_url,
             http_client=self._http_client,
-            max_retries=1,
+            # Every request is billed; the only retry is the deliberate validation retry below
+            max_retries=0,
         )
         return self._openai
 
@@ -238,6 +241,7 @@ class MetaClient:
         messages: list[ChatCompletionMessageParam],
         temperature: float,
     ) -> str:
+        started = time.monotonic()
         try:
             completion = await client.chat.completions.create(
                 model=model,
@@ -246,6 +250,9 @@ class MetaClient:
                 response_format={"type": "json_object"},
             )
         except APIError as err:
+            logger.warning(
+                "Meta API call failed: chat %s in %.1fs", model, time.monotonic() - started
+            )
             raise MetaAPIError(
                 f"Meta Model API error (status={getattr(err, 'status_code', 'unknown')}): "
                 f"{err.message}"
@@ -253,6 +260,14 @@ class MetaClient:
         except (OpenAIError, httpx.HTTPError) as err:
             raise MetaAPIError(f"Meta Model API transport failure: {type(err).__name__}") from err
 
+        usage = completion.usage
+        logger.info(
+            "Meta API call: chat %s in %.1fs (tokens in=%s out=%s)",
+            model,
+            time.monotonic() - started,
+            usage.prompt_tokens if usage else "?",
+            usage.completion_tokens if usage else "?",
+        )
         if not completion.choices:
             raise MetaAPIError("Meta Model API returned no completion choices.")
         content: Any = completion.choices[0].message.content
@@ -281,6 +296,7 @@ class MetaClient:
         if mask_image is not None:
             payload["mask"] = _to_data_uri(mask_image)
 
+        started = time.monotonic()
         try:
             response = await self._http_client.post(
                 f"{self._base_url}/images/generations",
@@ -289,6 +305,12 @@ class MetaClient:
             )
         except httpx.HTTPError as err:
             raise MetaAPIError(f"Muse Image transport error: {type(err).__name__}") from err
+        logger.info(
+            "Meta API call: image %s -> HTTP %s in %.1fs",
+            self._image_model,
+            response.status_code,
+            time.monotonic() - started,
+        )
 
         if response.status_code != 200:
             raise MetaAPIError(f"Muse Image error (status={response.status_code}).")
@@ -320,6 +342,7 @@ class MetaClient:
             "prompt": prompt or "artwork canvas product foreground",
             "response_format": "b64_json",
         }
+        started = time.monotonic()
         try:
             response = await self._http_client.post(
                 f"{self._base_url}/images/segmentations",
@@ -328,6 +351,12 @@ class MetaClient:
             )
         except httpx.HTTPError as err:
             raise MetaAPIError(f"SAM 3.1 transport error: {type(err).__name__}") from err
+        logger.info(
+            "Meta API call: segment %s -> HTTP %s in %.1fs",
+            self._sam_model,
+            response.status_code,
+            time.monotonic() - started,
+        )
 
         if response.status_code != 200:
             raise MetaAPIError(f"SAM 3.1 segmentation error (status={response.status_code}).")

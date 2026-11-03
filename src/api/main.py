@@ -8,8 +8,13 @@ from fastapi.responses import JSONResponse
 from src.api import bids, creative, intel
 from src.clients.comfyui import ComfyUIError
 from src.clients.meta import MetaAPIError
+from src.config import get_settings
 from src.utils.sitemap import SitemapError
 
+logging.basicConfig(
+    level=get_settings().log_level.upper(),
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
 logger = logging.getLogger(__name__)
 
 API_PREFIX = "/api/v1"

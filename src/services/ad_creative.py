@@ -287,10 +287,15 @@ class AdCreativeService:
 
         comfy_live = request.use_comfyui and await comfy.is_reachable()
         creatives: list[Creative] = []
+        images_per_placement: dict[Placement, int] = dict.fromkeys(request.placements, 0)
 
         for angle in brief.angles:
-            if angle.placement not in request.placements:
+            # Each Muse Image call is billed; Muse Spark may return more angles than requested
+            if images_per_placement.get(angle.placement, request.variants_per_placement) >= (
+                request.variants_per_placement
+            ):
                 continue
+            images_per_placement[angle.placement] += 1
             muse_bytes = await meta.generate_image(
                 prompt=angle.scene_prompt,
                 reference_image=artwork_bytes,
