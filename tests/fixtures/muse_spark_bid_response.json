@@ -1,0 +1,65 @@
+{
+  "performance_summary": "Your retargeting ad set is earning the most per dollar and is running out of budget every day. The wall art interest ad set is getting tired: fewer people click as the same people see it more often.",
+  "trend_analysis": [
+    "Interest - Wall Art Lovers: CTR (share of people who click) fell sharply from the first half to the second half while frequency rose.",
+    "Retargeting - Site Visitors: spend_pacing is at the daily budget with the best roas_vs_account."
+  ],
+  "competitive_context": [
+    "The competitor is spending on large framed prints, so competing head-on for that audience is expensive. Your cheaper unframed prints are where they are absent."
+  ],
+  "bid_adjustments": [
+    {
+      "ad_set_name": "Retargeting - Site Visitors",
+      "action": "increase",
+      "bid_strategy": null,
+      "triggering_metric": "spend_pacing",
+      "reasoning": "It hits its budget every day and has the best roas_vs_account.",
+      "expected_impact": "More sales from people who already know your shop, at a similar cost per sale."
+    },
+    {
+      "ad_set_name": "Interest - Wall Art Lovers",
+      "action": "decrease",
+      "bid_strategy": "cost_cap",
+      "triggering_metric": "ctr_trend",
+      "reasoning": "CTR is falling while frequency rises, a sign the ad is wearing out.",
+      "expected_impact": "Should stop cost per sale from climbing further."
+    },
+    {
+      "ad_set_name": "Lookalike - Purchasers 1%",
+      "action": "increase",
+      "triggering_metric": "roas",
+      "reasoning": "Hallucinated ad set that is not in the data.",
+      "expected_impact": "n/a"
+    }
+  ],
+  "budget_shifts": [
+    {
+      "from_ad_set": "Interest - Wall Art Lovers",
+      "to_ad_set": "Retargeting - Site Visitors",
+      "shift_percent": 20,
+      "triggering_metric": "roas",
+      "reasoning": "Move money from the weakest ad set to the one limited by budget."
+    }
+  ],
+  "pause_candidates": [
+    {
+      "ad_set_name": "Interest - Wall Art Lovers",
+      "triggering_metric": "ctr_trend",
+      "reasoning": "If a fresh image does not lift CTR within a week, pause it.",
+      "alternative": "Swap in a new product photo before pausing."
+    }
+  ],
+  "audience_suggestions": [
+    {
+      "audience": "Renters and college students interested in apartment decor",
+      "competitor_gap": "No small or unframed prints under $50",
+      "rationale": "The competitor ignores budget buyers, so you face less competition for them.",
+      "how_to_test": "Duplicate your prospecting ad set, add the interests 'apartment decor' and 'dorm room', and feature an 8x10 print."
+    }
+  ],
+  "next_steps": [
+    "Raise the Retargeting - Site Visitors daily budget.",
+    "Upload a new image to Interest - Wall Art Lovers.",
+    "Start a small test aimed at renters with your under-$50 prints."
+  ]
+}

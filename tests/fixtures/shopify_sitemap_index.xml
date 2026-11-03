@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <sitemap>
+    <loc>https://modernprintshop.example.com/sitemap_pages_1.xml</loc>
+    <lastmod>2026-10-01T00:00:00Z</lastmod>
+  </sitemap>
+  <sitemap>
+    <loc>https://modernprintshop.example.com/sitemap_products_1.xml</loc>
+    <lastmod>2026-10-29T12:00:00Z</lastmod>
+  </sitemap>
+  <sitemap>
+    <loc>https://modernprintshop.example.com/sitemap_blogs_1.xml</loc>
+    <lastmod>2026-10-22T08:00:00Z</lastmod>
+  </sitemap>
+</sitemapindex>

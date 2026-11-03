@@ -12,3 +12,12 @@ TODO:
 - run_variants(creatives, workflow_name) -> list[Creative] via src.clients.comfyui
 - Output: CreativeSet (paths, prompts, suggested copy, producing model per image)
 """
+
+from __future__ import annotations
+
+from src.models.creative import CreativeSet, GenerateAdsRequest
+
+
+async def generate_ads(request: GenerateAdsRequest) -> CreativeSet:
+    """Placeholder so the API contract exists; the route maps this to HTTP 501."""
+    raise NotImplementedError("Ad Creative Studio (Flow 2) is not implemented yet.")
