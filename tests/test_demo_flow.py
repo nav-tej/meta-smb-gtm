@@ -16,8 +16,20 @@ BRIEF_OUTPUT = {
     "new_product_frequency": "A batch of uploads in April; nothing since.",
     "doubling_down_on": ["Portraits of Sikh women"],
     "competitor_gaps": ["No Gurpurab gift collection"],
+    "research_brief": [
+        {
+            "finding": "No Gurpurab gift collection",
+            "evidence": [{"source_url": "computed_signals", "detail": "No seasonal themes"}],
+            "recommendation": "Bundle 3 prints as a Gurpurab gift set.",
+        }
+    ],
     "actionable_insights": [
-        {"title": "Gurpurab gift set", "action": "Bundle 3 prints.", "why": "No one offers it."}
+        {
+            "title": "Gurpurab gift set",
+            "action": "Bundle 3 prints.",
+            "why": "No one offers it.",
+            "evidence": [{"source_url": "computed_signals", "detail": "No seasonal themes"}],
+        }
     ],
 }
 
@@ -68,4 +80,5 @@ def test_demo_full_flow_with_muse_spark(capsys: pytest.CaptureFixture[str]) -> N
     assert route.call_count == 2
     assert "[skipped]" not in out
     assert "No Gurpurab gift collection" in out
+    assert "F1 [low confidence] No Gurpurab gift collection" in out
     assert "Next steps" in out

@@ -70,7 +70,8 @@ Produce:
 - performance_summary: 2-3 sentences on how the account is doing overall.
 - trend_analysis: the trends that matter, each citing the metric.
 - competitive_context: how the competitor's positioning (what they are doubling down on, their
-  pricing, their gaps) should shape where this seller spends.
+  pricing, their gaps) should shape where this seller spends. When a point rests on a finding in
+  research_brief, end it with that finding's id in brackets, e.g. "[F2]".
 - bid_adjustments: per ad set, increase / decrease / hold. Set bid_strategy only if a strategy
   change is warranted (lowest_cost = let Meta get the most results for the budget; cost_cap = keep
   average cost per sale near a target; bid_cap = hard max per auction). Each must name its
@@ -81,7 +82,8 @@ Produce:
 - pause_candidates: ad sets that are wasting money, with a lighter alternative to try first when
   reasonable (e.g. refresh the creative for fatigue).
 - audience_suggestions: up to 3 new audiences to test, each tied to a specific gap in the
-  competitor brief.
+  competitor brief. Put the ids of the research_brief findings it relies on in finding_ids. Use
+  only ids that appear in the data; never invent one.
 - next_steps: the 3 most important actions, most important first."""
 
 
@@ -254,6 +256,19 @@ def _competitor_payload(brief: CompetitorBrief) -> str:
             "doubling_down_on": brief.doubling_down_on,
             "competitor_gaps": brief.competitor_gaps,
             "seo_keywords": brief.seo_keywords[:15],
+            "research_brief": [
+                {
+                    "id": f.id,
+                    "finding": f.finding,
+                    "confidence": f.confidence,
+                    "recommendation": f.recommendation,
+                    "evidence": [
+                        {"source_url": e.source_url, "detail": e.detail, "price": e.price}
+                        for e in f.evidence[:3]
+                    ],
+                }
+                for f in brief.research_brief
+            ],
         },
         ensure_ascii=False,
     )
@@ -297,6 +312,7 @@ def _finalize(
         logger.warning("Dropping %s for unknown ad set %r from Muse Spark output.", kind, name)
         return False
 
+    finding_ids = {f.id for f in brief.research_brief}
     reallocations = [
         BudgetReallocation(
             **shift.model_dump(),
@@ -321,8 +337,12 @@ def _finalize(
         bid_adjustments=[a for a in llm.bid_adjustments if known(a.ad_set_name, "bid adjustment")],
         budget_reallocations=reallocations,
         pause_candidates=[p for p in llm.pause_candidates if known(p.ad_set_name, "pause")],
-        audience_suggestions=llm.audience_suggestions,
+        audience_suggestions=[
+            s.model_copy(update={"finding_ids": [i for i in s.finding_ids if i in finding_ids]})
+            for s in llm.audience_suggestions
+        ],
         next_steps=llm.next_steps,
+        research_brief=brief.research_brief,
         metrics=metrics,
         model=model,
     )

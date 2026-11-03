@@ -64,6 +64,9 @@ class CompetitorSignals(BaseModel):
     growing_categories: list[str] = Field(default_factory=list)
     publishing_cadence_per_week: float | None = Field(default=None, ge=0)
     detected_price_hints: list[str] = Field(default_factory=list)
+    usd_priced_pages: int = Field(default=0, ge=0)
+    usd_price_min: float | None = Field(default=None, ge=0)
+    usd_price_max: float | None = Field(default=None, ge=0)
     seasonal_themes: list[str] = Field(default_factory=list)
     social_signals: SocialCompetitorSignals | None = None
 
@@ -85,6 +88,60 @@ class ActionableInsight(BaseModel):
     priority: Literal["high", "medium", "low"] = "medium"
 
 
+Confidence = Literal["high", "medium", "low"]
+COMPUTED_SIGNALS_SOURCE = "computed_signals"
+
+
+class EvidenceRef(BaseModel):
+    """A citation as Muse Spark returns it. Verified against the crawled pages in Python."""
+
+    source_url: str = Field(
+        min_length=1,
+        description=(
+            "An exact `url` copied from the competitor data, or 'computed_signals' for a number "
+            "taken from <computed_signals>."
+        ),
+    )
+    detail: str = Field(
+        min_length=1,
+        max_length=300,
+        description="What this source shows: the product name, its price, or the page text used.",
+    )
+
+
+class Evidence(EvidenceRef):
+    """A verified citation. `product_name` and `price` come from the crawl, not the model."""
+
+    product_name: str | None = None
+    price: str | None = None
+
+
+class ResearchFindingLLM(BaseModel):
+    finding: str = Field(min_length=1, description="What was observed, e.g. 'No prints under $60'.")
+    evidence: list[EvidenceRef] = Field(min_length=1, max_length=5)
+    recommendation: str = Field(min_length=1, description="What the seller should do about it.")
+
+
+class ResearchFinding(BaseModel):
+    """One cited finding. Downstream recommendations reference it by `id`."""
+
+    id: str = Field(description="Stable id such as 'F1'.")
+    finding: str
+    evidence: list[Evidence] = Field(min_length=1)
+    confidence: Confidence = Field(
+        description="From the number of verified sources: 3+ high, 2 medium, 1 low."
+    )
+    recommendation: str
+
+
+class CitedInsightLLM(ActionableInsight):
+    evidence: list[EvidenceRef] = Field(min_length=1, max_length=5)
+
+
+class CitedInsight(ActionableInsight):
+    evidence: list[Evidence] = Field(default_factory=list)
+
+
 class BatchAnalysis(BaseModel):
     """Muse Spark structured findings for a single batch of competitor URLs and page titles."""
 
@@ -94,6 +151,11 @@ class BatchAnalysis(BaseModel):
     seo_keywords: list[str] = Field(default_factory=list)
     new_product_frequency: str = ""
     notable_gaps: list[str] = Field(default_factory=list)
+    key_evidence: list[EvidenceRef] = Field(
+        default_factory=list,
+        max_length=10,
+        description="The specific pages (exact url + what they show) behind the findings above.",
+    )
 
 
 class CompetitorBriefLLMOutput(BaseModel):
@@ -133,10 +195,18 @@ class CompetitorBriefLLMOutput(BaseModel):
             "Underserved niches, missing content angles, or weaknesses the seller can exploit."
         ),
     )
-    actionable_insights: list[ActionableInsight] = Field(
+    research_brief: list[ResearchFindingLLM] = Field(
+        min_length=1,
+        max_length=8,
+        description=(
+            "3 to 6 cited findings covering the competitor gaps and pricing/positioning "
+            "observations, each with evidence and a recommendation."
+        ),
+    )
+    actionable_insights: list[CitedInsightLLM] = Field(
         min_length=1,
         max_length=7,
-        description="3 to 5 concrete, plain-language actions with a one-line 'why' each.",
+        description="3 to 5 concrete, plain-language actions, each with a 'why' and evidence.",
     )
 
 
@@ -180,6 +250,12 @@ class CompetitorBrief(BaseModel):
     new_product_frequency: str
     doubling_down_on: list[str] = Field(default_factory=list)
     competitor_gaps: list[str] = Field(default_factory=list)
-    actionable_insights: list[ActionableInsight] = Field(default_factory=list)
+    actionable_insights: list[CitedInsight] = Field(default_factory=list)
+    research_brief: list[ResearchFinding] = Field(default_factory=list)
+    unverified_citations_dropped: int = Field(
+        default=0,
+        ge=0,
+        description="Citations removed because their URL was not in the data Muse Spark saw.",
+    )
     signals: CompetitorSignals
     batches_analyzed: int = Field(default=0, ge=0)

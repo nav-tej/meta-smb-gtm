@@ -131,6 +131,14 @@ def show_brief(brief: CompetitorBrief) -> None:
     bullets(brief.doubling_down_on)
     print("\n  Gaps you can use")
     bullets(brief.competitor_gaps)
+    print("\n  Research brief (every finding cites crawled pages)")
+    for f in brief.research_brief:
+        para(f"{f.id} [{f.confidence} confidence] {f.finding}", "  ")
+        bullets(
+            [f"{e.detail} ({e.price + ', ' if e.price else ''}{e.source_url})" for e in f.evidence],
+            "     ",
+        )
+        para(f"-> {f.recommendation}", "     ")
     print("\n  Do this week")
     bullets(
         [f"[{i.priority}] {i.title}: {i.action} (why: {i.why})" for i in brief.actionable_insights]
@@ -194,7 +202,8 @@ def show_recommendations(rec: BidRecommendation) -> None:
         print("\n  New audiences to test")
         bullets(
             [
-                f"{s.audience} (gap: {s.competitor_gap}). {s.how_to_test}"
+                f"{s.audience} (gap: {s.competitor_gap}; "
+                f"based on {', '.join(s.finding_ids) or 'no cited finding'}). {s.how_to_test}"
                 for s in rec.audience_suggestions
             ]
         )

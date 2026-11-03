@@ -24,6 +24,12 @@ from src.services.competitor_intel import (
 
 FIXTURES = Path(__file__).parent / "fixtures"
 FIXED_NOW = datetime(2026, 11, 2, 12, 0, 0, tzinfo=UTC)
+PINE_URL = "https://fineartamerica.com/featured/christmas-pine-forest-framed-print-jane-doe.html"
+INVENTED_URL = "https://fineartamerica.com/featured/made-up-by-the-model.html"
+VALID_EVIDENCE = [
+    {"source_url": PINE_URL, "detail": "Christmas Pine Forest framed print at $98"},
+    {"source_url": "computed_signals", "detail": "3 of 5 pages updated in the last 30 days"},
+]
 
 
 async def _public_resolver(_host: str) -> list[str]:
@@ -85,6 +91,21 @@ def _sample_brief_llm_payload() -> dict[str, object]:
             "No under-$40 giftable mini-print bundles",
             "No personalized or room-mockup buyer guides for small apartments",
         ],
+        "research_brief": [
+            {
+                "finding": "Holiday framed prints start near $98, with no gift bundle under $40",
+                "evidence": [
+                    *VALID_EVIDENCE,
+                    {"source_url": INVENTED_URL, "detail": "Invented $35 bundle"},
+                ],
+                "recommendation": "List a 3-print holiday mini set under $45.",
+            },
+            {
+                "finding": "They sell room-mockup guides",
+                "evidence": [{"source_url": INVENTED_URL, "detail": "Not in the data"}],
+                "recommendation": "Ignore; this finding cites nothing real.",
+            },
+        ],
         "actionable_insights": [
             {
                 "title": "Launch a 3-piece Holiday Mini-Print Set under $45",
@@ -97,6 +118,7 @@ def _sample_brief_llm_payload() -> dict[str, object]:
                     "holiday bundles."
                 ),
                 "priority": "high",
+                "evidence": VALID_EVIDENCE,
             },
             {
                 "title": "Publish a 'Holiday Wall Art Under $50' Collection Page",
@@ -108,6 +130,7 @@ def _sample_brief_llm_payload() -> dict[str, object]:
                     "Competitor recently added a 2026 holiday gift guide to capture Q4 buyers."
                 ),
                 "priority": "high",
+                "evidence": VALID_EVIDENCE,
             },
             {
                 "title": "Add Medium + Style Keywords to Top Product Titles",
@@ -119,6 +142,7 @@ def _sample_brief_llm_payload() -> dict[str, object]:
                     "Every top competitor URL slug pairs art style, subject, and print format."
                 ),
                 "priority": "medium",
+                "evidence": VALID_EVIDENCE,
             },
         ],
     }
@@ -175,6 +199,7 @@ def test_derive_signals_computes_deterministic_counts() -> None:
     assert signals.publishing_cadence_per_week == round(3 / (90.0 / 7.0), 2)
     assert signals.growing_categories[0] == "products"
     assert signals.detected_price_hints == ["$95.00", "$65.00"]
+    assert (signals.usd_priced_pages, signals.usd_price_min, signals.usd_price_max) == (2, 65, 95)
     assert "christmas" in signals.seasonal_themes
     assert "holiday" in signals.seasonal_themes
     assert "gift" in signals.seasonal_themes
@@ -192,10 +217,7 @@ async def test_analyze_competitor_end_to_end_fineartamerica() -> None:
     respx.get("https://fineartamerica.com/sitemap.xml").mock(
         return_value=httpx.Response(200, content=sitemap_xml)
     )
-    pine_url = (
-        "https://fineartamerica.com/featured/christmas-pine-forest-framed-print-jane-doe.html"
-    )
-    respx.get(pine_url).mock(
+    respx.get(PINE_URL).mock(
         return_value=httpx.Response(
             200,
             text=(
@@ -233,11 +255,23 @@ async def test_analyze_competitor_end_to_end_fineartamerica() -> None:
     assert len(brief.actionable_insights) == 3
     assert brief.product_categories[0] == "Coastal watercolor canvas prints"
 
+    # Citations: real URL kept and enriched from the crawl, invented URLs dropped, the finding
+    # that cited only an invented URL removed, confidence from verified source count
+    assert [f.id for f in brief.research_brief] == ["F1"]
+    finding = brief.research_brief[0]
+    assert finding.confidence == "medium"
+    assert [e.source_url for e in finding.evidence] == [PINE_URL, "computed_signals"]
+    assert finding.evidence[0].price == "$98.00"
+    assert finding.evidence[0].product_name.startswith("Christmas Pine Forest Framed Print")
+    assert brief.unverified_citations_dropped == 2
+    assert all(len(i.evidence) == 2 for i in brief.actionable_insights)
+
     # Verify prompt-injection delimiters wrap competitor URLs + titles sent to Muse Spark
     assert spark_route.call_count == 1
     sent_payload = json.loads(spark_route.calls[0].request.content.decode("utf-8"))
     user_msg = sent_payload["messages"][-1]["content"]
     assert "<untrusted_competitor_data>" in user_msg
+    assert "CITATION RULE" in sent_payload["messages"][0]["content"]
     assert "Christmas Pine Forest Framed Print ($98.00) | FineArtAmerica" in user_msg
 
 
@@ -270,6 +304,9 @@ async def test_sitemap_index_recursion_and_multi_batch_spark_calls() -> None:
         "seo_keywords": ["minimalist line art poster", "christmas art gift ideas under 50"],
         "new_product_frequency": "Multiple October 2026 additions",
         "notable_gaps": ["No custom framing options"],
+        "key_evidence": [
+            {"source_url": "computed_signals", "detail": "2 products in this batch"},
+        ],
     }
     # 5 URLs across products (3) + blogs (2) with batch_size=2 -> 3 batch calls + 1 synthesis call
     spark_route = respx.post("https://api.meta.ai/v1/chat/completions").mock(
@@ -302,6 +339,12 @@ async def test_sitemap_index_recursion_and_multi_batch_spark_calls() -> None:
     assert brief.signals.bucket_counts == {"products": 2, "collections": 1, "blogs": 2}
     assert brief.batches_analyzed == 3
     assert spark_route.call_count == 4
+    # PINE_URL was never shown to the model for this shop, so only computed_signals survives
+    assert all(
+        [e.source_url for e in i.evidence] == ["computed_signals"]
+        for i in brief.actionable_insights
+    )
+    assert brief.research_brief[0].confidence == "low"
 
 
 @respx.mock

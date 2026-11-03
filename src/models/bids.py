@@ -7,7 +7,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
-from src.models.intel import CompetitorBrief
+from src.models.intel import CompetitorBrief, ResearchFinding
 
 BidAction = Literal["increase", "decrease", "hold"]
 BidStrategy = Literal["lowest_cost", "cost_cap", "bid_cap"]
@@ -170,6 +170,10 @@ class AudienceSuggestion(BaseModel):
     competitor_gap: str = Field(min_length=1, description="The competitor gap it exploits.")
     rationale: str = Field(min_length=1)
     how_to_test: str = Field(min_length=1, description="A five-minute setup step.")
+    finding_ids: list[str] = Field(
+        default_factory=list,
+        description="Ids of the competitor research findings it relies on, e.g. ['F2'].",
+    )
 
 
 class BidRecommendationLLMOutput(BaseModel):
@@ -218,5 +222,9 @@ class BidRecommendation(BaseModel):
     pause_candidates: list[PauseRecommendation]
     audience_suggestions: list[AudienceSuggestion]
     next_steps: list[str]
+    research_brief: list[ResearchFinding] = Field(
+        default_factory=list,
+        description="The cited competitor findings that recommendations reference by id.",
+    )
     metrics: PerformanceMetrics
     model: str

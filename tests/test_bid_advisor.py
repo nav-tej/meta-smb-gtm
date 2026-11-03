@@ -12,7 +12,7 @@ from pydantic import ValidationError
 from src.clients.meta import MetaAPIError, MetaClient
 from src.config import Settings
 from src.models.bids import AdSetDailyPerformance, BidAdviceRequest, CampaignPerformance
-from src.models.intel import CompetitorBrief
+from src.models.intel import CompetitorBrief, Evidence, ResearchFinding
 from src.services.bid_advisor import BidAdvisorService, compute_metrics
 from tests.conftest import (
     INTEREST,
@@ -238,3 +238,38 @@ async def test_advise_surfaces_api_errors(
 
     with pytest.raises(MetaAPIError, match="status=400"):
         await BidAdvisorService(meta_client=meta_client).advise(request_model)
+
+
+@respx.mock
+async def test_advise_traces_audiences_to_research_findings(
+    meta_client: MetaClient, request_model: BidAdviceRequest, spark_bid_content: str
+) -> None:
+    evidence = Evidence(
+        source_url="https://example-prints.com/products/sunset-pier",
+        detail="Cheapest framed print",
+        product_name="Sunset Pier Framed Print",
+        price="$120.00",
+    )
+    request_model.competitor_brief.research_brief = [
+        ResearchFinding(
+            id="F1",
+            finding="No unframed prints under $50",
+            evidence=[evidence],
+            confidence="low",
+            recommendation="Launch an under-$50 print collection.",
+        )
+    ]
+    llm_output = json.loads(spark_bid_content)
+    llm_output["audience_suggestions"][0]["finding_ids"] = ["F1", "F9"]
+    route = respx.post(CHAT_URL).mock(
+        return_value=httpx.Response(200, json=chat_completion(json.dumps(llm_output)))
+    )
+
+    result = await BidAdvisorService(meta_client=meta_client).advise(request_model)
+
+    user = json.loads(route.calls[0].request.content)["messages"][1]["content"]
+    untrusted = user.split("<untrusted_competitor_data>")[1]
+    assert '"id": "F1"' in untrusted
+    assert "https://example-prints.com/products/sunset-pier" in untrusted
+    assert result.audience_suggestions[0].finding_ids == ["F1"]
+    assert result.research_brief[0].evidence[0].price == "$120.00"
