@@ -18,6 +18,13 @@ If you sell prints on **FineArtAmerica / Pixels**, original paintings on **Saatc
 
 ## 2. What It Does (End-to-End Closed Loop)
 
+**Demo focus:** Muse Spark research → Muse Image Product Visuals, Multi-Image Combine and
+Restore/Enhance → Muse Spark bid advice. Spark also drafts editable creative plans. Vision
+screenshot audits and Muse Voice transcription are implemented optional capabilities that need
+separate live verification; cached demo mode does not simulate those calls. ComfyUI is a
+secondary extension for advanced local variants. Follow [the recording script](docs/DEMO_VIDEO_SCRIPT.md)
+for a three-minute walkthrough using saved Muse outputs.
+
 ### Step 0 — Storefront & Socials Reference Ingestion (`POST /api/v1/ingest-storefront` & `POST /api/v1/audit-seller`)
 Point it at a seller's own website, marketplace shop pages (`FineArtAmerica`, `Saatchi Art`, `Etsy`), and socials (`Instagram`, `Facebook`). It crawls public listings politely, flags pricing/checkout leaks, and builds a live `seller_context` anchor for every downstream model call.
 

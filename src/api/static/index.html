@@ -892,7 +892,7 @@
       <div class="brand-logo">M</div>
       <div>
         <div class="brand-title">Muse Growth Studio</div>
-        <div class="brand-sub">Open-Source SMB Growth Copilot · Meta Muse + SAM 3.1 + Local ComfyUI</div>
+        <div class="brand-sub">Powered by Meta Muse · Research → Create → Improve</div>
       </div>
     </div>
 
@@ -966,7 +966,7 @@
       </button>
       <button type="button" class="step-tab" data-tab="tab-creative">
         <span class="step-num">Step 2 · Creative & Reels Studio</span>
-        <span class="step-name">SAM 3.1 + Muse Image + Krea</span>
+        <span class="step-name">Muse Image Creative Studio</span>
         <span class="step-caption">2-Phase Brief Editor, Room Staging & 9:16 Reel</span>
       </button>
       <button type="button" class="step-tab" data-tab="tab-bids">
@@ -1117,7 +1117,7 @@
           </div>
           <div style="display:flex;gap:0.5rem;align-items:center;">
             <span class="badge green">Zero Brushwork Hallucination</span>
-            <span class="badge gold">Muse Image 1.0 Edit + ComfyUI Ready</span>
+            <span class="badge gold">Muse Image 1.0 · Product Visuals · Combine · Restore</span>
           </div>
         </div>
 
@@ -1211,12 +1211,12 @@
           </div>
 
           <div>
-            <label class="field-label" for="briefScenePrompt">Collector Scene Backdrop Prompt (SAM 3.1 Preserves Original Painting)</label>
+            <label class="field-label" for="briefScenePrompt">Muse Image Scene Direction (Review Artwork Details Before Publishing)</label>
             <textarea id="briefScenePrompt" class="textarea" style="margin-bottom:0.75rem;">Serene modern collector living room in warm neutrals, clean matte off-white gallery wall with soft museum spotlight from above, slim matte black gallery frame with wide white mat mounted at eye level, light oak console below with small lit brass diya and white orchid vase</textarea>
 
             <div class="grid-equal" style="gap:0.75rem;">
               <div>
-                <label class="field-label" for="briefImageWorkflow">Muse Playground / ComfyUI Mirror Workflow</label>
+                <label class="field-label" for="briefImageWorkflow">Muse Image Workflow · Optional Local Variants</label>
                 <select id="briefImageWorkflow" class="select">
                   <option value="muse_product_visuals">Muse Image 1.0: Product Visuals (/v1/responses · High Reasoning)</option>
                   <option value="muse_multi_image_combine">Muse Image 1.0: Multi-Image Combine Diptych (/v1/responses · 2 Images)</option>
@@ -1445,20 +1445,20 @@ Gurpurab Gifts,Golden Temple - Gift Buyers,-$2.25/day (Refresh Creative),instagr
   <!-- Modern Web Guidance: Light-Dismiss Local Mac Studio Engine Dialog -->
   <dialog id="localEngineDialog" closedby="any" aria-labelledby="localEngineDialogTitle">
     <div class="dialog-inner">
-      <span class="eyebrow">Zero Comfy Cloud Subscription Required</span>
-      <h2 id="localEngineDialogTitle" style="margin:0.2rem 0 0.4rem;font-size:1.25rem;">Run Locally on Your Mac Studio (Apple M4 Max · 36 GB Unified Memory)</h2>
+      <span class="eyebrow">Optional Advanced Local Variants</span>
+      <h2 id="localEngineDialogTitle" style="margin:0.2rem 0 0.4rem;font-size:1.25rem;">Extend Muse creatives with ComfyUI</h2>
       <p style="font-size:0.84rem;color:var(--text-muted);margin:0 0 0.9rem;">
-        Your project works two ways with <strong>zero paid Comfy Cloud subscription</strong>:
+        <strong>Muse powers the main workflow.</strong> ComfyUI adds optional local variants when a compatible server is available:
       </p>
       <div class="finding-list" style="margin-bottom:1rem;">
         <div class="finding-item">
-          <strong>1. Instant Hosted Meta Model API (Active Right Now)</strong>
+          <strong>1. Primary: Meta Muse API workflows</strong>
           <div style="font-size:0.82rem;color:var(--text-muted);margin-top:0.2rem;">
             Uses your <code>META_MODEL_API_KEY</code> on <code>api.meta.ai/v1</code> for <code>muse-spark-1.3</code>, <code>muse-image-1.0</code> (<code>/v1/images/edits</code> & <code>/v1/images/generations</code>), and <code>sam-3.1</code> (<code>/v1/responses</code>).
           </div>
         </div>
         <div class="finding-item">
-          <strong>2. 100% Local Open-Weight ComfyUI on Your Mac Studio (MPS Backend)</strong>
+          <strong>2. Optional: local ComfyUI variants</strong>
           <div style="font-size:0.82rem;color:var(--text-muted);margin-top:0.2rem;">
             Start a local ComfyUI instance on port <code>8188</code>—our <code>ComfyUIClient</code> auto-detects <code>http://127.0.0.1:8188/system_stats</code> and executes local graphs in <code>workflows/</code>:
           </div>

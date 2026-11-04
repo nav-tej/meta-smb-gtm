@@ -1,57 +1,88 @@
-# Muse Growth Studio — three-minute demo
+# Muse Growth Studio — three-minute Muse-first demo
 
-Recording target: November 4, 2026. Share a rehearsal for seller feedback November 3.
-Use the local portal at http://localhost:8000/ until a public deployment passes the checks in `docs/TONIGHT_DEMO_RUNBOOK.md`.
+Use the Art of Sarabjit Singh workspace and keep the saved-results disclosure visible.
+The public walkthrough replays saved Muse outputs; clicks do not run fresh inference.
+Rehearse with a timer. No additional paid calls are needed for this recording.
 
-## Before recording
+## 0:00–0:20 — A real seller's next campaign
 
-Use the Art of Sarabjit Singh preset. Keep this workspace throughout the main story. Reset the page, close unrelated tabs, hide notifications, and use a readable browser zoom. Rehearse once with a timer. Keep saved-result mode on; no billed calls are needed.
+**Screen:** Artist overview, original artwork and saved staged creative.
 
-The opening disclosure stays visible: this is an interactive demo with saved Muse outputs and sample campaign metrics. Do not describe button clicks as fresh inference. Storefront ingestion is a real external crawl and may be slow; do not depend on it in the recording.
+**Say:** “Independent artists are also their own marketing team. Muse Growth Studio connects
+market research, creative production and budget decisions in one place. This is Art of Sarabjit
+Singh. We're showing saved Muse outputs and sample campaign metrics so you can explore the
+workflow reliably.”
 
-## 0:00–0:25 — One seller, one problem
+## 0:20–0:50 — Muse Spark: evidence into a plan
 
-**Screen:** Artist workspace overview, then the first market finding.
+**Screen:** Step 1. Show a competitor finding and its source link, then the proposed action.
 
-**Say:** “Independent artists have to be their own marketing team. Muse Growth Studio helps them turn a product into a campaign they can review and use. This is Art of Sarabjit Singh, our real artist case study. Today I'm showing saved Muse results and sample campaign data, so the walkthrough is repeatable. Our goal is to make the next sales action easier; we have not measured sales lift yet.”
+**Say:** “Our crawler collects allowed public pages and Python computes catalog signals. Muse
+Spark 1.3 turns those inputs into a structured research brief with sources and recommendations.
+Here the seller can explore an affordable gift offer or a distinct collection. Source checks
+reject URLs outside the supplied evidence; the seller still reviews each conclusion.”
 
-## 0:25–0:55 — Muse Spark finds the next action
+## 0:50–1:55 — Muse Image: three useful ways to create
 
-**Screen:** Step 1, competitor brief and its source links. Open one finding and show its cited source. Skip the illustrative Ad Library section unless asked.
+**Screen:** Step 2. First show Ek Onkar's original and product-visual staging (20 seconds), then
+the Ek Onkar + Kirat Karo diptych (15 seconds), then Naam Japo restoration/enhancement (10 seconds).
+Use the existing artwork selector and Muse workflow menu. Finish by drafting a brief, editing
+its headline and previewing the saved image with the new copy (20 seconds).
 
-**Say:** “The pipeline crawls allowed public pages and computes catalog signals in Python. Muse Spark 1.3 turns that evidence into a structured brief: what competitors offer, where the seller might differentiate, and what to try next. Source checks reject unsupported URLs and quotes; sellers still review the conclusions. The competitor ad examples here are illustrative, and time running does not prove an ad is profitable.”
+**Say:** “Muse Image 1.0 gives the seller three visual workflows. Product Visuals shows artwork
+in a collector's room. Multi-Image Combine brings separate artworks together as a matching set.
+Restore and Enhance improves the presentation of an existing scan. These examples were generated
+through the Muse API, and the interface also shows the model's returned reasoning summary.
+Muse Spark drafts the audience, copy and scene direction. The seller edits the plan before
+approving generation. This saved preview applies our copy edits to an existing image. Generated
+staging can change artwork details, so the artist compares each result with the original.”
 
-## 0:55–1:50 — Muse turns an idea into an editable campaign
+**Recording note:** Select the matching saved artwork for each workflow. The workflow menu alone
+does not generate a new result. A reasoning summary is the API's returned summary, not an exposed
+internal reasoning trace. The animated reel preview is an image animation, not generated video.
 
-**Screen:** Step 2. Show the original artwork next to one saved Muse Image staging. Select a second artwork or the diptych. Draft the brief, edit the headline, then preview the approved creative.
+## 1:55–2:30 — Muse Spark: a budget decision with a reason
 
-**Say:** “Muse Image 1.0 creates visual directions for showing the artwork in a collector's home. These are saved outputs from the implemented image workflows. The seller can draft a brief with Muse Spark, edit the headline and scene direction, and approve it before requesting image generation. In this demo, preview reuses an existing image with the edited copy. The live workflow supports SAM product isolation, but generative staging can alter artwork details. The seller must compare the result with the original before publishing.”
+**Screen:** Step 3. Show the sample campaign table and a proposed budget shift.
 
-**Recording note:** The animated vertical preview is a browser presentation of an image. Call it a reel preview, not a generated video. Exact artwork pixels require an original-cutout compositing path; do not promise that all displayed images preserve every brushstroke.
+**Say:** “Python calculates spend, cost per sale and trends from campaign rows or a CSV. Muse
+Spark explains which budget moves to consider and which metric supports each suggestion. These
+are sample campaign numbers, not verified artist sales. The seller stays in control: the app
+never changes a live ad account.”
 
-## 1:50–2:20 — A budget decision with a reason
+## 2:30–2:50 — A campaign the seller can review
 
-**Screen:** Step 3, campaign table, then one recommendation.
+**Screen:** Planning CSV download and checkout template, then return to the best Muse Image result.
 
-**Say:** “For sellers already running ads, Python calculates performance metrics from campaign rows or a CSV export. Muse Spark explains the proposed budget decisions using those computed metrics. These campaign numbers are sample data, not the artist's verified sales results. Recommendations stay under the seller's control; the app does not change a live ad account.”
+**Say:** “The seller leaves with a research brief, editable copy, visual directions and a campaign
+planning pack. They review product details, configure their own payment links and adapt the CSV
+in Ads Manager. Muse connects the steps that normally require several separate tools.”
 
-## 2:20–2:45 — Leave with something usable
+## 2:50–3:00 — Close
 
-**Screen:** Step 4. Download the campaign planning CSV and show the checkout template.
+**Say:** “Our next step is testing with artists and makers: can they choose a useful campaign
+faster, and what would they need before publishing? ComfyUI remains an optional extension for
+advanced local variants; Muse powers the core experience.”
 
-**Say:** “The seller leaves with copy, creative previews, a campaign planning CSV, and a checkout card template. They add their own payment links and check product details before publishing. The CSV is a planning handoff that needs review in Ads Manager. No ad has been launched and no checkout is connected.”
+## Optional Muse capabilities — outside the timed path
 
-## 2:45–3:00 — Close on value and validation
-
-**Screen:** Best original/staged artwork comparison. Optionally show the second workspace for no more than three seconds.
-
-**Say:** “Muse connects research, creative direction, and the next marketing action in one workflow. Our next test is with artists and makers: can they choose a useful campaign faster, and what must change before they would publish it? We want to earn measurable sales impact through those pilots.”
+- **Muse Spark Vision:** screenshot audits for storefronts and social profiles; implemented, but
+  no cached screenshot response exists. Demo mode rejects this call. Show only after a separately
+  authorized and verified run; do not imply the source website was scraped.
+- **Muse Voice Transcribe:** turns spoken seller briefs into text; implemented, but no cached
+  transcript exists. Demo mode rejects it. Include only after separate verification.
+- **SAM 3.1:** Meta's supporting product-isolation step. The hosted implementation uses a box
+  mask; it does not establish exact artwork preservation. It is not a Muse model.
+- **Muse Image scene editing / text-to-image:** additional implemented API paths. The saved Golden
+  Temple holiday image is text-to-image, not a restaging of Sarabjit's actual painting.
+- **ComfyUI:** optional advanced variants and compositing. No local workflow or video demo should
+  delay the main Muse recording.
 
 ## Claims to avoid
 
-- No guaranteed revenue, ROI, or measured time savings without an actual pilot.
-- No claim that sample competitor ads are verified or profitable.
-- No claim that demo clicks generate new images or personalized analysis.
-- No claim that all generative outputs preserve exact artwork pixels.
-- No claim that the payment template is connected, that the CSV imports unchanged, or that the image preview is an AI-generated video.
-- Do not state a family relationship, artist biography, pricing, or edition availability unless the seller confirms it.
+- No guaranteed revenue, sales lift, profitability or measured time savings.
+- Ad Library brands and campaign performance are illustrative sample data.
+- Cached clicks do not perform fresh inference or personalize a new AI analysis.
+- Generative staging does not guarantee unchanged brushwork or exact original pixels.
+- The checkout template is not a connected payment flow; the CSV needs review before launch.
+- Confirm artist biography, pricing and availability with the seller before narrating them.
