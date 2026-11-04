@@ -943,30 +943,9 @@
       .badge { white-space: normal; max-width: 100%; min-width: 0; overflow-wrap: anywhere; }
       .finding-head { flex-wrap: wrap; }
       code, .channel-chip, .finding-item a, .journey a { overflow-wrap: anywhere; }
-      .journey-head h1 { font-size: 1.45rem; }
-      .journey-card { padding: 0.9rem; }
-      .journey-estimate { font-size: 0.82rem; }
     }
-    .journey-estimate { margin: -0.4rem 0 1rem; padding: 0.6rem 0.85rem; border-radius: 10px; background: #fff8ec; border: 1px solid #e7c9a9; font-size: 0.9rem; }
-    .journey-estimate small { display: block; color: var(--text-muted); margin-top: 0.2rem; font-size: 0.76rem; }
-    /* Story-first journey at the top of the portal */
-    .journey { margin: 0.5rem 0 1.75rem; }
-    .journey-head h1 { font-size: clamp(1.6rem, 2.6vw, 2.2rem); margin: 0.2rem 0 0.4rem; line-height: 1.15; }
-    .journey-proof { margin: 0 0 1rem; font-size: 0.95rem; }
-    .journey-steps { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.9rem; }
-    .journey-card { background: var(--surface, #fff); border: 1px solid var(--border, #e4ddd0); border-radius: 14px; padding: 1rem 1.1rem; display: flex; flex-direction: column; gap: 0.35rem; }
-    .journey-card h3 { margin: 0; font-size: 1.1rem; }
-    .journey-card p { margin: 0; font-size: 0.88rem; line-height: 1.45; }
-    .journey-num { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
-    .journey-note { font-size: 0.76rem !important; color: var(--text-muted, #6b6b6b); margin-top: auto !important; padding-top: 0.4rem; }
-    .competitor-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.45rem; font-size: 0.86rem; }
-    .competitor-list span { display: block; font-size: 0.76rem; color: var(--text-muted, #6b6b6b); }
-    .link-btn { background: none; border: 0; padding: 0; font: inherit; font-weight: 650; color: var(--accent); text-decoration: underline; cursor: pointer; }
-    .journey-cta { border: 2px solid var(--accent); }
-    .journey-btn { font-size: 1rem; padding: 0.8rem 1.1rem; text-align: center; margin-top: 0.4rem; }
-    @media (max-width: 980px) { .journey-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-    @media (max-width: 600px) { .journey-steps { grid-template-columns: 1fr; } }
 </style>
+  <link rel="stylesheet" href="/static/portal-journey.css">
 </head>
 <body>
   <!-- Top Bar -->
@@ -997,43 +976,107 @@
 
   <main class="shell">
     <section id="journey" class="journey" aria-label="Your growth plan">
-      <div class="journey-head">
-        <p class="eyebrow">ART OF SARABJIT SINGH · TODAY’S PLAN</p>
-        <h1>From your work to your next post, in four steps.</h1>
-        <p class="journey-proof">From saved public data: <strong>300</strong> competitor pages read · <strong>4</strong> similar sellers suggested · <strong>5</strong> Muse Spark recommendations · your next post ready in about <strong>6 clicks</strong>.</p>
-        <p class="journey-estimate"><strong>Estimated: ~12 hours of manual competitor research and ad copywriting replaced.</strong><small>Estimate, not measured. Assumes about 1.5 minutes per competitor page by hand (300 pages ≈ 7.5 h), about 2.5 h to turn notes into a brief, and about 2 h to draft and design one post.</small></p>
+      <div class="jr-hero">
+        <div>
+          <p class="jr-eyebrow">Art of Sarabjit Singh · today’s plan</p>
+          <h1>From your work to your next post, in four steps.</h1>
+          <div class="jr-stats" role="list">
+            <div role="listitem"><strong>300</strong><span>competitor pages read</span></div>
+            <div role="listitem"><strong>4</strong><span>similar sellers suggested</span></div>
+            <div role="listitem"><strong>5</strong><span>Muse Spark recommendations</span></div>
+            <div role="listitem"><strong>~6</strong><span>clicks to a ready post</span></div>
+          </div>
+        </div>
+        <aside class="jr-estimate" aria-label="Estimated time saved">
+          <span class="jr-estimate-tag">Estimated</span>
+          <strong>~12 hours of competitor research and ad copywriting, done in minutes.</strong>
+          <small>Estimate, not measured: ~1.5 min per competitor page by hand (300 pages ≈ 7.5 h), ~2.5 h to write a brief, ~2 h to draft and design one post.</small>
+        </aside>
       </div>
-      <ol class="journey-steps">
-        <li class="journey-card">
-          <span class="journey-num">1 · Your business</span>
-          <h3>Original Sikh heritage art</h3>
-          <p>Sells on <strong>Pixels</strong> (preferred), Fine Art America, Saatchi Art and her own website. Promotes on Instagram and Facebook. Etsy is closed.</p>
-        </li>
-        <li class="journey-card">
-          <span class="journey-num">2 · Similar sellers</span>
-          <h3>Suggested competitors</h3>
-          <ul class="competitor-list">
-            <li><button type="button" class="link-btn" id="journeyLoadBrief">SikhiArt.com</button> <span>Sikh history paintings &amp; prints · 300 pages · <em>saved Muse brief</em></span></li>
-            <li><a href="https://fineartamerica.com/profiles/gurinderpreet-kaur/art/paintings" target="_blank" rel="noopener noreferrer">Gurinderpreet Kaur</a> <span>Fine Art America · 70 listings</span></li>
-            <li><a href="https://fineartamerica.com/profiles/manjot-singh-sachdeva/art/photographs" target="_blank" rel="noopener noreferrer">Manjot Singh Sachdeva</a> <span>Golden Temple photos · Fine Art America / Pixels · 105 listings</span></li>
-            <li><a href="https://www.saatchiart.com/gurdishpannu" target="_blank" rel="noopener noreferrer">Gurdish Pannu</a> <span>Punjabi folk &amp; Sikh heritage · Saatchi Art</span></li>
-          </ul>
-          <p class="journey-note">Public snapshots captured Nov 3, 2026. Only SikhiArt.com has a saved Muse Spark brief.</p>
-        </li>
-        <li class="journey-card">
-          <span class="journey-num">3 · Muse recommends</span>
-          <h3>Tell the story they skip</h3>
-          <p>SikhiArt.com focuses on gurus and warriors, has almost no stories and no group for women’s stories. <strong>Suggested next move:</strong> post one painting with a short personal story, and point people to your Empowering Women work.</p>
-          <p class="journey-note">From the saved Muse Spark brief (Nov 3). You decide what to act on.</p>
-        </li>
-        <li class="journey-card journey-cta">
-          <span class="journey-num">4 · Create</span>
-          <h3>Make your next post</h3>
-          <p>Pick a painting, choose Pixels as the destination, review the words and download a ready-to-post image.</p>
-          <a class="btn btn-dark journey-btn" href="/create">Create your next post →</a>
-          <p class="journey-note"><button type="button" class="link-btn" id="journeyBudget">Then review ad budget (sample data)</button> · <a href="/today">Quick daily desk</a></p>
-        </li>
+
+      <ol class="jr-progress" aria-label="Steps">
+        <li class="c1"><span>1</span>Your business</li>
+        <li class="c2"><span>2</span>Similar sellers</li>
+        <li class="c3"><span>3</span>Muse recommends</li>
+        <li class="c4"><span>4</span>Create</li>
       </ol>
+
+      <div class="jr-grid">
+        <article class="jr-card c1">
+          <header><span class="jr-num">1</span><h3>Your business</h3></header>
+          <div class="jr-biz">
+            <span class="jr-avatar" aria-hidden="true">SS</span>
+            <div><strong>Art of Sarabjit Singh</strong><span>Original Sikh heritage art · SF Bay Area</span></div>
+          </div>
+          <p class="jr-label">Sells on</p>
+          <div class="jr-pills">
+            <span class="jr-pill star">★ Pixels · preferred</span>
+            <span class="jr-pill">Fine Art America</span>
+            <span class="jr-pill">Saatchi Art</span>
+            <span class="jr-pill">Own website</span>
+            <span class="jr-pill off">Etsy · closed</span>
+          </div>
+          <p class="jr-label">Posts on</p>
+          <div class="jr-pills"><span class="jr-pill">Instagram</span><span class="jr-pill">Facebook</span></div>
+          <button type="button" class="jr-action" id="journeyResearch">View full competitor research →</button>
+        </article>
+
+        <article class="jr-card c2">
+          <header><span class="jr-num">2</span><h3>Similar sellers</h3></header>
+          <ul class="jr-sellers" id="sellerList">
+            <li class="jr-seller has-brief">
+              <div><strong>SikhiArt.com</strong><span>Sikh history paintings &amp; prints · 300 pages</span></div>
+              <button type="button" class="jr-mini primary" id="journeyLoadBrief">Analyze this seller →</button>
+            </li>
+            <li class="jr-seller">
+              <div><a href="https://fineartamerica.com/profiles/gurinderpreet-kaur/art/paintings" target="_blank" rel="noopener noreferrer">Gurinderpreet Kaur</a><span>Fine Art America · 70 listings</span></div>
+              <button type="button" class="jr-mini" disabled title="Live analysis is off in this demo">Request analysis →</button>
+            </li>
+            <li class="jr-seller">
+              <div><a href="https://fineartamerica.com/profiles/manjot-singh-sachdeva/art/photographs" target="_blank" rel="noopener noreferrer">Manjot Singh Sachdeva</a><span>Golden Temple photos · FAA / Pixels · 105 listings</span></div>
+              <button type="button" class="jr-mini" disabled title="Live analysis is off in this demo">Request analysis →</button>
+            </li>
+            <li class="jr-seller">
+              <div><a href="https://www.saatchiart.com/gurdishpannu" target="_blank" rel="noopener noreferrer">Gurdish Pannu</a><span>Punjabi folk &amp; Sikh heritage · Saatchi Art</span></div>
+              <button type="button" class="jr-mini" disabled title="Live analysis is off in this demo">Request analysis →</button>
+            </li>
+          </ul>
+          <form class="jr-add" id="addCompetitorForm" novalidate>
+            <label for="addCompetitorInput">Add another competitor to analyze</label>
+            <div><input id="addCompetitorInput" type="url" inputmode="url" placeholder="https://their-shop.com" maxlength="300"><button type="submit" class="jr-mini primary">Add</button></div>
+          </form>
+          <p class="jr-note">Public snapshots captured Nov 3, 2026. Only SikhiArt.com has a saved Muse Spark brief; new analyses need a live server.</p>
+        </article>
+
+        <article class="jr-card c3">
+          <header><span class="jr-num">3</span><h3>Muse recommends</h3></header>
+          <div class="jr-reco">
+            <img src="/samples/ek_onkar_original.jpg" alt="Ek Onkar by Sarabjit Singh" width="96" height="96" loading="lazy">
+            <div>
+              <strong>Post Ek Onkar with a personal story about connection and equality.</strong>
+              <span>Why: SikhiArt.com sells guru and warrior prints with almost no stories (2 blog pages). A story-led post stands apart.</span>
+            </div>
+          </div>
+          <a class="jr-action solid" href="/create">Create this post now →</a>
+          <p class="jr-note">From the saved Muse Spark brief (Nov 3). Ek Onkar and “Share the story” are pre-selected. You decide what to post.</p>
+        </article>
+
+        <article class="jr-card c4 jr-cta">
+          <header><span class="jr-num">4</span><h3>Create your post</h3></header>
+          <ol class="jr-mini-steps"><li>Pick the painting</li><li>Choose “Share the story”</li><li>Make the words yours</li><li>Download and post</li></ol>
+          <a class="jr-action solid big" href="/create">Create your next post →</a>
+          <p class="jr-note">Ready-to-post image and caption. Nothing is posted for you.</p>
+        </article>
+      </div>
+
+      <div class="jr-next" aria-labelledby="whatsNextTitle">
+        <h2 id="whatsNextTitle">What’s next?</h2>
+        <div class="jr-next-grid">
+          <a class="jr-next-card" href="/create"><span class="jr-next-icon c4" aria-hidden="true">✦</span><strong>Create a post</strong><span>Turn Ek Onkar into a ready-to-share image and caption.</span><em>Start →</em></a>
+          <button type="button" class="jr-next-card" id="journeyBudget"><span class="jr-next-icon c2" aria-hidden="true">◔</span><strong>Review budget strategy</strong><span>See where Muse Spark would move ad budget, and why (sample data).</span><em>Review →</em></button>
+          <a class="jr-next-card" href="/today"><span class="jr-next-icon c3" aria-hidden="true">☀</span><strong>Check daily post desk</strong><span>One good post a day, with your next three ideas.</span><em>Open →</em></a>
+        </div>
+      </div>
     </section>
 
         <p role="note" style="padding:0.8rem 1rem;border:1px solid #e7c9a9;border-radius:12px;background:#fff8ec;">Interactive demo: saved Muse outputs and sample campaign data. Custom inputs do not produce personalized AI results in this mode. No ads are launched, payments connected, or sales lift measured.</p>
@@ -1938,11 +1981,40 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
       const target = document.getElementById(focusId) || document.getElementById(tabId);
       if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
-    document.getElementById('journeyLoadBrief').addEventListener('click', () => {
+    const showSavedBrief = () => {
       document.getElementById('compUrlInput').value = 'https://www.sikhiart.com';
       openStep('tab-intel', 'compSummaryText');
-    });
+    };
+    document.getElementById('journeyLoadBrief').addEventListener('click', showSavedBrief);
+    document.getElementById('journeyResearch').addEventListener('click', showSavedBrief);
     document.getElementById('journeyBudget').addEventListener('click', () => openStep('tab-bids', 'tab-bids'));
+    document.getElementById('addCompetitorForm').addEventListener('submit', (event) => {
+      event.preventDefault();
+      const input = document.getElementById('addCompetitorInput');
+      let url = null;
+      try { url = new URL(input.value.trim()); } catch { url = null; }
+      if (!url || !['http:', 'https:'].includes(url.protocol) || !url.hostname.includes('.')) {
+        input.setCustomValidity('Enter a full shop link, like https://their-shop.com');
+        input.reportValidity();
+        return;
+      }
+      input.setCustomValidity('');
+      const li = document.createElement('li');
+      li.className = 'jr-seller added';
+      const info = document.createElement('div');
+      const name = document.createElement('strong');
+      name.textContent = url.hostname.replace(/^www\./, '');
+      const meta = document.createElement('span');
+      meta.textContent = 'Added by you · analysis needs a live server';
+      info.append(name, meta);
+      const btn = document.createElement('button');
+      btn.type = 'button'; btn.className = 'jr-mini'; btn.disabled = true;
+      btn.title = 'Live analysis is off in this demo'; btn.textContent = 'Request analysis →';
+      li.append(info, btn);
+      document.getElementById('sellerList').append(li);
+      input.value = '';
+    });
+    document.getElementById('addCompetitorInput').addEventListener('input', (event) => event.target.setCustomValidity(''));
 
     async function loadPresets() {
       let data;
