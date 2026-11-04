@@ -284,7 +284,65 @@ This app fetches arbitrary URLs, parses untrusted XML, and feeds third-party con
 
 ---
 
-## 12. Current implementation status & next orchestration tasks (Claude & Hermes)
+## 12. Current status & multi-agent coordination (updated 2026-11-03, evening)
+
+**Deadline: Wednesday Nov 4 2026, 9:00 PM ET.** Contributors: Claude Code, Gemini CLI, Hermes
+(separate Mac Studio), and GPT/Codex (joining now). Everyone works on `main`: run
+`git pull --rebase origin main` before starting and `make check` before every push.
+
+### Snapshot
+
+| Area | Status |
+|---|---|
+| Flow 1 Competitor Intel | Implemented + tested. Cited research brief (F1..Fn verified against crawled URLs). |
+| Flow 2 Ad Creative | Implemented + tested. Two-phase draft/render; Muse Image live; ComfyUI optional. |
+| Flow 3 Bid Advisor | Implemented + tested. Deterministic metrics + Muse Spark; JSON and CSV input. |
+| Tests | `make check`: 94 passed, ruff clean. |
+| Security | XSS fixed in the portal (`esc()`/`safeUrl()`). Semgrep `--config auto`: no high/critical; 1 medium false positive (logs token counts, not secrets). |
+| Spending guard | Demo mode committed in `c42c966` (see below). |
+| Vercel | Config ready (`api/index.py`, `vercel.json`, `.vercelignore`). **Not deployed yet.** |
+| Portal UI | Works; needs polish for the demo recording. |
+| Demo script | `docs/DEMO_VIDEO_SCRIPT.md` has 2 risky claims to fix (below). |
+
+### Deploying to Vercel (CLI only)
+- The Vercel MCP returns 403 on project creation; deploy with the CLI: `npx vercel` (preview)
+  then `npx vercel --prod`.
+- Set env vars in Vercel: `META_MODEL_API_KEY`, `DEMO_KEY` (long random string, e.g.
+  `openssl rand -hex 24`). Leave `DEMO_MODE` unset (= true).
+- `maxDuration: 300` needs a Vercel Pro plan; on Hobby the deploy may reject or cap it. Cached
+  demo responses return instantly either way.
+- Demo mode: the 7 Muse routes serve saved results from `data/samples/`. A real call needs
+  `?live=true` + header `X-Demo-Key: <DEMO_KEY>`, capped at `LIVE_CALLS_PER_HOUR` (5). The cap is
+  in memory, so on serverless it is per running instance, not a global quota.
+- Locally, `.env` should have `DEMO_MODE=false` for the full live version. Tests pin it to false.
+
+### Verified facts (don't re-derive these, and don't repeat claims that contradict them)
+- **SAM 3.1:** the hosted model works only on `POST /v1/responses` and returns a bounding box,
+  which `MetaClient.segment()` turns into a box-shaped mask. `/v1/images/segmentations` does not
+  exist (404). Open-weight SAM 3.1 runs in ComfyUI via `workflows/sam3_segment.json` (core node
+  `SAM3_Detect`, weights `sam3.1_multiplex_fp16.safetensors`), but `AdCreativeService.generate()`
+  does not route to it yet (two pipeline tests mock the hosted path). There is no BiRefNet
+  integration in this repo.
+- **Live Muse calls:** Claude made 3 (2 Muse Spark: `competitor_brief_sikhiart_live.json`,
+  `bid_advice_live.json`; 1 Muse Image: `golden_temple_holiday_gift_live.webp`). The other live
+  outputs in `data/samples/` (6 more Muse Image renders, `ad_creative_ek_onkar_live.json`) came
+  from other agents' calls. Check the billing dashboard for total spend.
+- **`golden_temple_holiday_gift_live.webp`** is plain text-to-image (`/v1/images/generations`):
+  Muse Image's own Golden Temple, not Sarabjit's painting.
+- **Meta Ad Library data** (`data/samples/art_competitor_meta_ads.json`: "Desi Canvas Co",
+  "Punjab Heritage Prints") is hand-written sample data, not real ads.
+- **Pixel preservation:** only the ComfyUI workflows composite the original artwork pixels back
+  through the SAM mask. Muse Image paths (`/v1/responses` product_visuals, `/v1/images/edits`)
+  re-render the whole image.
+
+### Demo script: 2 risky claims to fix (`docs/DEMO_VIDEO_SCRIPT.md`)
+1. **0:35–1:15:** narrates the Ad Library brands and the "44-day winning ad" as real competitors.
+   Say "illustrative sample data" on screen and in the voiceover, or pull real records with an
+   Ad Library token.
+2. **1:15–2:15:** "100% of Sarabjit's original brushwork ... preserved untouched". True only for
+   the ComfyUI composite path. Safer: "SAM 3.1 isolates the artwork, and our ComfyUI composite
+   keeps the original pixels."
+
 
 ### Completed & verified (`make check` → 94/94 tests passing, 0 ruff errors)
 - **Meta Model API Client (`src/clients/meta.py`):** `MetaClient` using `AsyncOpenAI` (`https://api.meta.ai/v1`) with `.strip()` on credentials/model IDs, structured JSON validation with 1-retry repair (`chat_structured`), multimodal Vision screenshot analysis (`chat_vision_structured`), `generate_image` (`muse-image-1.0` on `/v1/images/generations`), `edit_image` (`muse-image-1.0` on `/v1/images/edits`), `generate_image_workflow` (`muse-image-1.0` on `/v1/responses` with `reasoning={"effort": "high"}` supporting `product_visuals`, `restore_enhance`, and `multi_image_combine` + returning `reasoning_summary`), `transcribe_audio` (`muse-voice-transcribe-1.0` on `/v1/audio/transcriptions`), and `segment` (`sam-3.1` on `/v1/responses` parsing `<|box;...|>` into a binary PNG mask).
@@ -299,7 +357,7 @@ This app fetches arbitrary URLs, parses untrusted XML, and feeds third-party con
     2. `diptych_ek_onkar_kirat_karo_live.webp` (*Ek Onkar + Kirat Karo* 2-Piece Collector Diptych — `multi_image_combine`)
     3. `naam_japo_restored_gallery_live.webp` (*Naam Japo* studio-restored & oak-framed — `restore_enhance`)
     4. `kirat_karo_collector_room_live.webp` (*Kirat Karo* brushed-brass dining room — `product_visuals`)
-    5. `golden_temple_holiday_gift_live.webp` (*Golden Temple* holiday collector gift staging — `product_visuals`)
+    5. `golden_temple_holiday_gift_live.webp` (*Golden Temple* holiday gift scene — plain text-to-image via `/v1/images/generations`, not her painting)
     6. `etsy_chai_set_product_visual_live.webp` (*Saffron & Clay* stoneware & hammered brass chai set — `product_visuals`)
     7. `etsy_diwali_gift_box_live.webp` (*Saffron & Clay* brass diya + marigold linen gift box — `multi_image_combine`)
 - **Flow 3 — Cited Bid Advisor & CSV Upload (`src/services/bid_advisor.py`, `src/models/bids.py`, `src/api/bids.py`):**
@@ -313,17 +371,44 @@ This app fetches arbitrary URLs, parses untrusted XML, and feeds third-party con
   - `docs/CLAUDE_HANDOFF_330PM.md`: Complete handoff brief and copy-paste prompt.
   - `docs/DEMO_VIDEO_SCRIPT.md`: Timestamped 3-minute hackathon pitch and click sequence.
 
-### Multi-Agent Coordination Rules & Next Tasks for Claude & Hermes
+### Coordination rules
+- **File ownership tonight, to avoid edit collisions:** `src/api/static/index.html`, `README.md`
+  and `docs/DEMO_VIDEO_SCRIPT.md` belong to GPT/Codex. Others don't edit them without saying so
+  in a commit message first.
+- Small commits, imperative subject, `make check` green before every push. Never commit `.env`.
+- **No paid Muse calls without the user's OK.** Budget is a $150 credit; tests must never hit the
+  network (`tests/conftest.py` blanks the API key and pins `DEMO_MODE=false`).
 - **Environment topology:**
-  - **Primary Mac (`localhost:8000`):** Runs the live FastAPI Customer Portal (`uvicorn src.api.main:app --reload`), Claude Code, and Antigravity.
-  - **Secondary Mac Studio (Hermes):** Hermes runs on a separate Mac Studio and syncs via `https://github.com/nav-tej/meta-smb-gtm.git` (`origin/main`). Always run `git pull --rebase origin main` before starting work and `make check` before pushing.
-- **Next Tasks for Claude:**
-  1. Verify the live Vercel deployment URL (or deploy via `vercel --prod` with `DEMO_MODE=true`) and confirm `GET /`, `GET /api/v1/demo-presets`, and all 4 portal steps work seamlessly in production.
-  2. Wire `golden_temple_holiday_gift_live.webp` as a 5th selectable card in the `sarabjit_singh` `artworks_showcase` in `src/api/intel.py` so the portal displays all 5 Fine Art stagings alongside the 2 Etsy physical-goods stagings.
-  3. Walk through `docs/DEMO_VIDEO_SCRIPT.md` to record or assist with the final 3-minute hackathon video.
-- **Next Tasks for Hermes (on the separate Mac Studio):**
-  1. Pull `origin/main` and run `make check` (`94 passed`).
-  2. If local ComfyUI (`http://127.0.0.1:8188`) is running on the Mac Studio, execute `workflows/ltx2_5_dfr_i2v.json` or `workflows/minimax_h3_i2v.json` on `data/samples/ek_onkar_collector_room_live.webp` to drop an optional real `.mp4` video reel asset into `data/samples/` without touching `src/api/static/index.html`.
-  3. Add additional offline edge-case tests in `tests/` (e.g., malformed CSV headers, multi-image combine validation) to push test coverage even higher without touching `src/api/static/index.html`.
+  - **Primary Mac (`localhost:8000`):** live FastAPI portal (`uvicorn src.api.main:app --reload`),
+    Claude Code, Gemini CLI.
+  - **Mac Studio (Hermes):** syncs via `origin/main` on `github.com/nav-tej/meta-smb-gtm`.
+- **GPT/Codex onboarding:** via `AGENT_HANDOFF_BRIEF.md`. That file is not in the repo yet; until
+  it is, read this file plus `docs/CLAUDE_HANDOFF_330PM.md`.
 
+### Next tasks: GPT/Codex
+1. **Portal UI polish** (`src/api/static/index.html`) for the recording: spacing and hierarchy,
+   loading/empty/error states for each step, a visible "Demo mode: saved live results" badge,
+   mobile width. Keep every dynamic value going through `esc()`/`safeUrl()`; never interpolate
+   raw strings into `innerHTML`.
+2. **README cleanup:** quickstart (local + Vercel), architecture diagram, curl examples, the
+   demo-mode explanation, and an honest model table (see `docs/MODELS.md`).
+3. **Demo script refinement:** fix the 2 risky claims above and keep it to 3:00.
+4. **Test coverage:** CSV edge cases (bad headers, empty file), demo-mode responses for every
+   guarded route, portal-served routes (`/`, `/samples/...`), `ingest-storefront` with blocked
+   hosts.
 
+### Next tasks: Claude
+1. Help the user deploy with `npx vercel`, then verify `/`, `/api/v1/health`,
+   `/api/v1/demo-presets` and all 4 portal steps on the deployed URL in demo mode.
+2. Route segmentation to open-weight SAM 3.1 on ComfyUI when it is reachable (hosted SAM as the
+   fallback), updating the two pipeline tests that mock the hosted path.
+
+### Next tasks: Hermes (Mac Studio)
+1. Pull `origin/main`, run `make check` (94 passed).
+2. If local ComfyUI is running, render `workflows/ltx2_5_dfr_i2v.json` or `minimax_h3_i2v.json`
+   from `data/samples/ek_onkar_collector_room_live.webp` and commit one `.mp4` reel to
+   `data/samples/`, without touching `src/api/static/index.html`.
+
+### Next tasks: Gemini CLI
+- Pick an unowned item above, say which in your commit message, and keep to files nobody else
+  owns tonight.
