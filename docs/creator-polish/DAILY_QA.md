@@ -16,6 +16,8 @@ Scope: only `tests/today_studio_contract.cjs`, `tests/test_today_studio.py` and 
 - Importing another item clears the artist image, offers and entered performance. A missing imported image blocks media export rather than showing unrelated artwork.
 - Cancelling a partial destination edit restores the prior destination/link and caption.
 - Restoring a saved custom item with no photo keeps that item's identity and its missing-photo state.
+- A never-resolving clipboard request after a media export hits the simulated 1500ms timeout, downloads the caption as text, and re-enables export/channel controls. A subsequent channel switch completes. This test advances a fake timer directly and does not wait or request clipboard access.
+- Clearing entered results removes all four count fields, persisted performance and the next starter request's performance payload. The UI returns to “No performance data added” and clears review.
 
 ## Findings relayed and resolved by Codex
 
@@ -24,3 +26,5 @@ The first static pass found that setup mutated canonical destination/item state 
 ## Limits
 
 These are mocked DOM/HTTP contracts. They do not prove canvas fidelity, actual downloads, browser clipboard permissions, mobile appearance, six-second clip encoding, live Muse quality, publishing, attributed sales, or a five-minute completion time. Those need the parent's browser rehearsal and actual user timing. No current blocker found in the tested state transitions.
+
+Follow-up verification after the clipboard recovery and clear-results patch: **2 targeted pytest tests passed in 0.38s**, Ruff lint/format clean, Node syntax clean. Runtime files were not edited by this QA task.

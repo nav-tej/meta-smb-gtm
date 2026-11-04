@@ -7,7 +7,8 @@ const vm = require('node:vm');
 const code = fs.readFileSync(path.join(__dirname, '../src/api/static/today.js'), 'utf8');
 
 function harness(saved = null) {
-  const elements = new Map(), requests = [], blobs = [], copied = [], store = new Map();
+  const elements = new Map(), requests = [], blobs = [], copied = [], store = new Map(), timers = new Map();
+  let timerId = 0, clipboardHangs = false;
   if (saved) store.set('muse-daily-v1', JSON.stringify(saved));
   class Element {
     constructor(id = '') { Object.assign(this, { id, value: '', checked: false, textContent: '', disabled: false, hidden: false, children: [], handlers: {}, attributes: {}, dataset: {}, classList: { toggle() {} } }); }
@@ -30,9 +31,10 @@ function harness(saved = null) {
       insight: { summary: 'No connected analytics.', next_action: 'Try one post.' }, sources: [] };
   };
   const context = { console, Blob, URL: class extends URL { static createObjectURL(blob) { blobs.push(blob); return 'blob:offline'; } static revokeObjectURL() {} }, Image, AbortController, queueMicrotask,
-    setTimeout: () => 1, clearTimeout() {}, window: {},
+    setTimeout: (fn, delay) => { const id = ++timerId; timers.set(id, { fn, delay }); return id; },
+    clearTimeout: id => timers.delete(id), window: {},
     localStorage: { getItem: key => store.get(key), setItem: (key, value) => store.set(key, value) },
-    navigator: { clipboard: { writeText: async text => copied.push(text) } },
+    navigator: { clipboard: { writeText: text => clipboardHangs ? new Promise(() => {}) : Promise.resolve(copied.push(text)) } },
     document: { body: new Element('body'), getElementById: node, createElement: () => new Element(), querySelectorAll: selector => selector === '[data-channel]' ? channels : [...elements.values(), ...channels] },
     fetch: async (url, options) => {
       const payload = options?.body ? JSON.parse(options.body) : null;
@@ -46,7 +48,8 @@ function harness(saved = null) {
   vm.runInNewContext(code, context);
   const flush = () => new Promise(resolve => setImmediate(resolve));
   const fire = async (target, name = 'click') => { const el = typeof target === 'string' ? node(target) : target; await el.handlers[name]?.({ target: el, preventDefault() {} }); await flush(); };
-  return { node, channels, requests, copied, blobs, store, context, fire, flush, snapshot: () => context.window.museDailySnapshot(), fail: value => { failPlan = value; } };
+  const timeout = delay => { const timer = [...timers.values()].find(item => item.delay === delay); assert(timer, `Expected a ${delay}ms timer`); timer.fn(); };
+  return { node, channels, requests, copied, blobs, store, context, fire, flush, timeout, hangClipboard: () => { clipboardHangs = true; }, snapshot: () => context.window.museDailySnapshot(), fail: value => { failPlan = value; } };
 }
 
 (async () => {
@@ -102,6 +105,38 @@ function harness(saved = null) {
   assert.equal(restored.snapshot().product.title, 'Handmade bowl');
   assert.equal(restored.node('noPhoto').hidden, false);
   assert(!JSON.stringify(restored.snapshot()).includes('Ek Onkar'));
+
+  // Clipboard can remain pending after a media export loses browser user activation.
+  // Advance its timeout directly: no real delay or browser permissions are involved.
+  const stalled = harness(); await stalled.flush(); stalled.hangClipboard();
+  stalled.node('reviewed').checked = true;
+  const exporting = stalled.fire('getPost'); await stalled.flush();
+  assert.equal(stalled.node('getPost').disabled, true);
+  assert.equal(stalled.blobs.at(-1).type, 'image/png');
+  stalled.timeout(1500); await exporting;
+  assert.equal(stalled.blobs.at(-1).type, 'text/plain');
+  assert.match(await stalled.blobs.at(-1).text(), /Ek Onkar/);
+  assert.match(stalled.node('notice').textContent, /Caption downloaded/);
+  assert.equal(stalled.node('getPost').disabled, false);
+  assert(stalled.channels.every(channel => channel.disabled === false));
+  await stalled.fire(stalled.channels[1]);
+  assert.equal(stalled.snapshot().channel, 'facebook');
+  assert.equal(stalled.node('getPost').disabled, false);
+
+  // Removing entered counts removes the displayed data and its persisted payload.
+  const metrics = harness(); await metrics.flush();
+  for (const [key, value] of Object.entries({ views: '200', clicks: '8', inquiries: '3', sales: '2' })) metrics.node(key).value = value;
+  await metrics.fire('resultsForm', 'submit');
+  assert.equal(metrics.snapshot().performance.sales, 2);
+  assert.match(metrics.node('resultsSource').textContent, /last-7-days counts/);
+  metrics.node('reviewed').checked = true; await metrics.fire('clearResults');
+  assert.equal(metrics.snapshot().performance, null);
+  assert.equal(metrics.node('reviewed').checked, false);
+  assert.match(metrics.node('resultsSource').textContent, /No performance data added/);
+  for (const key of ['views', 'clicks', 'inquiries', 'sales']) assert.equal(metrics.node(key).value, '');
+  assert.equal(JSON.parse(metrics.store.get('muse-daily-v1')).performance, null);
+  const latestRequest = metrics.requests.filter(request => request.url.includes('content-plan')).at(-1);
+  assert.equal(latestRequest.payload.performance, undefined);
 
   console.log('DAILY STUDIO CONTRACT PASSED');
 })().catch(error => { console.error(error); process.exitCode = 1; });
