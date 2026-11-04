@@ -19,8 +19,9 @@ workflow reliably.”
 
 **Say:** “Our crawler collects allowed public pages and Python computes catalog signals. Muse
 Spark 1.3 turns those inputs into a structured research brief with sources and recommendations.
-Here the seller can explore an affordable gift offer or a distinct collection. Source checks
-reject URLs outside the supplied evidence; the seller still reviews each conclusion.”
+Here the seller can explore an affordable gift offer or a distinct collection. Competitor ad
+signals shown are illustrative competitor data from sample snapshots rather than live Ad Library pulls.
+Source checks reject URLs outside the supplied evidence; the seller still reviews each conclusion.”
 
 ## 0:50–1:55 — Muse Image: three useful ways to create
 
@@ -34,8 +35,9 @@ in a collector's room. Multi-Image Combine brings separate artworks together as 
 Restore and Enhance improves the presentation of an existing scan. These examples were generated
 through the Muse API, and the interface also shows the model's returned reasoning summary.
 Muse Spark drafts the audience, copy and scene direction. The seller edits the plan before
-approving generation. This saved preview applies our copy edits to an existing image. Generated
-staging can change artwork details, so the artist compares each result with the original.”
+approving generation. This saved preview applies our copy edits to an existing image. While generative
+staging can re-render details, original brushwork is preserved when using the ComfyUI segmentation
+pipeline with SAM 3.1 composite masking, allowing the artist to compare and verify every result.”
 
 **Recording note:** Select the matching saved artwork for each workflow. The workflow menu alone
 does not generate a new result. A reasoning summary is the API's returned summary, not an exposed
@@ -81,8 +83,8 @@ advanced local variants; Muse powers the core experience.”
 ## Claims to avoid
 
 - No guaranteed revenue, sales lift, profitability or measured time savings.
-- Ad Library brands and campaign performance are illustrative sample data.
+- Competitor ad signals are illustrative competitor data (sample records, not real Ad Library pulls).
 - Cached clicks do not perform fresh inference or personalize a new AI analysis.
-- Generative staging does not guarantee unchanged brushwork or exact original pixels.
+- Generative staging may re-render pixels; original brushwork is preserved when using the ComfyUI segmentation pipeline.
 - The checkout template is not a connected payment flow; the CSV needs review before launch.
 - Confirm artist biography, pricing and availability with the seller before narrating them.
