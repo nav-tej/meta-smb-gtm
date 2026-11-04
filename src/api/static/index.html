@@ -1184,7 +1184,7 @@
           <h3 id="adDialogTitle"></h3>
           <p id="adDialogText"></p>
           <p class="jr-note">Saved Muse Image 1.0 output (Nov 3). AI scenes can change artwork details; prices and edition details need the artist’s confirmation.</p>
-          <a class="jr-action solid c4" href="/create">Make a post like this →</a>
+          <a class="jr-action solid c4" id="adDialogCreate" href="/create">Customize this ad →</a>
         </div>
       </dialog>
     </section>
@@ -1376,15 +1376,22 @@
                 <h2 class="card-title">Actionable Playbook for Sarabjit Singh</h2>
                 <p class="card-sub">5-to-15 minute high-leverage actions ranked by revenue impact.</p>
               </div>
-              <button type="button" class="btn btn-outline" id="runAuditBtn" style="font-size:0.78rem;padding:0.4rem 0.75rem;">
+              <button type="button" class="btn btn-outline" id="runAuditBtn" hidden style="font-size:0.78rem;padding:0.4rem 0.75rem;">
                 ↻ Refresh Seller Audit
               </button>
             </div>
+            <form class="ms-refine" id="refineForm" autocomplete="off">
+              <label for="refineInput">Refine this analysis</label>
+              <div class="ms-refine-row"><input id="refineInput" maxlength="140" placeholder="e.g. Focus more on pricing strategy"><button type="submit" class="btn btn-primary" data-credit="Refined analysis (saved)">Refine</button></div>
+              <div class="ms-refine-chips" aria-label="Suggestions"><button type="button" data-refine="Focus more on pricing strategy">Pricing strategy</button><button type="button" data-refine="Focus on gift buyers">Gift buyers</button><button type="button" data-refine="Focus on my Empowering Women series">Women’s series</button><button type="button" data-refine="Add analysis of Instagram posting frequency">Instagram posting</button></div>
+              <p class="ms-memory" id="memoryStrip" hidden></p>
+            </form>
+            <p class="ms-focus" id="focusBanner" role="status" hidden></p>
             <div class="finding-list" id="insightsContainer"></div>
           </div>
 
           <div class="card">
-            <h2 class="card-title" style="margin-bottom:0.4rem;">Storefront Channel Diagnostics (Deterministic Python)</h2>
+            <div class="ms-card-head"><h2 class="card-title" style="margin-bottom:0.4rem;">Storefront Channel Diagnostics (Deterministic Python)</h2><button type="button" class="btn btn-outline ms-rerun" id="rerunDiagBtn" data-credit="Diagnostics re-run (saved)">↻ Re-run</button></div>
             <p class="card-sub" style="margin-bottom:0.9rem;">Computed in Python without LLM guesswork across 72 artworks & 7 channels.</p>
             <div class="finding-list" id="diagnosticsContainer"></div>
           </div>
@@ -2152,6 +2159,7 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
       document.getElementById('adDialogKind').textContent = AD_KIND[art.workflow_mode] || 'Muse Image scene';
       document.getElementById('adDialogTitle').textContent = art.headline || '';
       document.getElementById('adDialogText').textContent = art.primary_text || '';
+      document.getElementById('adDialogCreate').setAttribute('href', `/create?artwork=${encodeURIComponent(art.id || '')}`);
       if (typeof dialog.showModal === 'function') dialog.showModal(); else dialog.setAttribute('open', '');
     }
     function renderAdGallery(ws) {

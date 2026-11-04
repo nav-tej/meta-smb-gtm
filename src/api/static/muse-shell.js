@@ -292,6 +292,152 @@
     main.insertBefore(section, main.firstChild);
   }
 
+
+  // ---------- Portal workspace: every item gets a next step ----------
+  const PIXELS_SHOP = 'https://sarabjit-singh.pixels.com/';
+  const ROUTES = [
+    { test: /checkout|contact form|1-click/i, label: 'Get the checkout template →', to: 'tab:tab-export' },
+    { test: /starter|cheap|under \$25|\$1\d/i, label: 'Promote your prints →', to: '/create?goal=visit' },
+    { test: /women|goddess|empower|mai bhago|mata gujri|shop group/i, label: 'Feature it in a post →', to: '/create?goal=story' },
+    { test: /gift|holiday|housewarming|wedding/i, label: 'Make a gift post →', to: '/create?goal=gift' },
+    { test: /story|blog|meaning|village/i, label: 'Make a story post →', to: '/create?goal=story' },
+    { test: /home|title|seo|metadata|series tag|omit|listing/i, label: 'Open your Pixels shop ↗', to: PIXELS_SHOP },
+  ];
+  const CONTAINER_DEFAULTS = {
+    metaAdsContainer: { label: 'Make an ad like this →', to: '/create', first: true },
+    reallocationsContainer: { label: 'Add to campaign pack →', to: 'tab:tab-export', first: true },
+    audiencesContainer: { label: 'Export for Ads Manager →', to: 'tab:tab-export', first: true },
+  };
+  function routeFor(containerId, text) {
+    const fixed = CONTAINER_DEFAULTS[containerId];
+    if (fixed?.first) return fixed;
+    const title = text.split('\n').map((t) => t.trim()).find(Boolean) || '';
+    return ROUTES.find((r) => r.test.test(title)) || ROUTES.find((r) => r.test.test(text)) || { label: 'Create a post for this →', to: '/create' };
+  }
+  function go(to) {
+    if (to.startsWith('tab:')) {
+      const tab = document.querySelector(`.step-tab[data-tab="${to.slice(4)}"]`);
+      tab?.click();
+      document.getElementById(to.slice(4))?.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth', block: 'start' });
+    } else if (/^https:\/\//.test(to)) {
+      window.open(to, '_blank', 'noopener');
+    } else {
+      location.href = to;
+    }
+  }
+  function decorate(container) {
+    container.querySelectorAll(':scope > .finding-item').forEach((item) => {
+      if (item.querySelector('.ms-do')) return;
+      const head = item.querySelector('.finding-head strong, strong');
+      const route = routeFor(container.id, `${head ? head.textContent : ''}\n${item.textContent || ''}`);
+      const row = el('div', { class: 'ms-do-row' });
+      const btn = el('button', { type: 'button', class: 'ms-do' }, route.label);
+      btn.addEventListener('click', () => go(route.to));
+      row.appendChild(btn);
+      item.appendChild(row);
+    });
+  }
+  function mountActions() {
+    const ids = ['findingsContainer', 'insightsContainer', 'diagnosticsContainer', 'metaAdsContainer', 'reallocationsContainer', 'audiencesContainer'];
+    for (const id of ids) {
+      const node = document.getElementById(id);
+      if (!node) continue;
+      decorate(node);
+      if (typeof MutationObserver !== 'undefined') new MutationObserver(() => decorate(node)).observe(node, { childList: true });
+    }
+    document.getElementById('rerunDiagBtn')?.addEventListener('click', async () => {
+      await progress('Re-running channel diagnostics', ['Re-reading the saved shop snapshot', 'Recounting listings and tags', 'Checking checkout friction']);
+      const box = document.getElementById('diagnosticsContainer');
+      box?.querySelectorAll('.finding-item').forEach((item) => { item.classList.remove('ms-flash'); void item.offsetWidth; item.classList.add('ms-flash'); });
+      toast('Diagnostics recalculated from the Nov 3 snapshot · no changes');
+    });
+  }
+
+  // ---------- Refine + memory ----------
+  const MEMORY_KEY = 'muse.memory';
+  const SYNONYMS = {
+    pricing: ['price', 'priced', 'cheap', 'starter', '$', 'premium', 'under'], price: ['price', 'cheap', 'starter', '$'],
+    gift: ['gift', 'holiday', 'housewarming', 'wedding'], instagram: ['instagram', 'social', 'post', 'story', 'reel', 'facebook'],
+    women: ['women', 'goddess', 'empower', 'mai bhago', 'mata gujri'], story: ['story', 'blog', 'meaning'], home: ['home', 'title'],
+  };
+  const readMemory = () => { try { return JSON.parse(store.get(MEMORY_KEY) || '[]').filter((x) => typeof x === 'string').slice(0, 5); } catch { return []; } };
+  function termsFor(text) {
+    const words = text.toLowerCase().match(/[a-z$]+/g) || [];
+    const terms = new Set();
+    for (const word of words) {
+      for (const [key, list] of Object.entries(SYNONYMS)) if (word.startsWith(key.slice(0, 5))) list.forEach((t) => terms.add(t));
+      if (word.length > 4 && !['focus', 'analysis', 'about', 'their', 'strategy', 'frequency', 'posting', 'add'].includes(word)) terms.add(word);
+    }
+    return [...terms];
+  }
+  function applyFocus(text) {
+    const terms = termsFor(text);
+    const lists = ['insightsContainer', 'findingsContainer'].map((id) => document.getElementById(id)).filter(Boolean);
+    let total = 0; let matched = 0;
+    for (const list of lists) {
+      const items = [...list.querySelectorAll(':scope > .finding-item')];
+      total += items.length;
+      const scored = items.map((item) => {
+        const body = (item.textContent || '').toLowerCase();
+        const score = terms.reduce((n, t) => n + (body.includes(t) ? 1 : 0), 0);
+        item.classList.toggle('ms-match', score > 0);
+        item.querySelector('.ms-match-tag')?.remove();
+        if (score > 0) { matched += 1; item.insertBefore(el('span', { class: 'ms-match-tag' }, 'Matches your focus'), item.firstChild); }
+        return { item, score };
+      });
+      scored.sort((a, b) => b.score - a.score).forEach(({ item }) => list.appendChild(item));
+    }
+    const banner = document.getElementById('focusBanner');
+    if (banner) {
+      banner.hidden = false;
+      banner.textContent = matched
+        ? `Focused on “${text}”: ${matched} of ${total} saved items match and are shown first. A fresh Muse Spark run with this focus needs a live server.`
+        : `Nothing in the saved analysis covers “${text}” yet. It’s saved to memory, and a live Muse Spark run would analyse it.`;
+    }
+  }
+  function renderMemory() {
+    const strip = document.getElementById('memoryStrip');
+    if (!strip) return;
+    const memory = readMemory();
+    strip.replaceChildren();
+    if (!memory.length) { strip.hidden = true; return; }
+    strip.hidden = false;
+    strip.appendChild(el('span', { class: 'ms-memory-badge' }, '🧠 Remembered'));
+    for (const item of memory) strip.appendChild(el('span', { class: 'ms-memory-item' }, item));
+    const forget = el('button', { type: 'button', class: 'ms-link ms-forget' }, 'Forget');
+    forget.addEventListener('click', () => { store.set(MEMORY_KEY, '[]'); renderMemory(); document.getElementById('focusBanner').hidden = true; document.querySelectorAll('.ms-match-tag').forEach((t) => t.remove()); document.querySelectorAll('.ms-match').forEach((m) => m.classList.remove('ms-match')); toast('Preferences forgotten.'); });
+    strip.appendChild(forget);
+  }
+  function mountRefine() {
+    const form = document.getElementById('refineForm');
+    if (!form) return;
+    const input = document.getElementById('refineInput');
+    form.querySelectorAll('[data-refine]').forEach((chip) => chip.addEventListener('click', () => { input.value = chip.dataset.refine; input.focus(); }));
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const text = input.value.trim().replace(/\s+/g, ' ').slice(0, 140);
+      if (!text) { input.focus(); return; }
+      await progress('Refining your seller audit', ['Saving your preference to memory', 'Re-ranking the saved findings', 'Highlighting what matches']);
+      const memory = [text, ...readMemory().filter((m) => m.toLowerCase() !== text.toLowerCase())].slice(0, 5);
+      store.set(MEMORY_KEY, JSON.stringify(memory));
+      renderMemory();
+      applyFocus(text);
+      toast('Your preferences saved');
+      input.value = '';
+    });
+    renderMemory();
+    // Re-apply the most recent preference once the saved analysis has rendered.
+    const latest = readMemory()[0];
+    const list = document.getElementById('insightsContainer');
+    if (latest && list) {
+      const reapply = () => { if (list.querySelector('.finding-item')) { applyFocus(latest); return true; } return false; };
+      if (!reapply() && typeof MutationObserver !== 'undefined') {
+        const obs = new MutationObserver(() => { if (reapply()) obs.disconnect(); });
+        obs.observe(list, { childList: true });
+      }
+    }
+  }
+
   function revealFallback() {
     // Throttled or background tabs may never fire IntersectionObserver; reveal anything still hidden.
     setTimeout(() => document.querySelectorAll('.reveal-on-scroll:not(.revealed)').forEach((x) => x.classList.add('revealed')), 900);
@@ -301,6 +447,8 @@
     revealFallback();
     mountCredits();
     mountBrief();
+    mountActions();
+    mountRefine();
     mountStages();
     document.querySelectorAll('[data-open-gift]').forEach((node) => node.addEventListener('click', openGift));
     document.querySelectorAll('[data-open-tour]').forEach((node) => node.addEventListener('click', openTour));

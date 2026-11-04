@@ -117,3 +117,28 @@
   .ms-move .ms-primary { justify-content: center; }
 }
 @media (prefers-reduced-motion: reduce) { .ms-dot { animation: none; } }
+
+/* Workspace next steps, refine and memory */
+.ms-do-row { display: flex; justify-content: flex-end; margin-top: 8px; }
+.ms-do { font: inherit; font-size: 12px; font-weight: 700; padding: 6px 12px; border-radius: 999px; border: 1px solid #b85d19; background: #fff; color: #b85d19; cursor: pointer; transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease; }
+.ms-do:hover { background: #b85d19; color: #fff; transform: translateY(-1px); }
+.ms-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.ms-rerun { font-size: 0.78rem !important; padding: 0.4rem 0.75rem !important; flex: none; }
+.ms-flash { animation: ms-flash 0.9s ease; }
+@keyframes ms-flash { 0% { box-shadow: 0 0 0 0 rgba(47, 95, 179, 0.5); } 40% { box-shadow: 0 0 0 4px rgba(47, 95, 179, 0.25); } 100% { box-shadow: 0 0 0 0 rgba(47, 95, 179, 0); } }
+.ms-refine { margin: 0 0 12px; padding: 12px; border-radius: 12px; background: #f7f4ee; border: 1px solid #e6e1d6; }
+.ms-refine label { display: block; font-size: 12px; font-weight: 700; margin-bottom: 6px; }
+.ms-refine-row { display: flex; gap: 8px; }
+.ms-refine-row input { flex: 1; min-width: 0; font: inherit; font-size: 13px; padding: 8px 10px; border: 1px solid #d9d3c6; border-radius: 9px; background: #fff; }
+.ms-refine-row input:focus { outline: 2px solid #2f5fb3; outline-offset: 1px; }
+.ms-refine-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.ms-refine-chips button { font: inherit; font-size: 11px; padding: 4px 10px; border-radius: 999px; border: 1px solid #d9d3c6; background: #fff; color: #4a4741; cursor: pointer; }
+.ms-refine-chips button:hover { border-color: #2f5fb3; color: #2f5fb3; }
+.ms-memory { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 10px 0 0; font-size: 12px; }
+.ms-memory-badge { font-weight: 800; color: #6a3fa0; background: #efe7fa; padding: 3px 9px; border-radius: 999px; }
+.ms-memory-item { padding: 3px 9px; border-radius: 999px; background: #fff; border: 1px solid #e0d6ef; color: #4a4741; }
+.ms-forget { margin: 0 0 0 auto; font-size: 12px; }
+.ms-focus { margin: 0 0 10px; padding: 8px 12px; border-radius: 10px; background: #e7eefb; color: #24498c; font-size: 12px; line-height: 1.45; }
+.finding-item.ms-match { border-color: #9fb9e6 !important; box-shadow: 0 0 0 2px rgba(47, 95, 179, 0.15); }
+.ms-match-tag { display: inline-block; margin-bottom: 6px; font-size: 10px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; background: #dbe6fb; color: #24498c; }
+@media (max-width: 560px) { .ms-refine-row { flex-direction: column; } .ms-card-head { flex-direction: column; } }

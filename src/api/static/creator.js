@@ -72,7 +72,7 @@
   function starter() {
     const name = state.product.name || 'My product';
     state.headline = name;
-    state.caption = state.custom ? `Meet ${name}. ${state.product.description || 'Made with care, ready to share.'}` : state.workspace === 'sarabjit_singh' ? 'Ek Onkar by Sarabjit Singh explores connection and equality through color and form. A print for a space that matters to you. Ask the artist about available editions.' : 'A moment for your daily chai ritual. Explore this stoneware and brass set from our illustrative shop collection.';
+    state.caption = state.custom ? `Meet ${name}. ${state.product.description || 'Made with care, ready to share.'}` : state.workspace === 'sarabjit_singh' ? (state.artwork ? `${state.artwork.name} by Sarabjit Singh${state.artwork.series ? `, from her ${state.artwork.series} work` : ''}.` : 'Ek Onkar by Sarabjit Singh explores connection and equality through color and form.') + ' A print for a space that matters to you. Ask the artist about available editions.' : 'A moment for your daily chai ritual. Explore this stoneware and brass set from our illustrative shop collection.';
     if (state.goal === 'gift') state.caption += ' A thoughtful gift starts with a story.';
     if (state.goal === 'visit') state.caption += ' Visit the product page to learn more.';
     state.caption = state.caption.slice(0, 600);
@@ -82,7 +82,7 @@
   function setProductFields() { for (const [id, key] of Object.entries(fields)) $(id).value = state.product[key] || ''; }
   function selectExample(workspace) {
     if (state.busy) return;
-    state.workspace = workspace; state.custom = false; state.copyEdited = false; state.sceneEdited = false; state.revision += 1;
+    state.workspace = workspace; state.custom = false; state.copyEdited = false; state.sceneEdited = false; state.revision += 1; state.artwork = null;
     const ws = state.presets?.workspaces?.[workspace]; const art = ws?.artworks_showcase?.[0];
     state.product = workspace === 'sarabjit_singh' ? { name: 'Ek Onkar · artwork promotion', price: '', seller: 'Art of Sarabjit Singh', description: 'Ek Onkar by Sarabjit Singh explores connection and equality. Check the selected shop for the matching artwork, available formats and current offer.', link: '', collection: '' } : { name: 'Stoneware & brass chai set', price: '$54', seller: 'Saffron & Clay', description: 'Illustrative product example: a stoneware and brass chai set.', link: '', collection: '' };
     resetOffers(workspace === 'sarabjit_singh');
@@ -258,7 +258,24 @@
     if (presets.status === 'fulfilled') state.presets = presets.value; else notify('Example product loaded. Research context is unavailable; live drafting may need the server connection restored.', 'error');
     if (readiness.status === 'fulfilled') { state.readiness = readiness.value; state.defaultLive = readiness.value.default_mode === 'live'; if (state.defaultLive) notify('This local server supports live requests. Turn on live mode in presenter settings before making billed Muse calls.'); }
     updateMode();
+    // The portal's saved-ad gallery links here with ?artwork=<id>; only ids in the saved presets are used.
+    const requestedArt = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('artwork') : null;
+    const art = requestedArt && !state.custom ? state.presets?.workspaces?.sarabjit_singh?.artworks_showcase?.find((a) => a && a.id === requestedArt) : null;
+    if (art && samplePath(art.staged_image)) applyArtwork(art);
   });
+  function applyArtwork(art) {
+    const names = { ek_onkar: 'Ek Onkar', diptych_combine: 'Ek Onkar + Kirat Karo diptych', naam_japo: 'Naam Japo', kirat_karo: 'Kirat Karo' };
+    const name = names[art.id] || String(art.title || 'Artwork').replace(/^\d+\.\s*[^:]*:\s*/, '').slice(0, 80);
+    state.artwork = { id: art.id, name, series: String(art.series || '').slice(0, 80) };
+    state.product.name = name;
+    state.product.description = `${name} by Sarabjit Singh. Check the selected shop for the matching artwork, available formats and current offer.`;
+    state.original = samplePath(art.original_image) || state.original;
+    state.sampleImage = samplePath(art.staged_image) || state.sampleImage;
+    state.revision += 1;
+    originalLayout(); setProductFields(); starter(); $('reviewed').checked = false; refreshPreview();
+    $('productImageCaption').textContent = `${name} · original artwork preview. Source: Art of Sarabjit Singh.`;
+    notify(`Loaded from the saved Muse ad: ${name}. Choose “Preview a room scene” in step 3 to use its saved Muse image.`);
+  }
   // Ranked ideas on the portal link here with ?goal=story|gift|visit; only known goals are accepted.
   const requestedGoal = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('goal') : null;
   if (requestedGoal && Object.hasOwn(goals, requestedGoal)) document.querySelector?.(`[data-goal="${requestedGoal}"]`)?.click();
