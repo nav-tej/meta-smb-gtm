@@ -59,8 +59,13 @@
       pill.appendChild(button);
     } else {
       countNode = button.querySelector('strong');
-      const coin = button.querySelector('.ms-coin');
-      if (coin) coin.textContent = '🪙';
+      let coin = button.querySelector('.ms-coin');
+      if (!coin) {
+        coin = el('span', { class: 'ms-coin', 'aria-hidden': 'true' }, '🪙');
+        button.prepend(coin);
+      } else {
+        coin.textContent = '🪙';
+      }
     }
     let menu = pill.querySelector('.ms-credits-menu');
     if (!menu) {
@@ -71,7 +76,7 @@
       const reset = el('button', { type: 'button', class: 'ms-link' }, `Reset to ${START_CREDITS} credits`);
       reset.addEventListener('click', () => { credits = START_CREDITS; store.set(CREDIT_KEY, String(credits)); renderCredits(true); toast('Demo credits reset.'); });
       menu.appendChild(reset);
-      const gift = el('button', { type: 'button', class: 'ms-link' }, 'Gift a growth plan →');
+      const gift = el('button', { type: 'button', class: 'ms-link' }, 'Gift a growth subscription ($29/mo) →');
       gift.addEventListener('click', () => { closeMenu(); openGift(); });
       menu.appendChild(gift);
       pill.appendChild(menu);
@@ -126,14 +131,14 @@
       const close = el('button', { type: 'button', class: 'ms-close', 'aria-label': 'Close' }, '×');
       close.addEventListener('click', () => giftDialog.close());
       giftDialog.appendChild(close);
-      giftDialog.appendChild(el('p', { class: 'ms-eyebrow' }, 'Planned pricing'));
-      giftDialog.appendChild(el('h2', { id: 'msGiftTitle' }, 'Gift a growth plan to a maker you love'));
+      giftDialog.appendChild(el('p', { class: 'ms-eyebrow' }, 'A thoughtful gift for a creator'));
+      giftDialog.appendChild(el('h2', { id: 'msGiftTitle' }, 'Gift a growth subscription'));
       giftDialog.appendChild(el('p', { class: 'ms-price' }, '$29 / month'));
       const list = el('ul', {});
       ['A daily brief on the competitors they choose', 'Ready-to-post Muse images and captions', 'Ranked next moves after every post', 'Budget advice if they run ads'].forEach((item) => list.appendChild(el('li', {}, item)));
       giftDialog.appendChild(list);
       giftDialog.appendChild(el('p', { class: 'ms-muted' }, 'Not on sale yet. Gift plans are planned for after the beta; this demo takes no payment and collects no details.'));
-      const ok = el('button', { type: 'button', class: 'ms-primary' }, 'Got it');
+      const ok = el('button', { type: 'button', class: 'ms-primary' }, 'Gift a growth subscription $29/mo');
       ok.addEventListener('click', () => giftDialog.close());
       giftDialog.appendChild(ok);
       giftDialog.addEventListener('click', (event) => { if (event.target === giftDialog) giftDialog.close(); });

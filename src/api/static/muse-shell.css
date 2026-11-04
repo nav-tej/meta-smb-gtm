@@ -1,12 +1,16 @@
 /* Shared app shell: demo credits, toasts, progress card, gift and tour dialogs, stage tabs. */
 .ms-credits { position: relative; display: inline-flex; z-index: 30; }
-.ms-credits-btn { display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 13px; padding: 6px 12px 6px 8px; border-radius: 999px; border: 1px solid #e3cfa8; background: linear-gradient(180deg, #fffaf0, #fbefd8); color: #6b4410; cursor: pointer; white-space: nowrap; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05); }
+.ms-credits-btn { display: inline-flex; align-items: center; gap: 7px; font: inherit; font-size: 13px; font-weight: 650; padding: 6px 13px 6px 9px; border-radius: 999px; border: 1px solid #e3cfa8; background: linear-gradient(180deg, #fffcf5 0%, #fbefd8 100%); color: #6b4410; cursor: pointer; white-space: nowrap; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05); transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease; }
 .ms-credits-btn strong { font-size: 14px; font-variant-numeric: tabular-nums; }
-.ms-credits-btn:hover { border-color: #d3b37a; }
-.ms-coin { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; font-size: 10px; color: #fff; background: linear-gradient(135deg, #e0a23a, #b86f12); }
+.ms-credits-btn:hover { border-color: #d3b37a; transform: translateY(-1px); box-shadow: 0 3px 8px rgba(184, 111, 18, 0.18); }
+.ms-coin { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; font-size: 13px; line-height: 1; background: none; filter: drop-shadow(0 1px 1px rgba(184, 93, 25, 0.25)); transition: transform 0.3s ease; }
 .ms-credits.empty .ms-credits-btn { background: #fff1ec; border-color: #e5b4a2; color: #8a3a1e; }
-.ms-credits.bump .ms-credits-btn { animation: ms-bump 0.45s ease; }
-@keyframes ms-bump { 0% { transform: scale(1); } 35% { transform: scale(1.12); } 100% { transform: scale(1); } }
+.ms-credits.bump .ms-credits-btn { animation: ms-bump 0.55s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+.ms-credits.bump .ms-coin { animation: ms-coin-spin 0.55s ease; }
+.ms-credits.bump::after { content: "-1"; position: absolute; right: -4px; top: -8px; font-size: 11px; font-weight: 800; color: #b85d19; background: #fff8ec; border: 1px solid #e3cfa8; padding: 1px 5px; border-radius: 999px; animation: ms-float-minus 0.8s ease forwards; pointer-events: none; }
+@keyframes ms-bump { 0% { transform: scale(1); } 25% { transform: scale(0.92); } 50% { transform: scale(1.16); box-shadow: 0 0 0 5px rgba(224, 162, 58, 0.35); } 100% { transform: scale(1); } }
+@keyframes ms-coin-spin { 0% { transform: translateY(0) rotate(0deg) scale(1); } 35% { transform: translateY(-4px) rotate(180deg) scale(1.3); } 70% { transform: translateY(1px) rotate(360deg) scale(1.1); } 100% { transform: translateY(0) rotate(360deg) scale(1); } }
+@keyframes ms-float-minus { 0% { opacity: 0; transform: translateY(0) scale(0.8); } 30% { opacity: 1; transform: translateY(-4px) scale(1.1); } 100% { opacity: 0; transform: translateY(-16px) scale(0.9); } }
 .ms-credits-menu { position: absolute; right: 0; top: calc(100% + 8px); width: 270px; padding: 14px; border-radius: 14px; background: #fff; border: 1px solid #e6e1d6; box-shadow: 0 18px 40px rgba(0, 0, 0, 0.14); font-size: 13px; line-height: 1.45; color: #22221f; }
 .ms-credits-menu p { margin: 6px 0; }
 .ms-muted { color: #6b6860; font-size: 12px; }
@@ -36,32 +40,35 @@
 .ms-progress small { display: block; margin-top: 6px; color: #8a867c; font-size: 11px; }
 
 .ms-dialog [hidden] { display: none !important; }
-.ms-dialog { background: #fff; opacity: 1; max-height: calc(100vh - 32px); overflow: auto; border: 0; border-radius: 22px; padding: 28px 28px 24px; width: min(480px, calc(100vw - 32px)); box-shadow: 0 30px 80px rgba(0, 0, 0, 0.3); color: #22221f; font-family: inherit; }
-.ms-dialog::backdrop { background: rgba(24, 24, 22, 0.55); backdrop-filter: blur(2px); }
+.ms-dialog { background: rgba(255, 255, 255, 0.97); opacity: 1; max-height: calc(100vh - 32px); overflow: auto; border: 1px solid rgba(255, 255, 255, 0.8); border-radius: 24px; padding: 30px 28px 24px; width: min(480px, calc(100vw - 32px)); box-shadow: 0 24px 60px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(24, 24, 22, 0.08); color: #22221f; font-family: inherit; backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
+.ms-dialog::backdrop { background: rgba(18, 18, 16, 0.65); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
 .ms-dialog[open] { animation: ms-pop 0.22s ease; }
 @keyframes ms-pop { from { opacity: 0; transform: translateY(10px) scale(0.98); } to { opacity: 1; transform: none; } }
 .ms-dialog h2 { margin: 4px 0 8px; font-size: 24px; line-height: 1.2; }
 .ms-eyebrow { margin: 0; font-size: 11px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: #b85d19; }
-.ms-close { position: absolute; top: 12px; right: 14px; width: 32px; height: 32px; border-radius: 50%; border: 0; background: #f4f1ea; font-size: 20px; cursor: pointer; }
-.ms-primary, .ms-secondary { display: inline-flex; align-items: center; justify-content: center; font: inherit; font-size: 14px; font-weight: 700; padding: 11px 18px; border-radius: 12px; cursor: pointer; text-decoration: none; }
+.ms-close { position: absolute; top: 12px; right: 14px; width: 32px; height: 32px; border-radius: 50%; border: 0; background: #f4f1ea; font-size: 20px; cursor: pointer; transition: background 0.15s ease; }
+.ms-close:hover { background: #e8e2d4; }
+.ms-primary, .ms-secondary { display: inline-flex; align-items: center; justify-content: center; font: inherit; font-size: 14px; font-weight: 700; padding: 11px 18px; border-radius: 12px; cursor: pointer; text-decoration: none; transition: transform 0.15s ease, filter 0.15s ease, box-shadow 0.15s ease; }
 .ms-primary { border: 0; color: #fff; background: #b85d19; box-shadow: 0 8px 18px rgba(184, 93, 25, 0.3); }
-.ms-primary:hover { filter: brightness(1.08); }
+.ms-primary:hover { filter: brightness(1.08); transform: translateY(-1px); box-shadow: 0 10px 22px rgba(184, 93, 25, 0.35); }
 .ms-secondary { border: 1px solid #e0d9cb; background: #fff; color: #22221f; }
+.ms-secondary:hover { background: #fbf9f4; transform: translateY(-1px); }
 .ms-price { margin: 0 0 8px; font-size: 30px; font-weight: 800; color: #1b6e44; }
 .ms-gift ul { margin: 0 0 12px; padding-left: 20px; font-size: 14px; line-height: 1.6; }
 
-.ms-tour { padding-top: 34px; text-align: center; }
+.ms-tour { padding-top: 36px; text-align: center; }
 .ms-skip { position: absolute; top: 12px; right: 14px; border: 0; background: none; font: inherit; font-size: 13px; color: #6b6860; cursor: pointer; }
 .ms-skip:hover { color: #22221f; text-decoration: underline; }
-.ms-tour-art { width: 64px; height: 64px; margin: 0 auto 12px; border-radius: 20px; display: grid; place-items: center; font-size: 26px; font-weight: 800; color: #fff; background: linear-gradient(135deg, #b85d19, #1b6e44); box-shadow: 0 12px 26px rgba(0, 0, 0, 0.18); }
+.ms-tour-art { width: 68px; height: 68px; margin: 0 auto 12px; border-radius: 22px; display: grid; place-items: center; font-size: 28px; font-weight: 800; color: #fff; background: linear-gradient(135deg, #b85d19, #1b6e44); box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18); transition: transform 0.25s ease; }
+.ms-tour-art:hover { transform: scale(1.05) rotate(2deg); }
 .ms-tour-art.s1 { background: linear-gradient(135deg, #2f5fb3, #4b7fd6); }
 .ms-tour-art.s2 { background: linear-gradient(135deg, #b85d19, #db8a46); }
 .ms-tour-art.s3 { background: linear-gradient(135deg, #1b6e44, #2f9a62); }
 .ms-tour-art.s4 { background: linear-gradient(135deg, #b7791f, #d9a24a); }
 .ms-tour-body { margin: 0 auto 14px; max-width: 380px; font-size: 15px; line-height: 1.55; color: #4a4741; }
-.ms-dots { display: flex; justify-content: center; gap: 6px; margin-bottom: 16px; }
-.ms-dots span { width: 8px; height: 8px; border-radius: 999px; background: #e0d9cb; transition: width 0.2s ease, background 0.2s ease; }
-.ms-dots span.on { width: 22px; background: #b85d19; }
+.ms-dots { display: inline-flex; align-items: center; justify-content: center; gap: 7px; margin: 4px auto 18px; padding: 6px 14px; background: rgba(244, 241, 234, 0.75); border: 1px solid rgba(224, 217, 203, 0.6); border-radius: 999px; }
+.ms-dots span { width: 8px; height: 8px; border-radius: 999px; background: #d4ccbd; transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.1); }
+.ms-dots span.on { width: 26px; height: 8px; background: linear-gradient(90deg, #b85d19 0%, #e07f35 100%); box-shadow: 0 2px 8px rgba(184, 93, 25, 0.4); }
 .ms-tour-nav { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
 
 /* Portal stage tabs: the loop rail switches stages instead of scrolling a long page. */
@@ -82,7 +89,7 @@
 }
 
 /* /today daily brief */
-.ms-brief { max-width: 1180px; margin: 16px auto 8px; padding: 16px 18px; border-radius: 18px; background: linear-gradient(180deg, #fff 0%, #fbf8f1 100%); border: 1px solid #e6e1d6; box-shadow: 0 8px 24px rgba(24, 24, 22, 0.06); color: #22221f; }
+.ms-brief { max-width: 1160px; margin: 16px auto 12px; padding: 18px 22px; border-radius: 18px; background: linear-gradient(180deg, #fff 0%, #fbf8f1 100%); border: 1px solid #e6e1d6; box-shadow: 0 8px 24px rgba(24, 24, 22, 0.06); color: #22221f; }
 .ms-brief-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
 .ms-brief h2 { margin: 2px 0 4px; font-size: 20px; line-height: 1.2; }
 .ms-brief-meta { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 12px; color: #6b6860; }

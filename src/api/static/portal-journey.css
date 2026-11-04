@@ -230,8 +230,32 @@
 .jr-dot { width: 8px; height: 8px; border-radius: 50%; background: #2f9a62; box-shadow: 0 0 0 0 rgba(47, 154, 98, 0.5); animation: jr-pulse 2.4s ease-out infinite; }
 @keyframes jr-pulse { 0% { box-shadow: 0 0 0 0 rgba(47, 154, 98, 0.45); } 70% { box-shadow: 0 0 0 8px rgba(47, 154, 98, 0); } 100% { box-shadow: 0 0 0 0 rgba(47, 154, 98, 0); } }
 .jr-seller .jr-new { display: inline-block; margin-top: 0.25rem; padding: 0.1rem 0.45rem; border-radius: 999px; background: #dff1e5; color: #14592f !important; font-weight: 700; font-size: 0.68rem !important; }
-.jr-gift { display: flex; align-items: center; gap: 1rem; margin: 0.5rem 0 0; padding: 1rem 1.2rem; border-radius: 18px; background: linear-gradient(120deg, #fff8ec 0%, #fbeadf 60%, #f3eafa 100%); border: 1px solid #efcfb5; box-shadow: var(--jr-shadow); }
-.jr-gift-icon { font-size: 1.8rem; }
+.jr-gift {
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+  margin: 0.75rem 0 0;
+  padding: 1.15rem 1.35rem;
+  border-radius: 18px;
+  background: linear-gradient(120deg, #fffbf4 0%, #fbeadf 60%, #f7ebfc 100%);
+  border: 1.5px solid #efcfb5;
+  box-shadow: 0 4px 18px rgba(184, 93, 25, 0.08), var(--jr-shadow);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.jr-gift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(184, 93, 25, 0.14);
+}
+.jr-gift-icon {
+  font-size: 2.1rem;
+  filter: drop-shadow(0 2px 4px rgba(184, 93, 25, 0.2));
+  animation: gift-bounce 3.5s ease-in-out infinite;
+}
+@keyframes gift-bounce {
+  0%, 85%, 100% { transform: scale(1) rotate(0deg); }
+  90% { transform: scale(1.12) rotate(-6deg); }
+  95% { transform: scale(1.12) rotate(6deg); }
+}
 .jr-gift > div { flex: 1; min-width: 0; }
 .jr-gift strong { display: block; font-size: 1rem; }
 .jr-gift span { display: block; font-size: 0.84rem; color: var(--text-muted); }
@@ -267,15 +291,26 @@
 
 /* 2. Top competitor monitoring status bar */
 .monitoring-bar {
-  background: linear-gradient(90deg, #181816 0%, #24221d 60%, #1f2722 100%);
+  background: linear-gradient(90deg, #181816 0%, #15251b 50%, #181816 100%);
   color: #e6e2d8;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1.5px solid rgba(52, 211, 153, 0.3);
   font-size: 0.78rem;
   line-height: 1.4;
   padding: 0.5rem 1.5rem;
   position: relative;
   z-index: 20;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+  animation: monitor-bar-pulse 3.2s ease-in-out infinite;
+}
+@keyframes monitor-bar-pulse {
+  0%, 100% {
+    border-bottom-color: rgba(52, 211, 153, 0.25);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1), inset 0 -1px 0 0 rgba(52, 211, 153, 0.15);
+  }
+  50% {
+    border-bottom-color: rgba(52, 211, 153, 0.85);
+    box-shadow: 0 4px 20px rgba(52, 211, 153, 0.28), inset 0 -1px 0 0 rgba(52, 211, 153, 0.45);
+  }
 }
 .monitoring-inner {
   max-width: 1320px;
@@ -294,30 +329,31 @@
 }
 .monitoring-pulse-wrapper {
   position: relative;
-  width: 10px;
-  height: 10px;
+  width: 12px;
+  height: 12px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
 }
 .monitoring-pulse-core {
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   background: #34d399;
+  box-shadow: 0 0 6px #34d399;
 }
 .monitoring-pulse-ring {
   position: absolute;
-  width: 12px;
-  height: 12px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
-  background: rgba(52, 211, 153, 0.45);
+  background: rgba(52, 211, 153, 0.5);
   animation: monitor-pulse 2s cubic-bezier(0.24, 0, 0.38, 1) infinite;
 }
 @keyframes monitor-pulse {
-  0% { transform: scale(0.6); opacity: 0.9; }
-  70% { transform: scale(1.6); opacity: 0; }
-  100% { transform: scale(1.6); opacity: 0; }
+  0% { transform: scale(0.5); opacity: 1; }
+  70% { transform: scale(1.8); opacity: 0; }
+  100% { transform: scale(1.8); opacity: 0; }
 }
 .monitoring-tag {
   font-size: 0.65rem;
@@ -325,10 +361,19 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: #34d399;
-  background: rgba(52, 211, 153, 0.12);
-  border: 1px solid rgba(52, 211, 153, 0.25);
-  padding: 0.15rem 0.45rem;
+  background: rgba(52, 211, 153, 0.15);
+  border: 1px solid rgba(52, 211, 153, 0.4);
+  padding: 0.16rem 0.52rem;
   border-radius: 999px;
+  animation: monitor-tag-pulse 3.2s ease-in-out infinite;
+}
+@keyframes monitor-tag-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(52, 211, 153, 0);
+  }
+  50% {
+    box-shadow: 0 0 8px 1px rgba(52, 211, 153, 0.55);
+  }
 }
 .monitoring-title strong {
   color: #ffffff;
