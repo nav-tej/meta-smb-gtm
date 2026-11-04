@@ -8,6 +8,9 @@ button into the `/create` wizard, then come back to `/` for the budget advice.
 - **Where:** the public site, https://meta-smb-gtm.vercel.app, now serves both `/` and `/create`
   (deployed revision checked Nov 4). It runs in saved mode with no keys, so it can't make paid
   calls. A local server started with `DEMO_MODE=true` also works.
+- **Tour and credits:** a fresh browser opens a short tour on `/` at first visit; the opening below
+  uses it. The header shows **demo credits** (12; each saved analysis, budget review or scene costs 1).
+  Reset them from the credits menu before recording. Say "demo credits"; no payment is taken.
 - **Warm-up:** open `/` once before recording. The first load after a deploy can take about
   4 seconds.
 - **Window:** a laptop-sized browser window (about 1440×900). Each `/create` step fits on one
@@ -24,8 +27,9 @@ button into the `/create` wizard, then come back to `/` for the budget advice.
 
 ## 0:00–0:25 — The loop, on one screen
 
-**Screen:** `/` at the top. Show the headline, the four stat tiles and the green **Estimated** box,
-then the loop rail: **Research → Create → Improve → Iterate** with the dashed return arrow.
+**Screen:** `/` opens with the tour. Click **Next →** through Research, Create, Improve and Iterate
+(the page behind it switches stage each time), then **Explore the plan**. Point at the green
+**Estimated** box and the **WATCHLIST** bar ("last checked Nov 3").
 
 **Say:** “My mom makes the art. Marketing it should not require becoming an ad agency. This is
 Art of Sarabjit Singh. Muse runs a loop: research what similar sellers do, create a post, improve
@@ -133,6 +137,7 @@ word.”
 
 - Presenting the "~12 hours" figure as measured. Always say "estimated"; the on-screen
   assumptions are about 1.5 min per competitor page, plus about 2.5 h for a brief and 2 h for a post.
+- Continuous monitoring: the watchlist was last checked Nov 3 and re-checks on request; never say it "monitors" around the clock.
 - Competitor ad spend or bids: not public, and the app says so. Price ranges come from public listing snapshots.
 - That Muse "found" or "discovered" the four competitors live. They come from public snapshots
   captured Nov 3, and only SikhiArt.com has a saved Muse Spark brief.
