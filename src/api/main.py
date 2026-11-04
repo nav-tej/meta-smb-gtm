@@ -8,7 +8,7 @@ from fastapi import APIRouter, FastAPI, Request, status
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from src.api import bids, creative, intel
+from src.api import bids, content_plan, creative, intel, product_reference
 from src.clients.comfyui import ComfyUIError
 from src.clients.meta import MetaAPIError
 from src.config import get_settings
@@ -68,6 +68,12 @@ async def creator_studio() -> FileResponse:
     return FileResponse(STATIC_DIR / "creator.html")
 
 
+@app.get("/today", include_in_schema=False)
+async def daily_studio() -> FileResponse:
+    """Serve the compact item-to-post daily workspace."""
+    return FileResponse(STATIC_DIR / "today.html")
+
+
 @app.get("/", include_in_schema=False)
 @app.get("/portal", include_in_schema=False)
 async def customer_portal() -> FileResponse:
@@ -106,6 +112,8 @@ app.include_router(health_router, prefix=API_PREFIX)
 app.include_router(intel.router, prefix=API_PREFIX)
 app.include_router(creative.router, prefix=API_PREFIX)
 app.include_router(bids.router, prefix=API_PREFIX)
+app.include_router(content_plan.router, prefix=API_PREFIX)
+app.include_router(product_reference.router, prefix=API_PREFIX)
 
 if SAMPLES_DIR.is_dir():
     app.mount("/samples", StaticFiles(directory=str(SAMPLES_DIR)), name="samples")

@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f6f3eb"><title>Muse · Your daily post</title><link rel="stylesheet" href="/static/today.css"><script src="/static/today.js" defer></script></head>
+<body>
+<header><a class="brand" href="/today"><i>m</i> muse</a><span id="saveStatus">Your daily studio</span><a href="/create">Full studio ↗</a></header>
+<main>
+  <div class="intro"><div><p class="eyebrow">A LITTLE MARKETING. BACK TO MAKING.</p><h1>One good post today.</h1><p id="dailyReason">Start with your work. We’ll help with the words.</p></div><button class="quiet" id="openSetup">Change item or goal</button></div>
+  <div id="notice" role="status" aria-live="polite" hidden></div>
+  <section class="desk" aria-label="Today's post">
+    <div class="visual"><div class="image-wrap"><canvas id="postCanvas" width="1080" height="1350" aria-label="Your post preview"></canvas><div id="noPhoto" hidden>Add your product photo to finish this post.</div></div><div class="visual-footer"><span id="imageNote">Original artwork layout</span><label class="upload">Change photo<input id="photo" type="file" accept="image/jpeg,image/png,image/webp"></label></div></div>
+    <div class="editor">
+      <div class="item"><div><span class="eyebrow" id="itemSource">SUGGESTED FROM THE ARTIST EXAMPLE</span><h2 id="itemTitle">Ek Onkar</h2></div><button id="changeItem" class="quiet">Change</button></div>
+      <div class="segmented" role="group" aria-label="Choose a channel"><button data-channel="instagram" aria-pressed="true">Instagram</button><button data-channel="facebook" aria-pressed="false">Facebook</button><button data-channel="x" aria-pressed="false">X</button><button data-channel="tiktok" aria-pressed="false">TikTok</button></div>
+      <div class="format-row"><label for="format">Make a</label><select id="format"><option value="image">Photo post</option><option value="video">Short video</option><option value="text">Text post</option></select><span id="planMode" class="tag">Starter draft</span></div>
+      <label for="postHook">Opening line</label><input id="postHook" maxlength="120">
+      <label for="postCaption">Your words <span id="copyCount"></span></label><textarea id="postCaption" rows="5" maxlength="2200"></textarea>
+      <p class="tip" id="channelTip"></p>
+      <p class="destination"><a id="destinationLink" target="_blank" rel="noopener noreferrer">Pixels ↗</a><span id="offerNote">No price assumed</span></p>
+      <details class="small-details"><summary>Image ideas &amp; video direction</summary><p id="visualDirection"></p><label for="scenePrompt">Optional scene</label><textarea id="scenePrompt" rows="2" maxlength="1500">A simple, softly lit room. Keep attention on the artwork.</textarea><button id="museImage" class="quiet">Create a scene with Muse</button><button id="useOriginal" class="quiet">Use original</button><p class="muted">AI scenes can change artwork details. Compare with your original.</p></details>
+      <label class="check"><input id="reviewed" type="checkbox"> Image, words and destination look right.</label>
+      <div class="primary-actions"><button id="getPost" class="primary">Get photo + caption</button><button id="copyOnly" class="secondary">Copy text</button></div>
+      <p id="deliveryNote" class="muted">Downloads the image and copies your text. You post from your account.</p>
+      <div class="done-row"><button id="markPosted" class="quiet">I posted this ✓</button><span id="postedStatus"></span></div>
+    </div>
+  </section>
+  <section class="week" aria-labelledby="weekTitle"><div class="section-title"><div><p class="eyebrow">NO NEED TO START OVER TOMORROW</p><h2 id="weekTitle">Your next three posts</h2></div><button id="downloadPlan" class="quiet">Save plan</button></div><div id="planCards" class="plan-cards"></div><p class="muted">Suggested days, not scheduled posts. Try them when your audience is active.</p></section>
+  <section class="results"><div><p class="eyebrow">ONE THING TO IMPROVE</p><h2 id="insightTitle">Start with one clear invitation.</h2><p id="insightAction">Share the work, then ask people to visit your shop or start a conversation.</p><span id="resultsSource" class="muted">No performance data added</span></div><details id="resultsDetails"><summary>Add last 7 days’ results</summary><p class="muted">From your channel insights or shop. Saved on this device.</p><form id="resultsForm"><div class="metrics"><label>Views<input id="views" type="number" min="0" step="1" placeholder="0"></label><label>Link clicks<input id="clicks" type="number" min="0" step="1" placeholder="0"></label><label>Inquiries<input id="inquiries" type="number" min="0" step="1" placeholder="0"></label><label>Sales<input id="sales" type="number" min="0" step="1" placeholder="0"></label></div><button class="secondary">Update insight</button></form><a href="/portal">Analyze an ads CSV in the full workspace ↗</a></details></section>
+  <details class="sources"><summary>How these suggestions work</summary><p>Starter drafts use your item and channel guidance. Live Muse can write a fresh plan after you enable it below. A post or a sales target does not guarantee sales.</p><div id="sources"></div><p>Five minutes is our design target. Accounts are not connected; posting and performance counts are yours to confirm.</p></details>
+  <details class="operator"><summary>Muse settings</summary><p>Live requests are billed. The unlock key stays only in this tab.</p><label for="unlockKey">Demo unlock key</label><input id="unlockKey" type="password" autocomplete="off"><label class="check"><input id="liveMode" type="checkbox"> Enable live Muse</label><button id="musePlan" class="secondary">Write a fresh plan with Muse Spark</button><p id="readinessNote" class="muted">Checking server configuration…</p></details>
+</main>
+<dialog id="setup"><form id="itemForm"><div class="dialog-heading"><h2>Your item</h2><button type="button" id="closeSetup" aria-label="Close item settings">×</button></div>
+  <div class="import"><label for="shopUrl">Shop or product link</label><div class="import-row"><input id="shopUrl" type="url" placeholder="https://your-shop.com"><button type="button" id="findItems" class="secondary">Find items</button><button type="button" id="readListing" class="quiet">Use this listing</button></div><p id="importStatus" class="muted">Pick from your shop, or enter an item below.</p><div id="importItems"></div></div>
+  <label for="productName">Item</label><input id="productName" maxlength="180" required>
+  <label for="sellerName">Your name / shop</label><input id="sellerName" maxlength="120">
+  <label for="productDescription">A sentence about it</label><textarea id="productDescription" rows="2" maxlength="1500"></textarea>
+  <div class="two"><label>Destination<select id="destination"><option value="pixels">Pixels</option><option value="fineartamerica">Fine Art America</option><option value="saatchi">Saatchi Art</option><option value="website">Artist website</option><option value="other">My shop / inquiry page</option></select></label><label>Price (optional)<input id="price" maxlength="40"></label></div>
+  <label for="productLink">Matching listing or shop link</label><input id="productLink" type="url" maxlength="2000">
+  <div class="two"><label>Series (optional)<input id="collection" maxlength="120" list="series"><datalist id="series"><option value="Empowering Women"><option value="Abstracts"></datalist></label><label>Goal<select id="goal"><option value="visits">Shop visits</option><option value="inquiries">Inquiries</option><option value="sales">Sales</option></select></label></div>
+  <label for="salesGoal">Weekly sales target (optional)</label><input id="salesGoal" type="number" min="1" step="1" placeholder="e.g. 3">
+  <p id="itemHint" class="muted">Pixels is your preferred shop. Its price stays separate from Saatchi and other destinations.</p>
+  <div class="dialog-actions"><button type="button" id="manualItem" class="quiet">Start with another item</button><button class="primary">Use this item</button></div>
+</form></dialog>
+<footer>Muse Growth Studio <span>Make one useful post. Then get back to making.</span></footer>
+</body></html>
