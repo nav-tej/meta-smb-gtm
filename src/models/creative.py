@@ -195,6 +195,16 @@ class Creative(BaseModel):
         default="",
         description="Reasoning summary returned by muse-image-1.0 (/v1/responses) when used.",
     )
+    media_data_url: str | None = Field(
+        default=None,
+        description=(
+            "Inline base64 data URL for a newly generated image, so the browser does not need a "
+            "second GET to the instance that wrote it. None for saved samples and videos."
+        ),
+    )
+    media_mime_type: Literal["image/png", "image/jpeg", "image/webp"] | None = Field(
+        default=None, description="MIME type detected from the image bytes, not the extension."
+    )
 
 
 class CreativeSet(BaseModel):

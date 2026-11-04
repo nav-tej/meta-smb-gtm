@@ -4,10 +4,11 @@ import base64
 import binascii
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from src.api.demo import LiveMode, demo_unavailable
+from src.api.media_delivery import MediaResponseTooLargeError, attach_inline_media
 from src.clients.comfyui import SUPPORTED_COMFY_WORKFLOWS, discover_comfy_cli
 from src.clients.meta import MetaAPIError, get_meta_client
 from src.models.creative import CreativeSet, EditableCreativeBrief, GenerateAdsRequest
@@ -91,4 +92,16 @@ async def generate_ads(
         return demo.demo_creative_set(request)
     if request.draft:
         return await service.draft(request)
-    return await service.generate(request)
+    creative_set = await service.generate(request)
+    try:
+        return attach_inline_media(creative_set)
+    except MediaResponseTooLargeError as err:
+        raise HTTPException(
+            status.HTTP_413_CONTENT_TOO_LARGE,
+            detail={
+                "error": "media_response_too_large",
+                "message": f"{err} Try fewer placements or variants.",
+                "estimated_bytes": err.estimated_bytes,
+                "limit_bytes": err.limit_bytes,
+            },
+        ) from err
