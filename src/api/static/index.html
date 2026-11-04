@@ -946,6 +946,8 @@
     }
 </style>
   <link rel="stylesheet" href="/static/portal-journey.css">
+  <link rel="stylesheet" href="/static/muse-shell.css">
+  <script src="/static/muse-shell.js" defer></script>
 </head>
 <body>
   <!-- Top Bar -->
@@ -980,9 +982,10 @@
         <div>
           <p class="jr-eyebrow">Art of Sarabjit Singh · growth loop</p>
           <h1>Research, create, improve, repeat: every post learns from the last.</h1>
+          <p class="jr-hero-actions"><button type="button" class="jr-tour-btn" data-open-tour>▶ Take the 20-second tour</button></p>
           <div class="jr-stats" role="list">
             <div role="listitem"><strong>300</strong><span>competitor pages read</span></div>
-            <div role="listitem"><strong>4</strong><span>similar sellers priced</span></div>
+            <div role="listitem"><strong>4</strong><span>competitors on your watchlist</span></div>
             <div role="listitem"><strong>5</strong><span>ranked Muse Spark ideas</span></div>
             <div role="listitem"><strong>4</strong><span>saved Muse Image ads</span></div>
           </div>
@@ -1025,15 +1028,16 @@
             </div>
             <p class="jr-label">Posts on</p>
             <div class="jr-pills"><span class="jr-pill">Instagram</span><span class="jr-pill">Facebook</span></div>
-            <button type="button" class="jr-action" id="journeyResearch">View full competitor research →</button>
+            <button type="button" class="jr-action" id="journeyResearch" data-credit="Competitor analysis (saved)">View full competitor research →</button>
           </article>
 
           <article class="jr-card c2">
-            <header><h3>Similar sellers</h3></header>
+            <header><h3>Competitor watchlist</h3></header>
+            <p class="jr-watch"><span class="jr-dot" aria-hidden="true"></span>4 competitors · 6 shop pages · last checked Nov 3 <button type="button" class="jr-mini" disabled title="Re-checking needs a live server">Re-check now</button></p>
             <ul class="jr-sellers" id="sellerList">
               <li class="jr-seller has-brief">
-                <div><strong>SikhiArt.com</strong><span>Sikh history paintings &amp; prints · 300 pages</span></div>
-                <button type="button" class="jr-mini primary" id="journeyLoadBrief">Analyze this seller →</button>
+                <div><strong>SikhiArt.com</strong><span>Sikh history paintings &amp; prints · 300 pages</span><span class="jr-new">New: 2 listings in the 30 days before Nov 3</span></div>
+                <button type="button" class="jr-mini primary" id="journeyLoadBrief" data-credit="Competitor analysis (saved)">Analyze this seller →</button>
               </li>
               <li class="jr-seller">
                 <div><a href="https://fineartamerica.com/profiles/gurinderpreet-kaur/art/paintings" target="_blank" rel="noopener noreferrer">Gurinderpreet Kaur</a><span>Fine Art America · 70 listings</span></div>
@@ -1127,7 +1131,7 @@
           <aside class="jr-card c1">
             <header><h3>If you run ads</h3></header>
             <p>Muse Spark reads your campaign numbers and suggests where to move budget, with the metric behind each move.</p>
-            <button type="button" class="jr-action" id="journeyBudget">Review budget strategy →</button>
+            <button type="button" class="jr-action" id="journeyBudget" data-credit="Budget recommendations (saved)">Review budget strategy →</button>
             <p class="jr-note">Sample campaign data. Advice only; nothing changes in your ad account.</p>
           </aside>
         </div>
@@ -1144,6 +1148,12 @@
         </div>
       </div>
 
+      <aside class="jr-gift" aria-label="Gift a growth plan">
+        <span class="jr-gift-icon" aria-hidden="true">🎁</span>
+        <div><strong>Know a maker who’d love this?</strong><span>Gift a growth plan: daily brief, ready-to-post ads and ranked next moves. $29/month, planned pricing.</span></div>
+        <button type="button" class="jr-action solid c4" data-open-gift>Gift a growth plan →</button>
+      </aside>
+
       <dialog id="adDialog" class="jr-dialog" aria-labelledby="adDialogTitle">
         <form method="dialog"><button class="jr-dialog-close" aria-label="Close">×</button></form>
         <img id="adDialogImg" alt="">
@@ -1156,6 +1166,12 @@
         </div>
       </dialog>
     </section>
+
+    <div class="ms-workspace-bar">
+      <div><strong>Full workspace</strong><span>Detailed competitor brief, creative studio, budget advisor and campaign pack.</span></div>
+      <button type="button" class="jr-action" id="toggleWorkspace" aria-expanded="false" aria-controls="workspaceDetail">Open full workspace ↓</button>
+    </div>
+    <div id="workspaceDetail" class="ms-workspace" hidden>
 
         <p role="note" style="padding:0.8rem 1rem;border:1px solid #e7c9a9;border-radius:12px;background:#fff8ec;">Interactive demo: saved Muse outputs and sample campaign data. Custom inputs do not produce personalized AI results in this mode. No ads are launched, payments connected, or sales lift measured.</p>
     <!-- Storefront Overview Hero -->
@@ -1307,7 +1323,7 @@
                 aria-label="Competitor website URL"
                 placeholder="https://www.sikhiart.com or any competitor store URL"
               />
-              <button type="button" class="btn btn-primary" id="runCompBtn">
+              <button type="button" class="btn btn-primary" id="runCompBtn" data-credit="Competitor analysis (saved)">
                 🔍 Load Saved Competitor Brief
               </button>
             </div>
@@ -1642,6 +1658,7 @@ Gurpurab Gifts,Golden Temple - Gift Buyers,-$2.25/day (Refresh Creative),instagr
 &lt;/script&gt;</pre>
       </div>
     </section>
+      </div>
   </main>
 
   <!-- Modern Web Guidance: Light-Dismiss Login / Workspace Onboarding Dialog -->
@@ -2046,18 +2063,36 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
     }
 
     function openStep(tabId, focusId) {
+      setWorkspaceOpen(true);
       const tab = document.querySelector(`.step-tab[data-tab="${tabId}"]`);
       if (tab) tab.click();
       const target = document.getElementById(focusId) || document.getElementById(tabId);
       if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
-    const showSavedBrief = () => {
+    const shellProgress = (title, steps) => (typeof window !== 'undefined' && window.museShell ? window.museShell.progress(title, steps) : Promise.resolve());
+    const showSavedBrief = async () => {
       document.getElementById('compUrlInput').value = 'https://www.sikhiart.com';
+      await shellProgress('Analyzing SikhiArt.com', ['Reading the saved shop snapshot', 'Comparing prices and catalog', 'Ranking what they skip']);
       openStep('tab-intel', 'compSummaryText');
     };
     document.getElementById('journeyLoadBrief').addEventListener('click', showSavedBrief);
     document.getElementById('journeyResearch').addEventListener('click', showSavedBrief);
-    document.getElementById('journeyBudget').addEventListener('click', () => openStep('tab-bids', 'tab-bids'));
+    document.getElementById('journeyBudget').addEventListener('click', async () => {
+      await shellProgress('Reviewing your ad budget', ['Reading sample campaign rows', 'Computing cost per sale and trends', 'Ranking budget moves']);
+      openStep('tab-bids', 'tab-bids');
+    });
+    const setWorkspaceOpen = (open) => {
+      const detail = document.getElementById('workspaceDetail');
+      const toggle = document.getElementById('toggleWorkspace');
+      if (open) detail.removeAttribute('hidden'); else detail.setAttribute('hidden', '');
+      toggle.setAttribute('aria-expanded', String(open));
+      toggle.textContent = open ? 'Close full workspace ↑' : 'Open full workspace ↓';
+    };
+    document.getElementById('toggleWorkspace').addEventListener('click', () => {
+      const open = document.getElementById('toggleWorkspace').getAttribute('aria-expanded') !== 'true';
+      setWorkspaceOpen(open);
+      if (open) document.getElementById('workspaceDetail').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
     document.getElementById('addCompetitorForm').addEventListener('submit', (event) => {
       event.preventDefault();
       const input = document.getElementById('addCompetitorInput');

@@ -70,7 +70,7 @@ like series, price and links stay tucked under More details.”
 ## 1:15–1:50 — 3. Make it yours
 
 **Screen:**
-1. Point at the badge **Saved example · no credits used**.
+1. Point at the badge **Saved example · no API cost**.
 2. Rewrite the headline in her own words.
 3. Click **Preview a room scene**. Point at "Saved Muse image from this example. No new image generated…".
 4. Tick **I’ve compared the image with the original and checked the selected shop, price and wording.**

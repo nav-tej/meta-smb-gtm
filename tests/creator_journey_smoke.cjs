@@ -366,7 +366,7 @@ async function trigger(id, eventName = 'click') {
 
   console.log('--- TEST 3: Saved Examples vs Live Generation Safeguards ---');
   // Verify default mode badge
-  assert.equal(getNode('modeBadge').textContent, 'Saved example · no credits used');
+  assert.equal(getNode('modeBadge').textContent, 'Saved example · no API cost');
   assert.equal(getNode('generateButton').textContent, 'Preview a room scene');
 
   // Attempt to enable live mode without unlock key
