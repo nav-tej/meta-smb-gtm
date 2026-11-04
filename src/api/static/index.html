@@ -932,6 +932,23 @@
       .toast { bottom: 4.5rem; left: 0.75rem; right: 0.75rem; }
     }
   
+    /* Phone layout: let grids, inputs and long labels shrink instead of widening the page. */
+    @media (max-width: 600px) {
+      .grid-2, .grid-equal { grid-template-columns: minmax(0, 1fr) !important; }
+      .grid-2 > *, .grid-equal > *, .finding-list > *, .card, .panel, .hero-card > * { min-width: 0; }
+      .input-row { flex-wrap: wrap; }
+      .input-row > * { min-width: 0; }
+      .input-row .btn { width: 100%; justify-content: center; }
+      .card-header { flex-wrap: wrap; gap: 0.5rem; }
+      .badge { white-space: normal; max-width: 100%; min-width: 0; overflow-wrap: anywhere; }
+      .finding-head { flex-wrap: wrap; }
+      code, .channel-chip, .finding-item a, .journey a { overflow-wrap: anywhere; }
+      .journey-head h1 { font-size: 1.45rem; }
+      .journey-card { padding: 0.9rem; }
+      .journey-estimate { font-size: 0.82rem; }
+    }
+    .journey-estimate { margin: -0.4rem 0 1rem; padding: 0.6rem 0.85rem; border-radius: 10px; background: #fff8ec; border: 1px solid #e7c9a9; font-size: 0.9rem; }
+    .journey-estimate small { display: block; color: var(--text-muted); margin-top: 0.2rem; font-size: 0.76rem; }
     /* Story-first journey at the top of the portal */
     .journey { margin: 0.5rem 0 1.75rem; }
     .journey-head h1 { font-size: clamp(1.6rem, 2.6vw, 2.2rem); margin: 0.2rem 0 0.4rem; line-height: 1.15; }
@@ -984,6 +1001,7 @@
         <p class="eyebrow">ART OF SARABJIT SINGH · TODAY’S PLAN</p>
         <h1>From your work to your next post, in four steps.</h1>
         <p class="journey-proof">From saved public data: <strong>300</strong> competitor pages read · <strong>4</strong> similar sellers suggested · <strong>5</strong> Muse Spark recommendations · your next post ready in about <strong>6 clicks</strong>.</p>
+        <p class="journey-estimate"><strong>Estimated: ~12 hours of manual competitor research and ad copywriting replaced.</strong><small>Estimate, not measured. Assumes about 1.5 minutes per competitor page by hand (300 pages ≈ 7.5 h), about 2.5 h to turn notes into a brief, and about 2 h to draft and design one post.</small></p>
       </div>
       <ol class="journey-steps">
         <li class="journey-card">
