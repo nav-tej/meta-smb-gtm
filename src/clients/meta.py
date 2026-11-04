@@ -7,6 +7,7 @@ overridden. Services must call this module rather than instantiating OpenAI clie
 from __future__ import annotations
 
 import base64
+import binascii
 import json
 import logging
 import re
@@ -104,16 +105,17 @@ def _extract_sam_mask_from_responses(body: dict[str, Any]) -> bytes | None:
     for item in outputs:
         if not isinstance(item, dict):
             continue
-        for part in item.get("content", []):
+        content = item.get("content", [])
+        if not isinstance(content, list):
+            continue
+        for part in content:
             if isinstance(part, dict) and isinstance(part.get("text"), str):
                 texts.append(part["text"])
 
     combined = "\n".join(texts)
     matches = _SAM_BOX_RE.findall(combined)
     if not matches:
-        # If SAM 3.1 returned a valid `/v1/responses` completion with no detected box,
-        # default to a centered 80% foreground canvas mask so downstream compositing proceeds.
-        return _render_boxes_mask_png([(12, 12, 115, 115)], 128, 128)
+        return None
 
     boxes: list[tuple[int, int, int, int]] = []
     canvas_w = 128
@@ -585,25 +587,32 @@ class MetaClient:
 
         content_type = response.headers.get("content-type", "").lower()
         if content_type.startswith("image/"):
+            _detect_image_mime(response.content)
             return response.content
 
-        body = response.json()
+        try:
+            body = response.json()
+        except ValueError as err:
+            raise MetaAPIError("SAM 3.1 returned malformed JSON.") from err
         if isinstance(body, dict):
             rendered_mask = _extract_sam_mask_from_responses(body)
             if rendered_mask is not None:
                 return rendered_mask
 
+            data = body.get("data")
+            first = data[0] if isinstance(data, list) and data else None
             mask_b64 = (
                 body.get("mask_b64")
                 or body.get("b64_json")
-                or (
-                    body.get("data", [{}])[0].get("b64_json")
-                    if isinstance(body.get("data"), list) and body.get("data")
-                    else None
-                )
+                or (first.get("b64_json") if isinstance(first, dict) else None)
             )
             if isinstance(mask_b64, str) and mask_b64:
-                return base64.b64decode(mask_b64)
+                try:
+                    mask_bytes = base64.b64decode(mask_b64, validate=True)
+                except (binascii.Error, ValueError) as err:
+                    raise MetaAPIError("SAM 3.1 returned invalid base64 mask bytes.") from err
+                _detect_image_mime(mask_bytes)
+                return mask_bytes
 
         raise MetaAPIError("SAM 3.1 response did not contain mask bytes.")
 

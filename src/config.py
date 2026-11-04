@@ -31,6 +31,7 @@ class Settings(BaseModel):
     demo_mode: bool = True
     demo_key: str = ""
     live_calls_per_hour: int = 5
+    hosted_environment: bool = False
 
 
 @lru_cache
@@ -41,4 +42,6 @@ def get_settings() -> Settings:
     # Serverless filesystems (Vercel) are read-only except /tmp
     if os.environ.get("VERCEL") and "output_dir" not in values:
         values["output_dir"] = "/tmp/outputs"
+    if os.environ.get("VERCEL"):
+        values["hosted_environment"] = True
     return Settings(**values)

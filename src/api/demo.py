@@ -45,7 +45,7 @@ async def live_mode(
 ) -> bool:
     """True when this request may call Muse; False means serve the saved demo result."""
     settings = get_settings()
-    if not settings.demo_mode:
+    if not settings.demo_mode and not settings.hosted_environment:
         return True
     if not live:
         return False

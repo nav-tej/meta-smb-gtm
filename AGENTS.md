@@ -2,6 +2,19 @@
 
 Context for any AI coding agent working in this repo (Claude Code, Gemini CLI, Qwen Code, Hermes, or a local model). `CLAUDE.md`, `GEMINI.md`, and `QWEN.md` are symlinks to this file, so there is one source of truth. Read it fully before making changes.
 
+
+## November 3 resource-aware sprint override (latest coordination)
+
+Nav requested a creator-first polish sprint with limited Claude usage, Gemini Flash 3.8 available (Argon exhausted), and manually relayed local Hermes work. Read `docs/creator-polish/RESOURCE_PLAN.md` and your `*-assignment.txt`. These override earlier shared-main instructions and broad ownership assignments for this sprint.
+
+- Codex owns portal UX, campaign state/exports, remaining backend integration and final release.
+- Claude has ONE 20–30 minute bounded media-delivery task: `src/api/media_delivery.py`, `src/api/creative.py`, additive fields in `src/models/creative.py`, `tests/test_live_media_delivery.py`. Reserve these files until handoff. No broad backend refactor.
+- Gemini Flash owns NEW `tests/creator_journey_smoke.cjs`, `tests/test_creator_journey.py` and its QA report; no portal/runtime edits or edits to Claude's test.
+- Hermes owns `docs/creator-polish/hermes-*`: product fact audit, plain-language copy and novice/rehearsal packets. No app/data/workflow edits. Model identity must be checked on the execution host.
+- All write their own status in `docs/creator-polish/`. Prepared prompts are not acknowledged work. Nav relays prompts and statuses. Do not overwrite another agent's files or push to main; prefer isolated worktrees and let Codex integrate. No paid calls or public deployment under these assignment prompts.
+- First-product recommendation: Ek Onkar 12x12 print. Website offer exists; current stock/price needs artist confirmation. Repo 432px preview is not a print master. Do not present generated art as the unchanged original or a contact form as working checkout.
+
+
 ---
 
 ## 1. What this project is

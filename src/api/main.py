@@ -49,6 +49,25 @@ async def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@health_router.get("/readiness")
+async def readiness() -> dict[str, str | bool]:
+    """Report configuration only; this check never calls a billed provider."""
+    settings = get_settings()
+    guarded = settings.demo_mode or settings.hosted_environment
+    return {
+        "default_mode": "saved" if guarded else "live",
+        "live_unlock_configured": bool(settings.demo_key.strip()),
+        "provider_key_configured": bool(settings.meta_model_api_key.strip()),
+        "provider_verified": False,
+    }
+
+
+@app.get("/create", include_in_schema=False)
+async def creator_studio() -> FileResponse:
+    """Serve the guided product-to-post creator journey."""
+    return FileResponse(STATIC_DIR / "creator.html")
+
+
 @app.get("/", include_in_schema=False)
 @app.get("/portal", include_in_schema=False)
 async def customer_portal() -> FileResponse:
