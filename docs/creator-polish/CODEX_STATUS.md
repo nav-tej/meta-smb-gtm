@@ -30,3 +30,8 @@ No paid Muse calls, no secret changes, no subscription purchase and no deploymen
 - Nav clarified that the guided flow must retain source/shop ingestion, competitive synthesis with compact citations, creative variations, distribution handoff and existing performance advice. Treat four steps as navigation, not a restriction to static presets. Prioritize real shop import -> three sourced recommendations -> promotion variants; connected publishing/monitoring must not be claimed until implemented.
 - Accepted Gemini QA with corrected concurrency and review-gate assertions; fixed direct JSON pack download gate. `make check`: 129 passed. Browser/live media integration still pending.
 - Existing `/api/v1/ingest-storefront` actually crawls allowed public sources without Muse; it is not blocked by cached mode. New guided UI does not yet consume it. Earlier cached-mode generalizations should not be applied to this route.
+
+## Claude inline media integrated — November 4, 2026
+
+- Cherry-picked Claude `1f53480` as `0f27429`; live image response now carries bounded base64 media. `/create` consumes it and refuses temporary-path fallback. 413 now explains a recoverable original-layout/smaller-upload choice. Relative configured output root and relative image paths resolve from repo root, independent of server CWD.
+- `make check`: 143 passed, Ruff clean; Gemini creator VM smoke 6/6. No live Muse request, browser verification or deployment.

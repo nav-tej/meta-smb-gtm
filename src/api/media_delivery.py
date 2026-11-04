@@ -50,13 +50,17 @@ def sniff_image_mime(data: bytes) -> str | None:
 
 def output_root() -> Path:
     """The configured output directory, resolved the same way the creative service writes to it."""
-    return Path(get_settings().output_dir).resolve()
+    configured = Path(get_settings().output_dir)
+    if not configured.is_absolute():
+        configured = Path(__file__).resolve().parents[2] / configured
+    return configured.resolve()
 
 
 def _resolve_inside(image_path: str, root: Path) -> Path | None:
     """Resolve symlinks and `..`; return the file only if it stays inside root."""
     try:
-        resolved = Path(image_path).resolve(strict=True)
+        candidate = Path(image_path)
+        resolved = (candidate if candidate.is_absolute() else root / candidate).resolve(strict=True)
     except (OSError, RuntimeError):
         return None
     if not resolved.is_relative_to(root) or not resolved.is_file():
