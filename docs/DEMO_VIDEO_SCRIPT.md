@@ -22,33 +22,33 @@ button into the `/create` wizard, then come back to `/` for the budget advice.
   appears only under the Artist website destination; confirm it before using it. The 432 px
   preview in the repo is a social preview, not a print master.
 
-## 0:00–0:25 — The plan, on one screen
+## 0:00–0:25 — The loop, on one screen
 
-**Screen:** `/` at the top. Show the four cards: Your business → Similar sellers → Muse
-recommends → Create. Point at the value line, then at the estimate box.
+**Screen:** `/` at the top. Show the headline, the four stat tiles and the green **Estimated** box,
+then the loop rail: **Research → Create → Improve → Iterate** with the dashed return arrow.
 
 **Say:** “My mom makes the art. Marketing it should not require becoming an ad agency. This is
-Art of Sarabjit Singh. Muse starts with her business: Pixels is her main shop, and she posts on
-Instagram and Facebook. It has already suggested four similar sellers from their public pages,
-and our crawler read three hundred of one competitor's pages for Muse Spark to analyse. We estimate that replaces about twelve hours
-of manual research and copywriting. That's an estimate, and its assumptions are on screen.”
+Art of Sarabjit Singh. Muse runs a loop: research what similar sellers do, create a post, improve
+with ranked ideas, then go again. We estimate one cycle replaces about twelve hours of manual
+research and copywriting. That's an estimate, and its assumptions are on screen.”
 
-## 0:25–0:45 — What competitors are doing (saved)
+## 0:25–0:45 — Research and Improve (saved)
 
 **Screen:**
-1. In card 2, click **SikhiArt.com**. The page jumps to the saved competitor summary.
-2. Scroll back to the top. Point at card 3, **Tell the story they skip**.
+1. Click **Research** in the loop rail. Point at the four similar sellers and the price chart:
+   her Pixels prints at $14–$22 against SikhiArt's $60–$2,500.
+2. Click **Improve** in the loop rail. Point at idea 1 (High impact) and idea 5, **Tell one painting story**.
 
-**Say:** “Muse Spark read a saved snapshot of SikhiArt's shop. They focus on gurus and warriors,
-with almost no stories and nothing for women's stories. So the recommendation is simple: post
-one painting with a short personal story, and point people to her Empowering Women work. The
-sample competitor ads further down are illustrative.”
+**Say:** “Muse Spark analysed a saved snapshot of SikhiArt's shop. They start at sixty dollars, and
+they have nothing for women's stories and almost no stories at all. So Muse ranks the next moves.
+The top one is to feature her Empowering Women series. The quick win is to tell one painting's story.
+Competitor ad formats here are illustrative, and ad spend isn't public.”
 
 ## 0:45–0:55 — Into the post
 
-**Screen:** In card 4, click **Create your next post →**.
+**Screen:** On idea 5, click **Create this post now →**.
 
-**Say:** “One button takes her from the plan to the post.”
+**Say:** “One click takes her from the idea to the post.”
 
 ## 0:55–1:05 — 1. Your product
 
@@ -98,22 +98,22 @@ the original before posting.” A fresh Muse Spark draft is under **Writing help
 **Say:** “She leaves with a social-sized image, her caption and a short checklist. The link goes in
 her profile or a Story, and she posts from her own accounts. Nothing is posted automatically.”
 
-## 2:15–2:40 — A budget suggestion with a reason (saved)
+## 2:15–2:40 — What to try next, and budget (saved)
 
 **Screen:**
-1. Click **Next: see what similar sellers are doing and plan your next post →** to return to `/`.
-2. In card 4, click **Then review ad budget (sample data)**.
+1. Below the downloads, point at **What to try next**: the ranked ideas and **Back to research ↺**.
+2. Click **Back to research ↺**, then click **Improve** in the loop rail and **Review budget strategy →**.
 3. Show one suggested budget change and the reason given for it.
 
-**Say:** “If she runs ads, the app does the maths on her campaign numbers, and Muse Spark
-suggests where to move budget and why. These are sample numbers, not her real sales. It's advice
-only; the app never changes her ad account.”
+**Say:** “After posting, the loop suggests the next idea and sends her back to research. If she runs
+ads, Muse Spark suggests where to move budget, and why. These are sample numbers, not her real
+sales. It's advice only; the app never changes her ad account.”
 
 ## 2:40–3:00 — Close
 
-**Screen:** scroll back to the four cards at the top of `/`.
+**Screen:** scroll up to the loop rail at the top of `/`, then tap one ad in the **Create** gallery.
 
-**Say:** “Plan, competitors, recommendation, post: one flow. Next we're testing with other
+**Say:** “Research, create, improve, repeat: every post learns from the last. Next we're testing with other
 artists and makers. Muse Spark and Muse Image do the core work; she stays in charge of every
 word.”
 
@@ -133,6 +133,7 @@ word.”
 
 - Presenting the "~12 hours" figure as measured. Always say "estimated"; the on-screen
   assumptions are about 1.5 min per competitor page, plus about 2.5 h for a brief and 2 h for a post.
+- Competitor ad spend or bids: not public, and the app says so. Price ranges come from public listing snapshots.
 - That Muse "found" or "discovered" the four competitors live. They come from public snapshots
   captured Nov 3, and only SikhiArt.com has a saved Muse Spark brief.
 - Source links or citation checks in the research view: the saved research result has no cited
