@@ -24,3 +24,9 @@ No paid Muse calls, no secret changes, no subscription purchase and no deploymen
 ## Resume scheduling
 
 `RESUME_TASK.txt` contains the prepared prompt. No task was scheduled: no automation tool exposed; CUA denied access to Codex for safety. Do not bypass through undocumented app storage. Nav was asked for exact reset time; no answer yet. User can create a ONE-TIME local scheduled task in Codex with repo `/Users/nav/meta-smb-gtm`, just after the displayed reset. Usage refresh does not guarantee total allowance is available.
+
+## Gemini integration and product direction update
+
+- Nav clarified that the guided flow must retain source/shop ingestion, competitive synthesis with compact citations, creative variations, distribution handoff and existing performance advice. Treat four steps as navigation, not a restriction to static presets. Prioritize real shop import -> three sourced recommendations -> promotion variants; connected publishing/monitoring must not be claimed until implemented.
+- Accepted Gemini QA with corrected concurrency and review-gate assertions; fixed direct JSON pack download gate. `make check`: 129 passed. Browser/live media integration still pending.
+- Existing `/api/v1/ingest-storefront` actually crawls allowed public sources without Muse; it is not blocked by cached mode. New guided UI does not yet consume it. Earlier cached-mode generalizations should not be applied to this route.
