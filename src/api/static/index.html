@@ -883,6 +883,54 @@
       box-shadow: var(--shadow-md);
       display: none;
     }
+
+    /* Recording-friendly hierarchy and accessible request feedback. */
+    .shell { max-width: 1320px; padding: 1.75rem 2rem 3rem; }
+    .card { margin-bottom: 1.5rem; }
+    .card-title { letter-spacing: -0.025em; line-height: 1.25; }
+    .card-sub { max-width: 72ch; line-height: 1.65; }
+    .flow-heading { display: flex; align-items: baseline; justify-content: space-between;
+      gap: 1rem; margin: 1.75rem 0 0.8rem; }
+    .flow-heading h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.02em; }
+    .flow-heading p { margin: 0; font-size: 0.82rem; color: var(--text-muted); }
+    .step-tab { min-height: 112px; padding: 1rem 1.1rem; }
+    .step-tab.active { box-shadow: 0 5px 18px rgba(20,20,19,0.15); }
+    .step-name { font-size: 1rem; }
+    .step-caption { line-height: 1.5; }
+    button:focus-visible, a:focus-visible, input:focus-visible,
+    textarea:focus-visible, select:focus-visible {
+      outline: 3px solid var(--accent); outline-offset: 4px;
+    }
+    .flow-footer { display: flex; justify-content: space-between; gap: 1rem;
+      padding: 1.25rem 0; border-top: 1px solid var(--border); }
+    .request-status { display: flex; align-items: center; gap: 0.65rem;
+      position: fixed; bottom: 1.25rem; left: 1.25rem; z-index: 55;
+      padding: 0.85rem 1.1rem; background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; box-shadow: var(--shadow-md); font-size: 0.85rem; }
+    .request-status[hidden] { display: none; }
+    .request-status[data-state="error"] { border-color: var(--danger); color: var(--danger); }
+    .request-status[data-state="error"]::before { display: none; }
+    .request-status::before, .btn[aria-busy="true"]::before {
+      content: ''; display: inline-block; width: 15px; height: 15px; flex-shrink: 0;
+      border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%;
+      animation: request-spin 0.8s linear infinite;
+    }
+    @keyframes request-spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) {
+      .request-status::before, .btn[aria-busy="true"]::before { animation: none; }
+    }
+    @media (max-width: 600px) {
+      .shell { padding: 1rem 0.85rem 2rem; }
+      .topbar { position: relative; padding: 0.8rem; flex-wrap: wrap; }
+      .hero-card { padding: 1.2rem; }
+      .flow-heading { align-items: start; flex-direction: column; gap: 0.3rem; }
+      .step-nav { gap: 0.5rem; }
+      .step-tab { min-height: 108px; padding: 0.8rem; }
+      .step-caption { font-size: 0.7rem; }
+      .flow-footer { flex-wrap: wrap; }
+      .request-status { bottom: 0.75rem; left: 0.75rem; right: 0.75rem; }
+      .toast { bottom: 4.5rem; left: 0.75rem; right: 0.75rem; }
+    }
   </style>
 </head>
 <body>
@@ -902,7 +950,7 @@
         Saved Muse outputs · Interactive demo
       </span>
       <button type="button" class="btn btn-outline" id="openLocalEngineBtn" style="padding:0.35rem 0.75rem;font-size:0.78rem;">
-        ⚡ Mac Studio M4 Max Local Setup
+        Optional local tools
       </button>
       <button type="button" class="workspace-btn" id="openLoginBtn">
         <span class="avatar" id="activeAvatar">SS</span>
@@ -957,27 +1005,31 @@
       </div>
     </section>
 
-    <!-- 4-Tab Guided Workflow -->
+    <div class="flow-heading">
+      <h2>Your next campaign, in three steps</h2>
+      <p>Research the opportunity → Create the visuals → Review the budget</p>
+    </div>
+    <!-- Three core flows followed by the download handoff. -->
     <nav class="step-nav" aria-label="Growth Copilot Workflow Steps">
       <button type="button" class="step-tab active" data-tab="tab-intel">
-        <span class="step-num">Step 1 · Competitor & Store Audit</span>
-        <span class="step-name">Cited Market Intelligence</span>
-        <span class="step-caption">Sitemap + Meta Ad Library + F1–F4 Evidence</span>
+        <span class="step-num">01 · Research</span>
+        <span class="step-name">Competitor Intel</span>
+        <span class="step-caption">Find an opportunity with source evidence</span>
       </button>
       <button type="button" class="step-tab" data-tab="tab-creative">
-        <span class="step-num">Step 2 · Creative & Reels Studio</span>
-        <span class="step-name">Muse Image Creative Studio</span>
-        <span class="step-caption">2-Phase Brief Editor, Room Staging & 9:16 Reel</span>
+        <span class="step-num">02 · Create</span>
+        <span class="step-name">Ad Creative Studio</span>
+        <span class="step-caption">Review copy, then explore Muse Image visuals</span>
       </button>
       <button type="button" class="step-tab" data-tab="tab-bids">
-        <span class="step-num">Step 3 · Bid & Budget Advisor</span>
-        <span class="step-name">Zero-Net-Spend Optimizer</span>
-        <span class="step-caption">Python Metrics + Cited Budget Shifts</span>
+        <span class="step-num">03 · Improve</span>
+        <span class="step-name">Bid Advisor</span>
+        <span class="step-caption">Understand where your budget works hardest</span>
       </button>
       <button type="button" class="step-tab" data-tab="tab-export">
-        <span class="step-num">Step 4 · 1-Click Launch Pack</span>
-        <span class="step-name">Website Fix & Meta CSV Export</span>
-        <span class="step-caption">Fix Weebly Checkout + Download Ads Pack</span>
+        <span class="step-num">Finish · Download</span>
+        <span class="step-name">Campaign Pack</span>
+        <span class="step-caption">Take your reviewed plan with you</span>
       </button>
     </nav>
 
@@ -1116,7 +1168,7 @@
             <p class="card-sub">SAM 3.1 supports product isolation. Generative staging can alter artwork details; review every output against the original before publishing. Exact pixels require compositing the original cutout.</p>
           </div>
           <div style="display:flex;gap:0.5rem;align-items:center;">
-            <span class="badge green">Zero Brushwork Hallucination</span>
+            <span class="badge green">Artist review before publishing</span>
             <span class="badge gold">Muse Image 1.0 · Product Visuals · Combine · Restore</span>
           </div>
         </div>
@@ -1480,7 +1532,8 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
     </div>
   </dialog>
 
-  <div class="toast" id="toast"></div>
+  <div class="request-status" id="requestStatus" role="status" aria-live="polite" hidden></div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
   <script>
     // Server and model text is untrusted (competitor pages feed Muse Spark): every dynamic value
@@ -1521,16 +1574,77 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
       }, 3400);
     }
 
-    // Step Tabs Navigation
-    document.querySelectorAll('.step-tab').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('.step-tab').forEach((b) => b.classList.remove('active'));
-        document.querySelectorAll('.panel').forEach((p) => p.classList.remove('active'));
-        btn.classList.add('active');
-        const target = document.getElementById(btn.dataset.tab);
-        if (target) target.classList.add('active');
+    const flowButtons = [...document.querySelectorAll('.step-tab')];
+    function selectFlow(btn) {
+      flowButtons.forEach((b) => {
+        b.classList.toggle('active', b === btn);
+        if (b === btn) b.setAttribute('aria-current', 'step');
+        else b.removeAttribute('aria-current');
       });
+      document.querySelectorAll('.panel').forEach((p) => {
+        p.classList.toggle('active', p.id === btn.dataset.tab);
+      });
+    }
+    flowButtons.forEach((btn, index) => {
+      btn.id = `flow-nav-${index}`;
+      btn.setAttribute('aria-controls', btn.dataset.tab);
+      if (index === 0) btn.setAttribute('aria-current', 'step');
+      const panel = document.getElementById(btn.dataset.tab);
+      panel.setAttribute('aria-labelledby', btn.id);
+      btn.addEventListener('click', () => selectFlow(btn));
+      btn.addEventListener('keydown', (event) => {
+        const delta = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
+        if (!delta) return;
+        event.preventDefault();
+        const next = flowButtons[(index + delta + flowButtons.length) % flowButtons.length];
+        selectFlow(next);
+        next.focus();
+      });
+      const footer = document.createElement('div');
+      footer.className = 'flow-footer';
+      [index - 1, index + 1].forEach((nextIndex) => {
+        if (!flowButtons[nextIndex]) return;
+        const next = document.createElement('button');
+        next.type = 'button';
+        next.className = `btn ${nextIndex > index ? 'btn-dark' : 'btn-outline'}`;
+        const name = flowButtons[nextIndex].querySelector('.step-name').textContent;
+        next.textContent = nextIndex > index ? `Next: ${name} →` : `← Back to ${name}`;
+        next.addEventListener('click', () => {
+          selectFlow(flowButtons[nextIndex]);
+          flowButtons[nextIndex].focus();
+          document.querySelector('.step-nav').scrollIntoView({ block: 'start' });
+        });
+        footer.appendChild(next);
+      });
+      panel.appendChild(footer);
     });
+
+    function setButtonBusy(button, busy) {
+      button.disabled = busy;
+      button.setAttribute('aria-busy', String(busy));
+    }
+
+    let pendingRequests = 0;
+    async function portalFetch(url, options) {
+      const status = document.getElementById('requestStatus');
+      pendingRequests += 1;
+      status.hidden = false;
+      status.dataset.state = 'loading';
+      status.textContent = url.includes('ingest-storefront')
+        ? 'Reading public storefront pages…' : 'Loading your workspace results…';
+      try {
+        const response = await fetch(url, options);
+        if (!response.ok) throw new Error(`Request failed (HTTP ${response.status}). Please try again.`);
+        return response;
+      } catch (error) {
+        status.dataset.state = 'error';
+        status.textContent = error.message || 'Unable to load results. Please try again.';
+        throw error;
+      } finally {
+        pendingRequests -= 1;
+        if (!pendingRequests && status.dataset.state !== 'error') status.hidden = true;
+      }
+    }
 
     // Dialog Openers using mandatory .showModal()
     document.getElementById('openLoginBtn').addEventListener('click', () => {
@@ -1747,7 +1861,7 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
     async function loadPresets() {
       let data;
       try {
-        const resp = await fetch('/api/v1/demo-presets');
+        const resp = await portalFetch('/api/v1/demo-presets');
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         data = await resp.json();
       } catch (err) {
@@ -1768,11 +1882,11 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
       const btn = document.getElementById('runCompBtn');
       const url = document.getElementById('compUrlInput').value.trim();
       if (!url) return;
-      btn.disabled = true;
+      setButtonBusy(btn, true);
       btn.textContent = '⏳ Loading competitor brief...';
       try {
         const ws = state.presets.workspaces[state.activeWorkspace];
-        const resp = await fetch('/api/v1/analyze-competitors', {
+        const resp = await portalFetch('/api/v1/analyze-competitors', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1789,7 +1903,7 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
       } catch (err) {
         showToast(`Note: Using cached live brief (${err.message})`);
       } finally {
-        btn.disabled = false;
+        setButtonBusy(btn, false);
         btn.textContent = '🔍 Load Saved Competitor Brief';
       }
     });
@@ -1798,12 +1912,12 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
     document.getElementById('draftBriefBtn').addEventListener('click', async () => {
       const btn = document.getElementById('draftBriefBtn');
       const banner = document.getElementById('creativeStatusBanner');
-      btn.disabled = true;
+      setButtonBusy(btn, true);
       btn.textContent = '⏳ Drafting with Muse Spark 1.3...';
       try {
         const ws = state.presets.workspaces[state.activeWorkspace];
         const art = ws.artworks_showcase[state.selectedArtworkIdx];
-        const resp = await fetch('/api/v1/generate-ads', {
+        const resp = await portalFetch('/api/v1/generate-ads', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1834,7 +1948,7 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
       } catch (err) {
         showToast(`Draft error: ${err.message}`);
       } finally {
-        btn.disabled = false;
+        setButtonBusy(btn, false);
         btn.textContent = '✍️ Phase 1: Draft New Brief (Muse Spark)';
       }
     });
@@ -1843,13 +1957,13 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
     document.getElementById('renderCreativeBtn').addEventListener('click', async () => {
       const btn = document.getElementById('renderCreativeBtn');
       const banner = document.getElementById('creativeStatusBanner');
-      btn.disabled = true;
+      setButtonBusy(btn, true);
       btn.textContent = '⏳ Preparing approved creative preview...';
       try {
         const ws = state.presets.workspaces[state.activeWorkspace];
         const art = ws.artworks_showcase[state.selectedArtworkIdx];
         // Fetch the original sample image and convert to base64 so SAM 3.1 + Muse Image 1.0 Edit run on the exact painting
-        const imgResp = await fetch(art.original_image);
+        const imgResp = await portalFetch(art.original_image);
         const blob = await imgResp.blob();
         const b64 = await new Promise((resolve) => {
           const reader = new FileReader();
@@ -1868,7 +1982,7 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
         };
         let secondaryB64 = null;
         if (wfSelect === 'muse_multi_image_combine' && art.secondary_image) {
-          const secResp = await fetch(art.secondary_image);
+          const secResp = await portalFetch(art.secondary_image);
           const secBlob = await secResp.blob();
           secondaryB64 = await new Promise((resolve) => {
             const r = new FileReader();
@@ -1915,7 +2029,7 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
           }
         };
 
-        const resp = await fetch('/api/v1/generate-ads', {
+        const resp = await portalFetch('/api/v1/generate-ads', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
@@ -1942,7 +2056,7 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
       } catch (err) {
         showToast(`Render note: ${err.message}`);
       } finally {
-        btn.disabled = false;
+        setButtonBusy(btn, false);
         btn.textContent = '🎨 Phase 2: Preview Approved Creative';
       }
     });
@@ -1950,11 +2064,11 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
     // Live API Button: Step 3 Re-Run Bid Advisor
     document.getElementById('runBidsBtn').addEventListener('click', async () => {
       const btn = document.getElementById('runBidsBtn');
-      btn.disabled = true;
+      setButtonBusy(btn, true);
       btn.textContent = '⏳ Loading sample campaign advice...';
       try {
         const ws = state.presets.workspaces[state.activeWorkspace];
-        const resp = await fetch('/api/v1/bid-advice', {
+        const resp = await portalFetch('/api/v1/bid-advice', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1969,7 +2083,7 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
       } catch (err) {
         showToast(`Bid advisor note: ${err.message}`);
       } finally {
-        btn.disabled = false;
+        setButtonBusy(btn, false);
         btn.textContent = '📈 Review Sample Bid Advice';
       }
     });
@@ -1977,11 +2091,11 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
     // Live API Button: Step 1 Refresh Seller Audit
     document.getElementById('runAuditBtn').addEventListener('click', async () => {
       const btn = document.getElementById('runAuditBtn');
-      btn.disabled = true;
+      setButtonBusy(btn, true);
       btn.textContent = '⏳ Auditing 7 Channels...';
       try {
         const ws = state.presets.workspaces[state.activeWorkspace];
-        const resp = await fetch('/api/v1/audit-seller', {
+        const resp = await portalFetch('/api/v1/audit-seller', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -2004,7 +2118,7 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
       } catch (err) {
         showToast(`Audit note: ${err.message}`);
       } finally {
-        btn.disabled = false;
+        setButtonBusy(btn, false);
         btn.textContent = '↻ Refresh Seller Audit';
       }
     });
@@ -2072,7 +2186,7 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
       showToast('⏳ Parsing Meta Ads CSV & computing anomalies...');
       try {
         const ws = state.presets.workspaces[state.activeWorkspace] || state.presets.workspaces.sarabjit_singh;
-        const resp = await fetch('/api/v1/bid-advice/csv', {
+        const resp = await portalFetch('/api/v1/bid-advice/csv', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -2159,10 +2273,10 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
         .map((s) => s.trim())
         .filter(Boolean);
 
-      btn.disabled = true;
+      setButtonBusy(btn, true);
       btn.textContent = '⏳ Crawling Your Website & Marketplaces...';
       try {
-        const resp = await fetch('/api/v1/ingest-storefront', {
+        const resp = await portalFetch('/api/v1/ingest-storefront', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -2196,7 +2310,7 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
       } catch (err) {
         showToast(`Ingest note: ${err.message}`);
       } finally {
-        btn.disabled = false;
+        setButtonBusy(btn, false);
         btn.textContent = '🚀 Ingest My Shop & Socials (Live Reference Crawl)';
       }
     });
@@ -2213,7 +2327,7 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
         reader.readAsDataURL(file);
       });
       try {
-        const resp = await fetch('/api/v1/audit-screenshot', {
+        const resp = await portalFetch('/api/v1/audit-screenshot', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

@@ -452,3 +452,14 @@ This app fetches arbitrary URLs, parses untrusted XML, and feeds third-party con
   4. Explicit Demo Mode section explaining cached-by-default execution for zero-credit risk.
   5. Dedicated Hackathon Judging Alignment table mapping the product to all 4 Cerebral Valley criteria (Impact 30%, Meta AI Tooling 25%, Demo 25%, Technical Depth 20%).
 - **Verification:** `make check` passes with 100 offline tests and 0 ruff errors. No `src/` files or `.env` were modified; zero paid Muse calls made. Each commit pushed separately to `origin/main`.
+
+### Codex portal polish — November 3, 2026
+
+- Polished the single-file portal: clearer three-flow navigation plus the campaign-pack handoff,
+  improved card spacing and mobile layout, keyboard step navigation, and back/next controls.
+- Added inline request spinners, accessible busy states, and persistent request-error feedback;
+  removed the remaining zero-brushwork guarantee from the creative header.
+- Extended the offline JavaScript harness to exercise step navigation, next controls, loading
+  state cleanup, and failed-request recovery. `make check`: 100 passed; lint/format clean.
+- No live Muse calls. No service, .env, or spending-guard changes. Browser review was blocked
+  by the unavailable browser host; visual rehearsal remains a release check.
