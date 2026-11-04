@@ -297,202 +297,24 @@ This app fetches arbitrary URLs, parses untrusted XML, and feeds third-party con
 
 ---
 
-## 12. Current status & multi-agent coordination (updated 2026-11-03, evening)
+## 12. Current status & multi-agent coordination (updated 2026-11-04, afternoon)
 
-**Deadline: Wednesday Nov 4 2026, 9:00 PM ET.** Contributors: Claude Code, Gemini CLI, Hermes
-(separate Mac Studio), and GPT/Codex (joining now). Everyone works on `main`: run
-`git pull --rebase origin main` before starting and `make check` before every push.
+### Current status (Nov 4, afternoon)
+- Commit c74374d on main, 181 tests pass, pushed to origin
+- Nav deploying to Vercel via CLI (npx vercel --prod)
+- README.md and DEMO_VIDEO_SCRIPT.md updated with honest claims
+- /create flow has destination picker, series, IG/FB handoff
+- /today daily post desk added (independent of /create)
+- Media delivery fix committed (double path bug resolved)
 
-### Snapshot
+### Active assignments
+- Gemini (Antigravity): CSS polish on /create and /today — own only CSS files and minor HTML class tweaks
+- Hermes: Record 3-min demo video per docs/DEMO_VIDEO_SCRIPT.md, DEMO_MODE=true always
+- Claude: QA and coordination, all review packets complete
+- Nav: Deploy to Vercel, rehearse, post video to X by 9 PM ET
 
-| Area | Status |
-|---|---|
-| Flow 1 Competitor Intel | Implemented + tested. Cited research brief (F1..Fn verified against crawled URLs). |
-| Flow 2 Ad Creative | Implemented + tested. Two-phase draft/render; Muse Image live; ComfyUI optional. |
-| Flow 3 Bid Advisor | Implemented + tested. Deterministic metrics + Muse Spark; JSON and CSV input. |
-| Tests | `make check`: 94 passed, ruff clean. |
-| Security | XSS fixed in the portal (`esc()`/`safeUrl()`). Semgrep `--config auto`: no high/critical; 1 medium false positive (logs token counts, not secrets). |
-| Spending guard | Demo mode committed in `c42c966` (see below). |
-| Vercel | Config ready (`api/index.py`, `vercel.json`, `.vercelignore`). **Not deployed yet.** |
-| Portal UI | Works; needs polish for the demo recording. |
-| Demo script | `docs/DEMO_VIDEO_SCRIPT.md` has 2 risky claims to fix (below). |
-
-### Deploying to Vercel (CLI only)
-- The Vercel MCP returns 403 on project creation; deploy with the CLI: `npx vercel` (preview)
-  then `npx vercel --prod`.
-- Set env vars in Vercel: `META_MODEL_API_KEY`, `DEMO_KEY` (long random string, e.g.
-  `openssl rand -hex 24`). Leave `DEMO_MODE` unset (= true).
-- `maxDuration: 300` needs a Vercel Pro plan; on Hobby the deploy may reject or cap it. Cached
-  demo responses return instantly either way.
-- Demo mode: the 7 Muse routes serve saved results from `data/samples/`. A real call needs
-  `?live=true` + header `X-Demo-Key: <DEMO_KEY>`, capped at `LIVE_CALLS_PER_HOUR` (5). The cap is
-  in memory, so on serverless it is per running instance, not a global quota.
-- Locally, `.env` should have `DEMO_MODE=false` for the full live version. Tests pin it to false.
-
-### Verified facts (don't re-derive these, and don't repeat claims that contradict them)
-- **SAM 3.1:** the hosted model works only on `POST /v1/responses` and returns a bounding box,
-  which `MetaClient.segment()` turns into a box-shaped mask. `/v1/images/segmentations` does not
-  exist (404). Open-weight SAM 3.1 runs in ComfyUI via `workflows/sam3_segment.json` (core node
-  `SAM3_Detect`, weights `sam3.1_multiplex_fp16.safetensors`), but `AdCreativeService.generate()`
-  does not route to it yet (two pipeline tests mock the hosted path). There is no BiRefNet
-  integration in this repo.
-- **Live Muse calls:** Claude made 3 (2 Muse Spark: `competitor_brief_sikhiart_live.json`,
-  `bid_advice_live.json`; 1 Muse Image: `golden_temple_holiday_gift_live.webp`). The other live
-  outputs in `data/samples/` (6 more Muse Image renders, `ad_creative_ek_onkar_live.json`) came
-  from other agents' calls. Check the billing dashboard for total spend.
-- **`golden_temple_holiday_gift_live.webp`** is plain text-to-image (`/v1/images/generations`):
-  Muse Image's own Golden Temple, not Sarabjit's painting.
-- **Meta Ad Library data** (`data/samples/art_competitor_meta_ads.json`: "Desi Canvas Co",
-  "Punjab Heritage Prints") is hand-written sample data, not real ads.
-- **Pixel preservation:** only the ComfyUI workflows composite the original artwork pixels back
-  through the SAM mask. Muse Image paths (`/v1/responses` product_visuals, `/v1/images/edits`)
-  re-render the whole image.
-
-### Demo script: 2 risky claims to fix (`docs/DEMO_VIDEO_SCRIPT.md`)
-1. **0:35–1:15:** narrates the Ad Library brands and the "44-day winning ad" as real competitors.
-   Say "illustrative sample data" on screen and in the voiceover, or pull real records with an
-   Ad Library token.
-2. **1:15–2:15:** "100% of Sarabjit's original brushwork ... preserved untouched". True only for
-   the ComfyUI composite path. Safer: "SAM 3.1 isolates the artwork, and our ComfyUI composite
-   keeps the original pixels."
-
-
-### Completed & verified (`make check` → 94/94 tests passing, 0 ruff errors)
-- **Meta Model API Client (`src/clients/meta.py`):** `MetaClient` using `AsyncOpenAI` (`https://api.meta.ai/v1`) with `.strip()` on credentials/model IDs, structured JSON validation with 1-retry repair (`chat_structured`), multimodal Vision screenshot analysis (`chat_vision_structured`), `generate_image` (`muse-image-1.0` on `/v1/images/generations`), `edit_image` (`muse-image-1.0` on `/v1/images/edits`), `generate_image_workflow` (`muse-image-1.0` on `/v1/responses` with `reasoning={"effort": "high"}` supporting `product_visuals`, `restore_enhance`, and `multi_image_combine` + returning `reasoning_summary`), `transcribe_audio` (`muse-voice-transcribe-1.0` on `/v1/audio/transcriptions`), and `segment` (`sam-3.1` on `/v1/responses` parsing `<|box;...|>` into a binary PNG mask).
-- **Flow 1 — Competitor Intel & Storefront Ingestion (`src/services/competitor_intel.py`, `src/utils/sitemap.py`, `src/models/intel.py`, `src/api/intel.py`):**
-  - SSRF-guarded HTTP (`validate_safe_url`, `_fetch_bytes_guarded`), RFC 9309 wildcard `robots.txt` (`parse_robots_txt`), `defusedxml` `<urlset>` & `<sitemapindex>` recursion, gzip-bomb defense, marketplace profile fallback (`crawl_listing_page_fallback`), deterministic signal derivation (`derive_signals`), verified `ResearchBrief` (`F1..Fn` citations checked by `_CitationChecker`), and Muse Spark synthesis (`POST /api/v1/analyze-competitors`).
-  - Live seller reference ingestion (`POST /api/v1/ingest-storefront`, verified live on `artofsarabjitsingh.com` + `fineartamerica.com` + `saatchiart.com` + `@artofsarabjitsingh` + `facebook.com`), multi-channel seller audit (`POST /api/v1/audit-seller`), Vision screenshot audit (`POST /api/v1/audit-screenshot`), and two full workspace presets (`GET /api/v1/demo-presets` returning `sarabjit_singh` Fine Artist and `etsy_ceramics` Physical Goods).
-- **Flow 2 — Two-Phase Hybrid Ad Creative Studio (`src/services/ad_creative.py`, `src/clients/comfyui.py`, `src/models/creative.py`, `src/api/creative.py`, `workflows/*.json`, `.claude/skills/comfy*`):**
-  - Two-phase reviewable creative workflow (`POST /api/v1/generate-ads` with `draft=true` -> seller edits `EditableCreativeBrief` -> Phase 2 render), plus voice-note transcription (`POST /api/v1/transcribe-voice`).
-  - Native Meta Playground workflows (`product_visuals`, `restore_enhance`, `multi_image_combine`) mirroring open-weight ComfyUI workflows (`sam3_segment.json`, `krea3_scene_edit.json`, `krea2_turbo_style_ref.json`, `ideogram4_collector_card.json`, `flux_krea_scene_relight.json`, `placement_outpaint.json`, `upscale_4x.json`, `ltx2_5_dfr_i2v.json`, `minimax_h3_i2v.json`).
-  - **7 Live `Muse Image 1.0` WebP Visuals in `data/samples/`:**
-    1. `ek_onkar_collector_room_live.webp` (*Ek Onkar* collector living room — `product_visuals`)
-    2. `diptych_ek_onkar_kirat_karo_live.webp` (*Ek Onkar + Kirat Karo* 2-Piece Collector Diptych — `multi_image_combine`)
-    3. `naam_japo_restored_gallery_live.webp` (*Naam Japo* studio-restored & oak-framed — `restore_enhance`)
-    4. `kirat_karo_collector_room_live.webp` (*Kirat Karo* brushed-brass dining room — `product_visuals`)
-    5. `golden_temple_holiday_gift_live.webp` (*Golden Temple* holiday gift scene — plain text-to-image via `/v1/images/generations`, not her painting)
-    6. `etsy_chai_set_product_visual_live.webp` (*Saffron & Clay* stoneware & hammered brass chai set — `product_visuals`)
-    7. `etsy_diwali_gift_box_live.webp` (*Saffron & Clay* brass diya + marigold linen gift box — `multi_image_combine`)
-- **Flow 3 — Cited Bid Advisor & CSV Upload (`src/services/bid_advisor.py`, `src/models/bids.py`, `src/api/bids.py`):**
-  - Deterministic Python math (`compute_metrics`, `load_campaign_csv`) + Muse Spark `BidRecommendation` (`POST /api/v1/bid-advice` and `POST /api/v1/bid-advice/csv`) tracing budget shifts and audience plays back to `ResearchBrief` findings `F1..Fn`. Sample Meta Ads Manager export ready in `data/samples/sarabjit_singh_ads_export.csv`.
-- **Vercel Serverless Deployment & `DEMO_MODE` Spending Guard (`api/index.py`, `vercel.json`, `.vercelignore`, `src/api/demo.py`, `src/services/demo.py`, `tests/test_demo_mode.py`):**
-  - Public deployments run with `DEMO_MODE=true` by default so all 7 Muse routes serve saved live results from `data/samples/` with zero API credit drain. Passing `?live=true` with header `X-Demo-Key: <DEMO_KEY>` unlocks real live calls capped at `LIVE_CALLS_PER_HOUR` (default 5).
-- **Lovable-Style Customer Portal (`src/api/static/index.html` served at `GET /` and `GET /portal`):**
-  - XSS-hardened (`esc()` + `safeUrl()` across all dynamic templates, Semgrep clean).
-  - Live interactive workspace switcher (`Art of Sarabjit Singh` Fine Artist vs. `Saffron & Clay Studio` Etsy Physical Goods vs. custom storefront onboarding), Step 0 storefront/marketplace/socials reference crawler, Step 1 cited competitor intel + Vision screenshot dropzone, Step 2 two-phase creative brief editor + live `Muse Image 1.0` stagings + High-Reasoning trace badge + 9:16 Reel preview player, Step 3 responsive campaign table + 1-click CSV upload, and Step 4 1-click Weebly/Shopify Stripe Checkout HTML + **Google Rich-Snippet JSON-LD (`VisualArtwork` + `Product`) Schema** + Meta Ads CSV export.
-- **Documentation & Demo Script (`docs/`):**
-  - `docs/CLAUDE_HANDOFF_330PM.md`: Complete handoff brief and copy-paste prompt.
-  - `docs/DEMO_VIDEO_SCRIPT.md`: Timestamped 3-minute hackathon pitch and click sequence.
-
-### Coordination rules
-- **File ownership tonight, to avoid edit collisions:** `src/api/static/index.html`, `README.md`
-  and `docs/DEMO_VIDEO_SCRIPT.md` belong to GPT/Codex. Others don't edit them without saying so
-  in a commit message first.
-- Small commits, imperative subject, `make check` green before every push. Never commit `.env`.
-- **No paid Muse calls without the user's OK.** Budget is a $150 credit; tests must never hit the
-  network (`tests/conftest.py` blanks the API key and pins `DEMO_MODE=false`).
-- **Environment topology:**
-  - **Primary Mac (`localhost:8000`):** live FastAPI portal (`uvicorn src.api.main:app --reload`),
-    Claude Code, Gemini CLI.
-  - **Mac Studio (Hermes):** syncs via `origin/main` on `github.com/nav-tej/meta-smb-gtm`.
-- **GPT/Codex onboarding:** via `AGENT_HANDOFF_BRIEF.md`. That file is not in the repo yet; until
-  it is, read this file plus `docs/CLAUDE_HANDOFF_330PM.md`.
-
-### Next tasks: GPT/Codex
-1. **Portal UI polish** (`src/api/static/index.html`) for the recording: spacing and hierarchy,
-   loading/empty/error states for each step, a visible "Demo mode: saved live results" badge,
-   mobile width. Keep every dynamic value going through `esc()`/`safeUrl()`; never interpolate
-   raw strings into `innerHTML`.
-2. **README cleanup:** quickstart (local + Vercel), architecture diagram, curl examples, the
-   demo-mode explanation, and an honest model table (see `docs/MODELS.md`).
-3. **Demo script refinement:** fix the 2 risky claims above and keep it to 3:00.
-4. **Test coverage:** CSV edge cases (bad headers, empty file), demo-mode responses for every
-   guarded route, portal-served routes (`/`, `/samples/...`), `ingest-storefront` with blocked
-   hosts.
-
-### Next tasks: Claude
-1. Help the user deploy with `npx vercel`, then verify `/`, `/api/v1/health`,
-   `/api/v1/demo-presets` and all 4 portal steps on the deployed URL in demo mode.
-2. Route segmentation to open-weight SAM 3.1 on ComfyUI when it is reachable (hosted SAM as the
-   fallback), updating the two pipeline tests that mock the hosted path.
-
-### Next tasks: Hermes (Mac Studio)
-1. Pull `origin/main`, run `make check` (94 passed).
-2. If local ComfyUI is running, render `workflows/ltx2_5_dfr_i2v.json` or `minimax_h3_i2v.json`
-   from `data/samples/ek_onkar_collector_room_live.webp` and commit one `.mp4` reel to
-   `data/samples/`, without touching `src/api/static/index.html`.
-
-### Next tasks: Gemini CLI
-- Pick an unowned item above, say which in your commit message, and keep to files nobody else
-  owns tonight.
-
-### Codex demo-readiness work — November 3, 2026
-
-- Scope: demo accuracy and recording readiness. See `docs/TONIGHT_DEMO_RUNBOOK.md` for the shared ownership proposal and release checklist.
-- Updated portal labels to distinguish saved outputs from live generation, mark competitor ad examples illustrative, qualify artwork fidelity, and identify checkout/CSV handoffs as templates requiring review.
-- Replaced `docs/DEMO_VIDEO_SCRIPT.md` with a three-minute seller-focused story and explicit sample-data disclosures.
-- Baseline `make check`: 94 passed, lint and format clean. No billed Muse calls made.
-- Claude retains deployment ownership; Gemini/Antigravity should confirm portal ownership before edits; Hermes retains optional local video/testing scope. No direct agent sessions have been contacted by Codex.
-
-- In-process smoke: health, portal, presets, and all seven saved image assets returned 200. Local server bind is prohibited by this session sandbox; Vercel identity lookup failed (`fetch failed`). Deployment/browser/recording remain unverified and assigned to the release owner.
-
-### Codex coordination follow-up — November 3
-
-- User explicitly authorized direct delegation to Claude, Gemini, and Hermes, and Vercel publication. Detailed assignments and delivery state: `.tasks/assignments.json`; prompts in `.tasks/*-assignment.txt`.
-- Latest confirmed Claude progress: `75a5109`. No newer Gemini commit or Hermes reel found locally; remote state not freshly fetched. CLI delivery attempts failed: Claude not logged in, Gemini timeout, Hermes gateway authorization. **No acknowledgement received; do not mark these agents active.**
-- Codex fixed active-workspace handlers, selected-product saved previews, remaining live/proven-ad labels, and escaped artwork details. Added `tests/test_portal_demo.py` plus the Node handler harness. README explains cached-only deployment and sample provenance.
-- Vercel CLI installed but network/DNS blocked here; optional Vercel integration located but not connected. Deployment remains unverified. Claude should publish from its authenticated normal terminal with DEMO_MODE=true and no live API keys needed.
-
-
-### Codex Vercel recovery — November 3, 2026
-
-- User asked Codex to resume deployment and maintain Obsidian context. Read `~/Downloads/AGENT_HANDOFF_BRIEF.md`, vault `Welcome.md`, `Meta Hackathon.md`, and repo instructions.
-- `git pull --rebase origin main` succeeded with network permission; main already current at `d0b7d32`. `make check`: 95 passed, lint and format clean.
-- Connected Vercel MCP returned empty project/team lists. CLI 62.2.0 can reach Vercel with network permission, but `vercel whoami` rejected the saved token. Started `vercel login`; user browser authentication pending. No project link or verified public deployment yet.
-- Publish cached-only production with `DEMO_MODE=true`, without Meta API or live-unlock credentials. No paid Muse calls authorized or made.
-- Updated primary Obsidian project, hub and log; corrected obsolete SAM/BiRefNet claims. Record final URL and remote smoke checks there after deployment succeeds.
-
-
-### Hackathon judges polish & demo script refinement — November 3, 2026
-
-- **`docs/DEMO_VIDEO_SCRIPT.md` (`44c5421`):** Fixed the two risky claims:
-  1. Competitor ad data: clarified in voiceover and guidelines that competitor ad signals are "illustrative competitor data" from sample snapshots rather than live Ad Library pulls.
-  2. Brushwork preservation: qualified generative staging so that original brushwork is specifically "preserved when using the ComfyUI segmentation pipeline" (with SAM 3.1 composite masking) rather than making blanket guarantees across all generative models.
-- **`README.md` (`5d0f787`):** Completely polished for hackathon judges:
-  1. Detailed setup instructions (git clone, python venv + pip install, cp .env.example, uvicorn start, plus `make` options).
-  2. Architecture overview diagram showing FastAPI routes → Services → Meta AI models (Muse Spark 1.3, Muse Image 1.0, SAM 3.1, Muse Voice) with ComfyUI local Apple Silicon fallback.
-  3. Deep dives into all three flows: Flow 1 Competitor Intel, Flow 2 Ad Creative Studio (with 2-phase brief review and reasoning summary traces), and Flow 3 Cited Bid Advisor.
-  4. Explicit Demo Mode section explaining cached-by-default execution for zero-credit risk.
-  5. Dedicated Hackathon Judging Alignment table mapping the product to all 4 Cerebral Valley criteria (Impact 30%, Meta AI Tooling 25%, Demo 25%, Technical Depth 20%).
-- **Verification:** `make check` passes with 100 offline tests and 0 ruff errors. No `src/` files or `.env` were modified; zero paid Muse calls made. Each commit pushed separately to `origin/main`.
-
-### Codex portal polish — November 3, 2026
-
-- Polished the single-file portal: clearer three-flow navigation plus the campaign-pack handoff,
-  improved card spacing and mobile layout, keyboard step navigation, and back/next controls.
-- Added inline request spinners, accessible busy states, and persistent request-error feedback;
-  removed the remaining zero-brushwork guarantee from the creative header.
-- Extended the offline JavaScript harness to exercise step navigation, next controls, loading
-  state cleanup, and failed-request recovery. `make check`: 100 passed; lint/format clean.
-- No live Muse calls. No service, .env, or spending-guard changes. Browser review was blocked
-  by the unavailable browser host; visual rehearsal remains a release check.
-
-### Codex cached endpoint coverage — November 3, 2026
-
-- Added tests/test_cached_portal_contract.py: GET / returns the exact single-file portal HTML;
-  competitor and bid POST responses match the saved live fixtures; one-shot creative POST
-  returns saved copy and sample image bytes that resolve successfully through /samples/.
-- Tests cover both omitted live and explicit live=false. Live service methods and outbound
-  AsyncClient.send are replaced with failures so cache bypasses fail offline, even with a
-  configured fake API key. No real network or paid API calls.
-- Final make check: 107 passed, lint and format clean. Portal polish was pushed separately
-  as 0d4cc65. No .env or src/services/ changes; demo spending guards remain unchanged.
-
-
-### Publication integration — November 4, 2026
-
-- Codex verified production /create and /api/v1/readiness both returned 404 before release.
-- Integrated creator shop import, artist-specific destinations/series/posting instructions, edit preservation, repo-anchored media delivery and skipping unused SAM in product_visuals.
-- Current offline make check: 153 passed; lint/format clean. No paid Muse calls.
-- Claude delivered final copy; Antigravity delivered import and edit-preservation QA; Hermes delivered recording/share drafts. Browser export rehearsal remains unverified.
-- Codex owns release publication and production HTTP checks; recording and actual novice walkthrough remain next.
+### Rules (unchanged)
+- No paid API calls without explicit Nav approval
+- DEMO_MODE=true for all recording
+- No secret changes, no license changes
+- Check this file before starting work
