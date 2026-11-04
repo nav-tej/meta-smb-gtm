@@ -438,3 +438,17 @@ This app fetches arbitrary URLs, parses untrusted XML, and feeds third-party con
 - Connected Vercel MCP returned empty project/team lists. CLI 62.2.0 can reach Vercel with network permission, but `vercel whoami` rejected the saved token. Started `vercel login`; user browser authentication pending. No project link or verified public deployment yet.
 - Publish cached-only production with `DEMO_MODE=true`, without Meta API or live-unlock credentials. No paid Muse calls authorized or made.
 - Updated primary Obsidian project, hub and log; corrected obsolete SAM/BiRefNet claims. Record final URL and remote smoke checks there after deployment succeeds.
+
+
+### Hackathon judges polish & demo script refinement — November 3, 2026
+
+- **`docs/DEMO_VIDEO_SCRIPT.md` (`44c5421`):** Fixed the two risky claims:
+  1. Competitor ad data: clarified in voiceover and guidelines that competitor ad signals are "illustrative competitor data" from sample snapshots rather than live Ad Library pulls.
+  2. Brushwork preservation: qualified generative staging so that original brushwork is specifically "preserved when using the ComfyUI segmentation pipeline" (with SAM 3.1 composite masking) rather than making blanket guarantees across all generative models.
+- **`README.md` (`5d0f787`):** Completely polished for hackathon judges:
+  1. Detailed setup instructions (git clone, python venv + pip install, cp .env.example, uvicorn start, plus `make` options).
+  2. Architecture overview diagram showing FastAPI routes → Services → Meta AI models (Muse Spark 1.3, Muse Image 1.0, SAM 3.1, Muse Voice) with ComfyUI local Apple Silicon fallback.
+  3. Deep dives into all three flows: Flow 1 Competitor Intel, Flow 2 Ad Creative Studio (with 2-phase brief review and reasoning summary traces), and Flow 3 Cited Bid Advisor.
+  4. Explicit Demo Mode section explaining cached-by-default execution for zero-credit risk.
+  5. Dedicated Hackathon Judging Alignment table mapping the product to all 4 Cerebral Valley criteria (Impact 30%, Meta AI Tooling 25%, Demo 25%, Technical Depth 20%).
+- **Verification:** `make check` passes with 100 offline tests and 0 ruff errors. No `src/` files or `.env` were modified; zero paid Muse calls made. Each commit pushed separately to `origin/main`.
