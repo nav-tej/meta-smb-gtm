@@ -1,52 +1,57 @@
-# 3-Minute Hackathon Demo Video Script (`http://localhost:8000/`)
+# Muse Growth Studio — three-minute demo
 
-**Project:** Meta SMB GTM (`Muse Growth Studio`) — Open-Source AI Growth Copilot for Makers & Artists
-**Live Portal URL:** `http://localhost:8000/` (FastAPI + Lovable-Style Customer Portal)
-**Models Used:**
-- `muse-spark-1.3` (`POST /v1/chat/completions` — text & multimodal Vision screenshot reasoning)
-- `muse-image-1.0` (`POST /v1/responses` with `reasoning={"effort": "high"}` + `POST /v1/images/edits` — *Product Visuals*, *Multi-Image Combine*, and *Restore Image*)
-- `sam-3.1` (`POST /v1/responses` + local ComfyUI `sam3_segment.json` — zero-hallucination artwork/product segmentation)
-- `muse-voice-transcribe-1.0` (`POST /v1/audio/transcriptions` — seller voice-note brief transcription)
-- Open-weight local ComfyUI mirrors (`krea2_turbo_style_ref`, `ideogram4_collector_card`, `flux_krea_scene_relight`, `ltx2_5_dfr_i2v`, `minimax_h3_i2v`)
+Recording target: November 4, 2026. Share a rehearsal for seller feedback November 3.
+Use the local portal at http://localhost:8000/ until a public deployment passes the checks in `docs/TONIGHT_DEMO_RUNBOOK.md`.
 
----
+## Before recording
 
-## Timestamped Storyboard (0:00 – 3:00)
+Use the Art of Sarabjit Singh preset. Keep this workspace throughout the main story. Reset the page, close unrelated tabs, hide notifications, and use a readable browser zoom. Rehearse once with a timer. Keep saved-result mode on; no billed calls are needed.
 
-### 0:00 – 0:35 · The Problem & Live Multi-Channel Storefront Ingestion (`Step 0`)
-- **On Screen:** Open `http://localhost:8000/`. Click **`▾ Switch / Login`** in the top-right to show the multi-workspace customer portal (**Art of Sarabjit Singh** Fine Artist workspace + **Saffron & Clay Studio** Etsy Physical Goods workspace).
-- **Action:** Point to **Step 0: Ingest Your Website, Marketplace Shop Pages & Socials as Reference for Muse**, pre-filled with:
-  - `https://www.artofsarabjitsingh.com/`
-  - `https://fineartamerica.com/profiles/sarabjit-singh/art/paintings, https://www.saatchiart.com/sarabjitsingh`
-  - `https://www.instagram.com/artofsarabjitsingh/, https://www.facebook.com/ArtofSarabjitSingh`
-- **Click:** Press **`🚀 Ingest My Shop & Socials (Live Reference Crawl)`**.
-- **Voiceover:** *"Independent artists and Etsy makers sell across 5 to 7 fragmented channels, but they aren't performance marketers. Here is my mom's real art business, Art of Sarabjit Singh. When we paste her website, FineArtAmerica, Saatchi Art, Instagram, and Facebook into Muse Growth Studio, our polite crawler ingests 49 live pages in seconds, respects `robots.txt` on social platforms via Muse Spark Vision screenshot analysis, and discovers her biggest revenue leak: she sells $14 open prints on FineArtAmerica, while her $75 to $900 signed 18k-gold museum editions are hidden behind a manual contact form."*
+The opening disclosure stays visible: this is an interactive demo with saved Muse outputs and sample campaign metrics. Do not describe button clicks as fresh inference. Storefront ingestion is a real external crawl and may be slow; do not depend on it in the recording.
 
----
+## 0:00–0:25 — One seller, one problem
 
-### 0:35 – 1:15 · Evidence-Cited Competitor Intelligence & Ad Library Signals (`Step 1`)
-- **On Screen:** Scroll down in **Step 1 · Cited Market Intelligence**.
-- **Action:** Highlight the verified findings `F1`–`F4` on `www.sikhiart.com` and the **30+ Day Active Competitor Meta Ad Library Signals** (`Desi Canvas Co`, `Punjab Heritage Prints`).
-- **Voiceover:** *"Next, Muse Spark 1.3 analyzes competitor sitemaps and active Meta Ad Library winners. Every claim in our ResearchBrief carries a verified citation badge (`F1` through `F4`)—our `_CitationChecker` automatically strips any URL or quote that wasn't actually crawled. Muse Spark spots that competitors start at $60, have zero collections for Sikh Women or Punjabi Village Life, and have been running a winning 'Collector Set' ad for 44 days."*
+**Screen:** Artist workspace overview, then the first market finding.
 
----
+**Say:** “Independent artists have to be their own marketing team. Muse Growth Studio helps them turn a product into a campaign they can review and use. This is Art of Sarabjit Singh, our real artist case study. Today I'm showing saved Muse results and sample campaign data, so the walkthrough is repeatable. Our goal is to make the next sales action easier; we have not measured sales lift yet.”
 
-### 1:15 – 2:15 · Two-Phase Creative Briefs + Muse Image 1.0 High-Reasoning Workflows (`Step 2`)
-- **On Screen:** Click **Step 2 · Creative & Reels Studio**.
-- **Action:**
-  1. Click through the 4 live workflow presets:
-     - **1. Product Visuals (*Ek Onkar*):** Raw unframed scan -> framed collector living room with brass diya & orchids.
-     - **2. Multi-Image Combine (*Ek Onkar + Kirat Karo Diptych Set*):** Combines two separate paintings side-by-side in matching frames on a sunlit plaster wall (`POST /v1/responses` with `reasoning: high`) to counter-position the competitor's multi-piece collector ad!
-     - **3. Restore Image (*Naam Japo*):** Restores a flat web scan into a crisp, high-resolution natural oak floating frame above a linen meditation bench.
-  2. Point to the **🧠 Muse Image 1.0 Reasoning Trace** box and the **9:16 Collector Reel Preview Player** (click **`🔊 Preview Ambient Audio Hook`**).
-  3. Scroll to the **Two-Phase Creative Brief Studio**: click **`✍️ Phase 1: Draft New Brief (Muse Spark)`** ($0 image cost), tweak a word in the headline, and click **`🎨 Phase 2: Render Approved Creative`**.
-- **Voiceover:** *"For fine art and handmade goods, generic AI image generators ruin the product by redrawing brushstrokes. We combine SAM 3.1 segmentation with Muse Image 1.0's high-reasoning workflows on `/v1/responses`—plus open-weight ComfyUI mirrors on Apple Silicon—so 100% of Sarabjit's original brushwork and 18k-gold calligraphy is preserved untouched. Sellers draft and edit their brief in Phase 1 before spending a single image credit in Phase 2."*
+## 0:25–0:55 — Muse Spark finds the next action
 
----
+**Screen:** Step 1, competitor brief and its source links. Open one finding and show its cited source. Skip the illustrative Ad Library section unless asked.
 
-### 2:15 – 3:00 · Cited Bid Advisor, 1-Click Launch Pack & Multi-Vertical Etsy Switch (`Step 3 & Step 4`)
-- **On Screen:**
-  1. Click **Step 3 · Bid & Budget Advisor**. Show the responsive campaign table (`Retargeting - Site Visitors` at **9.30x ROAS, $6.67 CPA** vs. `Golden Temple - Gift Buyers` with **-70% ROAS trend & creative fatigue**) and the zero-net-spend budget shifts citing `F1` and `F4`.
-  2. Click **Step 4 · 1-Click Launch Pack**. Click **`📋 Copy Embed HTML for Weebly / Shopify`**, **`📋 Copy JSON-LD Schema Snippet`**, and **`⬇ Download Meta Ads CSV Pack`**.
-  3. Click **`▾ Switch / Login`** -> select **`🏺 Saffron & Clay Studio (Etsy Physical Goods Seller)`** to show the entire suite switching to handcrafted stoneware/brass chai sets and holiday gift boxes.
-- **Voiceover:** *"Finally, in Step 3, Python computes every ROAS, CPA, and fatigue metric deterministically—Muse Spark never does mental math—and recommends zero-net-spend budget shifts traced back to findings `F1` and `F4`. In Step 4, one click copies a Stripe Collector Checkout card and Google Rich-Snippet JSON-LD schema to fix her website today, or switches workspaces to any Etsy or Shopify physical-goods brand."*
+**Say:** “The pipeline crawls allowed public pages and computes catalog signals in Python. Muse Spark 1.3 turns that evidence into a structured brief: what competitors offer, where the seller might differentiate, and what to try next. Source checks reject unsupported URLs and quotes; sellers still review the conclusions. The competitor ad examples here are illustrative, and time running does not prove an ad is profitable.”
+
+## 0:55–1:50 — Muse turns an idea into an editable campaign
+
+**Screen:** Step 2. Show the original artwork next to one saved Muse Image staging. Select a second artwork or the diptych. Draft the brief, edit the headline, then preview the approved creative.
+
+**Say:** “Muse Image 1.0 creates visual directions for showing the artwork in a collector's home. These are saved outputs from the implemented image workflows. The seller can draft a brief with Muse Spark, edit the headline and scene direction, and approve it before requesting image generation. In this demo, preview reuses an existing image with the edited copy. The live workflow supports SAM product isolation, but generative staging can alter artwork details. The seller must compare the result with the original before publishing.”
+
+**Recording note:** The animated vertical preview is a browser presentation of an image. Call it a reel preview, not a generated video. Exact artwork pixels require an original-cutout compositing path; do not promise that all displayed images preserve every brushstroke.
+
+## 1:50–2:20 — A budget decision with a reason
+
+**Screen:** Step 3, campaign table, then one recommendation.
+
+**Say:** “For sellers already running ads, Python calculates performance metrics from campaign rows or a CSV export. Muse Spark explains the proposed budget decisions using those computed metrics. These campaign numbers are sample data, not the artist's verified sales results. Recommendations stay under the seller's control; the app does not change a live ad account.”
+
+## 2:20–2:45 — Leave with something usable
+
+**Screen:** Step 4. Download the campaign planning CSV and show the checkout template.
+
+**Say:** “The seller leaves with copy, creative previews, a campaign planning CSV, and a checkout card template. They add their own payment links and check product details before publishing. The CSV is a planning handoff that needs review in Ads Manager. No ad has been launched and no checkout is connected.”
+
+## 2:45–3:00 — Close on value and validation
+
+**Screen:** Best original/staged artwork comparison. Optionally show the second workspace for no more than three seconds.
+
+**Say:** “Muse connects research, creative direction, and the next marketing action in one workflow. Our next test is with artists and makers: can they choose a useful campaign faster, and what must change before they would publish it? We want to earn measurable sales impact through those pilots.”
+
+## Claims to avoid
+
+- No guaranteed revenue, ROI, or measured time savings without an actual pilot.
+- No claim that sample competitor ads are verified or profitable.
+- No claim that demo clicks generate new images or personalized analysis.
+- No claim that all generative outputs preserve exact artwork pixels.
+- No claim that the payment template is connected, that the CSV imports unchanged, or that the image preview is an AI-generated video.
+- Do not state a family relationship, artist biography, pricing, or edition availability unless the seller confirms it.

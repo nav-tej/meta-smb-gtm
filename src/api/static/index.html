@@ -897,9 +897,9 @@
     </div>
 
     <div class="topbar-right">
-      <span class="status-pill" title="Live Meta Model API connected">
+      <span class="status-pill" title="Interactive demo using saved Muse outputs; no API connection check performed">
         <span class="dot"></span>
-        Muse Spark 1.3 + Muse Image 1.0 + SAM 3.1 Live
+        Saved Muse outputs · Interactive demo
       </span>
       <button type="button" class="btn btn-outline" id="openLocalEngineBtn" style="padding:0.35rem 0.75rem;font-size:0.78rem;">
         ⚡ Mac Studio M4 Max Local Setup
@@ -913,13 +913,14 @@
   </header>
 
   <main class="shell">
+    <p role="note" style="padding:0.8rem 1rem;border:1px solid #e7c9a9;border-radius:12px;background:#fff8ec;">Interactive demo: saved Muse outputs and sample campaign data. Custom inputs do not produce personalized AI results in this mode. No ads are launched, payments connected, or sales lift measured.</p>
     <!-- Storefront Overview Hero -->
     <section class="hero-card" aria-label="Connected Seller Workspace">
       <div>
         <span class="eyebrow" id="heroCategory">Fine Artist & Multi-Channel Creator · SF Bay Area</span>
         <h1 class="hero-title" id="heroTitle">Art of Sarabjit Singh — Multi-Channel Growth Workspace</h1>
         <p class="hero-desc" id="heroDesc">
-          Connected across 7 channels (Weebly Website, FineArtAmerica, Pixels, Saatchi Art, Etsy, Instagram <code>@artofsarabjitsingh</code>, and Facebook). Muse Spark audits catalog gaps, stages museum-grade collector rooms with zero brushwork alteration via SAM 3.1, and reallocates ad spend with cited competitor evidence.
+          Connected across 7 channels (Weebly Website, FineArtAmerica, Pixels, Saatchi Art, Etsy, Instagram <code>@artofsarabjitsingh</code>, and Facebook). Muse Spark audits catalog gaps, stages collector rooms for seller review using Muse Image, and reallocates ad spend with cited competitor evidence.
         </p>
         <div class="channel-strip" id="channelStrip">
           <a class="channel-chip ok" href="https://www.artofsarabjitsingh.com/" target="_blank" rel="noopener">✓ artofsarabjitsingh.com (24 pages)</a>
@@ -951,7 +952,7 @@
         <div class="kpi-box">
           <div class="kpi-label">Website Checkout Fix</div>
           <div class="kpi-val" style="color:var(--warn);">Contact Form → 1-Click</div>
-          <div class="kpi-sub">Ready-to-paste Stripe Collector Checkout snippet</div>
+          <div class="kpi-sub">Checkout template · add your payment links</div>
         </div>
       </div>
     </section>
@@ -1060,7 +1061,7 @@
                 placeholder="https://www.sikhiart.com or any competitor store URL"
               />
               <button type="button" class="btn btn-primary" id="runCompBtn">
-                🔍 Run Live Muse Spark Analysis
+                🔍 Load Saved Competitor Brief
               </button>
             </div>
 
@@ -1074,8 +1075,8 @@
           <div class="card">
             <div class="card-header">
               <div>
-                <h2 class="card-title">Active Competitor Meta Ad Library Signals (30+ Days Live)</h2>
-                <p class="card-sub">Ads running 30+ days are profitable winners. Muse Spark extracts their hooks so your ads counter-position immediately.</p>
+                <h2 class="card-title">Illustrative Meta Ad Library Signals</h2>
+                <p class="card-sub">These sample competitor ads illustrate the analysis workflow. Ad longevity alone does not establish profitability.</p>
               </div>
               <span class="badge gold">Instagram + Facebook Feed/Reels</span>
             </div>
@@ -1112,7 +1113,7 @@
         <div class="card-header">
           <div>
             <h2 class="card-title">Select Artwork / Product from Catalog</h2>
-            <p class="card-sub">SAM 3.1 isolates the original canvas so 100% of Sarabjit's brushwork and 18k gold ink stays untouched while staging the surrounding collector room.</p>
+            <p class="card-sub">SAM 3.1 supports product isolation. Generative staging can alter artwork details; review every output against the original before publishing. Exact pixels require compositing the original cutout.</p>
           </div>
           <div style="display:flex;gap:0.5rem;align-items:center;">
             <span class="badge green">Zero Brushwork Hallucination</span>
@@ -1133,7 +1134,7 @@
                 </div>
               </div>
               <div class="stage-box">
-                <span class="stage-tag" style="background:var(--accent);">2. Live Staged Collector Room (Muse Image 1.0)</span>
+                <span class="stage-tag" style="background:var(--accent);">2. Saved Collector Room (Muse Image 1.0)</span>
                 <img id="stageLiveImg" src="/samples/ek_onkar_collector_room_live.webp" alt="Staged collector room artwork" />
                 <div class="stage-foot" id="stageLiveFoot">
                   <strong>Output:</strong> Framed at eye level with museum spotlight, brass diya & orchids—ready for $75–$125 collector checkout.
@@ -1192,7 +1193,7 @@
               ✍️ Phase 1: Draft New Brief (Muse Spark)
             </button>
             <button type="button" class="btn btn-primary" id="renderCreativeBtn">
-              🎨 Phase 2: Render Approved Creative (Live API)
+              🎨 Phase 2: Preview Approved Creative
             </button>
           </div>
         </div>
@@ -1237,7 +1238,7 @@
             </div>
 
             <div id="creativeStatusBanner" style="margin-top:0.85rem;padding:0.65rem 0.85rem;border-radius:var(--radius-sm);background:var(--success-soft);color:var(--success);font-size:0.8rem;font-weight:600;">
-              ✓ Pre-loaded with live <code>muse-image-1.0:edit</code> + <code>sam-3.1</code> render. Edit any field above and click Phase 1 or Phase 2 to run live!
+              ✓ Saved Muse Image example. In demo mode, Phase 1 returns sample copy and Phase 2 pairs your edits with an existing image; it does not generate a new image.
             </div>
           </div>
         </div>
@@ -1258,7 +1259,7 @@
             </label>
             <input type="file" id="csvFileInput" accept=".csv,text/csv" style="display:none;" />
             <button type="button" class="btn btn-primary" id="runBidsBtn">
-              📈 Re-Run Live Muse Spark Bid Advisor
+              📈 Review Sample Bid Advice
             </button>
           </div>
         </div>
@@ -1317,7 +1318,7 @@
           <div class="card-header">
             <div>
               <h2 class="card-title">1. Fix Website Checkout Friction (`artofsarabjitsingh.com`)</h2>
-              <p class="card-sub">Replaces the manual Weebly "contact form to buy" on `/gurus.html` with a 1-click Collector Edition card featuring the staged room preview and direct Stripe Payment Links.</p>
+              <p class="card-sub">Checkout card template for your website. Replace the placeholder links with your own payment links and confirm product details before publishing. No payment integration is connected.</p>
             </div>
             <button type="button" class="btn btn-primary" id="copyWeeblyHtmlBtn">
               📋 Copy Embed HTML for Weebly / Shopify
@@ -1339,7 +1340,7 @@
           <div class="card-header">
             <div>
               <h2 class="card-title">2. Export Meta Ads Manager Campaign Pack</h2>
-              <p class="card-sub">Download the ready-to-import CSV containing your approved headlines, primary text, collector room creative paths, and zero-net-spend budget shifts.</p>
+              <p class="card-sub">Download a campaign planning CSV with copy, sample creative paths, and proposed budget changes. Review and adapt it in Ads Manager before launch.</p>
             </div>
             <button type="button" class="btn btn-dark" id="downloadAdsCsvBtn">
               ⬇ Download Meta Ads CSV Pack
@@ -1403,7 +1404,7 @@ Gurpurab Gifts,Golden Temple - Gift Buyers,-$2.25/day (Refresh Creative),instagr
         <div>
           <span class="eyebrow">Customer Portal Sign-In</span>
           <h2 id="loginDialogTitle" style="margin:0.2rem 0 0;font-size:1.3rem;">Select or Connect Your Small Business Storefront</h2>
-          <p style="margin:0.25rem 0 0;font-size:0.84rem;color:var(--text-muted);">Choose a pre-loaded live workspace or connect any website, Etsy shop, or Instagram handle.</p>
+          <p style="margin:0.25rem 0 0;font-size:0.84rem;color:var(--text-muted);">Choose a saved example workspace or crawl a public storefront. AI results remain samples in demo mode.</p>
         </div>
       </div>
 
@@ -1414,7 +1415,7 @@ Gurpurab Gifts,Golden Temple - Gift Buyers,-$2.25/day (Refresh Creative),instagr
             <code>artofsarabjitsingh.com</code> · FineArtAmerica · Pixels · Saatchi Art · Etsy · <code>@artofsarabjitsingh</code>
           </div>
         </div>
-        <span class="badge green">Live Data Ready</span>
+        <span class="badge green">Saved Demo Ready</span>
       </button>
 
       <button type="button" class="workspace-option" data-ws="etsy_ceramics">
@@ -1620,8 +1621,8 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
         div.className = 'finding-item';
         div.innerHTML = `
           <div class="finding-head">
-            <span class="badge gold">Competitor Ad #${esc(idx + 1)}</span>
-            <span class="badge green">30d+ Proven Hook</span>
+            <span class="badge gold">Sample Ad #${esc(idx + 1)}</span>
+            <span class="badge gold">Illustrative sample hook</span>
           </div>
           <div style="font-size:0.84rem;font-weight:600;">${esc(hook)}</div>
         `;
@@ -1665,7 +1666,7 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
       document.getElementById('briefPrimaryText').value = art.primary_text;
       document.getElementById('briefScenePrompt').value = art.scene_prompt;
       document.getElementById('stageLiveFoot').innerHTML =
-        `<strong>Output:</strong> ${art.exhibited_at} · Direct Signed Edition $${art.price_direct_usd} vs. $${art.price_pod_usd} POD print.`;
+        `<strong>Output:</strong> ${esc(art.exhibited_at)} · Sample offer $${esc(art.price_direct_usd)} vs. $${esc(art.price_pod_usd)} marketplace price.`;
       if (art.reasoning_summary) {
         document.getElementById('museReasoningText').textContent = art.reasoning_summary;
       }
@@ -1744,10 +1745,18 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
     }
 
     async function loadPresets() {
-      const resp = await fetch('/api/v1/demo-presets');
-      const data = await resp.json();
+      let data;
+      try {
+        const resp = await fetch('/api/v1/demo-presets');
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        data = await resp.json();
+      } catch (err) {
+        showToast(`Demo could not load: ${err.message}. Reload to retry.`);
+        document.getElementById('compSummaryText').textContent = 'Demo unavailable. Reload the page to retry loading the saved results.';
+        return;
+      }
       state.presets = data;
-      const ws = data.workspaces.sarabjit_singh;
+      const ws = data.workspaces[state.activeWorkspace];
       renderCompetitorBrief(ws.competitor_brief);
       renderDiagnosticsAndAds(ws);
       renderArtworksShowcase(ws);
@@ -1760,9 +1769,9 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
       const url = document.getElementById('compUrlInput').value.trim();
       if (!url) return;
       btn.disabled = true;
-      btn.textContent = '⏳ Muse Spark Crawling & Citing...';
+      btn.textContent = '⏳ Loading competitor brief...';
       try {
-        const ws = state.presets.workspaces.sarabjit_singh;
+        const ws = state.presets.workspaces[state.activeWorkspace];
         const resp = await fetch('/api/v1/analyze-competitors', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1776,12 +1785,12 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
         const brief = await resp.json();
         ws.competitor_brief = brief;
         renderCompetitorBrief(brief);
-        showToast('✓ Live Competitor Brief + Cited Findings updated!');
+        showToast('✓ Saved competitor brief loaded · example data');
       } catch (err) {
         showToast(`Note: Using cached live brief (${err.message})`);
       } finally {
         btn.disabled = false;
-        btn.textContent = '🔍 Run Live Muse Spark Analysis';
+        btn.textContent = '🔍 Load Saved Competitor Brief';
       }
     });
 
@@ -1792,7 +1801,7 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
       btn.disabled = true;
       btn.textContent = '⏳ Drafting with Muse Spark 1.3...';
       try {
-        const ws = state.presets.workspaces.sarabjit_singh;
+        const ws = state.presets.workspaces[state.activeWorkspace];
         const art = ws.artworks_showcase[state.selectedArtworkIdx];
         const resp = await fetch('/api/v1/generate-ads', {
           method: 'POST',
@@ -1820,7 +1829,7 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
           document.getElementById('briefScenePrompt').value = v.image_prompt;
           document.getElementById('reelHeadline').textContent = v.headline;
         }
-        banner.textContent = `✓ Phase 1 Draft generated by Muse Spark 1.3 (0 image credits used). Review/edit fields above, then click Phase 2!`;
+        banner.textContent = `✓ Draft loaded. Demo mode uses saved sample copy (0 image credits used). Edit the fields, then preview your approved creative.`;
         showToast('✓ Phase 1 Editable Creative Brief drafted!');
       } catch (err) {
         showToast(`Draft error: ${err.message}`);
@@ -1835,9 +1844,9 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
       const btn = document.getElementById('renderCreativeBtn');
       const banner = document.getElementById('creativeStatusBanner');
       btn.disabled = true;
-      btn.textContent = '⏳ SAM 3.1 + Muse Image 1.0 Rendering...';
+      btn.textContent = '⏳ Preparing approved creative preview...';
       try {
-        const ws = state.presets.workspaces.sarabjit_singh;
+        const ws = state.presets.workspaces[state.activeWorkspace];
         const art = ws.artworks_showcase[state.selectedArtworkIdx];
         // Fetch the original sample image and convert to base64 so SAM 3.1 + Muse Image 1.0 Edit run on the exact painting
         const imgResp = await fetch(art.original_image);
@@ -1887,7 +1896,7 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
           brief: {
             product_title: art.title,
             positioning_hook: 'Museum-exhibited signed 18k gold collector edition',
-            preserve_product_note: 'SAM 3.1 preserves original canvas untouched',
+            preserve_product_note: 'Compare generated details with the original before publishing',
             estimated_paid_calls: 2,
             variants: [
               {
@@ -1915,7 +1924,8 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
         const result = await resp.json();
         if (result.creatives && result.creatives.length > 0) {
           const c = result.creatives[0];
-          const relPath = c.image_path.includes('outputs/')
+          const cached = c.produced_by.startsWith('demo-cache');
+          const relPath = cached ? art.staged_image : c.image_path.includes('outputs/')
             ? '/outputs/' + c.image_path.split('outputs/').pop()
             : c.image_path.startsWith('samples/') ? '/' + c.image_path : art.staged_image;
           document.getElementById('stageLiveImg').src = relPath;
@@ -1924,14 +1934,16 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
           if (c.reasoning_summary) {
             document.getElementById('museReasoningText').textContent = c.reasoning_summary;
           }
-          banner.textContent = `✓ Rendered live via ${c.produced_by} (${relPath})!`;
-          showToast(`✓ Live Creative rendered via ${c.produced_by}!`);
+          banner.textContent = cached
+            ? `✓ Saved image preview with your edited copy. No new image generated (${relPath}).`
+            : `✓ Generated via ${c.produced_by} (${relPath}). Review product details before publishing.`;
+          showToast(cached ? '✓ Demo preview ready · saved image, edited copy' : `✓ Creative generated via ${c.produced_by}`);
         }
       } catch (err) {
         showToast(`Render note: ${err.message}`);
       } finally {
         btn.disabled = false;
-        btn.textContent = '🎨 Phase 2: Render Approved Creative (Live API)';
+        btn.textContent = '🎨 Phase 2: Preview Approved Creative';
       }
     });
 
@@ -1939,9 +1951,9 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
     document.getElementById('runBidsBtn').addEventListener('click', async () => {
       const btn = document.getElementById('runBidsBtn');
       btn.disabled = true;
-      btn.textContent = '⏳ Muse Spark Re-Evaluating Bids...';
+      btn.textContent = '⏳ Loading sample campaign advice...';
       try {
-        const ws = state.presets.workspaces.sarabjit_singh;
+        const ws = state.presets.workspaces[state.activeWorkspace];
         const resp = await fetch('/api/v1/bid-advice', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1953,12 +1965,12 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const advice = await resp.json();
         renderBidAdvisor(advice);
-        showToast('✓ Live Bid & Budget Advisor updated!');
+        showToast('✓ Sample bid advice loaded · no account changes');
       } catch (err) {
         showToast(`Bid advisor note: ${err.message}`);
       } finally {
         btn.disabled = false;
-        btn.textContent = '📈 Re-Run Live Muse Spark Bid Advisor';
+        btn.textContent = '📈 Review Sample Bid Advice';
       }
     });
 
@@ -1968,7 +1980,7 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
       btn.disabled = true;
       btn.textContent = '⏳ Auditing 7 Channels...';
       try {
-        const ws = state.presets.workspaces.sarabjit_singh;
+        const ws = state.presets.workspaces[state.activeWorkspace];
         const resp = await fetch('/api/v1/audit-seller', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1988,7 +2000,7 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
           ];
           renderCompetitorBrief(ws.competitor_brief);
         }
-        showToast('✓ Multi-Channel Seller Audit updated by Muse Spark!');
+        showToast('✓ Seller diagnostics refreshed · review the displayed results');
       } catch (err) {
         showToast(`Audit note: ${err.message}`);
       } finally {
@@ -2163,7 +2175,7 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
         });
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const data = await resp.json();
-        const ws = state.presets.workspaces.sarabjit_singh;
+        const ws = state.presets.workspaces[state.activeWorkspace];
         if (ws && ws.competitor_brief) {
           ws.competitor_brief.seller_context = data.seller_context;
         }
@@ -2178,7 +2190,7 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
         box.innerHTML = `
           <div style="margin-bottom:0.4rem;"><strong>✓ Live Storefront Reference Ingested (${esc(data.total_pages_crawled)} pages crawled across ${esc(data.total_channels)} channels):</strong> ${chipsHtml}</div>
           <div style="font-size:0.79rem;color:var(--text-muted);margin-bottom:0.35rem;"><strong>Sample Discovered Pages:</strong> ${sampleLinks || 'Loaded from profile'}</div>
-          <div style="font-size:0.78rem;color:var(--text);"><strong>Reference Context sent to Muse Spark:</strong> <code>${esc(data.seller_context)}</code></div>
+          <div style="font-size:0.78rem;color:var(--text);"><strong>Crawled reference context (saved; demo AI outputs stay unchanged):</strong> <code>${esc(data.seller_context)}</code></div>
         `;
         showToast(`✓ Ingested ${data.total_pages_crawled} pages across ${data.total_channels} seller channels!`);
       } catch (err) {

@@ -412,3 +412,20 @@ This app fetches arbitrary URLs, parses untrusted XML, and feeds third-party con
 ### Next tasks: Gemini CLI
 - Pick an unowned item above, say which in your commit message, and keep to files nobody else
   owns tonight.
+
+### Codex demo-readiness work — November 3, 2026
+
+- Scope: demo accuracy and recording readiness. See `docs/TONIGHT_DEMO_RUNBOOK.md` for the shared ownership proposal and release checklist.
+- Updated portal labels to distinguish saved outputs from live generation, mark competitor ad examples illustrative, qualify artwork fidelity, and identify checkout/CSV handoffs as templates requiring review.
+- Replaced `docs/DEMO_VIDEO_SCRIPT.md` with a three-minute seller-focused story and explicit sample-data disclosures.
+- Baseline `make check`: 94 passed, lint and format clean. No billed Muse calls made.
+- Claude retains deployment ownership; Gemini/Antigravity should confirm portal ownership before edits; Hermes retains optional local video/testing scope. No direct agent sessions have been contacted by Codex.
+
+- In-process smoke: health, portal, presets, and all seven saved image assets returned 200. Local server bind is prohibited by this session sandbox; Vercel identity lookup failed (`fetch failed`). Deployment/browser/recording remain unverified and assigned to the release owner.
+
+### Codex coordination follow-up — November 3
+
+- User explicitly authorized direct delegation to Claude, Gemini, and Hermes, and Vercel publication. Detailed assignments and delivery state: `.tasks/assignments.json`; prompts in `.tasks/*-assignment.txt`.
+- Latest confirmed Claude progress: `75a5109`. No newer Gemini commit or Hermes reel found locally; remote state not freshly fetched. CLI delivery attempts failed: Claude not logged in, Gemini timeout, Hermes gateway authorization. **No acknowledgement received; do not mark these agents active.**
+- Codex fixed active-workspace handlers, selected-product saved previews, remaining live/proven-ad labels, and escaped artwork details. Added `tests/test_portal_demo.py` plus the Node handler harness. README explains cached-only deployment and sample provenance.
+- Vercel CLI installed but network/DNS blocked here; optional Vercel integration located but not connected. Deployment remains unverified. Claude should publish from its authenticated normal terminal with DEMO_MODE=true and no live API keys needed.

@@ -1,0 +1,17 @@
+{
+  "date": "2026-11-03",
+  "assignments": {
+    "codex": "P0 integrate and fix portal, README, demo script; release checks",
+    "claude": "P0 Vercel deployment and production verification",
+    "gemini": "P0 offline route/CSV coverage and blockers",
+    "hermes": "P1 optional local reel; never block recording"
+  },
+  "status": "Prepared and CLI delivery attempted; no agent has acknowledged.",
+  "delivery": {
+    "claude": "CLI not logged in; existing session latest confirmed work is commit 75a5109",
+    "gemini": "CLI timed out after 45 seconds; no project contribution verified",
+    "hermes": "Gateway authorization failed; no remote peers or project sessions registered on this Mac",
+    "codex": "Portal workspace/cache regressions fixed; README and demo script updated; regression test passes",
+    "vercel": "CLI identity check failed; api.vercel.com DNS unavailable in sandbox; optional integration not connected"
+  }
+}
