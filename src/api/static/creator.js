@@ -159,7 +159,7 @@
     state.step = step;
     document.querySelectorAll('[data-panel]').forEach((el) => { el.hidden = Number(el.dataset.panel) !== step; });
     document.querySelectorAll('[data-step]').forEach((el) => { if (Number(el.dataset.step) === step) el.setAttribute('aria-current', 'step'); else el.removeAttribute('aria-current'); });
-    $('backButton').disabled = step === 0; $('nextButton').hidden = step === 3; $('nextButton').textContent = ['Choose an idea →', 'Make it yours →', 'Ready to share →'][step] || 'Continue'; $('stepCount').textContent = `Step ${step + 1} of 4`;
+    $('backButton').disabled = step === 0; $('nextButton').hidden = step === 3; $('nextButton').textContent = ['Choose an idea →', 'Make it yours →', 'Ready to share →'][step] || 'Continue'; $('stepCount').textContent = `Step ${step + 1} of 4`; $('tryNext').hidden = state.custom || state.workspace !== 'sarabjit_singh';
     refreshPreview(); const h = document.querySelector(`[data-panel="${step}"] h2`); h.tabIndex = -1; h.focus({ preventScroll: true }); h.scrollIntoView({ behavior: 'auto', block: 'start' });
   }
   function refreshPreview() {
@@ -258,6 +258,9 @@
     if (readiness.status === 'fulfilled') { state.readiness = readiness.value; state.defaultLive = readiness.value.default_mode === 'live'; if (state.defaultLive) notify('This local server supports live requests. Turn on live mode in presenter settings before making billed Muse calls.'); }
     updateMode();
   });
+  // Ranked ideas on the portal link here with ?goal=story|gift|visit; only known goals are accepted.
+  const requestedGoal = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('goal') : null;
+  if (requestedGoal && Object.hasOwn(goals, requestedGoal)) document.querySelector?.(`[data-goal="${requestedGoal}"]`)?.click();
   // Expose a read-only snapshot for focused offline contract checks; never expose the unlock key.
   window.museCreatorSnapshot = () => JSON.parse(JSON.stringify(campaignPack()));
 })();

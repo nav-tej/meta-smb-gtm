@@ -975,16 +975,16 @@
   </header>
 
   <main class="shell">
-    <section id="journey" class="journey" aria-label="Your growth plan">
+    <section id="journey" class="journey" aria-label="Your growth loop">
       <div class="jr-hero">
         <div>
-          <p class="jr-eyebrow">Art of Sarabjit Singh · today’s plan</p>
-          <h1>From your work to your next post, in four steps.</h1>
+          <p class="jr-eyebrow">Art of Sarabjit Singh · growth loop</p>
+          <h1>Research, create, improve, repeat: every post learns from the last.</h1>
           <div class="jr-stats" role="list">
             <div role="listitem"><strong>300</strong><span>competitor pages read</span></div>
-            <div role="listitem"><strong>4</strong><span>similar sellers suggested</span></div>
-            <div role="listitem"><strong>5</strong><span>Muse Spark recommendations</span></div>
-            <div role="listitem"><strong>~6</strong><span>clicks to a ready post</span></div>
+            <div role="listitem"><strong>4</strong><span>similar sellers priced</span></div>
+            <div role="listitem"><strong>5</strong><span>ranked Muse Spark ideas</span></div>
+            <div role="listitem"><strong>4</strong><span>saved Muse Image ads</span></div>
           </div>
         </div>
         <aside class="jr-estimate" aria-label="Estimated time saved">
@@ -994,89 +994,167 @@
         </aside>
       </div>
 
-      <ol class="jr-progress" aria-label="Steps">
-        <li class="c1"><span>1</span>Your business</li>
-        <li class="c2"><span>2</span>Similar sellers</li>
-        <li class="c3"><span>3</span>Muse recommends</li>
-        <li class="c4"><span>4</span>Create</li>
-      </ol>
+      <nav class="jr-loop" aria-label="Growth loop stages">
+        <ol>
+          <li class="c2"><a href="#loop-research"><span>1</span><strong>Research</strong><em>What similar sellers do</em></a></li>
+          <li class="c4"><a href="#loop-create"><span>2</span><strong>Create</strong><em>One ready-to-post ad</em></a></li>
+          <li class="c1"><a href="#loop-improve"><span>3</span><strong>Improve</strong><em>Ranked next moves</em></a></li>
+          <li class="c3"><a href="#loop-iterate"><span>4</span><strong>Iterate</strong><em>Learn, then go again</em></a></li>
+        </ol>
+        <svg class="jr-loop-return" viewBox="0 0 1000 60" preserveAspectRatio="none" aria-hidden="true"><defs><marker id="jrArrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b7791f"/></marker></defs><path d="M875,6 C875,52 125,52 125,10" fill="none" stroke="#b7791f" stroke-width="2.5" stroke-dasharray="7 6" marker-end="url(#jrArrow)"/></svg>
+        <p class="jr-loop-caption">↺ Each cycle starts from what the last post and your competitors taught you.</p>
+      </nav>
 
-      <div class="jr-grid">
-        <article class="jr-card c1">
-          <header><span class="jr-num">1</span><h3>Your business</h3></header>
-          <div class="jr-biz">
-            <span class="jr-avatar" aria-hidden="true">SS</span>
-            <div><strong>Art of Sarabjit Singh</strong><span>Original Sikh heritage art · SF Bay Area</span></div>
-          </div>
-          <p class="jr-label">Sells on</p>
-          <div class="jr-pills">
-            <span class="jr-pill star">★ Pixels · preferred</span>
-            <span class="jr-pill">Fine Art America</span>
-            <span class="jr-pill">Saatchi Art</span>
-            <span class="jr-pill">Own website</span>
-            <span class="jr-pill off">Etsy · closed</span>
-          </div>
-          <p class="jr-label">Posts on</p>
-          <div class="jr-pills"><span class="jr-pill">Instagram</span><span class="jr-pill">Facebook</span></div>
-          <button type="button" class="jr-action" id="journeyResearch">View full competitor research →</button>
-        </article>
-
-        <article class="jr-card c2">
-          <header><span class="jr-num">2</span><h3>Similar sellers</h3></header>
-          <ul class="jr-sellers" id="sellerList">
-            <li class="jr-seller has-brief">
-              <div><strong>SikhiArt.com</strong><span>Sikh history paintings &amp; prints · 300 pages</span></div>
-              <button type="button" class="jr-mini primary" id="journeyLoadBrief">Analyze this seller →</button>
-            </li>
-            <li class="jr-seller">
-              <div><a href="https://fineartamerica.com/profiles/gurinderpreet-kaur/art/paintings" target="_blank" rel="noopener noreferrer">Gurinderpreet Kaur</a><span>Fine Art America · 70 listings</span></div>
-              <button type="button" class="jr-mini" disabled title="Live analysis is off in this demo">Request analysis →</button>
-            </li>
-            <li class="jr-seller">
-              <div><a href="https://fineartamerica.com/profiles/manjot-singh-sachdeva/art/photographs" target="_blank" rel="noopener noreferrer">Manjot Singh Sachdeva</a><span>Golden Temple photos · FAA / Pixels · 105 listings</span></div>
-              <button type="button" class="jr-mini" disabled title="Live analysis is off in this demo">Request analysis →</button>
-            </li>
-            <li class="jr-seller">
-              <div><a href="https://www.saatchiart.com/gurdishpannu" target="_blank" rel="noopener noreferrer">Gurdish Pannu</a><span>Punjabi folk &amp; Sikh heritage · Saatchi Art</span></div>
-              <button type="button" class="jr-mini" disabled title="Live analysis is off in this demo">Request analysis →</button>
-            </li>
-          </ul>
-          <form class="jr-add" id="addCompetitorForm" novalidate>
-            <label for="addCompetitorInput">Add another competitor to analyze</label>
-            <div><input id="addCompetitorInput" type="url" inputmode="url" placeholder="https://their-shop.com" maxlength="300"><button type="submit" class="jr-mini primary">Add</button></div>
-          </form>
-          <p class="jr-note">Public snapshots captured Nov 3, 2026. Only SikhiArt.com has a saved Muse Spark brief; new analyses need a live server.</p>
-        </article>
-
-        <article class="jr-card c3">
-          <header><span class="jr-num">3</span><h3>Muse recommends</h3></header>
-          <div class="jr-reco">
-            <img src="/samples/ek_onkar_original.jpg" alt="Ek Onkar by Sarabjit Singh" width="96" height="96" loading="lazy">
-            <div>
-              <strong>Post Ek Onkar with a personal story about connection and equality.</strong>
-              <span>Why: SikhiArt.com sells guru and warrior prints with almost no stories (2 blog pages). A story-led post stands apart.</span>
+      <!-- 1. RESEARCH -->
+      <div class="jr-stage c2" id="loop-research">
+        <header class="jr-stage-head"><span class="jr-stage-num">1</span><div><h2>Research</h2><p>Who sells similar art, what they charge and how they advertise.</p></div></header>
+        <div class="jr-row three">
+          <article class="jr-card c1">
+            <header><h3>Your business</h3></header>
+            <div class="jr-biz">
+              <span class="jr-avatar" aria-hidden="true">SS</span>
+              <div><strong>Art of Sarabjit Singh</strong><span>Original Sikh heritage art · SF Bay Area</span></div>
             </div>
-          </div>
-          <a class="jr-action solid" href="/create">Create this post now →</a>
-          <p class="jr-note">From the saved Muse Spark brief (Nov 3). Ek Onkar and “Share the story” are pre-selected. You decide what to post.</p>
-        </article>
+            <p class="jr-label">Sells on</p>
+            <div class="jr-pills">
+              <span class="jr-pill star">★ Pixels · preferred</span>
+              <span class="jr-pill">Fine Art America</span>
+              <span class="jr-pill">Saatchi Art</span>
+              <span class="jr-pill">Own website</span>
+              <span class="jr-pill off">Etsy · closed</span>
+            </div>
+            <p class="jr-label">Posts on</p>
+            <div class="jr-pills"><span class="jr-pill">Instagram</span><span class="jr-pill">Facebook</span></div>
+            <button type="button" class="jr-action" id="journeyResearch">View full competitor research →</button>
+          </article>
 
-        <article class="jr-card c4 jr-cta">
-          <header><span class="jr-num">4</span><h3>Create your post</h3></header>
-          <ol class="jr-mini-steps"><li>Pick the painting</li><li>Choose “Share the story”</li><li>Make the words yours</li><li>Download and post</li></ol>
-          <a class="jr-action solid big" href="/create">Create your next post →</a>
-          <p class="jr-note">Ready-to-post image and caption. Nothing is posted for you.</p>
-        </article>
-      </div>
+          <article class="jr-card c2">
+            <header><h3>Similar sellers</h3></header>
+            <ul class="jr-sellers" id="sellerList">
+              <li class="jr-seller has-brief">
+                <div><strong>SikhiArt.com</strong><span>Sikh history paintings &amp; prints · 300 pages</span></div>
+                <button type="button" class="jr-mini primary" id="journeyLoadBrief">Analyze this seller →</button>
+              </li>
+              <li class="jr-seller">
+                <div><a href="https://fineartamerica.com/profiles/gurinderpreet-kaur/art/paintings" target="_blank" rel="noopener noreferrer">Gurinderpreet Kaur</a><span>Fine Art America · 70 listings</span></div>
+                <button type="button" class="jr-mini" disabled title="Live analysis is off in this demo">Request analysis →</button>
+              </li>
+              <li class="jr-seller">
+                <div><a href="https://fineartamerica.com/profiles/manjot-singh-sachdeva/art/photographs" target="_blank" rel="noopener noreferrer">Manjot Singh Sachdeva</a><span>Golden Temple photos · FAA / Pixels · 105 listings</span></div>
+                <button type="button" class="jr-mini" disabled title="Live analysis is off in this demo">Request analysis →</button>
+              </li>
+              <li class="jr-seller">
+                <div><a href="https://www.saatchiart.com/gurdishpannu" target="_blank" rel="noopener noreferrer">Gurdish Pannu</a><span>Punjabi folk &amp; Sikh heritage · Saatchi Art</span></div>
+                <button type="button" class="jr-mini" disabled title="Live analysis is off in this demo">Request analysis →</button>
+              </li>
+            </ul>
+            <form class="jr-add" id="addCompetitorForm" novalidate>
+              <label for="addCompetitorInput">Add another competitor to analyze</label>
+              <div><input id="addCompetitorInput" type="url" inputmode="url" placeholder="https://their-shop.com" maxlength="300"><button type="submit" class="jr-mini primary">Add</button></div>
+            </form>
+            <p class="jr-note">Public snapshots captured Nov 3, 2026. Only SikhiArt.com has a saved Muse Spark brief; new analyses need a live server.</p>
+          </article>
 
-      <div class="jr-next" aria-labelledby="whatsNextTitle">
-        <h2 id="whatsNextTitle">What’s next?</h2>
-        <div class="jr-next-grid">
-          <a class="jr-next-card" href="/create"><span class="jr-next-icon c4" aria-hidden="true">✦</span><strong>Create a post</strong><span>Turn Ek Onkar into a ready-to-share image and caption.</span><em>Start →</em></a>
-          <button type="button" class="jr-next-card" id="journeyBudget"><span class="jr-next-icon c2" aria-hidden="true">◔</span><strong>Review budget strategy</strong><span>See where Muse Spark would move ad budget, and why (sample data).</span><em>Review →</em></button>
-          <a class="jr-next-card" href="/today"><span class="jr-next-icon c3" aria-hidden="true">☀</span><strong>Check daily post desk</strong><span>One good post a day, with your next three ideas.</span><em>Open →</em></a>
+          <article class="jr-card c2">
+            <header><h3>What they charge &amp; advertise</h3></header>
+            <ul class="jr-prices" aria-label="Print price ranges, log scale">
+              <li class="you"><span class="jr-price-name">You · Pixels prints</span><span class="jr-price-bar"><i style="--l:5.9%;--w:7.9%"></i></span><span class="jr-price-val">$14–$22</span></li>
+              <li><span class="jr-price-name">Manjot S. Sachdeva</span><span class="jr-price-bar"><i style="--l:6.0%;--w:9.7%"></i></span><span class="jr-price-val">$14–$24</span></li>
+              <li><span class="jr-price-name">Gurinderpreet Kaur</span><span class="jr-price-bar"><i style="--l:5.7%;--w:22.4%"></i></span><span class="jr-price-val">$14–$50</span></li>
+              <li><span class="jr-price-name">SikhiArt.com</span><span class="jr-price-bar"><i style="--l:31.4%;--w:65.4%"></i></span><span class="jr-price-val">$60–$2,500</span></li>
+            </ul>
+            <p class="jr-scale" aria-hidden="true"><span style="left:0">$10</span><span style="left:40.4%">$100</span><span style="left:80.7%">$1,000</span></p>
+            <dl class="jr-facts">
+              <div><dt>Ad formats</dt><dd>Room-scene images, “see it on your wall” and festival-gift copy on Instagram + Facebook. <em>Illustrative examples, not real Ad Library records.</em></dd></div>
+              <div><dt>Ad spend</dt><dd>Not public. Meta’s Ad Library shows spend only for political and issue ads, so competitor budgets can’t be seen.</dd></div>
+            </dl>
+            <p class="jr-note">Prices from public listing snapshots (Nov 3): 40 Manjot, 35 Gurinderpreet and 39 SikhiArt prices. Gurdish Pannu sells originals with no USD prices listed.</p>
+          </article>
         </div>
       </div>
+
+      <!-- 2. CREATE -->
+      <div class="jr-stage c4" id="loop-create">
+        <header class="jr-stage-head"><span class="jr-stage-num">2</span><div><h2>Create</h2><p>Ads Muse Image already made from her paintings. Tap one to see the full ad.</p></div></header>
+        <div class="jr-row create">
+          <div class="jr-gallery" id="adGallery" aria-live="polite"><p class="jr-note">Loading saved Muse ads…</p></div>
+          <article class="jr-card c4 jr-cta">
+            <header><h3>Make your next post</h3></header>
+            <ol class="jr-mini-steps"><li>Pick the painting</li><li>Choose “Share the story”</li><li>Make the words yours</li><li>Download and post</li></ol>
+            <a class="jr-action solid big" href="/create">Create your next post →</a>
+            <p class="jr-note">Ready-to-post image and caption. Nothing is posted for you.</p>
+          </article>
+        </div>
+        <p class="jr-note">Saved Muse Image 1.0 ads from Nov 3. Their copy used prices and edition details from her website then; confirm with the artist before reusing.</p>
+      </div>
+
+      <!-- 3. IMPROVE -->
+      <div class="jr-stage c1" id="loop-improve">
+        <header class="jr-stage-head"><span class="jr-stage-num">3</span><div><h2>Improve</h2><p>Muse Spark’s next moves, ranked by the priority it gave each one.</p></div></header>
+        <div class="jr-row improve">
+          <ol class="jr-recos">
+            <li>
+              <span class="jr-impact high">High impact · competitors don’t have this</span>
+              <strong>Feature your Empowering Women series</strong>
+              <p>SikhiArt.com groups its art by warriors and saints but has no group for women. Post one Empowering Women piece and point people to that series on Pixels.</p>
+              <a href="/create?goal=story">Make this post →</a>
+            </li>
+            <li>
+              <span class="jr-impact high">High impact · undercuts a $59.99 entry price</span>
+              <strong>Lead with your $14–$22 Pixels prints</strong>
+              <p>SikhiArt’s cheapest print is $59.99. Your Pixels prints already start at about $14, so make that the easy first purchase. <em>Adapted from Muse’s Etsy suggestion; Etsy is closed.</em></p>
+              <a href="/create?goal=visit">Make a shop-visit post →</a>
+            </li>
+            <li>
+              <span class="jr-impact medium">Medium · reaches gift buyers</span>
+              <strong>Make a gift-ready post</strong>
+              <p>SikhiArt uses gift wording but has nothing under $59.99. Show one print as a thoughtful gift.</p>
+              <a href="/create?goal=gift">Make a gift post →</a>
+            </li>
+            <li>
+              <span class="jr-impact medium">Medium · improves search visibility</span>
+              <strong>Add “for your home” to three titles</strong>
+              <p>Almost every SikhiArt title says “for your home”. Try it on three of your Pixels listing titles.</p>
+              <span class="jr-reco-where">Do this in your Pixels shop</span>
+            </li>
+            <li>
+              <span class="jr-impact low">Quick win · stands out from 2 blog pages</span>
+              <strong>Tell one painting story</strong>
+              <p>SikhiArt has only two blog pages. A five-sentence story about one painting sets you apart. Ek Onkar is ready to go.</p>
+              <a href="/create">Create this post now →</a>
+            </li>
+          </ol>
+          <aside class="jr-card c1">
+            <header><h3>If you run ads</h3></header>
+            <p>Muse Spark reads your campaign numbers and suggests where to move budget, with the metric behind each move.</p>
+            <button type="button" class="jr-action" id="journeyBudget">Review budget strategy →</button>
+            <p class="jr-note">Sample campaign data. Advice only; nothing changes in your ad account.</p>
+          </aside>
+        </div>
+        <p class="jr-note">Ranked using the high, medium and low priorities in the saved Muse Spark brief on SikhiArt.com (Nov 3). Impact labels describe why, not a measured result.</p>
+      </div>
+
+      <!-- 4. ITERATE -->
+      <div class="jr-stage c3" id="loop-iterate">
+        <header class="jr-stage-head"><span class="jr-stage-num">4</span><div><h2>Iterate</h2><p>After you post: learn what worked, then start the next cycle.</p></div></header>
+        <div class="jr-next-grid">
+          <a class="jr-next-card" href="/today"><span class="jr-next-icon c3" aria-hidden="true">☀</span><strong>Log how it did</strong><span>Enter views, clicks and inquiries in the daily desk to get one thing to improve.</span><em>Open daily desk →</em></a>
+          <a class="jr-next-card" href="#loop-improve"><span class="jr-next-icon c1" aria-hidden="true">↑</span><strong>Try the next idea</strong><span>Pick the next ranked move, such as your Empowering Women series.</span><em>See ranked ideas →</em></a>
+          <a class="jr-next-card" href="#loop-research"><span class="jr-next-icon c2" aria-hidden="true">↺</span><strong>Start the next cycle</strong><span>Re-check similar sellers and prices before your next post.</span><em>Back to research →</em></a>
+        </div>
+      </div>
+
+      <dialog id="adDialog" class="jr-dialog" aria-labelledby="adDialogTitle">
+        <form method="dialog"><button class="jr-dialog-close" aria-label="Close">×</button></form>
+        <img id="adDialogImg" alt="">
+        <div class="jr-dialog-body">
+          <p class="jr-label" id="adDialogKind"></p>
+          <h3 id="adDialogTitle"></h3>
+          <p id="adDialogText"></p>
+          <p class="jr-note">Saved Muse Image 1.0 output (Nov 3). AI scenes can change artwork details; prices and edition details need the artist’s confirmation.</p>
+          <a class="jr-action solid c4" href="/create">Make a post like this →</a>
+        </div>
+      </dialog>
     </section>
 
         <p role="note" style="padding:0.8rem 1rem;border:1px solid #e7c9a9;border-radius:12px;background:#fff8ec;">Interactive demo: saved Muse outputs and sample campaign data. Custom inputs do not produce personalized AI results in this mode. No ads are launched, payments connected, or sales lift measured.</p>
@@ -1862,6 +1940,7 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
     }
 
     function renderArtworksShowcase(ws) {
+      renderAdGallery(ws);
       const list = ws.artworks_showcase || [];
       const selEl = document.getElementById('artworkSelector');
       selEl.innerHTML = '';
@@ -2006,15 +2085,49 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
       name.textContent = url.hostname.replace(/^www\./, '');
       const meta = document.createElement('span');
       meta.textContent = 'Added by you · analysis needs a live server';
-      info.append(name, meta);
+      info.appendChild(name); info.appendChild(meta);
       const btn = document.createElement('button');
       btn.type = 'button'; btn.className = 'jr-mini'; btn.disabled = true;
       btn.title = 'Live analysis is off in this demo'; btn.textContent = 'Request analysis →';
-      li.append(info, btn);
-      document.getElementById('sellerList').append(li);
+      li.appendChild(info); li.appendChild(btn);
+      document.getElementById('sellerList').appendChild(li);
       input.value = '';
     });
     document.getElementById('addCompetitorInput').addEventListener('input', (event) => event.target.setCustomValidity(''));
+
+    const AD_KIND = { product_visuals: 'Collector room scene', multi_image_combine: 'Two-painting set', restore_enhance: 'Restored scan, framed' };
+    function openAd(art) {
+      const dialog = document.getElementById('adDialog');
+      const img = document.getElementById('adDialogImg');
+      img.src = safeUrl(art.staged_image);
+      img.alt = `Saved Muse Image ad: ${art.headline || 'artwork scene'}`;
+      document.getElementById('adDialogKind').textContent = AD_KIND[art.workflow_mode] || 'Muse Image scene';
+      document.getElementById('adDialogTitle').textContent = art.headline || '';
+      document.getElementById('adDialogText').textContent = art.primary_text || '';
+      if (typeof dialog.showModal === 'function') dialog.showModal(); else dialog.setAttribute('open', '');
+    }
+    function renderAdGallery(ws) {
+      const box = document.getElementById('adGallery');
+      if (!box) return;
+      box.textContent = '';
+      const arts = (ws.artworks_showcase || []).filter((a) => a && a.staged_image && a.headline).slice(0, 4);
+      if (!arts.length) { const p = document.createElement('p'); p.className = 'jr-note'; p.textContent = 'No saved Muse ads for this workspace.'; box.appendChild(p); return; }
+      for (const art of arts) {
+        const card = document.createElement('button');
+        card.type = 'button'; card.className = 'jr-ad';
+        const img = document.createElement('img');
+        img.src = safeUrl(art.staged_image); img.alt = ''; img.loading = 'lazy';
+        const kind = document.createElement('span'); kind.className = 'jr-ad-kind'; kind.textContent = AD_KIND[art.workflow_mode] || 'Muse Image scene';
+        const head = document.createElement('strong'); head.textContent = art.headline;
+        const text = document.createElement('span'); text.className = 'jr-ad-text'; text.textContent = art.primary_text || '';
+        const more = document.createElement('em'); more.textContent = 'View ad →';
+        [img, kind, head, text, more].forEach((child) => card.appendChild(child));
+        card.setAttribute('aria-label', `View saved Muse ad: ${art.headline}`);
+        card.addEventListener('click', () => openAd(art));
+        box.appendChild(card);
+      }
+    }
+    document.getElementById('adDialog').addEventListener('click', (event) => { if (event.target.id === 'adDialog') event.target.close(); });
 
     async function loadPresets() {
       let data;
