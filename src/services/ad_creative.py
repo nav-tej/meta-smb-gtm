@@ -44,6 +44,14 @@ logger = logging.getLogger(__name__)
 
 MAX_PRODUCT_IMAGE_BYTES = 10 * 1024 * 1024
 
+
+def _resolve_output_dir(configured: Path) -> Path:
+    """Resolve relative artifact paths against the repository, independent of process cwd."""
+    if not configured.is_absolute():
+        configured = Path(__file__).resolve().parents[2] / configured
+    return configured.resolve()
+
+
 PLACEMENT_DIMENSIONS: dict[Placement, tuple[int, int]] = {
     "facebook_feed": (1080, 1080),
     "instagram_feed": (1080, 1350),
@@ -402,7 +410,7 @@ class AdCreativeService:
         """Generate creatives from `request.brief` if given (phase 2), else write one first."""
         meta = self._meta or get_meta_client()
         comfy = self._comfy or get_comfyui_client()
-        out_dir = self._output_dir or Path(get_settings().output_dir)
+        out_dir = _resolve_output_dir(self._output_dir or Path(get_settings().output_dir))
 
         artwork_bytes = await load_product_image(
             request.product,
@@ -423,7 +431,12 @@ class AdCreativeService:
 
         mask_bytes: bytes | None = None
         mask_path: str | None = None
-        if artwork_bytes is not None:
+        # The Muse Image playground workflows consume the original references
+        # directly. SAM is only needed for the default masked generation path
+        # or for optional ComfyUI compositing; avoid a billed no-op segmentation.
+        if artwork_bytes is not None and (
+            request.muse_workflow_mode == "default" or request.use_comfyui
+        ):
             mask_bytes, mask_path = await segment_product(
                 artwork_bytes,
                 prompt=request.product.title,

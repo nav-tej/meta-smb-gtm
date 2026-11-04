@@ -1,0 +1,82 @@
+.import-box {
+  margin: 0 0 22px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #f1f0e8;
+}
+
+.import-box label {
+  margin: 0 0 8px;
+}
+
+.import-row {
+  display: flex;
+  gap: 8px;
+}
+
+.import-row input {
+  min-width: 0;
+}
+
+.import-row button {
+  white-space: nowrap;
+}
+
+.import-box > p {
+  margin: 7px 0 0;
+}
+
+.import-results {
+  display: grid;
+  gap: 7px;
+  margin-top: 12px;
+}
+
+.import-results > p {
+  margin: 0;
+}
+
+.import-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--white);
+  color: var(--ink);
+  font-size: 12px;
+  text-align: left;
+}
+
+.import-item span {
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.import-item-info {
+  display: grid;
+  gap: 3px;
+  white-space: normal !important;
+}
+
+.import-item-info small {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.import-item:hover {
+  border-color: var(--green);
+  background: #fbfcf7;
+}
+
+@media (max-width: 480px) {
+  .import-row {
+    flex-direction: column;
+  }
+
+  .import-row button {
+    width: 100%;
+  }
+}

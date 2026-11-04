@@ -60,12 +60,20 @@ def _resolve_inside(image_path: str, root: Path) -> Path | None:
     """Resolve symlinks and `..`; return the file only if it stays inside root."""
     try:
         candidate = Path(image_path)
-        resolved = (candidate if candidate.is_absolute() else root / candidate).resolve(strict=True)
+        # The creative service can return a cwd-relative path such as
+        # `outputs/creative.png`; resolving that under `root` would duplicate
+        # the output directory. Plain filenames may still be relative to root.
+        candidates = [candidate] if candidate.is_absolute() else [candidate, root / candidate]
     except (OSError, RuntimeError):
         return None
-    if not resolved.is_relative_to(root) or not resolved.is_file():
-        return None
-    return resolved
+    for path in candidates:
+        try:
+            resolved = path.resolve(strict=True)
+        except (OSError, RuntimeError):
+            continue
+        if resolved.is_relative_to(root) and resolved.is_file():
+            return resolved
+    return None
 
 
 def _encoded_size(raw_size: int) -> int:

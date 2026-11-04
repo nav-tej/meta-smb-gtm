@@ -5,7 +5,7 @@ const nodes = new Map(), blobs = [], posts = [], paints = [];
 class Element {
   constructor(id = '') { this.id = id; this.value = ''; this.checked = false; this.dataset = {}; this.handlers = {}; this.classList = { toggle() {} }; }
   addEventListener(name, fn) { this.handlers[name] = fn; }
-  setAttribute() {} removeAttribute() {} focus() {} scrollIntoView() {} append() {} remove() {} click() {}
+  setAttribute() {} removeAttribute() {} focus() {} scrollIntoView() {} append() {} replaceChildren() {} remove() {} click() {}
   getContext() { return { fillRect() {}, clearRect() {}, drawImage() {}, fillText(text) { paints.push(text); }, measureText(text) { return { width: text.length * 10 }; } }; }
   toBlob(fn) { fn(new Blob(['png'], {type:'image/png'})); }
 }

@@ -1,0 +1,5 @@
+Hermes local task — artist feedback story
+
+Read AGENTS.md and docs/creator-polish/ARTIST_FEEDBACK_PLAN.md. Create docs/creator-polish/hermes-artist-feedback.md only. Keep it concise and grounded in the artist's latest feedback: Pixels is preferred; Fine Art America is also used; Etsy is closed; Saatchi is a separate, more abstract collection with different prices; Instagram and the linked Facebook page are manual promotion channels; Empowering Women is an optional existing Pixels series; the artist was unsure what to do next.
+
+Deliver five short, non-leading questions for a novice walkthrough and a 60-second recording segment with exact screen actions and plain-language narration. Show the optional series left blank for Ek Onkar. Do not imply shared inventory, current price/availability, connected social accounts, automatic publishing, or measured sales lift. No app/runtime edits, tests, APIs, secrets, deployment, commits, or push. Report model/host only if verified and list anything not verified.

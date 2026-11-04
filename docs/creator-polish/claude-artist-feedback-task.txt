@@ -1,0 +1,7 @@
+Claude Code review — artist feedback release
+
+Read AGENTS.md and docs/creator-polish/ARTIST_FEEDBACK_PLAN.md. Once Codex's local creator.js/html changes are ready, do a bounded, read-only review (10 minutes maximum) of the artist promotion flow. Own only docs/creator-polish/claude-artist-feedback-review.md.
+
+Check for stale offer/copy claims, price or link leaking between Pixels, Fine Art America, Saatchi and the artist website, unsafe destination links, series language that implies shop reorganization, and any suggestion that Instagram/Facebook are connected or posts publish automatically. Cite current file/line references; label verified facts and assumptions separately.
+
+Do not edit runtime or tests, access secrets, call live APIs, deploy, commit, or push. Preserve all pending work. Report completion and blockers.

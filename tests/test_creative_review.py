@@ -13,6 +13,7 @@ import respx
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
+import src.services.ad_creative as ad_creative_module
 from src.api.creative import get_ad_creative_service
 from src.api.main import app
 from src.clients.meta import MetaClient
@@ -24,12 +25,22 @@ from src.models.creative import (
     ProductInfo,
 )
 from src.models.intel import CompetitorBrief
-from src.services.ad_creative import AdCreativeService
+from src.services.ad_creative import AdCreativeService, _resolve_output_dir
 from tests.conftest import META_BASE_URL, chat_completion
 
 PNG_1PX = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
 )
+
+
+def test_relative_output_directory_is_repo_anchored(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    resolved = _resolve_output_dir(Path("outputs"))
+
+    assert resolved == Path(ad_creative_module.__file__).resolve().parents[2] / "outputs"
 
 
 def _angle(placement: str, n: int) -> dict[str, str]:
@@ -89,6 +100,37 @@ def _draft_brief() -> EditableCreativeBrief:
             ),
         ],
     )
+
+
+@pytest.mark.asyncio
+async def test_product_visuals_workflow_skips_unused_sam_call(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class WorkflowMeta:
+        image_model = "muse-image-1.0"
+
+        async def generate_image_workflow(self, **_: Any) -> tuple[bytes, str]:
+            return PNG_1PX, "Returned reasoning summary"
+
+    async def unexpected_segmentation(*_: Any, **__: Any) -> tuple[bytes | None, str | None]:
+        raise AssertionError("product_visuals with no ComfyUI must not pay for unused SAM")
+
+    monkeypatch.setattr(ad_creative_module, "segment_product", unexpected_segmentation)
+    service = AdCreativeService(meta_client=WorkflowMeta(), output_dir=tmp_path)  # type: ignore[arg-type]
+    brief = _draft_brief()
+    request = GenerateAdsRequest(
+        product=ProductInfo(title="Ek Onkar", image_base64=base64.b64encode(PNG_1PX).decode()),
+        brief=brief,
+        placements=["instagram_feed"],
+        variants_per_placement=1,
+        use_comfyui=False,
+        muse_workflow_mode="product_visuals",
+    )
+
+    result = await service.generate(request)
+
+    assert len(result.creatives) == 2
+    assert result.creatives[0].reasoning_summary == "Returned reasoning summary"
 
 
 @respx.mock

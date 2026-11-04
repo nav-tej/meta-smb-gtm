@@ -1,0 +1,28 @@
+.channel-note {
+  margin: 18px 0;
+  padding: 14px 16px;
+  border-left: 3px solid var(--green);
+  background: #eef1e7;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.channel-note p { margin: 6px 0; }
+.form-card select {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--white);
+  color: var(--ink);
+  font: inherit;
+}
+.posting-channels {
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  margin: 20px 0 8px;
+  padding: 12px 16px;
+}
+.posting-channels legend { font-size: 13px; }
+.posting-channels .check { display: inline-flex; margin: 6px 20px 6px 0; }
+#postingSteps li { margin-bottom: 16px; overflow-wrap: anywhere; }
+#postingSummary { margin-top: 0; }

@@ -70,6 +70,20 @@ def test_generated_image_is_inlined(out_dir: Path) -> None:
     assert creative.image_path == str(path)
 
 
+def test_cwd_relative_outputs_path_is_inlined(
+    out_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The creative service returns `outputs/name.png` when started from the repo root."""
+    path = out_dir / "relative-output.png"
+    path.write_bytes(PNG)
+    monkeypatch.chdir(out_dir.parent)
+
+    creative = attach_inline_media(_set(_creative("outputs/relative-output.png"))).creatives[0]
+
+    assert creative.media_mime_type == "image/png"
+    assert creative.media_data_url == "data:image/png;base64," + base64.b64encode(PNG).decode()
+
+
 def test_mime_comes_from_bytes_not_extension(out_dir: Path) -> None:
     path = out_dir / "mislabelled.png"
     path.write_bytes(WEBP)

@@ -51,6 +51,27 @@ def test_creator_journey_smoke_node_runner(tmp_path: Path, client: TestClient) -
     )
     assert result.returncode == 0, f"STDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}"
     assert "ALL CREATOR JOURNEY SMOKE TESTS PASSED" in result.stdout
+    assert "TEST 7: Edit Preservation" in result.stdout
+
+
+def test_creator_copy_preservation_contract(client: TestClient) -> None:
+    """Verify that creator.js guards manual edits, AI drafts, and product resets in its contract."""
+    js_resp = client.get("/static/creator.js")
+    assert js_resp.status_code == 200
+    js_code = js_resp.text
+
+    # Scene must be tracked via sceneEdited, while headline and caption are tracked via copyEdited
+    assert "['headline', 'caption'].includes" in js_code
+    assert "state.sceneEdited = true" in js_code
+
+    # starter() must only overwrite scene if sceneEdited is false
+    assert "if (!state.sceneEdited) state.scene =" in js_code
+
+    # draft() must mark copyEdited = true and sceneEdited = true to preserve live Muse draft
+    assert "state.copyEdited = true; state.sceneEdited = true;" in js_code
+
+    # Product switches must reset copyEdited and sceneEdited to false
+    assert "state.copyEdited = false; state.sceneEdited = false;" in js_code
 
 
 def test_creator_html_and_static_assets_contract(client: TestClient) -> None:

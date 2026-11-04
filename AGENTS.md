@@ -10,7 +10,7 @@ Nav requested a creator-first polish sprint with limited Claude usage, Gemini Fl
 - Codex owns portal UX, campaign state/exports, remaining backend integration and final release.
 - Claude has ONE 20–30 minute bounded media-delivery task: `src/api/media_delivery.py`, `src/api/creative.py`, additive fields in `src/models/creative.py`, `tests/test_live_media_delivery.py`. Reserve these files until handoff. No broad backend refactor.
 - Gemini Flash owns NEW `tests/creator_journey_smoke.cjs`, `tests/test_creator_journey.py` and its QA report; no portal/runtime edits or edits to Claude's test.
-- Hermes owns `docs/creator-polish/hermes-*`: product fact audit, plain-language copy and novice/rehearsal packets. No app/data/workflow edits. Model identity must be checked on the execution host.
+- Hermes owns `docs/creator-polish/hermes-*`: product fact audit, plain-language copy, novice/rehearsal packets, and latest priority E2E demo brief joining implemented ingestion, research, creative and bid analysis. Mark shipped vs proposed gaps. No app/data/workflow edits. Model identity must be checked on the execution host.
 - All write their own status in `docs/creator-polish/`. Prepared prompts are not acknowledged work. Nav relays prompts and statuses. Do not overwrite another agent's files or push to main; prefer isolated worktrees and let Codex integrate. No paid calls or public deployment under these assignment prompts.
 - First-product recommendation: Ek Onkar 12x12 print. Website offer exists; current stock/price needs artist confirmation. Repo 432px preview is not a print master. Do not present generated art as the unchanged original or a contact form as working checkout.
 
@@ -487,3 +487,12 @@ This app fetches arbitrary URLs, parses untrusted XML, and feeds third-party con
   configured fake API key. No real network or paid API calls.
 - Final make check: 107 passed, lint and format clean. Portal polish was pushed separately
   as 0d4cc65. No .env or src/services/ changes; demo spending guards remain unchanged.
+
+
+### Publication integration — November 4, 2026
+
+- Codex verified production /create and /api/v1/readiness both returned 404 before release.
+- Integrated creator shop import, artist-specific destinations/series/posting instructions, edit preservation, repo-anchored media delivery and skipping unused SAM in product_visuals.
+- Current offline make check: 153 passed; lint/format clean. No paid Muse calls.
+- Claude delivered final copy; Antigravity delivered import and edit-preservation QA; Hermes delivered recording/share drafts. Browser export rehearsal remains unverified.
+- Codex owns release publication and production HTTP checks; recording and actual novice walkthrough remain next.

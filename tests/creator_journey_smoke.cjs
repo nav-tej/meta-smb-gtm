@@ -99,6 +99,7 @@ class MockElement {
   scrollIntoView() {}
 
   append() {}
+  replaceChildren() {}
 
   remove() {}
 
@@ -145,7 +146,7 @@ const steps = [0, 1, 2, 3].map(i => {
 });
 
 const goals = ['story', 'gift', 'visit'].map(goal => {
-  const el = new MockElement(`goal-${goal}`);
+  const el = getNode(`goal-${goal}`);
   el.dataset.goal = goal;
   return el;
 });
@@ -305,8 +306,8 @@ async function trigger(id, eventName = 'click') {
   // Initial state should be Sarabjit Singh
   let snap = context.window.museCreatorSnapshot();
   assert.equal(snap.product.seller, 'Art of Sarabjit Singh');
-  assert.equal(snap.product.name, 'Ek Onkar · 12×12-inch print');
-  assert.equal(getNode('productPrice').value, '$75');
+  assert.equal(snap.product.name, 'Ek Onkar · artwork promotion');
+  assert.equal(getNode('productPrice').value, '', 'The website offer must not be assumed for Pixels');
 
   // Switch to Ceramics Example
   await trigger('ceramicsExample');
@@ -452,7 +453,117 @@ async function trigger(id, eventName = 'click') {
   assert.equal(getNode('sceneCompare').src.startsWith('data:image/png;base64,'), true);
   assert.match(getNode('imageProvenance').textContent, /Generated with muse-image-1\.0/);
 
-  console.log('ALL CREATOR JOURNEY SMOKE TESTS PASSED (6 of 6 criteria verified).');
+  console.log('--- TEST 7: Edit Preservation (Scene Prompt, Live AI Draft, and Product Reset) ---');
+  // 7A: In custom product mode, verify that manual setting/scene edits survive product fact edits and goal clicks.
+  await trigger('customProduct');
+  const mockUploadFile = new Blob(['mock-photo-bytes'], { type: 'image/jpeg' });
+  await getNode('productPhoto').handlers.change({ target: { files: [mockUploadFile] } });
+  await new Promise(r => setImmediate(r));
+
+  getNode('productName').value = 'Handcrafted Ceramic Vase';
+  await trigger('productName', 'input');
+  // Initially copyEdited is false, so starter() populated scene with the default template.
+  assert.equal(getNode('scene').value.startsWith('Warm neutral room'), true);
+
+  // User manually customizes the scene setting description in Step 2:
+  getNode('scene').value = 'Sunlit Mediterranean terrace with terracotta tiles and olive branches in breeze.';
+  await trigger('scene', 'input');
+
+  // Creator now edits product facts in Step 0:
+  getNode('productName').value = 'Large Terracotta Urn';
+  await trigger('productName', 'input');
+  getNode('productDescription').value = 'Hand-thrown porous clay urn, perfect for dried florals.';
+  await trigger('productDescription', 'input');
+
+  // Creator also switches goal in Step 1:
+  await trigger('goal-gift');
+
+  // Assert that the user's manual scene description is strictly preserved and NOT wiped by starter()!
+  assert.equal(
+    getNode('scene').value,
+    'Sunlit Mediterranean terrace with terracotta tiles and olive branches in breeze.',
+    'Manual scene description must be preserved when product facts change or goal is switched'
+  );
+
+  // 7B: Verify that a mocked successful live Muse draft survives product fact edits and goal clicks.
+  mockFetchResponse = {
+    variants: [{
+      headline: 'A Vessel for Your Quiet Moments',
+      primary_text: 'Hand-shaped from raw clay and fired slowly for warmth. A centerpiece meant to ground your space.',
+      image_prompt: 'Moody ceramic studio shelf with raw clay vessels and warm amber side-lighting.'
+    }]
+  };
+
+  // Ensure unlock key and live mode are enabled
+  getNode('unlockKey').value = 'test-demo-unlock-key';
+  await trigger('unlockKey', 'input');
+  getNode('liveMode').checked = true;
+  await trigger('liveMode', 'change');
+
+  // Execute live draft
+  await trigger('draftButton');
+
+  // Verify that the live Muse draft is reflected in the fields
+  assert.equal(getNode('headline').value, 'A Vessel for Your Quiet Moments');
+  assert.equal(getNode('caption').value, 'Hand-shaped from raw clay and fired slowly for warmth. A centerpiece meant to ground your space.');
+  assert.equal(getNode('scene').value, 'Moody ceramic studio shelf with raw clay vessels and warm amber side-lighting.');
+
+  // Creator now edits product facts:
+  getNode('productName').value = 'Large Terracotta Vessel';
+  await trigger('productName', 'input');
+  getNode('productDescription').value = 'Special edition vessel.';
+  await trigger('productDescription', 'input');
+
+  // Creator switches goal to 'visit':
+  await trigger('goal-visit');
+
+  // Assert that the live Muse draft is strictly preserved against product edits and goal clicks!
+  assert.equal(
+    getNode('headline').value,
+    'A Vessel for Your Quiet Moments',
+    'Live Muse draft headline must be preserved after product fact edits'
+  );
+  assert.equal(
+    getNode('caption').value,
+    'Hand-shaped from raw clay and fired slowly for warmth. A centerpiece meant to ground your space.',
+    'Live Muse draft caption must be preserved after product fact edits'
+  );
+  assert.equal(
+    getNode('scene').value,
+    'Moody ceramic studio shelf with raw clay vessels and warm amber side-lighting.',
+    'Live Muse draft scene prompt must be preserved after product fact edits'
+  );
+
+  // 7C: Selecting a different product resets copy and re-enables starter updates.
+  // Switch to artist example (Sarabjit Singh):
+  await trigger('artistExample');
+  snap = context.window.museCreatorSnapshot();
+  assert.equal(snap.product.name, 'Ek Onkar · artwork promotion');
+  assert.equal(getNode('headline').value, 'Ek Onkar · artwork promotion');
+  assert.equal(getNode('scene').value.startsWith('Warm neutral room'), true);
+  assert.ok(
+    getNode('caption').value.includes('Ek Onkar by Sarabjit Singh explores connection'),
+    'Switching to artist example resets caption to artist copy'
+  );
+
+  // Goal clicks now update the copy again because copyEdited was reset:
+  await trigger('goal-visit');
+  assert.ok(
+    getNode('caption').value.includes('Visit the product page to learn more.'),
+    'Goal updates caption after product switch'
+  );
+
+  // Switch to Ceramics example:
+  await trigger('ceramicsExample');
+  snap = context.window.museCreatorSnapshot();
+  assert.equal(snap.product.name, 'Stoneware & brass chai set');
+  assert.equal(getNode('headline').value, 'Stoneware & brass chai set');
+  assert.ok(
+    getNode('caption').value.includes('A moment for your daily chai ritual'),
+    'Switching to ceramics example resets caption to ceramics copy'
+  );
+
+  console.log('ALL CREATOR JOURNEY SMOKE TESTS PASSED (7 of 7 criteria verified).');
 })().catch((err) => {
   console.error('FAIL in creator_journey_smoke.cjs:', err);
   process.exitCode = 1;

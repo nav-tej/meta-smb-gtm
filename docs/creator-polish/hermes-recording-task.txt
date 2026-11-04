@@ -1,0 +1,12 @@
+Hermes local follow-up — recording runbook only
+
+Work in /Users/nav/meta-smb-gtm. Read AGENTS.md and the latest docs/creator-polish/CODEX_STATUS.md. Stay within docs/creator-polish/hermes-* ownership.
+
+Create or update docs/creator-polish/hermes-recording-runbook.md for tomorrow's 3-minute submission recording. Write it for a nontechnical creator and a first-time demo operator. Include:
+- a timed 3-minute talk track with short plain-language narration and exact screen actions;
+- a reliable saved-example path, plus a clearly optional live Muse segment that is used only after a successful rehearsal;
+- a brief line explaining the shop-import limits (public website crawl; marketplaces may block it; creator supplies and verifies the product photo/details);
+- five short post-demo questions for an Etsy/FineArtAmerica maker, focused on clarity, trust, usefulness and next action;
+- a truth table of what the app does live, uses saved examples for, and does not yet publish/automate.
+
+Use only facts verified in the repo. Distinguish deployed, local-only, tested and proposed features. Do not claim sales lift, checkout, ad publishing, continuous monitoring, or live source-linked recommendations unless current code proves it. No code edits, tests, paid API calls, secrets, deployment or push. Add a brief status note with files changed and anything you could not verify, then stop.

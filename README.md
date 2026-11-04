@@ -16,9 +16,9 @@ Built for the **Meta Global AI Developer Hackathon** (Cerebral Valley), November
 
 | Criterion | Weight | How Muse Growth Studio Delivers |
 |---|---|---|
-| **Impact** | **30%** | **Real Bay Area SMB Artist Case Study:** In our primary study (**[Art of Sarabjit Singh](https://www.artofsarabjitsingh.com/)**), 72 artworks across 7 platforms leak traffic to $14 print-on-demand listings because her own site lacks direct checkout. Meanwhile, competitor Shopify stores capture high-margin $75–$900 collector orders. A second vertical (**Saffron & Clay Studio**, Etsy physical goods) demonstrates instant portability to ceramics, home decor, and gifts. |
-| **Meta AI Tooling** | **25%** | **Deep, non-trivial use of four Meta models:**<br>• **Muse Spark 1.3:** Competitor sitemap analysis with verified citations, two-phase creative brief generation, and deterministic-metric-grounded bid advice.<br>• **Muse Image 1.0:** Reasoning-guided image generation (`POST /v1/responses` with `reasoning: {"effort": "high"}`) executing *Product Visuals*, *Multi-Image Combine*, and *Restore & Enhance* with internal reasoning traces.<br>• **SAM 3.1:** Automated foreground product/artwork segmentation.<br>• **Muse Voice Transcribe 1.0:** Hands-free voice-to-creative-brief transcription. |
-| **Demo** | **25%** | **Zero-Friction 3-Minute Experience:** Live on Vercel at [meta-smb-gtm.vercel.app](https://meta-smb-gtm.vercel.app) and local on `localhost:8000`. Step-by-step timed walkthrough in [`docs/DEMO_VIDEO_SCRIPT.md`](docs/DEMO_VIDEO_SCRIPT.md). Cached Demo Mode ensures judges can explore every flow immediately with zero setup or API credit risk. |
+| **Impact** | **30%** | **Real Bay Area SMB Artist Case Study:** In our primary study (**[Art of Sarabjit Singh](https://www.artofsarabjitsingh.com/)**), a public-page snapshot (`data/samples/sarabjit_singh_profile.json`, 2026-11-03) records 7 sales and social channels and 72 artworks (page 1 of the 150 paintings on Fine Art America). Her marketplace print listings start around $14, while the snapshot's direct limited editions are priced $75–$900. Snapshot prices are not confirmed current; check with the artist before quoting them. A second vertical (**Saffron & Clay Studio**, Etsy physical goods) demonstrates instant portability to ceramics, home decor, and gifts. |
+| **Meta AI Tooling** | **25%** | **Deep, non-trivial use of four Meta models:**<br>• **Muse Spark 1.3:** Competitor sitemap analysis (live runs check every cited source URL; the saved demo brief has no citations), two-phase creative brief generation, and deterministic-metric-grounded bid advice.<br>• **Muse Image 1.0:** Reasoning-guided image generation (`POST /v1/responses` with `reasoning: {"effort": "high"}`) executing *Product Visuals*, *Multi-Image Combine*, and *Restore & Enhance* with an API-returned reasoning summary.<br>• **SAM 3.1:** Locates the product or artwork in the photo (a bounding box via `/v1/responses`).<br>• **Muse Voice Transcribe 1.0:** Voice-note-to-brief transcription (implemented; not in the cached demo). |
+| **Demo** | **25%** | **Zero-Friction 3-Minute Experience:** The public Vercel URL [meta-smb-gtm.vercel.app](https://meta-smb-gtm.vercel.app) is the cached production demo, as previously curl-verified; current local changes are not deployed there. Run locally on `localhost:8000` for the latest version. Step-by-step timed walkthrough in [`docs/DEMO_VIDEO_SCRIPT.md`](docs/DEMO_VIDEO_SCRIPT.md). The seller journey is `/create` (local-only until a deployment with it is confirmed). Cached demo mode lets judges explore research, saved creatives and budget advice with no setup or credits; screenshot audit, voice transcription and live generation need a local server with a provider key. |
 | **Technical Depth** | **20%** | **Robust production architecture:** Pydantic v2 structured schemas with self-healing 1-retry repair, SSRF-guarded RFC 9309 sitemap crawler with `defusedxml` and gzip-bomb defense, deterministic Python arithmetic (LLMs never do math), **100 offline unit/integration tests** (`respx` mocked), Semgrep XSS-audited frontend (`esc()` + `safeUrl()`), and open-weight ComfyUI Apple Silicon fallback templates. |
 
 ---
@@ -79,15 +79,19 @@ Built for the **Meta Global AI Developer Hackathon** (Cerebral Valley), November
 ### Flow 3: Bid & Budget Advisor (`POST /api/v1/bid-advice` & `POST /api/v1/bid-advice/csv`)
 - **Deterministic Math First:** Accepts raw JSON campaign rows or direct **Meta Ads Manager CSV exports**. Python computes account and ad-set ROAS, CPA, CTR, CPM, pacing, 5-day trends, and flags (`creative_fatigue`, `budget_limited_winner`, `low_roas_material_spend`). The LLM never performs mental arithmetic.
 - **Evidence-Linked Advice:** **Muse Spark 1.3** suggests zero-net-spend budget reallocations and new audience targeting plays that cite findings `F1..Fn` from Step 1.
-- **Safety First:** Advisory only; never writes to or alters a live Meta ad account.
-- **1-Click Launch Pack:** Generates copy-pasteable Direct Collector Checkout HTML (Weebly/Shopify), Google Rich-Snippet `VisualArtwork` + `Product` JSON-LD schema, and downloadable Meta Ads CSVs.
+- **Safety First:** Bid and budget changes are advisory only. The app never writes to or alters a live Meta ad account; the seller decides and applies any change in Ads Manager.
+- **Campaign Handoff Pack:** Produces review-before-use templates, not live integrations:
+  - **Direct Collector Checkout HTML (Weebly/Shopify):** a copy-paste *template*. No payment provider is connected; the seller adds their own payment or inquiry links and confirms price and availability.
+  - **Google Rich-Snippet JSON-LD** (`VisualArtwork` + `Product`) to paste into the seller's own product page.
+  - **Meta Ads planning CSV:** a handoff file to review and adapt in Ads Manager. Nothing is uploaded, launched or spent by the app.
+- **Nothing is published automatically.** The `/create` journey downloads images and copy for the seller to post from their own accounts; no ads or social posts are created by the app.
 
 ---
 
 ## 4. Demo Mode (Zero-Credit, Safe to Try)
 
 By default, the application runs with **`DEMO_MODE=true`**:
-- **Instant, Safe Exploration:** All routes that call Muse serve pre-computed, verified live outputs from `data/samples/`. Judges and users can explore every flow immediately with **zero API credit expenditure** and zero risk of rate limits.
+- **Instant, Safe Exploration:** Routes that call Muse serve saved outputs from earlier live runs in `data/samples/`, with **zero API credit expenditure**. Screenshot audit and voice transcription have no saved result and return 403 in demo mode.
 - **Guarded Live Calls:** Passing `?live=true` with the `X-Demo-Key` header allows real upstream API execution against `api.meta.ai/v1`, protected by an in-memory hourly quota (`LIVE_CALLS_PER_HOUR`).
 - **Testing:** The test suite pins `DEMO_MODE=false` in `tests/conftest.py` with fully mocked `respx` responses to ensure complete offline verification.
 
