@@ -1,28 +1,566 @@
-.channel-note {
-  margin: 18px 0;
-  padding: 14px 16px;
-  border-left: 3px solid var(--green);
-  background: #eef1e7;
+/* ==========================================================================
+   Creator Studio Polish & Feedback Styling
+   Brand Colors: Paper #f6f3eb | Ink #263d35 | Green #234b3e | Accent #b44e35
+   ========================================================================== */
+
+/* 1. Global Touch & Typography Polish */
+body {
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 {
+  color: var(--ink);
+  letter-spacing: -0.02em;
+}
+
+.eyebrow {
+  color: var(--accent);
+  letter-spacing: 2px;
+}
+
+.intro p a[href="/today"] {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--soft);
+  color: var(--green);
+  padding: 8px 16px;
+  border-radius: 20px;
+  border: 1px solid #c6d7c0;
   font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.15s ease;
+  margin-top: 4px;
+  box-shadow: 0 1px 3px rgba(35, 75, 62, 0.05);
+}
+
+.intro p a[href="/today"]:hover {
+  background: #dde9d3;
+  border-color: var(--green);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(35, 75, 62, 0.1);
+}
+
+/* 2. Wizard Stepper Navigation */
+.steps {
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 6px rgba(38, 61, 53, 0.03);
+  margin-bottom: 32px;
+}
+
+.steps button {
+  padding: 15px 18px;
+  font-size: 13.5px;
+  font-weight: 550;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.steps button:hover:not([disabled]) {
+  background: #f7faf3;
+  color: var(--ink);
+}
+
+.steps span {
+  width: 26px;
+  height: 26px;
+  line-height: 24px;
+  font-size: 12px;
+  font-weight: 700;
+  border-width: 1.5px;
+  transition: all 0.2s ease;
+}
+
+.steps [aria-current="step"] {
+  background: var(--soft);
+  color: var(--green);
+  box-shadow: inset 0 -3px var(--green);
+}
+
+.steps [aria-current="step"] span {
+  background: var(--green);
+  color: var(--white);
+  border-color: var(--green);
+  box-shadow: 0 2px 6px rgba(35, 75, 62, 0.25);
+}
+
+/* 3. Product Choice Starting Points */
+.choices {
+  gap: 10px;
+  margin-bottom: 22px;
+}
+
+.choice {
+  border-radius: 10px;
+  border: 1.5px solid var(--line);
+  background: var(--white);
+  padding: 13px 15px;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(38, 61, 53, 0.03);
+}
+
+.choice small {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--muted);
+  margin-top: 4px;
+  display: block;
+}
+
+.choice:hover {
+  border-color: #aebfb1;
+  background: #fafcf8;
+  transform: translateY(-1px);
+}
+
+.choice.selected {
+  border-color: var(--green);
+  background: #f0f6ec;
+  box-shadow: 0 3px 10px rgba(35, 75, 62, 0.1);
+  color: var(--green);
+}
+
+/* 4. Verified Seller & Promotion Setup Banner */
+.channel-note {
+  margin: 18px 0 22px;
+  padding: 16px 18px;
+  border-radius: 10px;
+  border: 1px solid #cadbc7;
+  border-left: 4px solid var(--green);
+  background: linear-gradient(135deg, #f3f7ef 0%, #edf5e8 100%);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink);
+  box-shadow: 0 2px 6px rgba(35, 75, 62, 0.04);
   overflow-wrap: anywhere;
 }
-.channel-note p { margin: 6px 0; }
+
+.channel-note strong {
+  display: block;
+  font-size: 13.5px;
+  color: var(--green);
+  margin-bottom: 6px;
+  letter-spacing: 0.2px;
+}
+
+.channel-note p {
+  margin: 6px 0;
+}
+
+.channel-note p.small.muted {
+  font-size: 11.5px;
+  color: var(--muted);
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px dashed #cadbc7;
+}
+
+/* 5. Form Card & Input Ergonomics */
+.form-card, .download-card {
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  box-shadow: 0 4px 16px rgba(38, 61, 53, 0.04), 0 1px 3px rgba(38, 61, 53, 0.03);
+  padding: 28px;
+  background: var(--white);
+}
+
+label {
+  font-size: 12.5px;
+  font-weight: 650;
+  color: var(--ink);
+  margin: 16px 0 6px;
+}
+
+input:not([type="checkbox"]), textarea, select {
+  border: 1.5px solid var(--line);
+  border-radius: 8px;
+  padding: 11px 13px;
+  font-size: 14px;
+  color: var(--ink);
+  background: var(--white);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+input:focus, textarea:focus, select:focus {
+  border-color: var(--green);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(35, 75, 62, 0.12);
+}
+
 .form-card select {
   width: 100%;
-  padding: 12px;
-  border: 1px solid var(--line);
-  border-radius: 7px;
+  padding: 11px 13px;
+  border-radius: 8px;
+  border: 1.5px solid var(--line);
   background: var(--white);
   color: var(--ink);
   font: inherit;
+  font-size: 13.5px;
+  cursor: pointer;
 }
+
+/* 6. Posting Channels Fieldset */
 .posting-channels {
+  border: 1.5px solid var(--line);
+  border-radius: 10px;
+  margin: 22px 0 10px;
+  padding: 14px 16px;
+  background: #fafaf6;
+}
+
+.posting-channels legend {
+  font-size: 12.5px;
+  font-weight: 650;
+  color: var(--ink);
+  padding: 0 6px;
+}
+
+.posting-channels .check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 18px 4px 0;
+  background: var(--white);
+  padding: 7px 14px;
+  border-radius: 20px;
   border: 1px solid var(--line);
-  border-radius: 7px;
-  margin: 20px 0 8px;
+  font-size: 12.5px;
+  font-weight: 550;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.posting-channels .check:hover {
+  border-color: #a8bba5;
+  background: #f7faf3;
+}
+
+/* 7. Product Photo Mat Preview */
+.product-art {
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: #eae8df;
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+}
+
+.photo-mat img {
+  border: 10px solid var(--white);
+  border-radius: 4px;
+  box-shadow: 0 14px 28px rgba(38, 61, 53, 0.14), 0 3px 8px rgba(38, 61, 53, 0.08);
+}
+
+.upload {
+  border: 2px dashed #b8c4b2;
+  border-radius: 10px;
+  background: #fafaf6;
+  padding: 18px;
+  transition: all 0.2s ease;
+  font-weight: 600;
+  color: var(--green);
+}
+
+.upload:hover {
+  border-color: var(--green);
+  background: #f3f7ef;
+}
+
+/* 8. Goal Selection Cards (Step 1) */
+.goal-grid {
+  gap: 16px;
+}
+
+.goal {
+  border-radius: 12px;
+  border: 1.5px solid var(--line);
+  background: var(--white);
+  padding: 24px 22px;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(38, 61, 53, 0.03);
+}
+
+.goal:hover {
+  border-color: #a8bba5;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(38, 61, 53, 0.06);
+}
+
+.goal.selected {
+  border-color: var(--green);
+  background: #f3f8ee;
+  box-shadow: 0 4px 14px rgba(35, 75, 62, 0.1);
+}
+
+.goal strong {
+  font-size: 22px;
+  margin: 6px 0 8px;
+  color: var(--ink);
+}
+
+.goal p {
+  line-height: 1.45;
+}
+
+.idea-card {
+  border-radius: 10px;
+  border-left: 4px solid var(--accent);
+  background: #f3eedf;
+  padding: 22px 26px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+}
+
+/* 9. Step 2 Review Gate Checkbox */
+label.check {
+  background: #f7faf3;
+  border: 1.5px solid #c4d7be;
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin: 18px 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  font-size: 13px;
+  font-weight: 550;
+  color: var(--ink);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 3px rgba(38, 61, 53, 0.03);
+}
+
+label.check:hover {
+  background: #edf5e8;
+  border-color: var(--green);
+}
+
+/* 10. Social Post Preview Card */
+.post-preview {
+  border-radius: 12px;
+  border: 1px solid #d2d6c8;
+  box-shadow: 0 14px 34px rgba(38, 61, 53, 0.12);
+  overflow: hidden;
+}
+
+.post-shop {
+  background: #fafaf7;
+  border-bottom: 1px solid var(--line);
   padding: 12px 16px;
 }
-.posting-channels legend { font-size: 13px; }
-.posting-channels .check { display: inline-flex; margin: 6px 20px 6px 0; }
-#postingSteps li { margin-bottom: 16px; overflow-wrap: anywhere; }
-#postingSummary { margin-top: 0; }
+
+.shop-dot {
+  background: var(--soft);
+  color: var(--green);
+}
+
+/* 11. Buttons & Action Links */
+.primary {
+  background: var(--green);
+  color: var(--white);
+  border: 1.5px solid var(--green);
+  padding: 12px 22px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0.1px;
+  box-shadow: 0 2px 6px rgba(35, 75, 62, 0.18);
+  transition: all 0.15s ease;
+}
+
+.primary:hover:not(:disabled) {
+  background: #1b3d32;
+  border-color: #1b3d32;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(35, 75, 62, 0.25);
+}
+
+.secondary {
+  background: var(--white);
+  color: var(--green);
+  border: 1.5px solid #bcc7b6;
+  padding: 11px 20px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 650;
+  transition: all 0.15s ease;
+}
+
+.secondary:hover:not(:disabled) {
+  background: var(--soft);
+  border-color: var(--green);
+}
+
+/* 12. Step 3 Downloads & Posting Checklist */
+#postingSummary {
+  margin-top: 0;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 8px;
+}
+
+#postingSteps {
+  padding-left: 0;
+  list-style: none;
+  counter-reset: post-step;
+}
+
+#postingSteps li {
+  position: relative;
+  counter-increment: post-step;
+  margin-bottom: 14px;
+  padding: 14px 16px 14px 44px;
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--ink);
+  box-shadow: 0 1px 4px rgba(38, 61, 53, 0.03);
+}
+
+#postingSteps li::before {
+  content: counter(post-step);
+  position: absolute;
+  left: 14px;
+  top: 14px;
+  width: 22px;
+  height: 22px;
+  line-height: 22px;
+  background: var(--soft);
+  color: var(--green);
+  border: 1px solid #cadbc6;
+  border-radius: 50%;
+  text-align: center;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.download-card > button {
+  border-radius: 8px;
+  padding: 13px 18px;
+  font-size: 13px;
+}
+
+.download-card button span {
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+/* 13. Mobile Responsiveness (390px iPhone & Small Screens) */
+@media (max-width: 760px) {
+  .topbar {
+    padding: 16px 18px;
+  }
+
+  .steps {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    margin-bottom: 24px;
+    border-radius: 8px;
+  }
+
+  .steps button {
+    padding: 12px 4px;
+    font-size: 11px;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 4px;
+  }
+
+  .steps span {
+    width: 22px;
+    height: 22px;
+    line-height: 20px;
+    font-size: 11px;
+  }
+
+  .choices {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .choice {
+    padding: 12px 14px;
+  }
+
+  .field-row {
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .compare {
+    gap: 10px;
+  }
+
+  .flow-footer {
+    position: sticky;
+    bottom: 0;
+    background: rgba(246, 243, 235, 0.96);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    z-index: 10;
+    margin: 20px -20px 0;
+    padding: 14px 18px;
+    border-top: 1px solid var(--line);
+    box-shadow: 0 -4px 16px rgba(38, 61, 53, 0.08);
+  }
+
+  .flow-footer button {
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 420px) {
+  main {
+    padding: 0 16px;
+  }
+
+  h1 {
+    font-size: 34px;
+    letter-spacing: -1px;
+  }
+
+  h2 {
+    font-size: 26px;
+  }
+
+  .form-card, .download-card {
+    padding: 18px 16px;
+  }
+
+  .steps button {
+    font-size: 10px;
+  }
+
+  .photo-mat img {
+    max-width: 220px;
+    max-height: 220px;
+  }
+
+  .post-preview {
+    max-width: 100%;
+  }
+
+  #postingSteps li {
+    padding: 12px 12px 12px 38px;
+    font-size: 12.5px;
+  }
+
+  #postingSteps li::before {
+    left: 10px;
+    top: 12px;
+    width: 20px;
+    height: 20px;
+    line-height: 20px;
+    font-size: 10.5px;
+  }
+}
