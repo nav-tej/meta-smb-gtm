@@ -149,3 +149,44 @@
 .finding-item.ms-match { border-color: #9fb9e6 !important; box-shadow: 0 0 0 2px rgba(47, 95, 179, 0.15); }
 .ms-match-tag { display: inline-block; margin-bottom: 6px; font-size: 10px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; background: #dbe6fb; color: #24498c; }
 @media (max-width: 560px) { .ms-refine-row { flex-direction: column; } .ms-card-head { flex-direction: column; } }
+
+/* Logged-out demo: frosted gate over interactive areas */
+.ms-gated { position: relative; }
+.ms-gate { position: absolute; inset: 0; z-index: 6; display: grid; place-items: center; padding: 16px; border-radius: inherit; background: rgba(250, 248, 244, 0.55); -webkit-backdrop-filter: blur(3px) saturate(1.1); backdrop-filter: blur(3px) saturate(1.1); }
+.ms-gate-card { display: grid; gap: 6px; justify-items: center; text-align: center; max-width: 360px; padding: 18px 20px; border-radius: 18px; background: rgba(255, 255, 255, 0.94); border: 1px solid #e6e1d6; box-shadow: 0 18px 44px rgba(0, 0, 0, 0.16); }
+.ms-gate-card strong { font-size: 17px; color: #22221f; }
+.ms-gate-card span { font-size: 13px; color: #5d5a52; line-height: 1.45; }
+.ms-gate-card .ms-primary { margin-top: 6px; }
+.ms-workspace-bar.ms-gated .ms-gate { place-items: center end; padding-right: 18px; }
+.ms-workspace-bar.ms-gated .ms-gate-card { grid-template-columns: auto auto; align-items: center; max-width: none; padding: 10px 14px; }
+.ms-workspace-bar.ms-gated .ms-gate-card span { display: none; }
+.ms-signup-btn { white-space: nowrap; box-shadow: 0 6px 14px rgba(184, 93, 25, 0.28); }
+.ms-signup { text-align: center; }
+.ms-signup .ms-primary { margin: 4px 0 10px; }
+
+/* Planned pricing */
+.ms-pricing { width: min(820px, calc(100vw - 32px)); }
+.ms-pricing-gift { margin: 0 0 10px; font-size: 14px; color: #6a3fa0; font-weight: 650; }
+.ms-plans { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 12px 0; }
+.ms-plan { position: relative; display: flex; flex-direction: column; gap: 4px; padding: 16px; border-radius: 16px; border: 1px solid #e6e1d6; background: #fcfbf8; }
+.ms-plan.featured { border: 2px solid #b85d19; background: #fff8f2; box-shadow: 0 12px 28px rgba(184, 93, 25, 0.16); }
+.ms-plan-tag { position: absolute; top: -10px; left: 16px; font-size: 10px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #fff; background: #b85d19; padding: 3px 9px; border-radius: 999px; }
+.ms-plan-name { font-size: 15px; }
+.ms-plan-price { margin: 2px 0 0; font-size: 30px; font-weight: 800; color: #22221f; }
+.ms-plan-price small { font-size: 13px; font-weight: 600; color: #6b6860; }
+.ms-plan-runs { margin: 0; font-size: 13px; font-weight: 700; color: #1b6e44; }
+.ms-plan ul { margin: 6px 0 10px; padding-left: 18px; font-size: 13px; line-height: 1.6; color: #4a4741; }
+.ms-plan button { margin-top: auto; }
+.ms-plan button:disabled { opacity: 0.6; cursor: not-allowed; box-shadow: none; }
+.ms-credits.empty .ms-credits-label { display: inline !important; font-weight: 700; }
+.ms-more { color: #b85d19; }
+.ms-brief-plan { margin: 0 0 6px; font-size: 12px; color: #6a3fa0; font-weight: 650; }
+@media (max-width: 640px) {
+  .ms-plans { grid-template-columns: 1fr; }
+  .ms-gate-card { padding: 14px; }
+  .ms-workspace-bar.ms-gated .ms-gate { place-items: center; padding-right: 16px; }
+}
+.ms-credits[hidden], .ms-gate[hidden] { display: none !important; }
+.jr-stage > .ms-gate { place-items: start center; padding-top: 70px; }
+.jr-stage > .ms-gate .ms-gate-card { position: sticky; top: 90px; }
+.ms-pricing { max-width: none; }

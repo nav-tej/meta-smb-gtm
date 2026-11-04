@@ -4,7 +4,9 @@
 (() => {
   const CREDIT_KEY = 'muse.demoCredits';
   const TOUR_KEY = 'muse.tourSeen';
-  const START_CREDITS = 12;
+  const START_CREDITS = 5;
+  const SESSION_KEY = 'muse.demoSession';
+  const hasSession = () => store.get(SESSION_KEY) === '1';
   const store = {
     get(key) { try { return window.localStorage.getItem(key); } catch { return null; } },
     set(key, value) { try { window.localStorage.setItem(key, value); } catch { /* private mode */ } },
@@ -36,11 +38,14 @@
     if (!countNode) return;
     countNode.textContent = String(credits);
     pill.classList.toggle('empty', credits === 0);
-    pill.setAttribute('aria-label', `${credits} demo credits remaining`);
+    pill.setAttribute('aria-label', credits === 0 ? 'No demo runs left. Get more runs' : `${credits} demo credits remaining`);
+    const label = pill.querySelector('.ms-credits-label');
+    if (label) label.textContent = credits === 0 ? ' · Get more runs' : ' credits';
     if (bump && !reducedMotion) { pill.classList.remove('bump'); void pill.offsetWidth; pill.classList.add('bump'); }
   }
   function spend(label) {
-    if (credits === 0) { toast('Out of demo credits. Open the credits menu to reset; saved results still work.', 'warn'); return; }
+    if (!hasSession()) return;
+    if (credits === 0) { toast('No runs left. Pick a plan, or reset the demo credits.', 'warn'); openPricing(); return; }
     credits -= 1; store.set(CREDIT_KEY, String(credits)); renderCredits(true);
     toast(`−1 credit · ${label}`);
   }
@@ -76,8 +81,11 @@
       const reset = el('button', { type: 'button', class: 'ms-link' }, `Reset to ${START_CREDITS} credits`);
       reset.addEventListener('click', () => { credits = START_CREDITS; store.set(CREDIT_KEY, String(credits)); renderCredits(true); toast('Demo credits reset.'); });
       menu.appendChild(reset);
-      const gift = el('button', { type: 'button', class: 'ms-link' }, 'Gift a growth subscription ($29/mo) →');
-      gift.addEventListener('click', () => { closeMenu(); openGift(); });
+      const more = el('button', { type: 'button', class: 'ms-link ms-more' }, 'Get more runs →');
+      more.addEventListener('click', () => { closeMenu(); openPricing(); });
+      menu.appendChild(more);
+      const gift = el('button', { type: 'button', class: 'ms-link' }, 'Gift a subscription →');
+      gift.addEventListener('click', () => { closeMenu(); openPricing('gift'); });
       menu.appendChild(gift);
       pill.appendChild(menu);
     }
@@ -123,28 +131,103 @@
     });
   }
 
-  // ---------- Gift plan dialog ----------
-  let giftDialog;
-  function openGift() {
-    if (!giftDialog) {
-      giftDialog = el('dialog', { class: 'ms-dialog ms-gift', 'aria-labelledby': 'msGiftTitle' });
+  // ---------- Pricing (planned) ----------
+  const PLANS = [
+    { name: 'Starter', price: '$9', per: 'one-time', runs: '10 runs', points: ['Competitor analysis', 'Ready-to-post ads', 'Ranked next moves'] },
+    { name: 'Growth', price: '$29', per: '/month', runs: '50 runs a month', points: ['Everything in Starter', 'Daily growth brief', 'Budget advice for ads'], featured: true },
+    { name: 'Unlimited', price: '$99', per: '/month', runs: 'Unlimited runs', points: ['Everything in Growth', 'Unlimited competitors', 'Priority support'] },
+  ];
+  let pricingDialog;
+  function openPricing(mode = '') {
+    if (!pricingDialog) {
+      pricingDialog = el('dialog', { class: 'ms-dialog ms-pricing', 'aria-labelledby': 'msPricingTitle' });
       const close = el('button', { type: 'button', class: 'ms-close', 'aria-label': 'Close' }, '×');
-      close.addEventListener('click', () => giftDialog.close());
-      giftDialog.appendChild(close);
-      giftDialog.appendChild(el('p', { class: 'ms-eyebrow' }, 'A thoughtful gift for a creator'));
-      giftDialog.appendChild(el('h2', { id: 'msGiftTitle' }, 'Gift a growth subscription'));
-      giftDialog.appendChild(el('p', { class: 'ms-price' }, '$29 / month'));
-      const list = el('ul', {});
-      ['A daily brief on the competitors they choose', 'Ready-to-post Muse images and captions', 'Ranked next moves after every post', 'Budget advice if they run ads'].forEach((item) => list.appendChild(el('li', {}, item)));
-      giftDialog.appendChild(list);
-      giftDialog.appendChild(el('p', { class: 'ms-muted' }, 'Not on sale yet. Gift plans are planned for after the beta; this demo takes no payment and collects no details.'));
-      const ok = el('button', { type: 'button', class: 'ms-primary' }, 'Gift a growth subscription $29/mo');
-      ok.addEventListener('click', () => giftDialog.close());
-      giftDialog.appendChild(ok);
-      giftDialog.addEventListener('click', (event) => { if (event.target === giftDialog) giftDialog.close(); });
-      document.body.appendChild(giftDialog);
+      close.addEventListener('click', () => pricingDialog.close());
+      pricingDialog.appendChild(close);
+      pricingDialog.appendChild(el('p', { class: 'ms-eyebrow' }, 'Planned pricing'));
+      pricingDialog.appendChild(el('h2', { id: 'msPricingTitle' }, 'Get more runs'));
+      pricingDialog.appendChild(el('p', { class: 'ms-pricing-gift' }));
+      const grid = el('div', { class: 'ms-plans' });
+      for (const plan of PLANS) {
+        const card = el('div', { class: `ms-plan${plan.featured ? ' featured' : ''}` });
+        if (plan.featured) card.appendChild(el('span', { class: 'ms-plan-tag' }, 'Most popular'));
+        card.appendChild(el('strong', { class: 'ms-plan-name' }, plan.name));
+        const price = el('p', { class: 'ms-plan-price' }, plan.price);
+        price.appendChild(el('small', {}, ` ${plan.per}`));
+        card.appendChild(price);
+        card.appendChild(el('p', { class: 'ms-plan-runs' }, plan.runs));
+        const list = el('ul', {});
+        plan.points.forEach((point) => list.appendChild(el('li', {}, point)));
+        card.appendChild(list);
+        card.appendChild(el('button', { type: 'button', class: plan.featured ? 'ms-primary' : 'ms-secondary', disabled: '', title: 'Not on sale in this demo' }, 'Coming soon'));
+        grid.appendChild(card);
+      }
+      pricingDialog.appendChild(grid);
+      pricingDialog.appendChild(el('p', { class: 'ms-muted' }, 'Plans open after the beta. This demo takes no payment and collects no details. 1 run = one competitor analysis, ad generation or budget review.'));
+      pricingDialog.addEventListener('click', (event) => { if (event.target === pricingDialog) pricingDialog.close(); });
+      document.body.appendChild(pricingDialog);
     }
-    if (typeof giftDialog.showModal === 'function') giftDialog.showModal(); else giftDialog.setAttribute('open', '');
+    pricingDialog.querySelector('h2').textContent = mode === 'gift' ? 'Gift a subscription' : 'Get more runs';
+    const giftLine = pricingDialog.querySelector('.ms-pricing-gift');
+    giftLine.textContent = mode === 'gift' ? 'Any plan can be sent as a gift to a maker you love.' : '';
+    giftLine.hidden = mode !== 'gift';
+    if (typeof pricingDialog.showModal === 'function') pricingDialog.showModal(); else pricingDialog.setAttribute('open', '');
+  }
+  const openGift = () => openPricing('gift');
+
+  // ---------- Logged-out demo and free signup ----------
+  let signupDialog;
+  function openSignup() {
+    if (!signupDialog) {
+      signupDialog = el('dialog', { class: 'ms-dialog ms-signup', 'aria-labelledby': 'msSignupTitle' });
+      const close = el('button', { type: 'button', class: 'ms-close', 'aria-label': 'Close' }, '×');
+      close.addEventListener('click', () => signupDialog.close());
+      signupDialog.appendChild(close);
+      signupDialog.appendChild(el('p', { class: 'ms-eyebrow' }, 'Free to start'));
+      signupDialog.appendChild(el('h2', { id: 'msSignupTitle' }, '5 runs on us'));
+      signupDialog.appendChild(el('p', { class: 'ms-tour-body' }, 'Analyze competitors, create ready-to-post ads and get ranked next moves for Art of Sarabjit Singh.'));
+      const start = el('button', { type: 'button', class: 'ms-primary' }, 'Start free with 5 runs');
+      start.addEventListener('click', () => { startSession(); signupDialog.close(); });
+      signupDialog.appendChild(start);
+      signupDialog.appendChild(el('p', { class: 'ms-muted' }, 'Accounts open after the beta. For now, your free demo runs are saved in this browser; no email or payment is needed.'));
+      signupDialog.addEventListener('click', (event) => { if (event.target === signupDialog) signupDialog.close(); });
+      document.body.appendChild(signupDialog);
+    }
+    if (typeof signupDialog.showModal === 'function') signupDialog.showModal(); else signupDialog.setAttribute('open', '');
+  }
+  function startSession() {
+    store.set(SESSION_KEY, '1');
+    if (store.get(CREDIT_KEY) === null) { credits = START_CREDITS; store.set(CREDIT_KEY, String(credits)); }
+    document.body.classList.remove('ms-logged-out');
+    document.querySelectorAll('.ms-gate').forEach((gate) => gate.remove());
+    document.querySelectorAll('.ms-signup-btn').forEach((btn) => btn.remove());
+    if (pill) { pill.hidden = false; renderCredits(true); }
+    toast(`Welcome! ${credits} free runs are ready.`);
+  }
+  function mountSession() {
+    if (hasSession()) return;
+    document.body.classList.add('ms-logged-out');
+    if (pill) pill.hidden = true;
+    const header = document.querySelector('header.topbar') || document.querySelector('body > header');
+    if (header) {
+      const btn = el('button', { type: 'button', class: 'ms-primary ms-small ms-signup-btn' }, 'Sign up free');
+      btn.addEventListener('click', openSignup);
+      if (pill?.parentNode) pill.insertAdjacentElement('afterend', btn); else header.appendChild(btn);
+    }
+    // On the portal, frost the interactive stages and workspace until the visitor starts.
+    const gated = [...document.querySelectorAll('.jr-stage'), document.querySelector('.ms-workspace-bar')].filter(Boolean);
+    for (const area of gated) {
+      area.classList.add('ms-gated');
+      const gate = el('div', { class: 'ms-gate' });
+      const card = el('div', { class: 'ms-gate-card' });
+      card.appendChild(el('strong', {}, 'Sign up free — 5 runs on us'));
+      card.appendChild(el('span', {}, 'Sample data shown. Start free to run analyses, open ads and use the tools.'));
+      const cta = el('button', { type: 'button', class: 'ms-primary' }, 'Sign up free');
+      cta.addEventListener('click', openSignup);
+      card.appendChild(cta);
+      gate.appendChild(card);
+      area.appendChild(gate);
+    }
   }
 
   // ---------- Portal: one stage at a time ----------
@@ -255,8 +338,9 @@
     const section = el('section', { class: 'ms-brief', id: 'msBrief', 'aria-labelledby': 'msBriefTitle' });
     const head = el('div', { class: 'ms-brief-head' });
     const titleBox = el('div');
-    titleBox.appendChild(el('p', { class: 'ms-eyebrow' }, `Today’s brief · ${today}`));
+    titleBox.appendChild(el('p', { class: 'ms-eyebrow' }, `Your daily growth brief · ${today}`));
     titleBox.appendChild(el('h2', { id: 'msBriefTitle' }, 'What changed at the shops you watch'));
+    titleBox.appendChild(el('p', { class: 'ms-brief-plan' }, 'Planned: a fresh brief delivered every morning. Today’s is built from the Nov 3 snapshot.'));
     const meta = el('p', { class: 'ms-brief-meta' });
     meta.appendChild(el('span', { class: 'ms-dot', 'aria-hidden': 'true' }));
     meta.appendChild(document.createTextNode('Watchlist: 4 competitors · 6 shop pages · last checked Nov 3 · social accounts not checked yet'));
@@ -451,6 +535,7 @@
   function init() {
     revealFallback();
     mountCredits();
+    mountSession();
     mountBrief();
     mountActions();
     mountRefine();
@@ -460,6 +545,6 @@
     if (document.getElementById('journey') && !store.get(TOUR_KEY) && !location.hash) setTimeout(openTour, 500);
   }
 
-  window.museShell = { spend, progress, toast, openGift, openTour, showStage };
+  window.museShell = { spend, progress, toast, openGift, openPricing, openSignup, openTour, showStage };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();
