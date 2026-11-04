@@ -149,6 +149,8 @@
     for (const stage of STAGES) {
       const node = document.getElementById(stage);
       if (node) { node.hidden = stage !== id; node.classList.toggle('ms-enter', stage === id && !reducedMotion); }
+      // Scroll-reveal styling must never leave a shown stage invisible.
+      if (node && stage === id) [node, ...node.querySelectorAll('.reveal-on-scroll')].forEach((x) => x.classList.add('revealed'));
     }
     document.querySelectorAll('.jr-loop a').forEach((link) => {
       const active = link.getAttribute('href') === `#${id}`;
@@ -290,7 +292,13 @@
     main.insertBefore(section, main.firstChild);
   }
 
+  function revealFallback() {
+    // Throttled or background tabs may never fire IntersectionObserver; reveal anything still hidden.
+    setTimeout(() => document.querySelectorAll('.reveal-on-scroll:not(.revealed)').forEach((x) => x.classList.add('revealed')), 900);
+  }
+
   function init() {
+    revealFallback();
     mountCredits();
     mountBrief();
     mountStages();
