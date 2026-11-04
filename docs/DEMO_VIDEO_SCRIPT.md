@@ -9,11 +9,11 @@ button into the `/create` wizard, then come back to `/` for the budget advice.
   (deployed revision checked Nov 4). It runs in saved mode with no keys, so it can't make paid
   calls. A local server started with `DEMO_MODE=true` also works.
 - **Tour and credits:** a fresh browser opens a short tour on `/` at first visit; the opening below
-  uses it. The header shows **demo credits** (5 to start; each saved analysis, budget review or scene costs 1).
+  uses it. The header shows **demo credits** (3 to start; each saved analysis, budget review or scene costs 1).
   Reset them from the credits menu before recording. Say "demo credits"; no payment is taken.
-- **Free start:** after the tour, the portal shows "Sign up free — 5 runs on us" over the tools. Click
-  **Sign up free → Start free with 5 runs** on camera (no email or payment; it starts a browser-local demo).
-  Credits start at 5; at 0 the pill shows "Get more runs", which opens the planned pricing.
+- **Free start:** after the tour, the portal shows "Sign up free — 3 runs on us" over the tools. Click
+  **Sign up free → Start free with 3 runs** on camera (no email or payment; it starts a browser-local demo).
+  Credits start at 3; at 0 the pill shows "Get more runs", which opens the planned pricing.
 - **Warm-up:** open `/` once before recording. The first load after a deploy can take about
   4 seconds.
 - **Window:** a laptop-sized browser window (about 1440×900). Each `/create` step fits on one

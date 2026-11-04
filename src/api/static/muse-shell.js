@@ -4,7 +4,7 @@
 (() => {
   const CREDIT_KEY = 'muse.demoCredits';
   const TOUR_KEY = 'muse.tourSeen';
-  const START_CREDITS = 5;
+  const START_CREDITS = 3;
   const SESSION_KEY = 'muse.demoSession';
   const hasSession = () => store.get(SESSION_KEY) === '1';
   const store = {
@@ -184,9 +184,9 @@
       close.addEventListener('click', () => signupDialog.close());
       signupDialog.appendChild(close);
       signupDialog.appendChild(el('p', { class: 'ms-eyebrow' }, 'Free to start'));
-      signupDialog.appendChild(el('h2', { id: 'msSignupTitle' }, '5 runs on us'));
+      signupDialog.appendChild(el('h2', { id: 'msSignupTitle' }, '3 runs on us'));
       signupDialog.appendChild(el('p', { class: 'ms-tour-body' }, 'Analyze competitors, create ready-to-post ads and get ranked next moves for Art of Sarabjit Singh.'));
-      const start = el('button', { type: 'button', class: 'ms-primary' }, 'Start free with 5 runs');
+      const start = el('button', { type: 'button', class: 'ms-primary' }, 'Start free with 3 runs');
       start.addEventListener('click', () => { startSession(); signupDialog.close(); });
       signupDialog.appendChild(start);
       signupDialog.appendChild(el('p', { class: 'ms-muted' }, 'Accounts open after the beta. For now, your free demo runs are saved in this browser; no email or payment is needed.'));
@@ -220,7 +220,7 @@
       area.classList.add('ms-gated');
       const gate = el('div', { class: 'ms-gate' });
       const card = el('div', { class: 'ms-gate-card' });
-      card.appendChild(el('strong', {}, 'Sign up free — 5 runs on us'));
+      card.appendChild(el('strong', {}, 'Sign up free — 3 runs on us'));
       card.appendChild(el('span', {}, 'Sample data shown. Start free to run analyses, open ads and use the tools.'));
       const cta = el('button', { type: 'button', class: 'ms-primary' }, 'Sign up free');
       cta.addEventListener('click', openSignup);
