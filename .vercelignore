@@ -10,3 +10,5 @@ workflows/gallery
 
 .agents
 .tasks
+.env*
+!.env.example

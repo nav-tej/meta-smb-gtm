@@ -429,3 +429,12 @@ This app fetches arbitrary URLs, parses untrusted XML, and feeds third-party con
 - Latest confirmed Claude progress: `75a5109`. No newer Gemini commit or Hermes reel found locally; remote state not freshly fetched. CLI delivery attempts failed: Claude not logged in, Gemini timeout, Hermes gateway authorization. **No acknowledgement received; do not mark these agents active.**
 - Codex fixed active-workspace handlers, selected-product saved previews, remaining live/proven-ad labels, and escaped artwork details. Added `tests/test_portal_demo.py` plus the Node handler harness. README explains cached-only deployment and sample provenance.
 - Vercel CLI installed but network/DNS blocked here; optional Vercel integration located but not connected. Deployment remains unverified. Claude should publish from its authenticated normal terminal with DEMO_MODE=true and no live API keys needed.
+
+
+### Codex Vercel recovery — November 3, 2026
+
+- User asked Codex to resume deployment and maintain Obsidian context. Read `~/Downloads/AGENT_HANDOFF_BRIEF.md`, vault `Welcome.md`, `Meta Hackathon.md`, and repo instructions.
+- `git pull --rebase origin main` succeeded with network permission; main already current at `d0b7d32`. `make check`: 95 passed, lint and format clean.
+- Connected Vercel MCP returned empty project/team lists. CLI 62.2.0 can reach Vercel with network permission, but `vercel whoami` rejected the saved token. Started `vercel login`; user browser authentication pending. No project link or verified public deployment yet.
+- Publish cached-only production with `DEMO_MODE=true`, without Meta API or live-unlock credentials. No paid Muse calls authorized or made.
+- Updated primary Obsidian project, hub and log; corrected obsolete SAM/BiRefNet claims. Record final URL and remote smoke checks there after deployment succeeds.

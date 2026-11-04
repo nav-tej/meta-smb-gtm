@@ -1,6 +1,7 @@
 """FastAPI app entry point. All feature routers are mounted under /api/v1."""
 
 import logging
+import mimetypes
 from pathlib import Path
 
 from fastapi import APIRouter, FastAPI, Request, status
@@ -12,6 +13,9 @@ from src.clients.comfyui import ComfyUIError
 from src.clients.meta import MetaAPIError
 from src.config import get_settings
 from src.utils.sitemap import SitemapError
+
+# Ensure .webp files are served with image/webp Content-Type on serverless environments
+mimetypes.add_type("image/webp", ".webp")
 
 logging.basicConfig(
     level=get_settings().log_level.upper(),
