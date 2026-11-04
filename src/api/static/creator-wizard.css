@@ -60,7 +60,7 @@
   .product-grid { grid-template-columns: 1fr; gap: 16px; }
   .product-grid > .product-art { position: static; padding: 16px; }
   .product-art .photo-mat img { max-height: 42vh; }
-  .flow-footer { margin: 18px -20px 0; padding: 12px 20px; }
+  .flow-footer { margin: 18px -16px 0; padding: 12px 16px; }
   #nextButton { padding: 13px 20px; font-size: 15px; }
 }
 
