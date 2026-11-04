@@ -247,8 +247,11 @@ Canonical list is `.env.example`. Summary:
 | `META_AD_ACCOUNT_ID` | stretch | Ad account (`act_...`) |
 | `CRAWLER_USER_AGENT` | no | Identifies our crawler honestly |
 | `CRAWLER_MAX_URLS` | no | Cap on URLs parsed per crawl |
-| `OUTPUT_DIR` | no | Where generated assets are written |
+| `OUTPUT_DIR` | no | Where generated assets are written (`/tmp/outputs` on Vercel) |
 | `LOG_LEVEL` | no | `INFO` by default |
+| `DEMO_MODE` | no | Defaults to `true` (serves saved live results in `data/samples/` to protect API credits) |
+| `DEMO_KEY` | live unlock | Header value (`X-Demo-Key` + `?live=true`) to unlock real live Muse API calls in demo mode |
+| `LIVE_CALLS_PER_HOUR` | no | Hourly live call cap when `DEMO_KEY` is used (default `5`) |
 
 Read env only in `src/config.py`. Everything else imports settings from there.
 
@@ -283,7 +286,7 @@ This app fetches arbitrary URLs, parses untrusted XML, and feeds third-party con
 
 ## 12. Current implementation status & next orchestration tasks (Claude & Hermes)
 
-### Completed & verified (`make check` → 92/92 tests passing, 0 ruff errors)
+### Completed & verified (`make check` → 94/94 tests passing, 0 ruff errors)
 - **Meta Model API Client (`src/clients/meta.py`):** `MetaClient` using `AsyncOpenAI` (`https://api.meta.ai/v1`) with `.strip()` on credentials/model IDs, structured JSON validation with 1-retry repair (`chat_structured`), multimodal Vision screenshot analysis (`chat_vision_structured`), `generate_image` (`muse-image-1.0` on `/v1/images/generations`), `edit_image` (`muse-image-1.0` on `/v1/images/edits`), `generate_image_workflow` (`muse-image-1.0` on `/v1/responses` with `reasoning={"effort": "high"}` supporting `product_visuals`, `restore_enhance`, and `multi_image_combine` + returning `reasoning_summary`), `transcribe_audio` (`muse-voice-transcribe-1.0` on `/v1/audio/transcriptions`), and `segment` (`sam-3.1` on `/v1/responses` parsing `<|box;...|>` into a binary PNG mask).
 - **Flow 1 — Competitor Intel & Storefront Ingestion (`src/services/competitor_intel.py`, `src/utils/sitemap.py`, `src/models/intel.py`, `src/api/intel.py`):**
   - SSRF-guarded HTTP (`validate_safe_url`, `_fetch_bytes_guarded`), RFC 9309 wildcard `robots.txt` (`parse_robots_txt`), `defusedxml` `<urlset>` & `<sitemapindex>` recursion, gzip-bomb defense, marketplace profile fallback (`crawl_listing_page_fallback`), deterministic signal derivation (`derive_signals`), verified `ResearchBrief` (`F1..Fn` citations checked by `_CitationChecker`), and Muse Spark synthesis (`POST /api/v1/analyze-competitors`).
@@ -291,17 +294,21 @@ This app fetches arbitrary URLs, parses untrusted XML, and feeds third-party con
 - **Flow 2 — Two-Phase Hybrid Ad Creative Studio (`src/services/ad_creative.py`, `src/clients/comfyui.py`, `src/models/creative.py`, `src/api/creative.py`, `workflows/*.json`, `.claude/skills/comfy*`):**
   - Two-phase reviewable creative workflow (`POST /api/v1/generate-ads` with `draft=true` -> seller edits `EditableCreativeBrief` -> Phase 2 render), plus voice-note transcription (`POST /api/v1/transcribe-voice`).
   - Native Meta Playground workflows (`product_visuals`, `restore_enhance`, `multi_image_combine`) mirroring open-weight ComfyUI workflows (`sam3_segment.json`, `krea3_scene_edit.json`, `krea2_turbo_style_ref.json`, `ideogram4_collector_card.json`, `flux_krea_scene_relight.json`, `placement_outpaint.json`, `upscale_4x.json`, `ltx2_5_dfr_i2v.json`, `minimax_h3_i2v.json`).
-  - **6 Live `Muse Image 1.0` WebP Visuals in `data/samples/`:**
+  - **7 Live `Muse Image 1.0` WebP Visuals in `data/samples/`:**
     1. `ek_onkar_collector_room_live.webp` (*Ek Onkar* collector living room — `product_visuals`)
     2. `diptych_ek_onkar_kirat_karo_live.webp` (*Ek Onkar + Kirat Karo* 2-Piece Collector Diptych — `multi_image_combine`)
     3. `naam_japo_restored_gallery_live.webp` (*Naam Japo* studio-restored & oak-framed — `restore_enhance`)
     4. `kirat_karo_collector_room_live.webp` (*Kirat Karo* brushed-brass dining room — `product_visuals`)
-    5. `etsy_chai_set_product_visual_live.webp` (*Saffron & Clay* stoneware & hammered brass chai set — `product_visuals`)
-    6. `etsy_diwali_gift_box_live.webp` (*Saffron & Clay* brass diya + marigold linen gift box — `multi_image_combine`)
+    5. `golden_temple_holiday_gift_live.webp` (*Golden Temple* holiday collector gift staging — `product_visuals`)
+    6. `etsy_chai_set_product_visual_live.webp` (*Saffron & Clay* stoneware & hammered brass chai set — `product_visuals`)
+    7. `etsy_diwali_gift_box_live.webp` (*Saffron & Clay* brass diya + marigold linen gift box — `multi_image_combine`)
 - **Flow 3 — Cited Bid Advisor & CSV Upload (`src/services/bid_advisor.py`, `src/models/bids.py`, `src/api/bids.py`):**
   - Deterministic Python math (`compute_metrics`, `load_campaign_csv`) + Muse Spark `BidRecommendation` (`POST /api/v1/bid-advice` and `POST /api/v1/bid-advice/csv`) tracing budget shifts and audience plays back to `ResearchBrief` findings `F1..Fn`. Sample Meta Ads Manager export ready in `data/samples/sarabjit_singh_ads_export.csv`.
+- **Vercel Serverless Deployment & `DEMO_MODE` Spending Guard (`api/index.py`, `vercel.json`, `.vercelignore`, `src/api/demo.py`, `src/services/demo.py`, `tests/test_demo_mode.py`):**
+  - Public deployments run with `DEMO_MODE=true` by default so all 7 Muse routes serve saved live results from `data/samples/` with zero API credit drain. Passing `?live=true` with header `X-Demo-Key: <DEMO_KEY>` unlocks real live calls capped at `LIVE_CALLS_PER_HOUR` (default 5).
 - **Lovable-Style Customer Portal (`src/api/static/index.html` served at `GET /` and `GET /portal`):**
-  - Live interactive workspace switcher (`Art of Sarabjit Singh` Fine Artist vs. `Saffron & Clay Studio` Etsy Physical Goods vs. custom storefront onboarding), Step 0 storefront/marketplace/socials reference crawler, Step 1 cited competitor intel + Vision screenshot dropzone, Step 2 two-phase creative brief editor + 6 live `Muse Image 1.0` stagings + High-Reasoning trace badge + 9:16 Reel preview player, Step 3 responsive campaign table + 1-click CSV upload, and Step 4 1-click Weebly/Shopify Stripe Checkout HTML + **Google Rich-Snippet JSON-LD (`VisualArtwork` + `Product`) Schema** + Meta Ads CSV export.
+  - XSS-hardened (`esc()` + `safeUrl()` across all dynamic templates, Semgrep clean).
+  - Live interactive workspace switcher (`Art of Sarabjit Singh` Fine Artist vs. `Saffron & Clay Studio` Etsy Physical Goods vs. custom storefront onboarding), Step 0 storefront/marketplace/socials reference crawler, Step 1 cited competitor intel + Vision screenshot dropzone, Step 2 two-phase creative brief editor + live `Muse Image 1.0` stagings + High-Reasoning trace badge + 9:16 Reel preview player, Step 3 responsive campaign table + 1-click CSV upload, and Step 4 1-click Weebly/Shopify Stripe Checkout HTML + **Google Rich-Snippet JSON-LD (`VisualArtwork` + `Product`) Schema** + Meta Ads CSV export.
 - **Documentation & Demo Script (`docs/`):**
   - `docs/CLAUDE_HANDOFF_330PM.md`: Complete handoff brief and copy-paste prompt.
   - `docs/DEMO_VIDEO_SCRIPT.md`: Timestamped 3-minute hackathon pitch and click sequence.
@@ -311,11 +318,12 @@ This app fetches arbitrary URLs, parses untrusted XML, and feeds third-party con
   - **Primary Mac (`localhost:8000`):** Runs the live FastAPI Customer Portal (`uvicorn src.api.main:app --reload`), Claude Code, and Antigravity.
   - **Secondary Mac Studio (Hermes):** Hermes runs on a separate Mac Studio and syncs via `https://github.com/nav-tej/meta-smb-gtm.git` (`origin/main`). Always run `git pull --rebase origin main` before starting work and `make check` before pushing.
 - **Next Tasks for Claude:**
-  1. Walk through `docs/DEMO_VIDEO_SCRIPT.md` on `http://localhost:8000/` and verify every click path (Workspace Switcher, Step 0 Live Crawl, Step 1 Cited Brief, Step 2 Phase 1 Draft -> Phase 2 Render, Step 3 CSV Upload with `data/samples/sarabjit_singh_ads_export.csv`, Step 4 Checkout + JSON-LD copy).
-  2. Optional UI/UX polish or README/submission write-up enhancements for the Cerebral Valley judging rubric (Impact 30%, Meta AI Tooling 25%, Demo 25%, Technical Depth 20%).
+  1. Verify the live Vercel deployment URL (or deploy via `vercel --prod` with `DEMO_MODE=true`) and confirm `GET /`, `GET /api/v1/demo-presets`, and all 4 portal steps work seamlessly in production.
+  2. Wire `golden_temple_holiday_gift_live.webp` as a 5th selectable card in the `sarabjit_singh` `artworks_showcase` in `src/api/intel.py` so the portal displays all 5 Fine Art stagings alongside the 2 Etsy physical-goods stagings.
+  3. Walk through `docs/DEMO_VIDEO_SCRIPT.md` to record or assist with the final 3-minute hackathon video.
 - **Next Tasks for Hermes (on the separate Mac Studio):**
-  1. Pull `origin/main` (`c16c354`+) and run `make check` (`92 passed`).
+  1. Pull `origin/main` and run `make check` (`94 passed`).
   2. If local ComfyUI (`http://127.0.0.1:8188`) is running on the Mac Studio, execute `workflows/ltx2_5_dfr_i2v.json` or `workflows/minimax_h3_i2v.json` on `data/samples/ek_onkar_collector_room_live.webp` to drop an optional real `.mp4` video reel asset into `data/samples/` without touching `src/api/static/index.html`.
-  3. Expand `README.md` with architecture diagrams, quickstart screenshots, and sample API curl commands so judges inspecting the GitHub repo see the full pipeline immediately.
+  3. Add additional offline edge-case tests in `tests/` (e.g., malformed CSV headers, multi-image combine validation) to push test coverage even higher without touching `src/api/static/index.html`.
 
 
