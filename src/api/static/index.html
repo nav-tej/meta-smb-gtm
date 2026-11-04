@@ -931,7 +931,25 @@
       .request-status { bottom: 0.75rem; left: 0.75rem; right: 0.75rem; }
       .toast { bottom: 4.5rem; left: 0.75rem; right: 0.75rem; }
     }
-  </style>
+  
+    /* Story-first journey at the top of the portal */
+    .journey { margin: 0.5rem 0 1.75rem; }
+    .journey-head h1 { font-size: clamp(1.6rem, 2.6vw, 2.2rem); margin: 0.2rem 0 0.4rem; line-height: 1.15; }
+    .journey-proof { margin: 0 0 1rem; font-size: 0.95rem; }
+    .journey-steps { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.9rem; }
+    .journey-card { background: var(--surface, #fff); border: 1px solid var(--border, #e4ddd0); border-radius: 14px; padding: 1rem 1.1rem; display: flex; flex-direction: column; gap: 0.35rem; }
+    .journey-card h3 { margin: 0; font-size: 1.1rem; }
+    .journey-card p { margin: 0; font-size: 0.88rem; line-height: 1.45; }
+    .journey-num { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+    .journey-note { font-size: 0.76rem !important; color: var(--text-muted, #6b6b6b); margin-top: auto !important; padding-top: 0.4rem; }
+    .competitor-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.45rem; font-size: 0.86rem; }
+    .competitor-list span { display: block; font-size: 0.76rem; color: var(--text-muted, #6b6b6b); }
+    .link-btn { background: none; border: 0; padding: 0; font: inherit; font-weight: 650; color: var(--accent); text-decoration: underline; cursor: pointer; }
+    .journey-cta { border: 2px solid var(--accent); }
+    .journey-btn { font-size: 1rem; padding: 0.8rem 1.1rem; text-align: center; margin-top: 0.4rem; }
+    @media (max-width: 980px) { .journey-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 600px) { .journey-steps { grid-template-columns: 1fr; } }
+</style>
 </head>
 <body>
   <!-- Top Bar -->
@@ -961,23 +979,60 @@
   </header>
 
   <main class="shell">
-    <p><a class="btn btn-dark" href="/today">Get today’s post →</a> <a href="/create">Full creative studio</a></p>
-    <p role="note" style="padding:0.8rem 1rem;border:1px solid #e7c9a9;border-radius:12px;background:#fff8ec;">Interactive demo: saved Muse outputs and sample campaign data. Custom inputs do not produce personalized AI results in this mode. No ads are launched, payments connected, or sales lift measured.</p>
+    <section id="journey" class="journey" aria-label="Your growth plan">
+      <div class="journey-head">
+        <p class="eyebrow">ART OF SARABJIT SINGH · TODAY’S PLAN</p>
+        <h1>From your work to your next post, in four steps.</h1>
+        <p class="journey-proof">From saved public data: <strong>300</strong> competitor pages read · <strong>4</strong> similar sellers suggested · <strong>5</strong> Muse Spark recommendations · your next post ready in about <strong>6 clicks</strong>.</p>
+      </div>
+      <ol class="journey-steps">
+        <li class="journey-card">
+          <span class="journey-num">1 · Your business</span>
+          <h3>Original Sikh heritage art</h3>
+          <p>Sells on <strong>Pixels</strong> (preferred), Fine Art America, Saatchi Art and her own website. Promotes on Instagram and Facebook. Etsy is closed.</p>
+        </li>
+        <li class="journey-card">
+          <span class="journey-num">2 · Similar sellers</span>
+          <h3>Suggested competitors</h3>
+          <ul class="competitor-list">
+            <li><button type="button" class="link-btn" id="journeyLoadBrief">SikhiArt.com</button> <span>Sikh history paintings &amp; prints · 300 pages · <em>saved Muse brief</em></span></li>
+            <li><a href="https://fineartamerica.com/profiles/gurinderpreet-kaur/art/paintings" target="_blank" rel="noopener noreferrer">Gurinderpreet Kaur</a> <span>Fine Art America · 70 listings</span></li>
+            <li><a href="https://fineartamerica.com/profiles/manjot-singh-sachdeva/art/photographs" target="_blank" rel="noopener noreferrer">Manjot Singh Sachdeva</a> <span>Golden Temple photos · Fine Art America / Pixels · 105 listings</span></li>
+            <li><a href="https://www.saatchiart.com/gurdishpannu" target="_blank" rel="noopener noreferrer">Gurdish Pannu</a> <span>Punjabi folk &amp; Sikh heritage · Saatchi Art</span></li>
+          </ul>
+          <p class="journey-note">Public snapshots captured Nov 3, 2026. Only SikhiArt.com has a saved Muse Spark brief.</p>
+        </li>
+        <li class="journey-card">
+          <span class="journey-num">3 · Muse recommends</span>
+          <h3>Tell the story they skip</h3>
+          <p>SikhiArt.com focuses on gurus and warriors, has almost no stories and no group for women’s stories. <strong>Suggested next move:</strong> post one painting with a short personal story, and point people to your Empowering Women work.</p>
+          <p class="journey-note">From the saved Muse Spark brief (Nov 3). You decide what to act on.</p>
+        </li>
+        <li class="journey-card journey-cta">
+          <span class="journey-num">4 · Create</span>
+          <h3>Make your next post</h3>
+          <p>Pick a painting, choose Pixels as the destination, review the words and download a ready-to-post image.</p>
+          <a class="btn btn-dark journey-btn" href="/create">Create your next post →</a>
+          <p class="journey-note"><button type="button" class="link-btn" id="journeyBudget">Then review ad budget (sample data)</button> · <a href="/today">Quick daily desk</a></p>
+        </li>
+      </ol>
+    </section>
+
+        <p role="note" style="padding:0.8rem 1rem;border:1px solid #e7c9a9;border-radius:12px;background:#fff8ec;">Interactive demo: saved Muse outputs and sample campaign data. Custom inputs do not produce personalized AI results in this mode. No ads are launched, payments connected, or sales lift measured.</p>
     <!-- Storefront Overview Hero -->
     <section class="hero-card" aria-label="Connected Seller Workspace">
       <div>
         <span class="eyebrow" id="heroCategory">Fine Artist & Multi-Channel Creator · SF Bay Area</span>
         <h1 class="hero-title" id="heroTitle">Art of Sarabjit Singh — Multi-Channel Growth Workspace</h1>
         <p class="hero-desc" id="heroDesc">
-          Connected across 7 channels (Weebly Website, FineArtAmerica, Pixels, Saatchi Art, Etsy, Instagram <code>@artofsarabjitsingh</code>, and Facebook). Muse Spark audits catalog gaps, stages collector rooms for seller review using Muse Image, and reallocates ad spend with cited competitor evidence.
+          Sells on Pixels (preferred), Fine Art America, Saatchi Art and her own website; promotes on Instagram <code>@artofsarabjitsingh</code> and Facebook. Etsy is closed. These accounts are not connected to Muse; the workspace below uses saved public snapshots.
         </p>
         <div class="channel-strip" id="channelStrip">
           <a class="channel-chip ok" href="https://www.artofsarabjitsingh.com/" target="_blank" rel="noopener">✓ artofsarabjitsingh.com (24 pages)</a>
           <a class="channel-chip ok" href="https://fineartamerica.com/profiles/sarabjit-singh/art/paintings" target="_blank" rel="noopener">✓ FineArtAmerica (72 paintings)</a>
           <a class="channel-chip ok" href="https://sarabjit-singh.pixels.com/" target="_blank" rel="noopener">✓ Pixels Storefront</a>
           <a class="channel-chip social" href="https://www.saatchiart.com/sarabjitsingh" target="_blank" rel="noopener">⚡ Saatchi Art Originals</a>
-          <a class="channel-chip social" href="https://www.etsy.com/shop/ArtOfSarabjitSingh" target="_blank" rel="noopener">⚡ Etsy Shop</a>
-          <a class="channel-chip social" href="https://www.instagram.com/artofsarabjitsingh/" target="_blank" rel="noopener">📸 @artofsarabjitsingh</a>
+                    <a class="channel-chip social" href="https://www.instagram.com/artofsarabjitsingh/" target="_blank" rel="noopener">📸 @artofsarabjitsingh</a>
           <a class="channel-chip social" href="https://www.facebook.com/ArtofSarabjitSingh" target="_blank" rel="noopener">📘 Facebook Page</a>
         </div>
       </div>
@@ -994,7 +1049,7 @@
           <div class="kpi-sub">Bridge $14 POD prints to $75 signed 18k-gold editions</div>
         </div>
         <div class="kpi-box">
-          <div class="kpi-label">14-Day Ad ROAS</div>
+          <div class="kpi-label">14-Day Ad ROAS (sample data)</div>
           <div class="kpi-val" style="color:var(--success);" id="kpiRoas">3.80x ($2,848)</div>
           <div class="kpi-sub">Retargeting winning at 9.30x ROAS ($6.67 CPA)</div>
         </div>
@@ -1859,6 +1914,18 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
       });
     }
 
+    function openStep(tabId, focusId) {
+      const tab = document.querySelector(`.step-tab[data-tab="${tabId}"]`);
+      if (tab) tab.click();
+      const target = document.getElementById(focusId) || document.getElementById(tabId);
+      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    document.getElementById('journeyLoadBrief').addEventListener('click', () => {
+      document.getElementById('compUrlInput').value = 'https://www.sikhiart.com';
+      openStep('tab-intel', 'compSummaryText');
+    });
+    document.getElementById('journeyBudget').addEventListener('click', () => openStep('tab-bids', 'tab-bids'));
+
     async function loadPresets() {
       let data;
       try {
@@ -2219,6 +2286,7 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
       document.getElementById('activeWorkspaceLabel').textContent = ws.name;
       document.getElementById('heroCategory').textContent = `${ws.category} · ${ws.location}`;
       document.getElementById('heroTitle').textContent = `${ws.name} — Multi-Channel Growth Workspace`;
+      document.getElementById('journey').hidden = wsId !== 'sarabjit_singh';
       if (wsId === 'etsy_ceramics') {
         document.getElementById('sellerWebsiteInput').value = 'https://www.saffronandclay.com/';
         document.getElementById('sellerMarketplacesInput').value = 'https://www.etsy.com/shop/SaffronAndClayStudio';
