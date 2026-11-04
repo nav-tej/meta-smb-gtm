@@ -463,3 +463,14 @@ This app fetches arbitrary URLs, parses untrusted XML, and feeds third-party con
   state cleanup, and failed-request recovery. `make check`: 100 passed; lint/format clean.
 - No live Muse calls. No service, .env, or spending-guard changes. Browser review was blocked
   by the unavailable browser host; visual rehearsal remains a release check.
+
+### Codex cached endpoint coverage — November 3, 2026
+
+- Added tests/test_cached_portal_contract.py: GET / returns the exact single-file portal HTML;
+  competitor and bid POST responses match the saved live fixtures; one-shot creative POST
+  returns saved copy and sample image bytes that resolve successfully through /samples/.
+- Tests cover both omitted live and explicit live=false. Live service methods and outbound
+  AsyncClient.send are replaced with failures so cache bypasses fail offline, even with a
+  configured fake API key. No real network or paid API calls.
+- Final make check: 107 passed, lint and format clean. Portal polish was pushed separately
+  as 0d4cc65. No .env or src/services/ changes; demo spending guards remain unchanged.
