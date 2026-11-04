@@ -4,6 +4,16 @@ version = "0.1.0"
 description = "AI growth-ops copilot for SMB sellers, built on Meta's Muse models"
 license = { text = "AGPL-3.0-only" }
 requires-python = ">=3.11"
+# Mirrors requirements.txt so hosts that install from pyproject (e.g. Vercel) get the same deps
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "httpx>=0.27",
+    "openai>=1.50",
+    "pydantic>=2.8",
+    "python-dotenv>=1.0",
+    "defusedxml>=0.7",
+]
 
 [tool.ruff]
 line-length = 100

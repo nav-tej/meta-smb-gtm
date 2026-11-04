@@ -1482,6 +1482,10 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
   <div class="toast" id="toast"></div>
 
   <script>
+    // Server and model text is untrusted (competitor pages feed Muse Spark): every dynamic value
+    // passes through esc() before it reaches innerHTML, and links/images through safeUrl().
+    const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const safeUrl = (u) => (/^(https?:\/\/|\/samples\/|\/outputs\/)/i.test(String(u ?? '')) ? esc(u) : '#');
     // Mandatory Safari Fallback for <dialog closedby="any"> per modern-web-guidance
     document.querySelectorAll('dialog').forEach((dialog) => {
       if (!('closedBy' in HTMLDialogElement.prototype)) {
@@ -1550,12 +1554,12 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
         div.className = 'finding-item';
         div.innerHTML = `
           <div class="finding-head">
-            <span class="badge">${f.finding_id} · ${f.category.toUpperCase()}</span>
-            <span class="badge green">Verified: ${ev}</span>
+            <span class="badge">${esc(f.finding_id)} · ${esc(f.category.toUpperCase())}</span>
+            <span class="badge green">Verified: ${esc(ev)}</span>
           </div>
-          <div style="font-weight:700;font-size:0.88rem;">${f.claim}</div>
+          <div style="font-weight:700;font-size:0.88rem;">${esc(f.claim)}</div>
           <div style="font-size:0.82rem;color:var(--text-muted);margin-top:0.25rem;">
-            <strong>Growth Move:</strong> ${f.implication}
+            <strong>Growth Move:</strong> ${esc(f.implication)}
           </div>
         `;
         findingsEl.appendChild(div);
@@ -1569,11 +1573,11 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
         div.className = 'finding-item';
         div.innerHTML = `
           <div class="finding-head">
-            <strong style="font-size:0.9rem;">${ins.title}</strong>
-            <span class="badge ${badgeClass}">${ins.priority.toUpperCase()} PRIORITY</span>
+            <strong style="font-size:0.9rem;">${esc(ins.title)}</strong>
+            <span class="badge ${esc(badgeClass)}">${esc(ins.priority.toUpperCase())} PRIORITY</span>
           </div>
-          <div style="font-size:0.84rem;">${ins.action}</div>
-          <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.25rem;">Why: ${ins.why}</div>
+          <div style="font-size:0.84rem;">${esc(ins.action)}</div>
+          <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.25rem;">Why: ${esc(ins.why)}</div>
         `;
         insightsEl.appendChild(div);
       });
@@ -1594,11 +1598,11 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
         </div>
         <div class="finding-item">
           <div class="finding-head">
-            <strong>Catalog Metadata Coverage (${diag.total_artworks_indexed || 72} Artworks)</strong>
-            <span class="badge gold">${diag.artworks_missing_series_tag || 50} Missing Series Tag</span>
+            <strong>Catalog Metadata Coverage (${esc(diag.total_artworks_indexed || 72)} Artworks)</strong>
+            <span class="badge gold">${esc(diag.artworks_missing_series_tag || 50)} Missing Series Tag</span>
           </div>
           <div style="font-size:0.83rem;">
-            ${diag.artworks_missing_original_price || 69} listings on FineArtAmerica omit original canvas pricing ($2,000–$4,000), hiding collector scarcity.
+            ${esc(diag.artworks_missing_original_price || 69)} listings on FineArtAmerica omit original canvas pricing ($2,000–$4,000), hiding collector scarcity.
           </div>
         </div>
       `;
@@ -1616,10 +1620,10 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
         div.className = 'finding-item';
         div.innerHTML = `
           <div class="finding-head">
-            <span class="badge gold">Competitor Ad #${idx + 1}</span>
+            <span class="badge gold">Competitor Ad #${esc(idx + 1)}</span>
             <span class="badge green">30d+ Proven Hook</span>
           </div>
-          <div style="font-size:0.84rem;font-weight:600;">${hook}</div>
+          <div style="font-size:0.84rem;font-weight:600;">${esc(hook)}</div>
         `;
         adsEl.appendChild(div);
       });
@@ -1634,10 +1638,10 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
         btn.type = 'button';
         btn.className = 'art-pill' + (idx === state.selectedArtworkIdx ? ' active' : '');
         btn.innerHTML = `
-          <img src="${art.original_image}" alt="${art.title}" />
+          <img src="${safeUrl(art.original_image)}" alt="${esc(art.title)}" />
           <div>
-            <div style="font-weight:700;font-size:0.83rem;">${art.title}</div>
-            <div style="font-size:0.73rem;color:var(--text-muted);">${art.subtitle}</div>
+            <div style="font-weight:700;font-size:0.83rem;">${esc(art.title)}</div>
+            <div style="font-size:0.73rem;color:var(--text-muted);">${esc(art.subtitle)}</div>
           </div>
         `;
         btn.addEventListener('click', () => {
@@ -1690,17 +1694,17 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
         const actionBadge = adj.action === 'decrease' ? 'red' : (adj.action === 'increase' ? 'green' : 'gold');
         const tr = document.createElement('tr');
         tr.innerHTML = `
-          <th scope="row">${s.ad_set_name}<div style="font-size:0.72rem;color:var(--text-muted);font-weight:400;">${s.campaign_name}</div></th>
-          <td>$${s.totals.spend.toFixed(2)}</td>
-          <td>${s.totals.conversions}</td>
-          <td><strong>${s.totals.roas.toFixed(2)}x</strong></td>
-          <td>$${s.totals.cpa.toFixed(2)}</td>
-          <td style="color:${s.roas_trend_pct < 0 ? 'var(--danger)' : (s.roas_trend_pct > 0 ? 'var(--success)' : 'var(--text-muted)')};font-weight:700;">
-            ${s.roas_trend_pct > 0 ? '+' : ''}${s.roas_trend_pct.toFixed(1)}%
+          <th scope="row">${esc(s.ad_set_name)}<div style="font-size:0.72rem;color:var(--text-muted);font-weight:400;">${esc(s.campaign_name)}</div></th>
+          <td>$${esc(s.totals.spend.toFixed(2))}</td>
+          <td>${esc(s.totals.conversions)}</td>
+          <td><strong>${esc(s.totals.roas.toFixed(2))}x</strong></td>
+          <td>$${esc(s.totals.cpa.toFixed(2))}</td>
+          <td style="color:${esc(s.roas_trend_pct < 0 ? 'var(--danger)' : (s.roas_trend_pct > 0 ? 'var(--success)' : 'var(--text-muted)'))};font-weight:700;">
+            ${esc(s.roas_trend_pct > 0 ? '+' : '')}${esc(s.roas_trend_pct.toFixed(1))}%
           </td>
           <td>
-            <span class="badge ${actionBadge}">${adj.action.toUpperCase()}</span>
-            ${(s.flags || []).map((fl) => `<span class="badge">${fl}</span>`).join(' ')}
+            <span class="badge ${esc(actionBadge)}">${esc(adj.action.toUpperCase())}</span>
+            ${(s.flags || []).map((fl) => `<span class="badge">${esc(fl)}</span>`).join(' ')}
           </td>
         `;
         tbody.appendChild(tr);
@@ -1713,11 +1717,11 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
         div.className = 'finding-item';
         div.innerHTML = `
           <div class="finding-head">
-            <strong>Shift ${r.shift_percent}% ($${(r.daily_amount || 0).toFixed(2)}/day)</strong>
+            <strong>Shift ${esc(r.shift_percent)}% ($${esc((r.daily_amount || 0).toFixed(2))}/day)</strong>
             <span class="badge green"> Cited: F1 · F4</span>
           </div>
-          <div style="font-size:0.85rem;">From <code>${r.from_ad_set}</code> → To <code>${r.to_ad_set}</code></div>
-          <div style="font-size:0.79rem;color:var(--text-muted);margin-top:0.25rem;">${r.reasoning}</div>
+          <div style="font-size:0.85rem;">From <code>${esc(r.from_ad_set)}</code> → To <code>${esc(r.to_ad_set)}</code></div>
+          <div style="font-size:0.79rem;color:var(--text-muted);margin-top:0.25rem;">${esc(r.reasoning)}</div>
         `;
         reallocEl.appendChild(div);
       });
@@ -1729,11 +1733,11 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
         div.className = 'finding-item';
         div.innerHTML = `
           <div class="finding-head">
-            <strong style="font-size:0.88rem;">${aud.audience}</strong>
-            <span class="badge gold">F${(i % 3) + 1} Gap</span>
+            <strong style="font-size:0.88rem;">${esc(aud.audience)}</strong>
+            <span class="badge gold">${esc((aud.finding_ids || []).join(', ') || 'Competitor')} Gap</span>
           </div>
-          <div style="font-size:0.82rem;"><strong>Gap:</strong> ${aud.competitor_gap}</div>
-          <div style="font-size:0.79rem;color:var(--text-muted);margin-top:0.25rem;"><strong>How to Test:</strong> ${aud.how_to_test}</div>
+          <div style="font-size:0.82rem;"><strong>Gap:</strong> ${esc(aud.competitor_gap)}</div>
+          <div style="font-size:0.79rem;color:var(--text-muted);margin-top:0.25rem;"><strong>How to Test:</strong> ${esc(aud.how_to_test)}</div>
         `;
         audEl.appendChild(div);
       });
@@ -1913,7 +1917,7 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
           const c = result.creatives[0];
           const relPath = c.image_path.includes('outputs/')
             ? '/outputs/' + c.image_path.split('outputs/').pop()
-            : art.staged_image;
+            : c.image_path.startsWith('samples/') ? '/' + c.image_path : art.staged_image;
           document.getElementById('stageLiveImg').src = relPath;
           document.getElementById('reelImg').src = relPath;
           document.getElementById('reelHeadline').textContent = c.headline;
@@ -2165,16 +2169,16 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
         }
         const chipsHtml = (data.channels || []).map((c) => {
           const cls = c.status === 'fetched' ? 'green' : 'gold';
-          const label = c.status === 'fetched' ? `✓ ${c.host} (${c.pages_found} pages)` : `⚡ ${c.host} (Vision/Profile)`;
+          const label = c.status === 'fetched' ? `✓ ${esc(c.host)} (${esc(c.pages_found)} pages)` : `⚡ ${esc(c.host)} (Vision/Profile)`;
           return `<span class="badge ${cls}" style="margin-right:0.35rem;">${label}</span>`;
         }).join('');
         const sampleLinks = (data.discovered_catalog_items || []).slice(0, 6).map(
-          (item) => `<a href="${item.url}" target="_blank" rel="noopener" style="color:var(--accent);margin-right:0.6rem;">${item.title}</a>`
+          (item) => `<a href="${safeUrl(item.url)}" target="_blank" rel="noopener" style="color:var(--accent);margin-right:0.6rem;">${esc(item.title)}</a>`
         ).join('');
         box.innerHTML = `
-          <div style="margin-bottom:0.4rem;"><strong>✓ Live Storefront Reference Ingested (${data.total_pages_crawled} pages crawled across ${data.total_channels} channels):</strong> ${chipsHtml}</div>
+          <div style="margin-bottom:0.4rem;"><strong>✓ Live Storefront Reference Ingested (${esc(data.total_pages_crawled)} pages crawled across ${esc(data.total_channels)} channels):</strong> ${chipsHtml}</div>
           <div style="font-size:0.79rem;color:var(--text-muted);margin-bottom:0.35rem;"><strong>Sample Discovered Pages:</strong> ${sampleLinks || 'Loaded from profile'}</div>
-          <div style="font-size:0.78rem;color:var(--text);"><strong>Reference Context sent to Muse Spark:</strong> <code>${data.seller_context}</code></div>
+          <div style="font-size:0.78rem;color:var(--text);"><strong>Reference Context sent to Muse Spark:</strong> <code>${esc(data.seller_context)}</code></div>
         `;
         showToast(`✓ Ingested ${data.total_pages_crawled} pages across ${data.total_channels} seller channels!`);
       } catch (err) {
@@ -2207,10 +2211,10 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
         });
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const vision = await resp.json();
-        const hooks = (vision.visual_merchandising_hooks || []).join(' · ');
-        const gaps = (vision.conversion_friction_or_gaps || []).join(' · ');
+        const hooks = (vision.visual_merchandising_hooks || []).map(esc).join(' · ');
+        const gaps = (vision.conversion_friction_or_gaps || []).map(esc).join(' · ');
         box.innerHTML = `
-          <div><strong>📸 Muse Spark 1.3 Vision Audit (${vision.platform_detected}):</strong></div>
+          <div><strong>📸 Muse Spark 1.3 Vision Audit (${esc(vision.platform_detected)}):</strong></div>
           <div style="font-size:0.8rem;margin-top:0.25rem;"><strong>Visual Hooks:</strong> ${hooks}</div>
           <div style="font-size:0.8rem;color:var(--danger);margin-top:0.2rem;"><strong>Conversion Gaps to Fix:</strong> ${gaps}</div>
         `;

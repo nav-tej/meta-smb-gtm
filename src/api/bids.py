@@ -5,8 +5,10 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
+from src.api.demo import LiveMode
 from src.models.bids import BidAdviceRequest, BidRecommendation, PerformanceMetrics
 from src.models.intel import CompetitorBrief
+from src.services import demo
 from src.services.bid_advisor import BidAdvisorService, compute_metrics, load_campaign_csv
 
 router = APIRouter(tags=["bids"])
@@ -32,7 +34,10 @@ def get_bid_advisor_service() -> BidAdvisorService:
 async def bid_advice(
     request: BidAdviceRequest,
     service: Annotated[BidAdvisorService, Depends(get_bid_advisor_service)],
+    live: LiveMode,
 ) -> BidRecommendation:
+    if not live:
+        return demo.demo_bid_recommendation()
     return await service.advise(request)
 
 
@@ -40,6 +45,7 @@ async def bid_advice(
 async def bid_advice_csv(
     request: CsvBidAdviceRequest,
     service: Annotated[BidAdvisorService, Depends(get_bid_advisor_service)],
+    live: LiveMode,
 ) -> BidRecommendation | PerformanceMetrics:
     try:
         campaign = load_campaign_csv(
@@ -55,6 +61,8 @@ async def bid_advice_csv(
 
     if request.deterministic_only or request.competitor_brief is None:
         return compute_metrics(campaign)
+    if not live:
+        return demo.demo_bid_recommendation()
     return await service.advise(
         BidAdviceRequest(
             campaign=campaign,

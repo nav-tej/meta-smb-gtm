@@ -10,6 +10,7 @@ from urllib.parse import urlparse
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
+from src.api.demo import LiveMode, demo_unavailable
 from src.clients.ad_library import load_sample_ad_library_signals
 from src.clients.meta import MetaAPIError
 from src.models.intel import CompetitorBrief, CompetitorIntelRequest
@@ -19,6 +20,7 @@ from src.models.seller import (
     SellerFootprintAudit,
     SellerProfile,
 )
+from src.services import demo
 from src.services.competitor_intel import CompetitorIntelService, collect_entries
 from src.services.seller_audit import (
     analyze_social_screenshots,
@@ -62,15 +64,19 @@ def get_competitor_intel_service() -> CompetitorIntelService:
 async def analyze_competitors(
     request: CompetitorIntelRequest,
     service: Annotated[CompetitorIntelService, Depends(get_competitor_intel_service)],
+    live: LiveMode,
 ) -> CompetitorBrief:
+    if not live:
+        return demo.demo_competitor_brief()
     return await service.analyze(request)
 
 
 @router.post("/audit-seller", response_model=SellerFootprintAudit | SellerDiagnostics)
 async def audit_seller(
     request: AuditSellerRequest,
+    live: LiveMode,
 ) -> SellerFootprintAudit | SellerDiagnostics:
-    if request.deterministic_only:
+    if request.deterministic_only or not live:
         return compute_seller_diagnostics(request.profile)
     return await audit_seller_footprint(
         request.profile,
@@ -181,8 +187,10 @@ async def ingest_storefront(request: IngestStorefrontRequest) -> dict[str, Any]:
 
 
 @router.post("/audit-screenshot", response_model=ScreenshotAnalysis)
-async def audit_screenshot(request: ScreenshotAuditRequest) -> ScreenshotAnalysis:
+async def audit_screenshot(request: ScreenshotAuditRequest, live: LiveMode) -> ScreenshotAnalysis:
     """Run Muse Spark 1.3 Vision on an uploaded IG, FB, Saatchi, Etsy, or website screenshot."""
+    if not live:
+        raise demo_unavailable("Screenshot analysis")
     raw = request.image_base64.strip()
     if "," in raw and raw.startswith("data:"):
         raw = raw.split(",", 1)[1]

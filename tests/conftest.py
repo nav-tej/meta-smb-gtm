@@ -78,6 +78,8 @@ def _never_use_real_meta_key(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     Tests that need a key set a fake one and mock the API with respx.
     """
     monkeypatch.setenv("META_MODEL_API_KEY", "")
+    # Route tests exercise the full app; demo-mode tests turn this back on explicitly
+    monkeypatch.setenv("DEMO_MODE", "false")
     monkeypatch.setattr(meta_module, "_shared_client", None)
     get_settings.cache_clear()
     yield

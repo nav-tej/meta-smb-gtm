@@ -26,10 +26,19 @@ class Settings(BaseModel):
     output_dir: str = "outputs"
     log_level: str = "INFO"
 
+    # Demo mode serves saved live results so a public deployment can't spend Muse credits.
+    # Live calls need ?live=true plus an X-Demo-Key header matching DEMO_KEY.
+    demo_mode: bool = True
+    demo_key: str = ""
+    live_calls_per_hour: int = 5
+
 
 @lru_cache
 def get_settings() -> Settings:
     load_dotenv()
     fields = Settings.model_fields
     values = {name: os.environ[name.upper()] for name in fields if os.environ.get(name.upper())}
+    # Serverless filesystems (Vercel) are read-only except /tmp
+    if os.environ.get("VERCEL") and "output_dir" not in values:
+        values["output_dir"] = "/tmp/outputs"
     return Settings(**values)

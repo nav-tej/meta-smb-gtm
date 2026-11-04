@@ -7,9 +7,11 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
+from src.api.demo import LiveMode, demo_unavailable
 from src.clients.comfyui import SUPPORTED_COMFY_WORKFLOWS, discover_comfy_cli
 from src.clients.meta import MetaAPIError, get_meta_client
 from src.models.creative import CreativeSet, EditableCreativeBrief, GenerateAdsRequest
+from src.services import demo
 from src.services.ad_creative import AdCreativeService
 
 router = APIRouter(tags=["creative"])
@@ -58,8 +60,10 @@ async def list_creative_models() -> dict[str, Any]:
 
 
 @router.post("/transcribe-voice")
-async def transcribe_voice(request: VoiceNoteRequest) -> dict[str, str]:
+async def transcribe_voice(request: VoiceNoteRequest, live: LiveMode) -> dict[str, str]:
     """Transcribe a seller's spoken voice note into text via `muse-voice-transcribe-1.0`."""
+    if not live:
+        raise demo_unavailable("Voice transcription")
     raw = request.audio_base64.strip()
     if "," in raw and raw.startswith("data:"):
         raw = raw.split(",", 1)[1]
@@ -78,8 +82,13 @@ GenerateAdsResponse = Annotated[CreativeSet | EditableCreativeBrief, Field(discr
 async def generate_ads(
     request: GenerateAdsRequest,
     service: Annotated[AdCreativeService, Depends(get_ad_creative_service)],
+    live: LiveMode,
 ) -> CreativeSet | EditableCreativeBrief:
     """draft=true returns a brief to review (kind="draft"); send it back as `brief` to render."""
+    if not live and request.draft:
+        return demo.demo_creative_draft(request)
+    if not live:
+        return demo.demo_creative_set(request)
     if request.draft:
         return await service.draft(request)
     return await service.generate(request)

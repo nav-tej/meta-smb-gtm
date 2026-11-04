@@ -23,9 +23,13 @@ API_PREFIX = "/api/v1"
 REPO_ROOT = Path(__file__).resolve().parents[2]
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 SAMPLES_DIR = REPO_ROOT / "data" / "samples"
-OUTPUTS_DIR = REPO_ROOT / "outputs"
-OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
-STATIC_DIR.mkdir(parents=True, exist_ok=True)
+OUTPUTS_DIR = Path(get_settings().output_dir)
+if not OUTPUTS_DIR.is_absolute():
+    OUTPUTS_DIR = REPO_ROOT / OUTPUTS_DIR
+try:
+    OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
+except OSError as err:  # read-only filesystems (serverless) without OUTPUT_DIR=/tmp/...
+    logging.getLogger(__name__).warning("Generated outputs disabled: %s", err)
 
 app = FastAPI(
     title="Meta SMB GTM",
