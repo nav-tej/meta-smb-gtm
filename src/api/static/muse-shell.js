@@ -47,29 +47,43 @@
   function mountCredits() {
     const header = document.querySelector('header.topbar') || document.querySelector('body > header');
     if (!header) return;
-    pill = el('div', { class: 'ms-credits' });
-    const button = el('button', { type: 'button', class: 'ms-credits-btn', 'aria-haspopup': 'dialog', 'aria-expanded': 'false' });
-    button.appendChild(el('span', { class: 'ms-coin', 'aria-hidden': 'true' }, '◆'));
-    countNode = el('strong', {}, String(credits));
-    button.appendChild(countNode);
-    button.appendChild(el('span', { class: 'ms-credits-label' }, ' credits'));
-    const menu = el('div', { class: 'ms-credits-menu', hidden: '' });
-    menu.appendChild(el('strong', {}, 'Demo credits'));
-    menu.appendChild(el('p', {}, '1 credit per run: competitor analysis, ad generation or budget recommendations.'));
-    menu.appendChild(el('p', { class: 'ms-muted' }, 'This demo uses saved Muse results and takes no payment. Credits are stored in this browser only.'));
-    const reset = el('button', { type: 'button', class: 'ms-link' }, `Reset to ${START_CREDITS} credits`);
-    reset.addEventListener('click', () => { credits = START_CREDITS; store.set(CREDIT_KEY, String(credits)); renderCredits(true); toast('Demo credits reset.'); });
-    menu.appendChild(reset);
-    const gift = el('button', { type: 'button', class: 'ms-link' }, 'Gift a growth plan →');
-    gift.addEventListener('click', () => { closeMenu(); openGift(); });
-    menu.appendChild(gift);
+    const existing = header.querySelector('.ms-credits');
+    pill = existing || el('div', { class: 'ms-credits' });
+    let button = pill.querySelector('.ms-credits-btn');
+    if (!button) {
+      button = el('button', { type: 'button', class: 'ms-credits-btn', 'aria-haspopup': 'dialog', 'aria-expanded': 'false' });
+      button.appendChild(el('span', { class: 'ms-coin', 'aria-hidden': 'true' }, '🪙'));
+      countNode = el('strong', {}, String(credits));
+      button.appendChild(countNode);
+      button.appendChild(el('span', { class: 'ms-credits-label' }, ' credits'));
+      pill.appendChild(button);
+    } else {
+      countNode = button.querySelector('strong');
+      const coin = button.querySelector('.ms-coin');
+      if (coin) coin.textContent = '🪙';
+    }
+    let menu = pill.querySelector('.ms-credits-menu');
+    if (!menu) {
+      menu = el('div', { class: 'ms-credits-menu', hidden: '' });
+      menu.appendChild(el('strong', {}, 'Demo credits'));
+      menu.appendChild(el('p', {}, '1 credit per run: competitor analysis, ad generation or budget recommendations.'));
+      menu.appendChild(el('p', { class: 'ms-muted' }, 'This demo uses saved Muse results and takes no payment. Credits are stored in this browser only.'));
+      const reset = el('button', { type: 'button', class: 'ms-link' }, `Reset to ${START_CREDITS} credits`);
+      reset.addEventListener('click', () => { credits = START_CREDITS; store.set(CREDIT_KEY, String(credits)); renderCredits(true); toast('Demo credits reset.'); });
+      menu.appendChild(reset);
+      const gift = el('button', { type: 'button', class: 'ms-link' }, 'Gift a growth plan →');
+      gift.addEventListener('click', () => { closeMenu(); openGift(); });
+      menu.appendChild(gift);
+      pill.appendChild(menu);
+    }
     const closeMenu = () => { menu.hidden = true; button.setAttribute('aria-expanded', 'false'); };
     button.addEventListener('click', (event) => { event.stopPropagation(); menu.hidden = !menu.hidden; button.setAttribute('aria-expanded', String(!menu.hidden)); });
     document.addEventListener('click', (event) => { if (!pill.contains(event.target)) closeMenu(); });
     document.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeMenu(); });
-    pill.append(button, menu);
-    const anchor = header.querySelector('.mode, .status-pill, #saveStatus');
-    if (anchor) anchor.insertAdjacentElement('afterend', pill); else header.appendChild(pill);
+    if (!existing) {
+      const anchor = header.querySelector('.mode, .status-pill, #saveStatus');
+      if (anchor) anchor.insertAdjacentElement('afterend', pill); else header.appendChild(pill);
+    }
     renderCredits();
     // Any control marked data-credit costs one credit when used.
     document.addEventListener('click', (event) => {
@@ -218,8 +232,67 @@
     if (stage) showStage(stage, true);
   }
 
+
+  // ---------- /today: daily brief from the latest saved snapshot ----------
+  const WATCH = [
+    { name: 'SikhiArt.com', where: 'Own shop · 300 pages', status: 'new', note: '2 new listings in the 30 days before Nov 3: new editions of Mai Bhago ji and Hari Singh Nalwa' },
+    { name: 'Gurinderpreet Kaur', where: 'Fine Art America · 70 listings', status: 'first', note: 'Prints $14–$50. First check, so nothing to compare yet' },
+    { name: 'Manjot Singh Sachdeva', where: 'Fine Art America / Pixels · 105 listings', status: 'first', note: 'Prints $14–$24. First check, so nothing to compare yet' },
+    { name: 'Gurdish Pannu', where: 'Saatchi Art · originals', status: 'first', note: 'Originals, no USD prices listed. First check' },
+  ];
+  function mountBrief() {
+    if (!location.pathname.startsWith('/today')) return;
+    const main = document.querySelector('main');
+    if (!main || document.getElementById('msBrief')) return;
+    const today = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+    const section = el('section', { class: 'ms-brief', id: 'msBrief', 'aria-labelledby': 'msBriefTitle' });
+    const head = el('div', { class: 'ms-brief-head' });
+    const titleBox = el('div');
+    titleBox.appendChild(el('p', { class: 'ms-eyebrow' }, `Today’s brief · ${today}`));
+    titleBox.appendChild(el('h2', { id: 'msBriefTitle' }, 'What changed at the shops you watch'));
+    const meta = el('p', { class: 'ms-brief-meta' });
+    meta.appendChild(el('span', { class: 'ms-dot', 'aria-hidden': 'true' }));
+    meta.appendChild(document.createTextNode('Watchlist: 4 competitors · 6 shop pages · last checked Nov 3 · social accounts not checked yet'));
+    titleBox.appendChild(meta);
+    const recheck = el('button', { type: 'button', class: 'ms-secondary ms-small', disabled: '', title: 'Re-checking needs a live server' }, 'Re-check now');
+    const toggle = el('button', { type: 'button', class: 'ms-link ms-brief-toggle', 'aria-expanded': 'true', 'aria-controls': 'msBriefBody' }, 'Hide');
+    const actions = el('div', { class: 'ms-brief-actions' });
+    actions.append(recheck, toggle);
+    head.append(titleBox, actions);
+    const body = el('div', { class: 'ms-brief-body', id: 'msBriefBody' });
+    const list = el('ul', { class: 'ms-watch' });
+    for (const item of WATCH) {
+      const li = el('li', { class: item.status });
+      li.appendChild(el('span', { class: `ms-chip ${item.status}` }, item.status === 'new' ? 'New' : 'First check'));
+      li.appendChild(el('strong', {}, item.name));
+      li.appendChild(el('span', { class: 'ms-where' }, item.where));
+      li.appendChild(el('span', { class: 'ms-note' }, item.note));
+      list.appendChild(li);
+    }
+    const move = el('div', { class: 'ms-move' });
+    const moveText = el('div');
+    moveText.appendChild(el('span', { class: 'ms-chip high' }, 'Today’s move · high impact'));
+    moveText.appendChild(el('strong', {}, 'Feature your Empowering Women series'));
+    moveText.appendChild(el('span', { class: 'ms-note' }, 'SikhiArt keeps adding warrior and guru editions but has no group for women’s stories.'));
+    const go = el('a', { class: 'ms-primary ms-small', href: '/create?goal=story' }, 'Make this post →');
+    move.append(moveText, go);
+    body.append(list, move);
+    body.appendChild(el('p', { class: 'ms-muted' }, 'From saved public snapshots captured Nov 3. Muse checks again when you run a re-check on a live server; it does not watch continuously.'));
+    section.append(head, body);
+    toggle.addEventListener('click', () => {
+      const open = body.hidden;
+      body.hidden = !open;
+      toggle.textContent = open ? 'Hide' : 'Show brief';
+      toggle.setAttribute('aria-expanded', String(open));
+      store.set('muse.briefHidden', open ? '' : '1');
+    });
+    if (store.get('muse.briefHidden') === '1') { body.hidden = true; toggle.textContent = 'Show brief'; toggle.setAttribute('aria-expanded', 'false'); }
+    main.insertBefore(section, main.firstChild);
+  }
+
   function init() {
     mountCredits();
+    mountBrief();
     mountStages();
     document.querySelectorAll('[data-open-gift]').forEach((node) => node.addEventListener('click', openGift));
     document.querySelectorAll('[data-open-tour]').forEach((node) => node.addEventListener('click', openTour));
