@@ -88,7 +88,7 @@
     resetOffers(workspace === 'sarabjit_singh');
     state.original = samplePath(art?.original_image) || (workspace === 'sarabjit_singh' ? '/samples/ek_onkar_original.jpg' : '/samples/etsy_chai_set_product_visual_live.webp');
     state.sampleImage = samplePath(art?.staged_image) || (workspace === 'sarabjit_singh' ? '/samples/ek_onkar_collector_room_live.webp' : '/samples/etsy_chai_set_product_visual_live.webp');
-    originalLayout(); setProductFields(); starter(); $('reviewed').checked = false;
+    originalLayout(); setProductFields(); starter(); $('reviewed').checked = false; $('moreDetails').open = false;
     $('productFactNote').textContent = workspace === 'sarabjit_singh' ? 'Confirm the matching artwork and offer at your chosen destination. Frame is staging only. Preview image is not a print master.' : 'Illustrative shop and sample pricing. These are saved examples, not a connected shop.';
     $('productImageCaption').textContent = workspace === 'sarabjit_singh' ? 'Ek Onkar · original artwork preview. Source: Art of Sarabjit Singh.' : 'Illustrative product image generated for the example shop.';
     updateChoices(); refreshPreview();
@@ -98,7 +98,7 @@
   function newProduct() {
     if (state.busy) return;
     state.custom = true; state.copyEdited = false; state.sceneEdited = false; state.revision += 1; state.product = { name: '', price: '', seller: '', description: '', link: '', collection: '' }; resetOffers(false); state.original = ''; state.image = ''; state.sampleImage = ''; state.provenance = 'Add a photo to create your own product layout.';
-    setProductFields(); starter(); updateChoices(); $('reviewed').checked = false; $('productFactNote').textContent = 'Your photo stays in this tab. A live request sends it to Muse only when you choose to generate.'; $('productImageCaption').textContent = 'Your product photo will appear here.'; refreshPreview(); $('productName').focus();
+    setProductFields(); starter(); updateChoices(); $('reviewed').checked = false; $('productFactNote').textContent = 'Your photo stays in this tab. A live request sends it to Muse only when you choose to generate.'; $('productImageCaption').textContent = 'Your product photo will appear here.'; $('moreDetails').open = true; refreshPreview(); $('productName').focus();
   }
   function imageElement(src) { return new Promise((resolve, reject) => { const image = new Image(); image.onload = () => resolve(image); image.onerror = () => reject(new Error('We could not open that image. Try a JPEG, PNG or WebP photo.')); image.src = src; }); }
   async function upload(file) {
@@ -151,7 +151,7 @@
     } catch (error) { notify(error.name === 'AbortError' ? 'This shop is taking too long to respond. Try again later or enter the details below.' : `${error.message} Your work is still here.`, 'error'); }
     finally { clearTimeout(timer); setBusy(false); }
   }
-  function validateProduct() { sync(); if (!state.product.name) { notify('Give your product a name first.', 'error'); $('productName').focus(); return false; } if (!state.original) { notify('Add a product photo first.', 'error'); return false; } if (state.product.link && !safeLink(state.product.link)) { notify('Use a complete http:// or https:// product link, or leave it empty.', 'error'); $('productLink').focus(); return false; } return true; }
+  function validateProduct() { sync(); if (!state.product.name) { notify('Give your product a name first.', 'error'); $('productName').focus(); return false; } if (!state.original) { $('moreDetails').open = true; notify('Add a product photo first. Open “More details” to upload it.', 'error'); return false; } if (state.product.link && !safeLink(state.product.link)) { $('moreDetails').open = true; notify('Use a complete http:// or https:// product link, or leave it empty.', 'error'); $('productLink').focus(); return false; } return true; }
   function go(step) {
     if (state.busy || (step > 0 && !validateProduct())) return;
     if (step === 3 && !postingChannels().length) { notify('Choose Instagram or Facebook for this post before sharing.', 'error'); go(0); return; }
