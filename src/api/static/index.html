@@ -961,6 +961,13 @@
     </div>
 
     <div class="topbar-right">
+      <div class="ms-credits" id="headerCreditsBadge">
+        <button type="button" class="ms-credits-btn" aria-haspopup="dialog" aria-expanded="false" title="12 demo credits remaining">
+          <span class="ms-coin" aria-hidden="true">🪙</span>
+          <strong id="creditsCount">12</strong>
+          <span class="ms-credits-label"> credits</span>
+        </button>
+      </div>
       <span class="status-pill" title="Interactive demo using saved Muse outputs; no API connection check performed">
         <span class="dot"></span>
         Saved Muse outputs · Interactive demo
@@ -975,6 +982,28 @@
       </button>
     </div>
   </header>
+
+  <!-- Competitor Monitoring Live Status Bar -->
+  <aside class="monitoring-bar" role="status" aria-label="Competitor Intelligence Monitor">
+    <div class="monitoring-inner">
+      <div class="monitoring-left">
+        <span class="monitoring-pulse-wrapper" aria-hidden="true">
+          <span class="monitoring-pulse-ring"></span>
+          <span class="monitoring-pulse-core"></span>
+        </span>
+        <span class="monitoring-tag">ACTIVE MONITOR</span>
+        <span class="monitoring-title">
+          <strong>Monitoring 4 competitors across 12 channels</strong>
+          <span class="monitoring-details">· SikhiArt.com, Fine Art America, Saatchi Art, Pixels</span>
+        </span>
+      </div>
+      <div class="monitoring-right">
+        <span class="monitoring-pill">300 pages analyzed</span>
+        <span class="monitoring-pill highlight">4 ad formats</span>
+        <span class="monitoring-time">Updated today</span>
+      </div>
+    </div>
+  </aside>
 
   <main class="shell">
     <section id="journey" class="journey" aria-label="Your growth loop">
@@ -2640,6 +2669,30 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
     });
 
     loadPresets();
+
+    // Subtle fade-in / slide-up animations as sections scroll into view
+    if (typeof window !== 'undefined' && 'IntersectionObserver' in window && typeof document !== 'undefined' && document.querySelectorAll) {
+      try {
+        const scrollObserver = new IntersectionObserver((entries, obs) => {
+          entries.forEach(entry => {
+            if (entry.isIntersecting) {
+              entry.target.classList.add('revealed');
+              obs.unobserve(entry.target);
+            }
+          });
+        }, { threshold: 0.08, rootMargin: '0px 0px -30px 0px' });
+
+        const targets = document.querySelectorAll('.jr-stage, .jr-hero, .jr-next-card, .jr-card, .hero-card, .panel .card');
+        if (targets && targets.forEach) {
+          targets.forEach(el => {
+            if (el && el.classList && typeof el.classList.add === 'function') {
+              el.classList.add('reveal-on-scroll');
+              scrollObserver.observe(el);
+            }
+          });
+        }
+      } catch (_) {}
+    }
   </script>
 </body>
 </html>

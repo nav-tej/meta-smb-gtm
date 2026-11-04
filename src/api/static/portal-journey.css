@@ -248,3 +248,299 @@
   .ms-workspace-bar .jr-action { width: 100%; }
 }
 @media (prefers-reduced-motion: reduce) { .jr-dot { animation: none; } }
+
+/* ==========================================================================
+   Micro-animations & Interactive App Polish
+   ========================================================================== */
+
+/* 1. Scroll-triggered reveal animations */
+.reveal-on-scroll {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 0.45s cubic-bezier(0.16, 1, 0.3, 1), transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
+}
+.reveal-on-scroll.revealed {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* 2. Top competitor monitoring status bar */
+.monitoring-bar {
+  background: linear-gradient(90deg, #181816 0%, #24221d 60%, #1f2722 100%);
+  color: #e6e2d8;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 0.78rem;
+  line-height: 1.4;
+  padding: 0.5rem 1.5rem;
+  position: relative;
+  z-index: 20;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+.monitoring-inner {
+  max-width: 1320px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.monitoring-left {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+.monitoring-pulse-wrapper {
+  position: relative;
+  width: 10px;
+  height: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.monitoring-pulse-core {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #34d399;
+}
+.monitoring-pulse-ring {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: rgba(52, 211, 153, 0.45);
+  animation: monitor-pulse 2s cubic-bezier(0.24, 0, 0.38, 1) infinite;
+}
+@keyframes monitor-pulse {
+  0% { transform: scale(0.6); opacity: 0.9; }
+  70% { transform: scale(1.6); opacity: 0; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+.monitoring-tag {
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #34d399;
+  background: rgba(52, 211, 153, 0.12);
+  border: 1px solid rgba(52, 211, 153, 0.25);
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+}
+.monitoring-title strong {
+  color: #ffffff;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.monitoring-details {
+  color: #a39e93;
+}
+.monitoring-right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.72rem;
+  color: #a39e93;
+}
+.monitoring-pill {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  color: #d1ccbe;
+  white-space: nowrap;
+}
+.monitoring-pill.highlight {
+  background: rgba(184, 93, 25, 0.2);
+  border-color: rgba(184, 93, 25, 0.4);
+  color: #ffc49e;
+  font-weight: 600;
+}
+.monitoring-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: #8c877c;
+}
+
+/* 3. Header credits badge enhancement */
+.ms-credits-btn, .credits-badge {
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+.ms-credits-btn:hover, .credits-badge:hover {
+  transform: translateY(-1.5px);
+  box-shadow: 0 4px 10px rgba(184, 111, 18, 0.2);
+  border-color: #d3b37a;
+}
+.ms-coin {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  font-size: 13px;
+  line-height: 1;
+  background: none;
+  animation: coin-shimmer 4s ease-in-out infinite;
+}
+@keyframes coin-shimmer {
+  0%, 80%, 100% { transform: scale(1) rotate(0deg); }
+  85% { transform: scale(1.15) rotate(-10deg); }
+  90% { transform: scale(1.15) rotate(10deg); }
+  95% { transform: scale(1.05) rotate(0deg); }
+}
+
+/* 4. Interactive Card and Button Hover Effects */
+.card, .hero-card, .kpi-box, .jr-stats > div, .stage-box, .finding-item, .jr-seller {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease;
+}
+.card:hover, .hero-card:hover {
+  box-shadow: 0 4px 12px rgba(24, 24, 22, 0.04), 0 16px 32px rgba(24, 24, 22, 0.08);
+}
+.kpi-box:hover, .jr-stats > div:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(24, 24, 22, 0.06), 0 14px 28px rgba(24, 24, 22, 0.08);
+  border-color: #dcd6c8;
+}
+.stage-box:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(24, 24, 22, 0.1);
+}
+.jr-seller:hover {
+  transform: translateY(-1.5px);
+  box-shadow: 0 2px 8px rgba(24, 24, 22, 0.08);
+  border-color: #bcd0f0;
+}
+
+.btn, button:not(:disabled), .jr-action, .jr-mini:not(:disabled), .workspace-btn, .step-tab, .channel-chip, .jr-tour-btn {
+  cursor: pointer;
+  transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.15s cubic-bezier(0.16, 1, 0.3, 1), background 0.15s ease, border-color 0.15s ease, filter 0.15s ease;
+}
+.btn:hover:not(:disabled), .workspace-btn:hover, .step-tab:hover {
+  transform: translateY(-1.5px);
+  box-shadow: 0 4px 12px rgba(24, 24, 22, 0.1);
+}
+.btn:active:not(:disabled), .workspace-btn:active, .step-tab:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(24, 24, 22, 0.06);
+}
+.channel-chip:hover {
+  transform: translateY(-1.5px);
+  box-shadow: 0 3px 8px rgba(24, 24, 22, 0.1);
+  filter: brightness(1.03);
+}
+
+/* 5. Playbook & Recommendation Interactive Cues (pulsing dots and arrows) */
+.jr-recos li {
+  cursor: pointer;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease;
+}
+.jr-recos li:hover {
+  transform: translateY(-2px);
+  border-color: var(--c1);
+  box-shadow: 0 4px 14px rgba(27, 110, 68, 0.12), 0 12px 28px rgba(24, 24, 22, 0.08);
+}
+.jr-recos li a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  text-decoration: none;
+  transition: transform 0.15s ease, color 0.15s ease;
+}
+.jr-recos li a:hover {
+  transform: translateX(2px);
+  color: #14592f;
+  text-decoration: underline;
+}
+.jr-recos li a::after {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--c1);
+  box-shadow: 0 0 0 0 rgba(27, 110, 68, 0.7);
+  animation: pulse-dot 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  flex-shrink: 0;
+}
+
+#insightsContainer .finding-item {
+  position: relative;
+  cursor: pointer;
+  padding-right: 2.5rem;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease;
+}
+#insightsContainer .finding-item:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent);
+  box-shadow: 0 4px 14px rgba(184, 93, 25, 0.12), 0 12px 28px rgba(24, 24, 22, 0.08);
+}
+#insightsContainer .finding-item::after {
+  content: "→";
+  position: absolute;
+  right: 1.1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--accent);
+  animation: nudge-arrow 1.6s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.finding-item {
+  cursor: pointer;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease;
+}
+.finding-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(20, 20, 19, 0.08);
+  border-color: #d8d2c4;
+}
+
+@keyframes pulse-dot {
+  0%, 100% {
+    transform: scale(0.9);
+    box-shadow: 0 0 0 0 rgba(27, 110, 68, 0.7);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.2);
+    box-shadow: 0 0 0 6px rgba(27, 110, 68, 0);
+    opacity: 1;
+  }
+}
+
+@keyframes nudge-arrow {
+  0%, 100% {
+    transform: translateY(-50%) translateX(0);
+    opacity: 0.7;
+  }
+  50% {
+    transform: translateY(-50%) translateX(4px);
+    opacity: 1;
+  }
+}
+
+@media (max-width: 780px) {
+  .monitoring-right { display: none; }
+  .monitoring-bar { padding: 0.45rem 0.85rem; }
+  .monitoring-details { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal-on-scroll {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+  .monitoring-pulse-ring, .ms-coin, .jr-recos li a::after, #insightsContainer .finding-item::after {
+    animation: none !important;
+  }
+  .card:hover, .hero-card:hover, .kpi-box:hover, .stage-box:hover, .btn:hover, .step-tab:hover, .jr-seller:hover, .jr-recos li:hover, #insightsContainer .finding-item:hover {
+    transform: none !important;
+  }
+}
