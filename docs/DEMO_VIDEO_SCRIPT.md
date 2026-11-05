@@ -9,7 +9,7 @@ button into the `/create` wizard, then come back to `/` for the budget advice.
   (deployed revision checked Nov 4). It runs in saved mode with no keys, so it can't make paid
   calls. A local server started with `DEMO_MODE=true` also works.
 - **Tour and credits:** a fresh browser opens a short tour on `/` at first visit; the opening below
-  uses it. The header shows **demo credits** (3 to start; each saved analysis, budget review or scene costs 1).
+  uses it. Saved results are always free; only a new live Muse generation costs 1 run. Signed-in accounts start with 3 free runs.
   Reset them from the credits menu before recording. Say "demo credits"; no payment is taken.
 - **Free start:** after the tour, the portal shows "Sign up free — 3 runs on us" over the tools. Click
   **Sign up free → Start free with 3 runs** on camera (no email or payment; it starts a browser-local demo).

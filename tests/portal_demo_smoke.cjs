@@ -42,10 +42,11 @@ const panels = panelIds.map(get);
 const context = vm.createContext({
   document: {
     getElementById: get, createElement: element,
+    readyState: 'complete',
     querySelector: () => get('step-nav'),
     querySelectorAll: (selector) => selector === '.step-tab' ? navButtons : selector === '.panel' ? panels : [],
   },
-  window: {}, console, clearTimeout() {}, setTimeout() {},
+  window: { addEventListener() {} }, console, clearTimeout() {}, setTimeout() {},
   FileReader: class {
     readAsDataURL() { this.result = 'data:image/png;base64,AAAA'; this.onloadend(); }
   },

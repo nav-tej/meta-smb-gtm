@@ -12,3 +12,9 @@ workflows/gallery
 .tasks
 .env*
 !.env.example
+
+# Demo video projects and recordings are deliverables, not API runtime files.
+docs
+scripts
+supabase
+workflows

@@ -1,0 +1,36 @@
+{
+  "business_summary": "n+α Ventures is a San Francisco-based B2B GTM consulting firm led by founder Nav Singh. Snapshot shows fractional VP Marketing + RevOps, scoped GTM system builds, and weekly advisory with a 3-month minimum. Positioning cites 10+ years and $500M+ growth work including HeyGen ($20M to $100M+ ARR), Semgrep, Egnyte and a16z, plus case studies on organic growth, analytics and AI-agent SEO and a GTM frameworks blog.",
+  "targets": [
+    {
+      "name": "Clutch B2B Marketing Directory",
+      "url": "https://clutch.co",
+      "reason": "Directory of smaller independent marketing and GTM agencies serving B2B SaaS startups. Useful to find fractional marketing and RevOps studios pursuing the same founder and early-stage SaaS buyer."
+    },
+    {
+      "name": "Upwork Fractional Marketing Talent",
+      "url": "https://www.upwork.com",
+      "reason": "Marketplace where independent GTM consultants and micro-studios offer fractional CMO and SEO builds. Useful to study how solo and small-team competitors package offers and content angles."
+    },
+    {
+      "name": "Toptal Marketing Talent Network",
+      "url": "https://www.toptal.com",
+      "reason": "Network listing independent growth, RevOps and content specialists for tech companies. Overlaps on B2B SaaS customers needing funnel, analytics and system builds."
+    }
+  ],
+  "next_move": "In the next five minutes, open one directory link and note two smaller studios serving B2B SaaS plus one blog or case-study angle you could adapt.",
+  "evidence_urls": [
+    "https://nplusalpha.com/",
+    "https://nplusalpha.com/about",
+    "https://nplusalpha.com/blog",
+    "https://nplusalpha.com/services",
+    "https://nplusalpha.com/case-studies",
+    "https://nplusalpha.com/results",
+    "https://nplusalpha.com/fractional-cmo-vs-agency",
+    "https://nplusalpha.com/framework",
+    "https://nplusalpha.com/tools/funnel-velocity",
+    "https://nplusalpha.com/resources/agentic-outbound",
+    "https://nplusalpha.com/portfolio",
+    "https://nplusalpha.com/case-studies/heygen"
+  ],
+  "provenance": "Muse suggestions from your website snapshot; competitor sites are unverified. Refresh runs only when requested. Daily delivery is not enabled."
+}

@@ -12,12 +12,14 @@ def test_readiness_reports_configuration_without_claiming_provider_verification(
     monkeypatch.setenv("DEMO_KEY", "fake-unlock-secret")
     get_settings.cache_clear()
     response = TestClient(app).get("/api/v1/readiness")
-    assert response.json() == {
-        "default_mode": "saved",
-        "live_unlock_configured": True,
-        "provider_key_configured": True,
-        "provider_verified": False,
-    }
+    payload = response.json()
+    assert payload["default_mode"] == "saved"
+    assert payload["live_unlock_configured"] is True
+    assert payload["provider_key_configured"] is True
+    assert payload["provider_verified"] is False
+    assert payload["accounts_required"] is False
+    assert isinstance(payload["accounts_configured"], bool)
+    assert payload["trial_runs"] == 3
     assert "secret" not in response.text
 
 

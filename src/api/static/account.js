@@ -1,0 +1,255 @@
+'use strict';
+// Same-origin account UI. Session credentials are server-managed HttpOnly cookies.
+(() => {
+  if (window.museAccount) return;
+  const root = '/api/v1/account';
+  let snapshot = { configured: false, user: null, usage: null, live_available: false };
+  let accountEpoch = 0;
+  let workspaceVersion = 0;
+  let mode = 'signin';
+  let busy = false;
+  let dialog;
+  let form;
+  let title;
+  let description;
+  let email;
+  let password;
+  let passwordLabel;
+  let emailLabel;
+  let submit;
+  let message;
+  let tabs;
+  let recover;
+  let accountButton;
+  let signoutButton;
+  let quotaLabel;
+  const copy = value => JSON.parse(JSON.stringify(value));
+  const node = (tag, attrs = {}, text = '') => {
+    const element = document.createElement(tag);
+    for (const [name, value] of Object.entries(attrs)) element.setAttribute(name, value);
+    element.textContent = text;
+    return element;
+  };
+  function say(text, error = false) {
+    if (!message) return;
+    message.textContent = text;
+    message.className = error ? 'ma-message ma-error' : 'ma-message';
+  }
+  async function request(path, method = 'GET', body) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
+    try {
+      const response = await fetch(root + path, {
+        method, credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }), signal: controller.signal
+      });
+      let data = {};
+      try { data = await response.json(); } catch { /* A gateway may return HTML. */ }
+      if (!response.ok) {
+        const detail = typeof data.detail === 'string' ? data.detail : data.detail?.message;
+        const error = new Error(detail || (response.status === 429 ? 'Your current allowance is used. Try again when it resets.' : response.status === 409 ? 'A newer draft is saved. Load it before saving again.' : 'We could not complete that request. Your draft is still here.'));
+        error.status = response.status;
+        throw error;
+      }
+      return data;
+    } catch (error) {
+      if (error.name === 'AbortError') throw new Error('The account server took too long. Your draft is still here.');
+      throw error;
+    } finally { clearTimeout(timer); }
+  }
+  function update(data) {
+    const previous = snapshot.user?.id || null;
+    const user = data?.user && typeof data.user.id === 'string' ? {
+      id: data.user.id, email: String(data.user.email || ''), email_verified: data.user.email_verified === true
+    } : null;
+    snapshot = { configured: data?.configured === true, user, usage: data?.usage || null, live_available: data?.live_available === true };
+    if (previous !== (user?.id || null)) { accountEpoch += 1; workspaceVersion = 0; }
+    renderAccount();
+    const detail = copy(snapshot);
+    window.dispatchEvent(new CustomEvent('muse:account-change', { detail }));
+    window.dispatchEvent(new CustomEvent('account-change', { detail: copy(snapshot) }));
+    return copy(snapshot);
+  }
+  async function refresh() {
+    const epoch = accountEpoch;
+    const data = await request('/me');
+    if (epoch !== accountEpoch) return copy(snapshot);
+    return update(data);
+  }
+  function renderAccount() {
+    if (!accountButton) return;
+    const user = snapshot.user;
+    accountButton.hidden = !snapshot.configured;
+    quotaLabel.hidden = !snapshot.configured;
+    accountButton.textContent = user ? 'Your account' : 'Sign in';
+    accountButton.setAttribute('aria-label', user ? `Account for ${user.email}` : 'Sign in or create an account');
+    signoutButton.hidden = !user;
+    if (!user) quotaLabel.textContent = 'Saved demo is free';
+    else if (!user.email_verified) quotaLabel.textContent = 'Confirm your email to generate';
+    else if (snapshot.usage && snapshot.usage.plan === 'unlimited' && snapshot.live_available) quotaLabel.textContent = 'Unlimited runs';
+    else if (snapshot.usage && Number.isFinite(snapshot.usage.remaining)) quotaLabel.textContent = `${Math.max(0, snapshot.usage.remaining)} of ${snapshot.usage.limit} runs left`;
+    else quotaLabel.textContent = snapshot.live_available ? 'Muse generation available' : 'Live generation unavailable';
+  }
+  function setBusy(value) {
+    busy = value;
+    if (!form) return;
+    form.querySelectorAll('button, input').forEach(element => { element.disabled = value; });
+    submit.setAttribute('aria-busy', String(value));
+    if (signoutButton) signoutButton.disabled = value;
+  }
+  function setMode(next, text = '') {
+    mode = ['signin', 'signup', 'recover', 'password', 'account'].includes(next) ? next : 'signin';
+    const signedIn = mode === 'account';
+    const passwordOnly = mode === 'password';
+    title.textContent = { signin: 'Welcome back.', signup: 'Make it your studio.', recover: 'Reset your password.', password: 'Choose a new password.', account: 'Your Muse account' }[mode];
+    description.textContent = signedIn ? `${snapshot.user?.email || ''}${snapshot.user?.email_verified ? ' · email confirmed' : ' · confirm your email to generate'}` : mode === 'signup' ? 'Save your work and unlock 3 free Muse runs.' : mode === 'recover' ? 'We’ll send a password reset link if an account exists.' : passwordOnly ? 'Use at least 12 characters. Your draft stays here.' : 'Sign in to generate with Muse and save your work.';
+    emailLabel.hidden = passwordOnly || signedIn;
+    email.hidden = passwordOnly || signedIn;
+    email.required = !passwordOnly && !signedIn;
+    passwordLabel.hidden = mode === 'recover' || signedIn;
+    password.hidden = mode === 'recover' || signedIn;
+    password.required = mode !== 'recover' && !signedIn;
+    password.autocomplete = mode === 'signin' ? 'current-password' : 'new-password';
+    password.minLength = mode === 'signin' ? 1 : 12;
+    password.value = '';
+    submit.hidden = signedIn;
+    submit.textContent = { signin: 'Sign in', signup: 'Create account', recover: 'Send reset link', password: 'Update password' }[mode] || 'Continue';
+    tabs.hidden = signedIn || passwordOnly;
+    recover.hidden = mode !== 'signin';
+    say(text || (signedIn ? quotaLabel.textContent : 'Saved examples remain available without an account.'));
+  }
+  function open(next = 'signin', text = '') {
+    if (!dialog) mount();
+    if (busy || !dialog) return;
+    setMode(snapshot.user && next === 'signin' ? 'account' : next, text);
+    if (!dialog.open) dialog.showModal();
+    if (!snapshot.configured) say('Account setup is unavailable on this server. Your saved demo and draft still work.', true);
+  }
+  function liveReady() {
+    if (!snapshot.user) { open('signup', 'Create an account or sign in to make a new Muse generation. Your current draft stays here.'); return false; }
+    if (!snapshot.user.email_verified) { open('account', 'Confirm your email using the signup link, then refresh your account.'); return false; }
+    if (!snapshot.live_available || (snapshot.usage && snapshot.usage.remaining !== null && snapshot.usage.remaining <= 0)) {
+      open('account', snapshot.usage && snapshot.usage.remaining !== null && snapshot.usage.remaining <= 0 ? 'Your three free runs are used. Your saved drafts and downloads remain available. Credit purchases are coming later.' : 'Live generation is temporarily unavailable. Your saved drafts and downloads still work.');
+      return false;
+    }
+    return true;
+  }
+  async function onSubmit(event) {
+    event.preventDefault();
+    if (busy) return;
+    if (!snapshot.configured) { say('Account setup is unavailable on this server. Please try again later.', true); return; }
+    const selectedMode = mode;
+    const emailValue = email.value.trim();
+    const passwordValue = password.value;
+    if (selectedMode !== 'password' && !emailValue) { email.focus(); return; }
+    if (['signup', 'password'].includes(selectedMode) && passwordValue.length < 12) { say('Use a password with at least 12 characters.', true); password.focus(); return; }
+    setBusy(true); say('One moment…');
+    try {
+      if (selectedMode === 'signin') {
+        update(await request('/signin', 'POST', { email: emailValue, password: passwordValue }));
+        password.value = ''; dialog.close();
+      } else if (selectedMode === 'signup') {
+        const result = await request('/signup', 'POST', { email: emailValue, password: passwordValue });
+        setMode('signin', result.message || 'Check your inbox to confirm your email, then sign in.');
+      } else if (selectedMode === 'recover') {
+        const result = await request('/recover', 'POST', { email: emailValue });
+        setMode('signin', result.message || 'If an account exists, a reset link is on its way.');
+      } else if (selectedMode === 'password') {
+        await request('/password', 'POST', { password: passwordValue });
+        password.value = ''; await refresh(); setMode('account', 'Password updated. Your current draft is unchanged.');
+      }
+    } catch (error) { say(error.message, true); }
+    finally { password.value = ''; setBusy(false); }
+  }
+  async function signout() {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await request('/signout', 'POST', {});
+      update({ configured: snapshot.configured, user: null, usage: null, live_available: false });
+      if (dialog?.open) dialog.close();
+    } catch (error) { setBusy(false); open('account'); say(error.message, true); }
+    finally { setBusy(false); }
+  }
+  function requireAccount() {
+    if (!snapshot.user) { open('signup', 'Sign in to save or load your own workspace. Your draft stays here.'); throw new Error('Sign in to access your saved workspace.'); }
+    return { owner: snapshot.user.id, epoch: accountEpoch };
+  }
+  function stillOwner(start) { return start.epoch === accountEpoch && start.owner === snapshot.user?.id; }
+  async function loadWorkspace() {
+    const start = requireAccount();
+    const data = await request('/workspace');
+    if (!stillOwner(start)) throw new Error('The account changed. Load the workspace again.');
+    workspaceVersion = Number.isSafeInteger(data.version) ? data.version : 0;
+    return copy(data);
+  }
+  async function saveWorkspace(documentValue) {
+    const start = requireAccount();
+    const encoded = JSON.stringify(documentValue);
+    if (!encoded || encoded.length > 3000000) throw new Error('This draft is too large to save. Download the image separately.');
+    if (/"(?:key|access_token|refresh_token|service_role_key|service_key|unlockKey|unlock_key|demo_key|authorization)"\s*:/i.test(encoded)) throw new Error('Save draft content only, without account or presenter keys.');
+    const data = await request('/workspace', 'PUT', { document: JSON.parse(encoded), expected_version: workspaceVersion });
+    if (!stillOwner(start)) throw new Error('The account changed while saving. Reload your workspace.');
+    workspaceVersion = Number.isSafeInteger(data.version) ? data.version : workspaceVersion;
+    return copy(data);
+  }
+  async function callback() {
+    const hash = new URLSearchParams(window.location.hash.slice(1));
+    const access = hash.get('access_token');
+    const refreshToken = hash.get('refresh_token');
+    const recovery = hash.get('type') === 'recovery';
+    const callbackError = hash.get('error_description') || hash.get('error');
+    if (!access && !refreshToken && !callbackError) return false;
+    // Remove credentials from the visible URL before any network transmission.
+    history.replaceState(null, '', window.location.pathname + window.location.search);
+    if (callbackError) { try { await refresh(); } catch {} open('signin', 'That sign-in link expired or could not be used. Sign in or request a new password reset link.'); return true; }
+    if (!access || !refreshToken) { try { await refresh(); } catch {} open('signin', 'That sign-in link is incomplete. Please sign in again.'); return true; }
+    try {
+      update(await request('/session', 'POST', { access_token: access, refresh_token: refreshToken }));
+      if (recovery) open('password');
+      else open('account', 'Email confirmed. Your account is ready.');
+    } catch { try { await refresh(); } catch {} open('signin', 'We could not complete that sign-in link. Please sign in again.'); }
+    return true;
+  }
+  function mount() {
+    if (dialog || !document.body) return;
+    const container = node('div', { class: 'ma-account-controls' });
+    accountButton = node('button', { type: 'button', class: 'ma-account-button' }, 'Sign in');
+    quotaLabel = node('span', { class: 'ma-quota', 'aria-live': 'polite' }, 'Saved demo is free');
+    signoutButton = node('button', { type: 'button', class: 'ma-signout', hidden: '' }, 'Sign out');
+    container.append(quotaLabel, accountButton, signoutButton);
+    const header = document.querySelector('header.topbar') || document.querySelector('body > header');
+    (header || document.body).append(container);
+    accountButton.addEventListener('click', () => open()); signoutButton.addEventListener('click', signout);
+    dialog = node('dialog', { class: 'ma-dialog', 'aria-labelledby': 'ma-title' });
+    const close = node('button', { type: 'button', class: 'ma-close', 'aria-label': 'Close account dialog' }, '×');
+    close.addEventListener('click', () => { if (!busy) { password.value = ''; dialog.close(); } });
+    title = node('h2', { id: 'ma-title' }, 'Welcome back.');
+    description = node('p', { class: 'ma-description' });
+    tabs = node('div', { class: 'ma-tabs' });
+    const signinTab = node('button', { type: 'button' }, 'Sign in');
+    const signupTab = node('button', { type: 'button' }, 'Create account');
+    signinTab.addEventListener('click', () => { if (!busy) setMode('signin'); }); signupTab.addEventListener('click', () => { if (!busy) setMode('signup'); }); tabs.append(signinTab, signupTab);
+    form = node('form');
+    emailLabel = node('label', { for: 'ma-email' }, 'Email'); email = node('input', { id: 'ma-email', type: 'email', autocomplete: 'email', maxlength: '254', required: '' });
+    passwordLabel = node('label', { for: 'ma-password' }, 'Password'); password = node('input', { id: 'ma-password', type: 'password', autocomplete: 'current-password', maxlength: '128', required: '' });
+    submit = node('button', { type: 'submit', class: 'ma-primary' }, 'Sign in');
+    message = node('p', { class: 'ma-message', role: 'status', 'aria-live': 'polite' });
+    recover = node('button', { type: 'button', class: 'ma-recover' }, 'Forgot password?'); recover.addEventListener('click', () => { if (!busy) setMode('recover'); });
+    form.append(emailLabel, email, passwordLabel, password, submit); form.addEventListener('submit', onSubmit);
+    const refreshButton = node('button', { type: 'button', class: 'ma-refresh' }, 'Refresh account');
+    refreshButton.addEventListener('click', async () => { if (busy) return; setBusy(true); try { await refresh(); setMode(snapshot.user ? 'account' : 'signin', 'Account refreshed.'); } catch (error) { say(error.message, true); } finally { setBusy(false); } });
+    dialog.append(close, title, description, tabs, form, recover, message, refreshButton);
+    dialog.addEventListener('cancel', event => { if (busy) event.preventDefault(); else password.value = ''; });
+    document.body.append(dialog); renderAccount();
+  }
+  mount();
+  const readyPromise = (async () => {
+    try { if (!await callback()) await refresh(); }
+    catch { renderAccount(); }
+    return copy(snapshot);
+  })();
+  window.museAccount = Object.freeze({
+    ready: () => readyPromise, refresh, open, liveReady, getSnapshot: () => copy(snapshot), saveWorkspace, loadWorkspace, signout
+  });
+})();

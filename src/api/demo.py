@@ -1,19 +1,23 @@
 """Spending guard for public deployments.
 
 With DEMO_MODE on, routes that call Muse serve saved live results instead. A real call needs
-`?live=true` plus an `X-Demo-Key` header matching DEMO_KEY, and is capped at
+`?live=true` plus either a verified account with runs remaining (ACCOUNTS_REQUIRED) or an
+`X-Demo-Key` header matching DEMO_KEY (legacy presenter path), and is capped at
 LIVE_CALLS_PER_HOUR. The cap is held in memory, so on serverless hosts it applies per running
 instance (cold starts reset it); it bounds abuse rather than enforcing an exact global quota.
 """
 
 from __future__ import annotations
 
+import hashlib
 import hmac
 import logging
 import time
 from collections import deque
+from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from typing import Annotated
+from uuid import uuid4
 
 from fastapi import Depends, Header, HTTPException, Query, Request, status
 
@@ -38,17 +42,53 @@ def _reserve_live_slot(limit: int) -> int:
     return limit - len(_live_calls)
 
 
+def _client_ip_hash(request: Request) -> str:
+    forwarded = request.headers.get("x-forwarded-for", "")
+    ip = forwarded.split(",", 1)[0].strip() or (request.client.host if request.client else "")
+    return hashlib.sha256(ip.encode()).hexdigest()
+
+
 async def live_mode(
     request: Request,
     live: Annotated[bool, Query(description="Make a real (billed) Muse call.")] = False,
     x_demo_key: Annotated[str | None, Header()] = None,
-) -> bool:
-    """True when this request may call Muse; False means serve the saved demo result."""
+) -> AsyncIterator[bool]:
+    """Yield True when this request may call Muse; False means saved demo result.
+
+    With accounts enabled, one run is authorized per live request and finished when
+    the route completes, so 1 run = 1 live action against the user's quota.
+    """
+    from src.services import usage_meter
+    from src.services.accounts import resolve_account
+
     settings = get_settings()
-    if not settings.demo_mode and not settings.hosted_environment:
-        return True
+    if (
+        not settings.accounts_required
+        and not settings.demo_mode
+        and not settings.hosted_environment
+    ):
+        yield True
+        return
     if not live:
-        return False
+        yield False
+        return
+    if settings.accounts_required:
+        account = await resolve_account(request, require_verified=True)
+        assert account is not None
+        operation_id = await usage_meter.authorize_operation(
+            account.user_id, _client_ip_hash(request), str(uuid4()), account.session_id
+        )
+        logger.warning(
+            "LIVE Muse run authorized: %s user=%s op=%s",
+            request.url.path,
+            account.user_id,
+            operation_id,
+        )
+        try:
+            yield True
+        finally:
+            await usage_meter.finish_operation("completed", operation_id=operation_id)
+        return
     if not (
         settings.demo_key
         and x_demo_key
@@ -62,7 +102,7 @@ async def live_mode(
         datetime.now(UTC).isoformat(),
         remaining,
     )
-    return True
+    yield True
 
 
 LiveMode = Annotated[bool, Depends(live_mode)]

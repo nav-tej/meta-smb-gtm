@@ -12,6 +12,14 @@
     set(key, value) { try { window.localStorage.setItem(key, value); } catch { /* private mode */ } },
   };
   const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  // Server accounts (Supabase + runs quota) replace browser-local demo credits when on.
+  const serverSnapshot = () => window.museAccount?.getSnapshot?.() || null;
+  const serverMode = () => serverSnapshot()?.configured === true;
+  function removeGates() {
+    document.body.classList.remove('ms-logged-out');
+    document.querySelectorAll('.ms-gate').forEach((gate) => gate.remove());
+    document.querySelectorAll('.ms-signup-btn').forEach((btn) => btn.remove());
+  }
   const el = (tag, attrs = {}, text = '') => {
     const node = document.createElement(tag);
     for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, value);
@@ -44,6 +52,7 @@
     if (bump && !reducedMotion) { pill.classList.remove('bump'); void pill.offsetWidth; pill.classList.add('bump'); }
   }
   function spend(label) {
+    if (serverMode()) return; // The server counts real runs; saved actions stay free.
     if (!hasSession()) return;
     if (credits === 0) { toast('No runs left. Pick a plan, or reset the demo credits.', 'warn'); openPricing(); return; }
     credits -= 1; store.set(CREDIT_KEY, String(credits)); renderCredits(true);
@@ -76,8 +85,8 @@
     if (!menu) {
       menu = el('div', { class: 'ms-credits-menu', hidden: '' });
       menu.appendChild(el('strong', {}, 'Demo credits'));
-      menu.appendChild(el('p', {}, '1 credit per run: competitor analysis, ad generation or budget recommendations.'));
-      menu.appendChild(el('p', { class: 'ms-muted' }, 'This demo uses saved Muse results and takes no payment. Credits are stored in this browser only.'));
+      menu.appendChild(el('p', {}, 'Saved results are always free. Only a new live Muse generation costs 1 run.'));
+      menu.appendChild(el('p', { class: 'ms-muted' }, 'This demo takes no payment. Browser credits apply to presenter live mode only; signed-in runs are counted on the server.'));
       const reset = el('button', { type: 'button', class: 'ms-link' }, `Reset to ${START_CREDITS} credits`);
       reset.addEventListener('click', () => { credits = START_CREDITS; store.set(CREDIT_KEY, String(credits)); renderCredits(true); toast('Demo credits reset.'); });
       menu.appendChild(reset);
@@ -98,11 +107,8 @@
       if (anchor) anchor.insertAdjacentElement('afterend', pill); else header.appendChild(pill);
     }
     renderCredits();
-    // Any control marked data-credit costs one credit when used.
-    document.addEventListener('click', (event) => {
-      const target = event.target.closest?.('[data-credit]');
-      if (target && !target.disabled) spend(target.dataset.credit);
-    }, true);
+    // Runs are spent only by explicit spend() calls after a live Muse request
+    // succeeds. Viewing saved results is always free; no click auto-spends.
   }
 
   // ---------- Progress card ----------
@@ -131,12 +137,51 @@
     });
   }
 
-  // ---------- Pricing (planned) ----------
+  // ---------- Pricing ----------
   const PLANS = [
-    { name: 'Starter', price: '$9', per: 'one-time', runs: '10 runs', points: ['Competitor analysis', 'Ready-to-post ads', 'Ranked next moves'] },
-    { name: 'Growth', price: '$29', per: '/month', runs: '50 runs a month', points: ['Everything in Starter', 'Daily growth brief', 'Budget advice for ads'], featured: true },
-    { name: 'Unlimited', price: '$99', per: '/month', runs: 'Unlimited runs', points: ['Everything in Growth', 'Unlimited competitors', 'Priority support'] },
+    { id: 'starter', name: 'Starter', price: '$9', per: 'one-time', runs: '10 runs', points: ['Competitor analysis', 'Ready-to-post ads', 'Ranked next moves'] },
+    { id: 'growth', name: 'Growth', price: '$29', per: '/month', runs: '50 runs a month', points: ['Everything in Starter', 'Daily growth brief', 'Budget advice for ads'], featured: true },
+    { id: 'unlimited', name: 'Unlimited', price: '$99', per: '/month', runs: 'Unlimited runs', points: ['Everything in Growth', 'Unlimited competitors', 'Priority support'] },
   ];
+  async function buyPlan(plan, button) {
+    const snap = serverSnapshot();
+    if (!snap?.configured) return;
+    if (!snap.user) { toast('Sign in to pick a plan.'); window.museAccount.open('signup'); return; }
+    if (!snap.user.email_verified) { toast('Confirm your email first.'); window.museAccount.open('account'); return; }
+    button.disabled = true;
+    try {
+      const response = await fetch('/api/v1/billing/checkout', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ plan }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.url) throw new Error(data.detail || 'Checkout failed.');
+      location.href = data.url;
+    } catch (error) { toast(error.message, 'warn'); button.disabled = false; }
+  }
+  function refreshPlanButtons() {
+    if (!pricingDialog) return;
+    pricingDialog.querySelectorAll('.ms-plan').forEach((card, index) => {
+      const plan = PLANS[index];
+      const button = card.querySelector('button');
+      if (!plan || !button) return;
+      if (serverMode()) {
+        button.disabled = false;
+        button.removeAttribute('title');
+        button.textContent = `Choose ${plan.name}`;
+        button.onclick = () => buyPlan(plan.id, button);
+      } else {
+        button.disabled = true;
+        button.title = 'Not on sale in this demo';
+        button.textContent = 'Coming soon';
+        button.onclick = null;
+      }
+    });
+    const note = pricingDialog.querySelector('.ms-muted');
+    if (note) note.textContent = serverMode()
+      ? 'Secure checkout via Stripe. 1 run = one competitor analysis, ad generation or budget review.'
+      : 'Plans open after the beta. This demo takes no payment and collects no details. 1 run = one competitor analysis, ad generation or budget review.';
+  }
   let pricingDialog;
   function openPricing(mode = '') {
     if (!pricingDialog) {
@@ -144,7 +189,7 @@
       const close = el('button', { type: 'button', class: 'ms-close', 'aria-label': 'Close' }, '×');
       close.addEventListener('click', () => pricingDialog.close());
       pricingDialog.appendChild(close);
-      pricingDialog.appendChild(el('p', { class: 'ms-eyebrow' }, 'Planned pricing'));
+      pricingDialog.appendChild(el('p', { class: 'ms-eyebrow' }, 'Plans'));
       pricingDialog.appendChild(el('h2', { id: 'msPricingTitle' }, 'Get more runs'));
       pricingDialog.appendChild(el('p', { class: 'ms-pricing-gift' }));
       const grid = el('div', { class: 'ms-plans' });
@@ -159,14 +204,15 @@
         const list = el('ul', {});
         plan.points.forEach((point) => list.appendChild(el('li', {}, point)));
         card.appendChild(list);
-        card.appendChild(el('button', { type: 'button', class: plan.featured ? 'ms-primary' : 'ms-secondary', disabled: '', title: 'Not on sale in this demo' }, 'Coming soon'));
+        card.appendChild(el('button', { type: 'button', class: plan.featured ? 'ms-primary' : 'ms-secondary' }, ''));
         grid.appendChild(card);
       }
       pricingDialog.appendChild(grid);
-      pricingDialog.appendChild(el('p', { class: 'ms-muted' }, 'Plans open after the beta. This demo takes no payment and collects no details. 1 run = one competitor analysis, ad generation or budget review.'));
+      pricingDialog.appendChild(el('p', { class: 'ms-muted' }, ''));
       pricingDialog.addEventListener('click', (event) => { if (event.target === pricingDialog) pricingDialog.close(); });
       document.body.appendChild(pricingDialog);
     }
+    refreshPlanButtons();
     pricingDialog.querySelector('h2').textContent = mode === 'gift' ? 'Gift a subscription' : 'Get more runs';
     const giftLine = pricingDialog.querySelector('.ms-pricing-gift');
     giftLine.textContent = mode === 'gift' ? 'Any plan can be sent as a gift to a maker you love.' : '';
@@ -178,6 +224,7 @@
   // ---------- Logged-out demo and free signup ----------
   let signupDialog;
   function openSignup() {
+    if (serverMode()) { window.museAccount.open('signup'); return; }
     if (!signupDialog) {
       signupDialog = el('dialog', { class: 'ms-dialog ms-signup', 'aria-labelledby': 'msSignupTitle' });
       const close = el('button', { type: 'button', class: 'ms-close', 'aria-label': 'Close' }, '×');
@@ -204,12 +251,27 @@
     if (pill) { pill.hidden = false; renderCredits(true); }
     toast(`Welcome! ${credits} free runs are ready.`);
   }
+  function syncServerSession() {
+    // Verified accounts see the tools; the server counts their runs.
+    if (!serverMode()) return;
+    if (pill) pill.hidden = true;
+    const snap = serverSnapshot();
+    if (snap?.user?.email_verified) removeGates();
+    else document.querySelectorAll('.ms-signup-btn').forEach((btn) => btn.remove());
+  }
   function mountSession() {
+    if (serverMode()) {
+      // Server accounts own signup; gates open the account dialog until verified.
+      document.body.classList.add('ms-logged-out');
+      if (pill) pill.hidden = true;
+      syncServerSession();
+      window.addEventListener('muse:account-change', syncServerSession);
+    }
     if (hasSession()) return;
     document.body.classList.add('ms-logged-out');
     if (pill) pill.hidden = true;
     const header = document.querySelector('header.topbar') || document.querySelector('body > header');
-    if (header) {
+    if (header && !serverMode()) {
       const btn = el('button', { type: 'button', class: 'ms-primary ms-small ms-signup-btn' }, 'Sign up free');
       btn.addEventListener('click', openSignup);
       if (pill?.parentNode) pill.insertAdjacentElement('afterend', btn); else header.appendChild(btn);
@@ -534,15 +596,15 @@
 
   function init() {
     revealFallback();
-    mountCredits();
-    mountSession();
-    mountBrief();
+    // The daily desk stays focused on the post; research lives in the portal.
+    removeGates();
+    if (document.getElementById("journey")) mountBrief();
     mountActions();
     mountRefine();
     mountStages();
     document.querySelectorAll('[data-open-gift]').forEach((node) => node.addEventListener('click', openGift));
     document.querySelectorAll('[data-open-tour]').forEach((node) => node.addEventListener('click', openTour));
-    if (document.getElementById('journey') && !store.get(TOUR_KEY) && !location.hash) setTimeout(openTour, 500);
+
   }
 
   window.museShell = { spend, progress, toast, openGift, openPricing, openSignup, openTour, showStage };

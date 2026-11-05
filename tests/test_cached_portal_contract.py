@@ -112,3 +112,10 @@ def test_bid_advice_returns_the_saved_recommendation(
     expected = BidRecommendation.model_validate_json((SAMPLES / "bid_advice_live.json").read_text())
     assert response.status_code == 200
     assert response.json() == expected.model_dump(mode="json")
+
+
+def test_saved_views_carry_no_auto_spend_hook() -> None:
+    """Reshowing cached results must never cost a run: no click auto-spends."""
+    for page in ("index.html", "creator.html", "today.html"):
+        html = (ROOT / "src" / "api" / "static" / page).read_text()
+        assert "data-credit" not in html, f"{page} still auto-spends on click"

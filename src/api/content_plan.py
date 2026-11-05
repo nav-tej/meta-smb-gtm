@@ -32,5 +32,9 @@ async def content_plan(
         )
     if not body.use_muse:
         return starter_plan(body)
-    await live_mode(request, live=True, x_demo_key=x_demo_key)
-    return await service.generate(body)
+    live_request = live_mode(request, live=True, x_demo_key=x_demo_key)
+    try:
+        await live_request.__anext__()
+        return await service.generate(body)
+    finally:
+        await live_request.aclose()

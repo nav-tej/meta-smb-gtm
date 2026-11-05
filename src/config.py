@@ -33,10 +33,30 @@ class Settings(BaseModel):
     live_calls_per_hour: int = 5
     hosted_environment: bool = False
 
+    # Freemium accounts: verified users spend runs from a Supabase-tracked quota
+    # instead of the shared demo key. 1 run = one live action; the trial is 3 runs,
+    # one-time (no refill).
+    accounts_required: bool = False
+    trial_runs: int = 3
+    supabase_url: str = ""
+    supabase_publishable_key: str = ""
+    supabase_secret_key: str = ""
+    app_url: str = "https://meta-smb-gtm.vercel.app"
+    account_cookie_secure: bool = True
+
+    # Paid tiers via Stripe Checkout. Starter is one-time; Growth/Unlimited are
+    # subscriptions. Price IDs come from the Stripe dashboard (test or live).
+    stripe_secret_key: str = ""
+    stripe_webhook_secret: str = ""
+    stripe_price_starter: str = ""
+    stripe_price_growth: str = ""
+    stripe_price_unlimited: str = ""
+
 
 @lru_cache
 def get_settings() -> Settings:
     load_dotenv()
+    load_dotenv(".env.local", override=True)
     fields = Settings.model_fields
     values = {name: os.environ[name.upper()] for name in fields if os.environ.get(name.upper())}
     # Serverless filesystems (Vercel) are read-only except /tmp

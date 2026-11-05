@@ -8,11 +8,13 @@ from __future__ import annotations
 
 import base64
 import binascii
+import io
 import json
 import logging
 import re
 import struct
 import time
+import wave
 import zlib
 from collections.abc import Sequence
 from typing import Any, TypeVar
@@ -30,11 +32,106 @@ ModelT = TypeVar("ModelT", bound=BaseModel)
 
 # Generous read timeout: a timed-out call may still be billed, and we never auto-retry it
 DEFAULT_TIMEOUT = httpx.Timeout(120.0, connect=10.0)
+MAX_SPARK_OUTPUT_TOKENS = 4096
+MAX_SPARK_TEXT_BYTES = 100_000
+MAX_SPARK_INPUT_TOKENS = 100_000
+SPARK_RESERVATION_MICROS = 250_000
+IMAGE_RESERVATION_MICROS = 50_000
+SAM_RESERVATION_MICROS = 10_000
+VOICE_RESERVATION_MICROS = 10_000
 _CODE_FENCE_RE = re.compile(r"^\s*```(?:json)?\s*(.*?)\s*```\s*$", re.DOTALL | re.IGNORECASE)
 
 
 class MetaAPIError(Exception):
     """Raised when a Meta Model API request or structured-output parse fails."""
+
+
+def _metering_enabled() -> bool:
+    """Apply public cost bounds to configured accounts and authorized request contexts."""
+    from src.services import usage_meter
+
+    return bool(getattr(get_settings(), "accounts_required", False)) or bool(
+        usage_meter.current_operation_id()
+    )
+
+
+async def _reserve_provider(kind: str, model: str, amount_micros: int) -> None:
+    """The durable ledger authorizes each attempt before any billed provider work."""
+    from src.services.usage_meter import reserve_provider
+
+    await reserve_provider(kind, model, amount_micros)
+
+
+def _require_metered_model(model: str, expected: str) -> None:
+    if _metering_enabled() and model != expected:
+        raise MetaAPIError("This model is not enabled for the trial credit budget.")
+
+
+def _bounded_chat_input(
+    messages: list[ChatCompletionMessageParam],
+) -> tuple[bool, list[dict[str, Any]]]:
+    """Build a token-count request without treating base64 image bytes as text tokens."""
+    converted: list[dict[str, Any]] = []
+    text_messages: list[dict[str, Any]] = []
+    has_images = False
+    image_count = 0
+    for message in messages:
+        role = message.get("role")
+        if role not in {"user", "assistant", "system", "developer"}:
+            raise MetaAPIError("This trial supports text and image conversations without tools.")
+        content = message.get("content")
+        if isinstance(content, str):
+            converted.append({"role": role, "content": content})
+            text_messages.append({"role": role, "content": content})
+            continue
+        if not isinstance(content, list):
+            raise MetaAPIError("Unsupported content in the trial conversation.")
+        blocks: list[dict[str, Any]] = []
+        text_blocks: list[dict[str, Any]] = []
+        for part in content:
+            if not isinstance(part, dict):
+                raise MetaAPIError("Unsupported content in the trial conversation.")
+            if part.get("type") == "text" and isinstance(part.get("text"), str):
+                blocks.append({"type": "input_text", "text": part["text"]})
+                text_blocks.append({"type": "text", "text": part["text"]})
+            elif part.get("type") == "image_url" and isinstance(part.get("image_url"), dict):
+                url = part["image_url"].get("url")
+                if not isinstance(url, str) or len(url) > 4_000_000:
+                    raise MetaAPIError("Choose a smaller image for this trial request.")
+                blocks.append({"type": "input_image", "image_url": url})
+                has_images = True
+                image_count += 1
+            else:
+                raise MetaAPIError(
+                    "This trial supports text and image conversations without tools."
+                )
+        converted.append({"role": role, "content": blocks})
+        text_messages.append({"role": role, "content": text_blocks})
+    if image_count > 4:
+        raise MetaAPIError("Use no more than four reference images in this trial request.")
+    if len(json.dumps(text_messages, ensure_ascii=False).encode("utf-8")) > MAX_SPARK_TEXT_BYTES:
+        raise MetaAPIError(
+            "This request has too much text. Use a smaller product or research brief."
+        )
+    return has_images, converted
+
+
+def _validate_bounded_voice(audio_bytes: bytes) -> None:
+    """A bounded WAV duration has a known transcription price; compressed input does not."""
+    try:
+        with wave.open(io.BytesIO(audio_bytes), "rb") as audio:
+            rate = audio.getframerate()
+            frames = audio.getnframes()
+            duration = frames / rate if rate else 0
+            if not 0 < duration <= 120:
+                raise MetaAPIError("Use a WAV voice note no longer than two minutes.")
+            if audio.getcomptype() != "NONE":
+                raise MetaAPIError("Use an uncompressed WAV voice note for this trial.")
+            expected_bytes = frames * audio.getsampwidth() * audio.getnchannels()
+            if len(audio.readframes(frames)) != expected_bytes:
+                raise MetaAPIError("Use a complete WAV voice note for this trial.")
+    except (wave.Error, EOFError, ValueError) as err:
+        raise MetaAPIError("Use a valid WAV voice note no longer than two minutes.") from err
 
 
 def _strip_code_fences(raw_text: str) -> str:
@@ -310,13 +407,24 @@ class MetaClient:
         messages: list[ChatCompletionMessageParam],
         temperature: float,
     ) -> str:
+        metered = _metering_enabled()
+        _require_metered_model(model, "muse-spark-1.3")
+        has_images = False
+        count_input: list[dict[str, Any]] = []
+        if metered:
+            has_images, count_input = _bounded_chat_input(messages)
+        await _reserve_provider("text", model, SPARK_RESERVATION_MICROS)
+        if has_images:
+            await self._check_vision_tokens(model, count_input)
+        call_client = client.with_options(max_retries=0) if metered else client
         started = time.monotonic()
         try:
-            completion = await client.chat.completions.create(
+            completion = await call_client.chat.completions.create(
                 model=model,
                 messages=messages,
                 temperature=temperature,
                 response_format={"type": "json_object"},
+                max_completion_tokens=MAX_SPARK_OUTPUT_TOKENS,
             )
         except APIError as err:
             logger.warning(
@@ -344,6 +452,27 @@ class MetaClient:
             raise MetaAPIError("Meta Model API returned an empty message content.")
         return content
 
+    async def _check_vision_tokens(self, model: str, count_input: list[dict[str, Any]]) -> None:
+        """Count media input before inference; never guess tokens from image dimensions."""
+        try:
+            response = await self._http_client.post(
+                f"{self._base_url}/responses/input_tokens",
+                headers={"Authorization": f"Bearer {self._require_api_key()}"},
+                json={"model": model, "input": count_input},
+            )
+            if response.status_code != 200:
+                raise MetaAPIError("Could not verify this image request's input size. Try later.")
+            body = response.json()
+        except (httpx.HTTPError, ValueError) as err:
+            raise MetaAPIError(
+                "Could not verify this image request's input size. Try later."
+            ) from err
+        tokens = body.get("input_tokens") if isinstance(body, dict) else None
+        if type(tokens) is not int or not 0 < tokens <= MAX_SPARK_INPUT_TOKENS:
+            raise MetaAPIError(
+                "This image request exceeds the trial input limit. Use fewer images."
+            )
+
     async def generate_image(
         self,
         prompt: str,
@@ -370,6 +499,11 @@ class MetaClient:
             "size": size,
             "response_format": "b64_json",
         }
+
+        _require_metered_model(self._image_model, "muse-image-1.0")
+        if _metering_enabled():
+            payload["n"] = 1
+        await _reserve_provider("image", self._image_model, IMAGE_RESERVATION_MICROS)
 
         started = time.monotonic()
         try:
@@ -407,6 +541,10 @@ class MetaClient:
             "prompt": prompt,
             "images": [{"image_url": _to_data_uri(img)} for img in reference_images],
         }
+        _require_metered_model(self._image_model, "muse-image-1.0")
+        if _metering_enabled():
+            payload["n"] = 1
+        await _reserve_provider("image", self._image_model, IMAGE_RESERVATION_MICROS)
         started = time.monotonic()
         try:
             response = await self._http_client.post(
@@ -455,6 +593,20 @@ class MetaClient:
             "reasoning": {"effort": reasoning_effort},
             "input": [{"role": "user", "content": content_blocks}],
         }
+        _require_metered_model(self._image_model, "muse-image-1.0")
+        if _metering_enabled():
+            payload["reasoning"] = {"effort": "low"}
+            payload["tools"] = [
+                {
+                    "type": "image_generation",
+                    "reasoning_strength": "low",
+                    "output_format": "webp",
+                    "enable_web_search": False,
+                    "enable_image_search": False,
+                    "enable_shell": False,
+                }
+            ]
+        await _reserve_provider("image", self._image_model, IMAGE_RESERVATION_MICROS)
         started = time.monotonic()
         try:
             response = await self._http_client.post(
@@ -512,6 +664,10 @@ class MetaClient:
     ) -> str:
         """Transcribe seller voice notes via `muse-voice-transcribe-1.0`."""
         api_key = self._require_api_key()
+        _require_metered_model(model, "muse-voice-transcribe-1.0")
+        if _metering_enabled():
+            _validate_bounded_voice(audio_bytes)
+        await _reserve_provider("voice", model, VOICE_RESERVATION_MICROS)
         try:
             response = await self._http_client.post(
                 f"{self._base_url}/audio/transcriptions",
@@ -566,6 +722,8 @@ class MetaClient:
                 }
             ],
         }
+        _require_metered_model(self._sam_model, "sam-3.1")
+        await _reserve_provider("sam", self._sam_model, SAM_RESERVATION_MICROS)
         started = time.monotonic()
         try:
             response = await self._http_client.post(

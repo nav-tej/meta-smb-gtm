@@ -4,5 +4,6 @@ httpx>=0.27
 openai>=1.50
 pydantic>=2.8
 python-dotenv>=1.0
+stripe>=8.0
 # Safe XML parsing for untrusted competitor sitemaps (see AGENTS.md, section 10)
 defusedxml>=0.7
