@@ -22,6 +22,7 @@ from fastapi import Response
 from pydantic import BaseModel, TypeAdapter, ValidationError
 
 from src.config import get_settings
+from src.services import live_quota
 
 logger = logging.getLogger(__name__)
 
@@ -110,6 +111,8 @@ async def cached(
     if not refresh:
         hit = load(namespace, payload, adapter)
         if hit is not None:
+            # No Muse call happens on a hit, so give back any presenter live-call slot.
+            live_quota.release_reserved()
             if response is not None:
                 response.headers[CACHE_HEADER] = "hit"
             return hit

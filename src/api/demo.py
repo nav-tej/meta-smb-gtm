@@ -12,7 +12,6 @@ from __future__ import annotations
 import hashlib
 import hmac
 import logging
-import time
 from collections import deque
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
@@ -22,24 +21,14 @@ from uuid import uuid4
 from fastapi import Depends, Header, HTTPException, Query, Request, status
 
 from src.config import get_settings
+from src.services import live_quota
 
 logger = logging.getLogger(__name__)
 
-WINDOW_SECONDS = 3600
-_live_calls: deque[float] = deque()
-
-
-def _reserve_live_slot(limit: int) -> int:
-    now = time.monotonic()
-    while _live_calls and now - _live_calls[0] > WINDOW_SECONDS:
-        _live_calls.popleft()
-    if len(_live_calls) >= limit:
-        raise HTTPException(
-            status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=f"Live call limit reached ({limit} per hour). Cached demo results still work.",
-        )
-    _live_calls.append(now)
-    return limit - len(_live_calls)
+WINDOW_SECONDS = live_quota.WINDOW_SECONDS
+# Same deque object as live_quota's, kept here for existing callers and tests.
+_live_calls: deque[float] = live_quota._live_calls
+_reserve_live_slot = live_quota.reserve
 
 
 def _client_ip_hash(request: Request) -> str:

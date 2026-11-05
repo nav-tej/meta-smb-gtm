@@ -221,6 +221,7 @@
   async function draft() {
     if (state.busy || !validateProduct()) return;
     if (!state.live) { notify('Saved mode uses editable starter copy. Enable a configured live presenter session to write a new Muse draft.'); return; }
+    if (window.museShell?.canRun && !window.museShell.canRun('Fresh Muse draft')) return;
     setBusy(true); notify('Muse is writing your draft. Your current words are kept until the new draft is ready…', 'busy');
     try { const result = await request({ draft: true, product: productPayload(), competitor_brief: promotionResearchContext(), placements: ['instagram_feed'], variants_per_placement: 1, use_comfyui: false }); const variant = result.variants?.[0]; if (!variant) throw new Error('Muse returned no editable draft. Your previous copy is still here.'); state.copyEdited = true; state.sceneEdited = true; state.headline = variant.headline; state.caption = variant.primary_text; state.scene = variant.image_prompt; $('headline').value = state.headline; $('caption').value = state.caption; $('scene').value = state.scene; $('reviewed').checked = false; refreshPreview(); spendLive('Fresh Muse draft'); notify('Fresh Muse draft ready. Read it through and make it sound like you.'); } catch (error) { try { window.museAccount?.refresh?.().catch(() => {}); } catch {} notify(error.message, 'error'); } finally { setBusy(false); }
   }
@@ -229,6 +230,7 @@
     if (!state.live && !state.custom && typeof window !== 'undefined' && window.museShell) { if (window.museShell.requireRun && !window.museShell.requireRun('Ad scene')) return; setBusy(true); try { await window.museShell.progress('Staging your painting', ['Reading the saved Muse Image result', 'Fitting it to the feed layout', 'Adding your words']); } finally { setBusy(false); } }
     if (!state.live) { if (state.custom) { originalLayout(); notify('Your original-photo layout is ready. Saved mode does not generate personalized AI scenes.'); } else { state.image = state.sampleImage; state.imageKind = 'saved'; state.provenance = 'Saved Muse image from this example. No new image generated; compare details against the original. Frame and room are staging only.'; refreshPreview(); notify('Saved scene loaded. Your edited copy stays yours.'); } $('reviewed').checked = false; return; }
     if (!state.scene || !state.headline || !state.caption) { notify('Add your headline, caption and setting before creating an image.', 'error'); return; }
+    if (window.museShell?.canRun && !window.museShell.canRun('Live Muse scene')) return;
     setBusy(true); notify('Muse is creating your scene. This can take a few minutes. Please keep this tab open…', 'busy');
     try {
       const product = { ...productPayload(), image_base64: await sourceData() };

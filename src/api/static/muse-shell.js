@@ -65,6 +65,13 @@
   }
   // Gate for any run (analysis, generation, refinement). Returns false when the visitor must
   // sign up or buy more runs first. Server accounts count their own runs.
+  // Check without spending: used before a paid live call, which spends only after it succeeds.
+  function canRun(label) {
+    if (serverMode()) return true;
+    if (!hasSession()) { openSignup(`Create a free account to run ${label.toLowerCase()}.`); return false; }
+    if (credits === 0) { toast('No runs left. Pick a plan to keep going.', 'warn'); openPricing(); return false; }
+    return true;
+  }
   function requireRun(label) {
     if (serverMode()) return true;
     if (!hasSession()) { openSignup(`Create a free account to run ${label.toLowerCase()}.`); return false; }
@@ -850,6 +857,6 @@
 
   }
 
-  window.museShell = { spend, requireRun, hasAccount: hasSession, progress, toast, openGift, openPricing, openSignup, openActions, openTour, showStage };
+  window.museShell = { spend, canRun, requireRun, hasAccount: hasSession, progress, toast, openGift, openPricing, openSignup, openActions, openTour, showStage };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();
