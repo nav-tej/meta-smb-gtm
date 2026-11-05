@@ -5,12 +5,16 @@
   const CREDIT_KEY = 'muse.demoCredits';
   const TOUR_KEY = 'muse.tourSeen';
   const START_CREDITS = 3;
-  const SESSION_KEY = 'muse.demoSession';
-  const hasSession = () => store.get(SESSION_KEY) === '1';
+  const ACCOUNT_KEY = 'muse.demoAccount';
   const store = {
     get(key) { try { return window.localStorage.getItem(key); } catch { return null; } },
     set(key, value) { try { window.localStorage.setItem(key, value); } catch { /* private mode */ } },
+    remove(key) { try { window.localStorage.removeItem(key); } catch { /* private mode */ } },
   };
+  // Demo accounts live in this browser only (no auth backend in demo mode).
+  const readAccount = () => { try { const a = JSON.parse(store.get(ACCOUNT_KEY) || 'null'); return a && typeof a.email === 'string' ? a : null; } catch { return null; } };
+  const hasSession = () => !!readAccount();
+  const creditKey = () => { const a = readAccount(); return a ? `${CREDIT_KEY}:${a.email}` : CREDIT_KEY; };
   const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   // Server accounts (Supabase + runs quota) replace browser-local demo credits when on.
   const serverSnapshot = () => window.museAccount?.getSnapshot?.() || null;
@@ -38,8 +42,9 @@
   }
 
   // ---------- Demo credits ----------
-  let credits = Number.parseInt(store.get(CREDIT_KEY) ?? '', 10);
-  if (!Number.isFinite(credits) || credits < 0) credits = START_CREDITS;
+  const loadCredits = () => { const n = Number.parseInt(store.get(creditKey()) ?? '', 10); return Number.isFinite(n) && n >= 0 ? n : START_CREDITS; };
+  let credits = loadCredits();
+  const saveCredits = () => store.set(creditKey(), String(credits));
   let countNode;
   let pill;
   function renderCredits(bump = false) {
@@ -48,15 +53,24 @@
     pill.classList.toggle('empty', credits === 0);
     pill.setAttribute('aria-label', credits === 0 ? 'No demo runs left. Get more runs' : `${credits} demo credits remaining`);
     const label = pill.querySelector('.ms-credits-label');
-    if (label) label.textContent = credits === 0 ? ' · Get more runs' : ' credits';
+    if (label) label.textContent = credits === 0 ? ' · Get more runs' : (credits === 1 ? ' run' : ' runs');
     if (bump && !reducedMotion) { pill.classList.remove('bump'); void pill.offsetWidth; pill.classList.add('bump'); }
   }
   function spend(label) {
     if (serverMode()) return; // The server counts real runs; saved actions stay free.
     if (!hasSession()) return;
     if (credits === 0) { toast('No runs left. Pick a plan, or reset the demo credits.', 'warn'); openPricing(); return; }
-    credits -= 1; store.set(CREDIT_KEY, String(credits)); renderCredits(true);
-    toast(`−1 credit · ${label}`);
+    credits -= 1; saveCredits(); renderCredits(true);
+    toast(`−1 run · ${label}`);
+  }
+  // Gate for any run (analysis, generation, refinement). Returns false when the visitor must
+  // sign up or buy more runs first. Server accounts count their own runs.
+  function requireRun(label) {
+    if (serverMode()) return true;
+    if (!hasSession()) { openSignup(`Create a free account to run ${label.toLowerCase()}.`); return false; }
+    if (credits === 0) { toast('No runs left. Pick a plan to keep going.', 'warn'); openPricing(); return false; }
+    spend(label);
+    return true;
   }
   function mountCredits() {
     const header = document.querySelector('header.topbar') || document.querySelector('body > header');
@@ -84,12 +98,9 @@
     let menu = pill.querySelector('.ms-credits-menu');
     if (!menu) {
       menu = el('div', { class: 'ms-credits-menu', hidden: '' });
-      menu.appendChild(el('strong', {}, 'Demo credits'));
-      menu.appendChild(el('p', {}, 'Saved results are always free. Only a new live Muse generation costs 1 run.'));
-      menu.appendChild(el('p', { class: 'ms-muted' }, 'This demo takes no payment. Browser credits apply to presenter live mode only; signed-in runs are counted on the server.'));
-      const reset = el('button', { type: 'button', class: 'ms-link' }, `Reset to ${START_CREDITS} credits`);
-      reset.addEventListener('click', () => { credits = START_CREDITS; store.set(CREDIT_KEY, String(credits)); renderCredits(true); toast('Demo credits reset.'); });
-      menu.appendChild(reset);
+      menu.appendChild(el('strong', {}, 'Runs'));
+      menu.appendChild(el('p', {}, '1 run = one competitor analysis, refinement, re-run or ad scene. Viewing results you already have is free.'));
+      menu.appendChild(el('p', { class: 'ms-muted' }, 'Demo account: runs are stored in this browser. Repeat live results come from a 24-hour cache, so they never spend Muse API credit twice.'));
       const more = el('button', { type: 'button', class: 'ms-link ms-more' }, 'Get more runs →');
       more.addEventListener('click', () => { closeMenu(); openPricing(); });
       menu.appendChild(more);
@@ -138,6 +149,7 @@
   }
 
   // ---------- Pricing ----------
+  const PLAN_RUNS = { starter: 10, growth: 50, unlimited: 999 };
   const PLANS = [
     { id: 'starter', name: 'Starter', price: '$9', per: 'one-time', runs: '10 runs', points: ['Competitor analysis', 'Ready-to-post ads', 'Ranked next moves'] },
     { id: 'growth', name: 'Growth', price: '$29', per: '/month', runs: '50 runs a month', points: ['Everything in Starter', 'Daily growth brief', 'Budget advice for ads'], featured: true },
@@ -171,16 +183,16 @@
         button.textContent = `Choose ${plan.name}`;
         button.onclick = () => buyPlan(plan.id, button);
       } else {
-        button.disabled = true;
-        button.title = 'Not on sale in this demo';
-        button.textContent = 'Coming soon';
-        button.onclick = null;
+        button.disabled = false;
+        button.title = 'Demo checkout: no payment is taken';
+        button.textContent = `Choose ${plan.name}`;
+        button.onclick = () => { pricingDialog.close(); openCheckout(plan); };
       }
     });
     const note = pricingDialog.querySelector('.ms-muted');
     if (note) note.textContent = serverMode()
       ? 'Secure checkout via Stripe. 1 run = one competitor analysis, ad generation or budget review.'
-      : 'Plans open after the beta. This demo takes no payment and collects no details. 1 run = one competitor analysis, ad generation or budget review.';
+      : 'Demo checkout: no card is needed and no payment is taken; runs are added to this browser. 1 run = one analysis, refinement, re-run or ad scene.';
   }
   let pricingDialog;
   function openPricing(mode = '') {
@@ -221,75 +233,274 @@
   }
   const openGift = () => openPricing('gift');
 
-  // ---------- Logged-out demo and free signup ----------
+  // ---------- Demo checkout (adds runs; no payment) ----------
+  let checkoutDialog;
+  function openCheckout(plan) {
+    if (!hasSession()) { openSignup('Create a free account before choosing a plan.'); return; }
+    if (!checkoutDialog) {
+      checkoutDialog = el('dialog', { class: 'ms-dialog ms-checkout', 'aria-labelledby': 'msCheckoutTitle' });
+      const close = el('button', { type: 'button', class: 'ms-close', 'aria-label': 'Close' }, '×');
+      close.addEventListener('click', () => checkoutDialog.close());
+      checkoutDialog.appendChild(close);
+      checkoutDialog.appendChild(el('p', { class: 'ms-eyebrow' }, 'Demo checkout'));
+      checkoutDialog.appendChild(el('h2', { id: 'msCheckoutTitle' }));
+      const summary = el('div', { class: 'ms-checkout-summary' });
+      checkoutDialog.appendChild(summary);
+      checkoutDialog.appendChild(el('p', { class: 'ms-checkout-note' }, 'This is a demo: no card is needed, nothing is charged, and no payment details are collected. Runs are added to this browser.'));
+      const pay = el('button', { type: 'button', class: 'ms-primary ms-pay' });
+      checkoutDialog.appendChild(pay);
+      checkoutDialog.addEventListener('click', (event) => { if (event.target === checkoutDialog) checkoutDialog.close(); });
+      document.body.appendChild(checkoutDialog);
+    }
+    const account = readAccount();
+    checkoutDialog.querySelector('h2').textContent = `${plan.name} · ${plan.runs}`;
+    const summary = checkoutDialog.querySelector('.ms-checkout-summary');
+    summary.replaceChildren();
+    [['Plan', plan.name], ['Price', `${plan.price} ${plan.per}`], ['Runs added', plan.id === 'unlimited' ? 'Unlimited (999 in this demo)' : String(PLAN_RUNS[plan.id])], ['Account', account.email]]
+      .forEach(([k, v]) => { const row = el('div', {}); row.append(el('span', {}, k), el('strong', {}, v)); summary.appendChild(row); });
+    const pay = checkoutDialog.querySelector('.ms-pay');
+    pay.disabled = false;
+    pay.textContent = `Complete demo purchase · ${plan.price}`;
+    pay.onclick = async () => {
+      pay.disabled = true;
+      await progress('Completing demo purchase', ['Confirming the plan', 'Adding runs to your account']);
+      credits += PLAN_RUNS[plan.id] || 0; saveCredits(); renderCredits(true);
+      const history = account.purchases || [];
+      history.push({ plan: plan.id, runs: PLAN_RUNS[plan.id], at: new Date().toISOString() });
+      store.set(ACCOUNT_KEY, JSON.stringify({ ...account, purchases: history.slice(-20) }));
+      checkoutDialog.close();
+      toast(`+${PLAN_RUNS[plan.id]} runs added · demo purchase, nothing charged`);
+    };
+    if (typeof checkoutDialog.showModal === 'function') checkoutDialog.showModal(); else checkoutDialog.setAttribute('open', '');
+  }
+
+  // ---------- Demo sign-up and account ----------
+  const EMAIL_RE = /^[^\s@]{1,64}@[^\s@]{1,190}\.[A-Za-z]{2,24}$/;
   let signupDialog;
-  function openSignup() {
+  function openSignup(reason = '') {
     if (serverMode()) { window.museAccount.open('signup'); return; }
+    if (hasSession()) { renderAccount(); return; }
     if (!signupDialog) {
       signupDialog = el('dialog', { class: 'ms-dialog ms-signup', 'aria-labelledby': 'msSignupTitle' });
       const close = el('button', { type: 'button', class: 'ms-close', 'aria-label': 'Close' }, '×');
       close.addEventListener('click', () => signupDialog.close());
       signupDialog.appendChild(close);
-      signupDialog.appendChild(el('p', { class: 'ms-eyebrow' }, 'Free to start'));
-      signupDialog.appendChild(el('h2', { id: 'msSignupTitle' }, '3 runs on us'));
-      signupDialog.appendChild(el('p', { class: 'ms-tour-body' }, 'Analyze competitors, create ready-to-post ads and get ranked next moves for Art of Sarabjit Singh.'));
-      const start = el('button', { type: 'button', class: 'ms-primary' }, 'Start free with 3 runs');
-      start.addEventListener('click', () => { startSession(); signupDialog.close(); });
-      signupDialog.appendChild(start);
-      signupDialog.appendChild(el('p', { class: 'ms-muted' }, 'Accounts open after the beta. For now, your free demo runs are saved in this browser; no email or payment is needed.'));
+      signupDialog.appendChild(el('p', { class: 'ms-eyebrow' }, 'Free to start · 3 runs'));
+      signupDialog.appendChild(el('h2', { id: 'msSignupTitle' }, 'Create your free account'));
+      signupDialog.appendChild(el('p', { class: 'ms-signup-reason' }));
+      const form = el('form', { class: 'ms-signup-form', novalidate: '' });
+      form.appendChild(el('label', { for: 'msSignupEmail' }, 'Email'));
+      form.appendChild(el('input', { id: 'msSignupEmail', type: 'email', autocomplete: 'email', required: '', maxlength: '254', placeholder: 'you@yourshop.com' }));
+      form.appendChild(el('label', { for: 'msSignupName' }, 'Shop or name (optional)'));
+      form.appendChild(el('input', { id: 'msSignupName', type: 'text', autocomplete: 'organization', maxlength: '80', placeholder: 'Art of Sarabjit Singh' }));
+      form.appendChild(el('p', { class: 'ms-signup-error', role: 'alert' }));
+      form.appendChild(el('button', { type: 'submit', class: 'ms-primary' }, 'Create free account'));
+      form.addEventListener('submit', (event) => {
+        event.preventDefault();
+        const email = form.querySelector('#msSignupEmail').value.trim().toLowerCase();
+        const name = form.querySelector('#msSignupName').value.trim().replace(/\s+/g, ' ').slice(0, 80);
+        if (!EMAIL_RE.test(email)) { form.querySelector('.ms-signup-error').textContent = 'Enter a valid email address.'; form.querySelector('#msSignupEmail').focus(); return; }
+        createAccount(email, name);
+        signupDialog.close();
+      });
+      signupDialog.appendChild(form);
+      const demo = el('button', { type: 'button', class: 'ms-link ms-demo-user' }, 'Or continue as the demo user (Art of Sarabjit Singh) →');
+      demo.addEventListener('click', () => { createAccount('demo@artofsarabjitsingh.example', 'Art of Sarabjit Singh'); signupDialog.close(); });
+      signupDialog.appendChild(demo);
+      signupDialog.appendChild(el('p', { class: 'ms-muted' }, 'Demo mode: your account and runs are saved in this browser only. No email is sent and no password is stored.'));
       signupDialog.addEventListener('click', (event) => { if (event.target === signupDialog) signupDialog.close(); });
       document.body.appendChild(signupDialog);
     }
+    const reasonNode = signupDialog.querySelector('.ms-signup-reason');
+    reasonNode.textContent = reason || 'Analyze competitors, create ready-to-post ads and get ranked next moves.';
+    signupDialog.querySelector('.ms-signup-error').textContent = '';
     if (typeof signupDialog.showModal === 'function') signupDialog.showModal(); else signupDialog.setAttribute('open', '');
+    setTimeout(() => signupDialog.querySelector('#msSignupEmail')?.focus(), 30);
   }
-  function startSession() {
-    store.set(SESSION_KEY, '1');
-    if (store.get(CREDIT_KEY) === null) { credits = START_CREDITS; store.set(CREDIT_KEY, String(credits)); }
-    document.body.classList.remove('ms-logged-out');
-    document.querySelectorAll('.ms-gate').forEach((gate) => gate.remove());
-    document.querySelectorAll('.ms-signup-btn').forEach((btn) => btn.remove());
-    if (pill) { pill.hidden = false; renderCredits(true); }
-    toast(`Welcome! ${credits} free runs are ready.`);
+  function createAccount(email, name) {
+    const existing = store.get(`${CREDIT_KEY}:${email}`);
+    store.set(ACCOUNT_KEY, JSON.stringify({ email, name, created: new Date().toISOString(), purchases: [] }));
+    credits = loadCredits();
+    if (existing === null) { credits = START_CREDITS; saveCredits(); }
+    renderAccount();
+    renderCredits(true);
+    toast(existing === null ? `Welcome${name ? `, ${name}` : ''}! ${credits} free runs are ready.` : `Welcome back! ${credits} runs left.`);
+    window.dispatchEvent(new CustomEvent('muse:demo-account', { detail: { email } }));
+  }
+  function signOut() {
+    store.remove(ACCOUNT_KEY);
+    credits = loadCredits();
+    renderAccount();
+    toast('Signed out. Your saved demo results stay in this browser.');
+    window.dispatchEvent(new CustomEvent('muse:demo-account', { detail: { email: null } }));
+  }
+  let accountSlot;
+  function renderAccount() {
+    if (serverMode() || !accountSlot) return;
+    const account = readAccount();
+    accountSlot.replaceChildren();
+    if (pill) pill.hidden = !account;
+    if (!account) {
+      const btn = el('button', { type: 'button', class: 'ms-primary ms-small ms-signup-btn' }, 'Sign up free');
+      btn.addEventListener('click', () => openSignup());
+      accountSlot.appendChild(btn);
+      return;
+    }
+    const chip = el('button', { type: 'button', class: 'ms-account-chip', 'aria-haspopup': 'menu', 'aria-expanded': 'false' });
+    chip.appendChild(el('span', { class: 'ms-account-initial', 'aria-hidden': 'true' }, (account.name || account.email).trim().charAt(0).toUpperCase()));
+    chip.appendChild(el('span', { class: 'ms-account-label' }, account.name || account.email));
+    const queued = Object.values(readActions()).filter((a) => a.status === 'accepted').length;
+    if (queued) chip.appendChild(el('span', { class: 'ms-account-count', title: 'Accepted actions' }, String(queued)));
+    const menu = el('div', { class: 'ms-account-menu', hidden: '' });
+    menu.appendChild(el('p', { class: 'ms-muted' }, `Signed in as ${account.email} (demo account)`));
+    const actions = el('button', { type: 'button', class: 'ms-link' }, `My actions (${queued}) →`);
+    actions.addEventListener('click', () => { menu.hidden = true; openActions(); });
+    const plans = el('button', { type: 'button', class: 'ms-link' }, 'Get more runs →');
+    plans.addEventListener('click', () => { menu.hidden = true; openPricing(); });
+    const out = el('button', { type: 'button', class: 'ms-link ms-signout-link' }, 'Sign out');
+    out.addEventListener('click', () => { menu.hidden = true; signOut(); });
+    menu.append(actions, plans, out);
+    chip.addEventListener('click', (event) => { event.stopPropagation(); menu.hidden = !menu.hidden; chip.setAttribute('aria-expanded', String(!menu.hidden)); });
+    document.addEventListener('click', (event) => { if (!accountSlot.contains(event.target)) menu.hidden = true; });
+    accountSlot.append(chip, menu);
   }
   function syncServerSession() {
-    // Verified accounts see the tools; the server counts their runs.
+    // Server accounts (when configured) own sign-in and count runs on the server.
     if (!serverMode()) return;
     if (pill) pill.hidden = true;
-    const snap = serverSnapshot();
-    if (snap?.user?.email_verified) removeGates();
-    else document.querySelectorAll('.ms-signup-btn').forEach((btn) => btn.remove());
+    if (accountSlot) accountSlot.replaceChildren();
+    removeGates();
   }
   function mountSession() {
-    if (serverMode()) {
-      // Server accounts own signup; gates open the account dialog until verified.
-      document.body.classList.add('ms-logged-out');
-      if (pill) pill.hidden = true;
-      syncServerSession();
-      window.addEventListener('muse:account-change', syncServerSession);
-    }
-    if (hasSession()) return;
-    document.body.classList.add('ms-logged-out');
-    if (pill) pill.hidden = true;
     const header = document.querySelector('header.topbar') || document.querySelector('body > header');
-    if (header && !serverMode()) {
-      const btn = el('button', { type: 'button', class: 'ms-primary ms-small ms-signup-btn' }, 'Sign up free');
-      btn.addEventListener('click', openSignup);
-      if (pill?.parentNode) pill.insertAdjacentElement('afterend', btn); else header.appendChild(btn);
+    if (!header) return;
+    accountSlot = el('div', { class: 'ms-account' });
+    if (pill?.parentNode) pill.insertAdjacentElement('afterend', accountSlot); else header.appendChild(accountSlot);
+    renderAccount();
+    syncServerSession();
+    window.addEventListener('muse:account-change', () => { syncServerSession(); renderAccount(); });
+  }
+
+  // ---------- Recommendation triage: accept, dismiss, archive ----------
+  const ACTIONS_KEY = 'muse.actions';
+  const readActions = () => { try { const v = JSON.parse(store.get(ACTIONS_KEY) || '{}'); return v && typeof v === 'object' ? v : {}; } catch { return {}; } };
+  const writeActions = (v) => store.set(ACTIONS_KEY, JSON.stringify(v));
+  const actionId = (text) => { let h = 0; for (const ch of text) h = (h * 31 + ch.charCodeAt(0)) | 0; return `a${(h >>> 0).toString(36)}`; };
+  const TRIAGE_SELECTORS = ['.jr-recos > li', '#insightsContainer > .finding-item', '.try-next li', '#msBrief .ms-move'];
+  function itemTitle(item) {
+    const head = item.querySelector('strong:not(.ms-match-tag)');
+    return (head?.textContent || item.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 120);
+  }
+  function itemLink(item) {
+    const link = item.querySelector('a[href]');
+    return link ? link.getAttribute('href') : '';
+  }
+  function setStatus(item, status) {
+    const id = item.dataset.actionId;
+    const all = readActions();
+    if (status) all[id] = { status, title: itemTitle(item), href: itemLink(item), page: location.pathname, at: new Date().toISOString() };
+    else delete all[id];
+    writeActions(all);
+    applyStatus(item);
+    renderAccount();
+    const labels = { accepted: 'Added to My actions', dismissed: 'Dismissed', archived: 'Archived' };
+    if (status) toast(`${labels[status]} · ${itemTitle(item).slice(0, 48)}`);
+  }
+  function applyStatus(item) {
+    const state = readActions()[item.dataset.actionId]?.status || '';
+    item.classList.toggle('ms-accepted', state === 'accepted');
+    item.hidden = state === 'dismissed' || state === 'archived';
+    const accept = item.querySelector('.ms-triage-accept');
+    if (accept) { accept.textContent = state === 'accepted' ? '✓ In My actions' : '✓ Accept'; accept.setAttribute('aria-pressed', String(state === 'accepted')); }
+  }
+  function addTriage(item) {
+    if (item.querySelector('.ms-triage')) return;
+    item.dataset.actionId = actionId(itemTitle(item));
+    const bar = el('div', { class: 'ms-triage', role: 'group', 'aria-label': 'Recommendation actions' });
+    const accept = el('button', { type: 'button', class: 'ms-triage-accept' }, '✓ Accept');
+    const dismiss = el('button', { type: 'button', class: 'ms-triage-dismiss' }, '✕ Dismiss');
+    const archive = el('button', { type: 'button', class: 'ms-triage-archive' }, '⤓ Archive');
+    accept.addEventListener('click', () => setStatus(item, readActions()[item.dataset.actionId]?.status === 'accepted' ? '' : 'accepted'));
+    dismiss.addEventListener('click', () => setStatus(item, 'dismissed'));
+    archive.addEventListener('click', () => setStatus(item, 'archived'));
+    bar.append(accept, dismiss, archive);
+    item.appendChild(bar);
+    applyStatus(item);
+  }
+  function hiddenCountFor(list) {
+    const all = readActions();
+    return [...list.children].filter((c) => c.dataset?.actionId && all[c.dataset.actionId]?.status === 'dismissed').length;
+  }
+  function addRestore(list) {
+    let restore = list.nextElementSibling?.classList?.contains('ms-restore') ? list.nextElementSibling : null;
+    const n = hiddenCountFor(list);
+    if (!n) { restore?.remove(); return; }
+    if (!restore) {
+      restore = el('button', { type: 'button', class: 'ms-link ms-restore' });
+      restore.addEventListener('click', () => {
+        const all = readActions();
+        [...list.children].forEach((c) => { const st = all[c.dataset?.actionId]?.status; if (st === 'dismissed') delete all[c.dataset.actionId]; });
+        writeActions(all);
+        [...list.children].forEach((c) => c.dataset?.actionId && applyStatus(c));
+        addRestore(list);
+      });
+      list.insertAdjacentElement('afterend', restore);
     }
-    // On the portal, frost the interactive stages and workspace until the visitor starts.
-    const gated = [...document.querySelectorAll('.jr-stage'), document.querySelector('.ms-workspace-bar')].filter(Boolean);
-    for (const area of gated) {
-      area.classList.add('ms-gated');
-      const gate = el('div', { class: 'ms-gate' });
-      const card = el('div', { class: 'ms-gate-card' });
-      card.appendChild(el('strong', {}, 'Sign up free — 3 runs on us'));
-      card.appendChild(el('span', {}, 'Sample data shown. Start free to run analyses, open ads and use the tools.'));
-      const cta = el('button', { type: 'button', class: 'ms-primary' }, 'Sign up free');
-      cta.addEventListener('click', openSignup);
-      card.appendChild(cta);
-      gate.appendChild(card);
-      area.appendChild(gate);
+    restore.textContent = `Show ${n} dismissed ↺`;
+  }
+  function mountTriage() {
+    const run = () => {
+      for (const sel of TRIAGE_SELECTORS) document.querySelectorAll(sel).forEach(addTriage);
+      new Set([...document.querySelectorAll('[data-action-id]')].map((i) => i.parentElement)).forEach((list) => list && addRestore(list));
+    };
+    run();
+    document.addEventListener('click', (event) => { if (event.target.closest?.('.ms-triage')) setTimeout(run, 0); });
+    const insights = document.getElementById('insightsContainer');
+    if (insights && typeof MutationObserver !== 'undefined') new MutationObserver(() => setTimeout(run, 0)).observe(insights, { childList: true });
+    window.addEventListener('muse:brief-ready', run);
+  }
+  let actionsDialog;
+  function openActions() {
+    if (!actionsDialog) {
+      actionsDialog = el('dialog', { class: 'ms-dialog ms-actions', 'aria-labelledby': 'msActionsTitle' });
+      const close = el('button', { type: 'button', class: 'ms-close', 'aria-label': 'Close' }, '×');
+      close.addEventListener('click', () => actionsDialog.close());
+      actionsDialog.appendChild(close);
+      actionsDialog.appendChild(el('p', { class: 'ms-eyebrow' }, 'Your queue'));
+      actionsDialog.appendChild(el('h2', { id: 'msActionsTitle' }, 'My actions'));
+      actionsDialog.appendChild(el('div', { class: 'ms-actions-body' }));
+      actionsDialog.addEventListener('click', (event) => { if (event.target === actionsDialog) actionsDialog.close(); });
+      document.body.appendChild(actionsDialog);
     }
+    const body = actionsDialog.querySelector('.ms-actions-body');
+    body.replaceChildren();
+    const all = readActions();
+    const groups = [['accepted', 'To do'], ['done', 'Done'], ['archived', 'Archived']];
+    let any = false;
+    for (const [status, heading] of groups) {
+      const items = Object.entries(all).filter(([, a]) => a.status === status);
+      if (!items.length) continue;
+      any = true;
+      body.appendChild(el('h3', {}, `${heading} (${items.length})`));
+      const list = el('ul', { class: 'ms-actions-list' });
+      for (const [id, a] of items) {
+        const li = el('li', {});
+        li.appendChild(el('strong', {}, a.title));
+        const row = el('div', { class: 'ms-actions-row' });
+        if (a.href && status === 'accepted') { const go = el('a', { href: a.href, class: 'ms-link' }, 'Do it →'); row.appendChild(go); }
+        const next = { accepted: ['Mark done', 'done'], done: ['Reopen', 'accepted'], archived: ['Restore', 'accepted'] }[status];
+        const move = el('button', { type: 'button', class: 'ms-link' }, next[0]);
+        move.addEventListener('click', () => { const v = readActions(); v[id] = { ...v[id], status: next[1] }; writeActions(v); openActions(); renderAccount(); document.querySelectorAll(`[data-action-id="${id}"]`).forEach(applyStatus); });
+        const remove = el('button', { type: 'button', class: 'ms-link ms-remove' }, 'Remove');
+        remove.addEventListener('click', () => { const v = readActions(); delete v[id]; writeActions(v); openActions(); renderAccount(); document.querySelectorAll(`[data-action-id="${id}"]`).forEach(applyStatus); });
+        row.append(move, remove);
+        li.appendChild(row);
+        list.appendChild(li);
+      }
+      body.appendChild(list);
+    }
+    if (!any) body.appendChild(el('p', { class: 'ms-muted' }, 'Accept a recommendation to add it here. Dismissed ideas are hidden; archived ones are kept here for later.'));
+    if (typeof actionsDialog.showModal === 'function') actionsDialog.showModal(); else actionsDialog.setAttribute('open', '');
   }
 
   // ---------- Portal: one stage at a time ----------
@@ -407,21 +618,48 @@
     meta.appendChild(el('span', { class: 'ms-dot', 'aria-hidden': 'true' }));
     meta.appendChild(document.createTextNode('Watchlist: 4 competitors · 6 shop pages · last checked Nov 3 · social accounts not checked yet'));
     titleBox.appendChild(meta);
-    const recheck = el('button', { type: 'button', class: 'ms-secondary ms-small', disabled: '', title: 'Re-checking needs a live server' }, 'Re-check now');
+    const recheck = el('button', { type: 'button', class: 'ms-secondary ms-small', title: 'Rebuild today’s brief from saved and cached data · 1 run' }, 'Re-check now');
     const toggle = el('button', { type: 'button', class: 'ms-link ms-brief-toggle', 'aria-expanded': 'true', 'aria-controls': 'msBriefBody' }, 'Hide');
     const actions = el('div', { class: 'ms-brief-actions' });
     actions.append(recheck, toggle);
     head.append(titleBox, actions);
     const body = el('div', { class: 'ms-brief-body', id: 'msBriefBody' });
     const list = el('ul', { class: 'ms-watch' });
-    for (const item of WATCH) {
-      const li = el('li', { class: item.status });
-      li.appendChild(el('span', { class: `ms-chip ${item.status}` }, item.status === 'new' ? 'New' : 'First check'));
-      li.appendChild(el('strong', {}, item.name));
-      li.appendChild(el('span', { class: 'ms-where' }, item.where));
-      li.appendChild(el('span', { class: 'ms-note' }, item.note));
-      list.appendChild(li);
-    }
+    const CHIP = { new: 'New', first: 'First check', fresh: 'Fresh Muse brief' };
+    const renderItems = (items) => {
+      list.replaceChildren();
+      for (const item of items) {
+        const status = CHIP[item.status] ? item.status : 'first';
+        const li = el('li', { class: status });
+        li.appendChild(el('span', { class: `ms-chip ${status}` }, CHIP[status]));
+        li.appendChild(el('strong', {}, String(item.name || '')));
+        li.appendChild(el('span', { class: 'ms-where' }, String(item.where || '')));
+        li.appendChild(el('span', { class: 'ms-note' }, String(item.note || '')));
+        list.appendChild(li);
+      }
+    };
+    renderItems(WATCH);
+    const sourceNote = el('p', { class: 'ms-muted ms-brief-source' }, 'From saved public snapshots captured Nov 3. Muse checks again when you run a re-check; it does not watch continuously.');
+    const loadBrief = async (refresh = false) => {
+      try {
+        const response = await fetch(`/api/v1/daily-brief${refresh ? '?refresh=true' : ''}`);
+        if (!response.ok) throw new Error(String(response.status));
+        const brief = await response.json();
+        if (Array.isArray(brief.items) && brief.items.length) renderItems(brief.items);
+        const built = brief.generated_at ? new Date(brief.generated_at).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) : '';
+        sourceNote.textContent = `${String(brief.source || '')}${built ? ` Generated ${built}; cached for today.` : ''}`;
+        return true;
+      } catch { return false; }
+    };
+    recheck.addEventListener('click', async () => {
+      if (!requireRun('Brief re-check')) return;
+      recheck.disabled = true;
+      await progress('Re-checking your watchlist', ['Reading saved snapshots', 'Looking for fresh Muse analyses', 'Ranking today’s move']);
+      const ok = await loadBrief(true);
+      recheck.disabled = false;
+      toast(ok ? 'Brief rebuilt from saved and cached data' : 'Could not rebuild the brief; showing the saved one.', ok ? '' : 'warn');
+    });
+    loadBrief(false);
     const move = el('div', { class: 'ms-move' });
     const moveText = el('div');
     moveText.appendChild(el('span', { class: 'ms-chip high' }, 'Today’s move · high impact'));
@@ -430,7 +668,7 @@
     const go = el('a', { class: 'ms-primary ms-small', href: '/create?goal=story' }, 'Make this post →');
     move.append(moveText, go);
     body.append(list, move);
-    body.appendChild(el('p', { class: 'ms-muted' }, 'From saved public snapshots captured Nov 3. Muse checks again when you run a re-check on a live server; it does not watch continuously.'));
+    body.appendChild(sourceNote);
     section.append(head, body);
     toggle.addEventListener('click', () => {
       const open = body.hidden;
@@ -497,6 +735,7 @@
       if (typeof MutationObserver !== 'undefined') new MutationObserver(() => decorate(node)).observe(node, { childList: true });
     }
     document.getElementById('rerunDiagBtn')?.addEventListener('click', async () => {
+      if (!requireRun('Diagnostics re-run')) return;
       await progress('Re-running channel diagnostics', ['Re-reading the saved shop snapshot', 'Recounting listings and tags', 'Checking checkout friction']);
       const box = document.getElementById('diagnosticsContainer');
       box?.querySelectorAll('.finding-item').forEach((item) => { item.classList.remove('ms-flash'); void item.offsetWidth; item.classList.add('ms-flash'); });
@@ -568,6 +807,7 @@
       event.preventDefault();
       const text = input.value.trim().replace(/\s+/g, ' ').slice(0, 140);
       if (!text) { input.focus(); return; }
+      if (!requireRun('Refined analysis')) return;
       await progress('Refining your seller audit', ['Saving your preference to memory', 'Re-ranking the saved findings', 'Highlighting what matches']);
       const memory = [text, ...readMemory().filter((m) => m.toLowerCase() !== text.toLowerCase())].slice(0, 5);
       store.set(MEMORY_KEY, JSON.stringify(memory));
@@ -598,15 +838,18 @@
     revealFallback();
     // The daily desk stays focused on the post; research lives in the portal.
     removeGates();
-    if (document.getElementById("journey")) mountBrief();
+    mountCredits();
+    mountSession();
+    if (document.getElementById('journey') || location.pathname.startsWith('/today')) mountBrief();
     mountActions();
     mountRefine();
     mountStages();
     document.querySelectorAll('[data-open-gift]').forEach((node) => node.addEventListener('click', openGift));
     document.querySelectorAll('[data-open-tour]').forEach((node) => node.addEventListener('click', openTour));
+    mountTriage();
 
   }
 
-  window.museShell = { spend, progress, toast, openGift, openPricing, openSignup, openTour, showStage };
+  window.museShell = { spend, requireRun, hasAccount: hasSession, progress, toast, openGift, openPricing, openSignup, openActions, openTour, showStage };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();

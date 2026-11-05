@@ -14,6 +14,7 @@ from src.api import (
     billing,
     content_plan,
     creative,
+    daily_brief,
     intel,
     product_reference,
     research_targets,
@@ -149,6 +150,7 @@ app.include_router(bids.router, prefix=API_PREFIX)
 app.include_router(content_plan.router, prefix=API_PREFIX)
 app.include_router(product_reference.router, prefix=API_PREFIX)
 app.include_router(research_targets.router, prefix=API_PREFIX)
+app.include_router(daily_brief.router, prefix=API_PREFIX)
 
 if SAMPLES_DIR.is_dir():
     app.mount("/samples", StaticFiles(directory=str(SAMPLES_DIR)), name="samples")

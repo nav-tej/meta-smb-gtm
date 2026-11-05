@@ -946,11 +946,11 @@
     }
 </style>
   <link rel="stylesheet" href="/static/portal-journey.css">
-  <link rel="stylesheet" href="/static/muse-shell.css?v=20261104-polish2">
+  <link rel="stylesheet" href="/static/muse-shell.css?v=20261105-polish3">
 
   <link rel="stylesheet" href="/static/account.css?v=20261104-polish2">
   <script src="/static/account.js?v=20261104-polish2" defer></script>
-  <script src="/static/muse-shell.js?v=20261104-polish2" defer></script>
+  <script src="/static/muse-shell.js?v=20261105-polish3" defer></script>
 </head>
 <body>
   <!-- Top Bar -->
@@ -2155,16 +2155,17 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
           btn.title = ready ? 'Generate a new brief · costs 1 run' : 'Sign in to analyze new sellers';
           btn.textContent = 'Request analysis →';
         } else {
-          btn.disabled = true;
-          btn.title = 'Live analysis needs a live server';
+          // Demo mode: analyze from the saved public snapshot (1 run), then re-view free.
+          btn.disabled = false;
+          btn.title = 'Analyze from the saved snapshot · costs 1 run';
           btn.textContent = 'Request analysis →';
         }
       });
       const recheck = document.getElementById('recheckBtn');
       if (recheck) {
-        recheck.disabled = !(ready || serverOn);
+        recheck.disabled = false;
         recheck.title = ready ? 'Re-analyze SikhiArt.com · costs 1 run'
-          : (serverOn ? 'Sign in to re-check competitors' : 'Re-checking needs a live server');
+          : (serverOn ? 'Sign in to re-check competitors' : 'Re-check from the saved snapshot · costs 1 run');
       }
     }
     async function loadBriefCache() {
@@ -2175,6 +2176,8 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
           const resp = await fetch('/api/v1/account/workspace', { credentials: 'same-origin' });
           if (resp.ok) Object.assign(briefCache, ((await resp.json()).document || {}).briefs || {});
         } catch {}
+      } else {
+        try { Object.assign(briefCache, JSON.parse(localStorage.getItem(DEMO_BRIEFS_KEY) || '{}')); } catch {}
       }
       refreshSellerButtons();
     }
@@ -2187,12 +2190,41 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
         });
       } catch {}
     }
+    const DEMO_BRIEFS_KEY = 'muse.demoBriefs';
+    async function requestDemoBrief(url, btn) {
+      // No live server: build the brief from the saved public snapshot (no Muse call).
+      const shell = typeof window !== 'undefined' ? window.museShell : null;
+      if (shell && !shell.requireRun('Competitor analysis')) return;
+      btn.disabled = true;
+      btn.textContent = 'Analyzing…';
+      try {
+        await shellProgress('Analyzing ' + url.replace(/^https?:\/\/(www\.)?/, '').split('/')[0],
+          ['Reading the saved shop snapshot', 'Counting listings and prices', 'Comparing with your prints']);
+        const resp = await portalFetch('/api/v1/analyze-competitors', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ competitor_url: url, max_urls: 40, seller_context: 'Fine artist selling Sikh & Punjabi heritage art' }),
+        });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const brief = await resp.json();
+        briefCache[url] = brief;
+        try { localStorage.setItem(DEMO_BRIEFS_KEY, JSON.stringify(briefCache)); } catch {}
+        renderCompetitorBrief(brief);
+        openStep('tab-intel', 'compSummaryText');
+        showToast('✓ Brief ready from the saved snapshot · reopen it any time for free');
+      } catch (err) {
+        showToast(`Analysis failed: ${err.message}`);
+      } finally {
+        refreshSellerButtons();
+      }
+    }
     async function requestBrief(url, btn) {
       if (briefCache[url]) {
         renderCompetitorBrief(briefCache[url]);
         openStep('tab-intel', 'compSummaryText');
         return;
       }
+      if (!liveRunsReady() && !liveSnapshot()?.configured) { await requestDemoBrief(url, btn); return; }
       if (window.museAccount && !window.museAccount.liveReady()) return;
       if (!liveRunsReady()) { showToast('Sign in to analyze new sellers.'); return; }
       btn.disabled = true;

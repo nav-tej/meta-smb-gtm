@@ -226,7 +226,7 @@
   }
   async function generate() {
     if (state.busy || !validateProduct()) return;
-    if (!state.live && !state.custom && typeof window !== 'undefined' && window.museShell) { setBusy(true); try { await window.museShell.progress('Staging your painting', ['Reading the saved Muse Image result', 'Fitting it to the feed layout', 'Adding your words']); } finally { setBusy(false); } }
+    if (!state.live && !state.custom && typeof window !== 'undefined' && window.museShell) { if (window.museShell.requireRun && !window.museShell.requireRun('Ad scene')) return; setBusy(true); try { await window.museShell.progress('Staging your painting', ['Reading the saved Muse Image result', 'Fitting it to the feed layout', 'Adding your words']); } finally { setBusy(false); } }
     if (!state.live) { if (state.custom) { originalLayout(); notify('Your original-photo layout is ready. Saved mode does not generate personalized AI scenes.'); } else { state.image = state.sampleImage; state.imageKind = 'saved'; state.provenance = 'Saved Muse image from this example. No new image generated; compare details against the original. Frame and room are staging only.'; refreshPreview(); notify('Saved scene loaded. Your edited copy stays yours.'); } $('reviewed').checked = false; return; }
     if (!state.scene || !state.headline || !state.caption) { notify('Add your headline, caption and setting before creating an image.', 'error'); return; }
     setBusy(true); notify('Muse is creating your scene. This can take a few minutes. Please keep this tab open…', 'busy');

@@ -190,3 +190,54 @@
 .jr-stage > .ms-gate { place-items: start center; padding-top: 70px; }
 .jr-stage > .ms-gate .ms-gate-card { position: sticky; top: 90px; }
 .ms-pricing { max-width: none; }
+
+/* Content must never be stuck invisible: reveal and stage-enter animate position only. */
+.reveal-on-scroll { opacity: 1 !important; }
+@keyframes ms-fade { from { transform: translateY(8px); } to { transform: none; } }
+
+/* Demo account */
+.ms-account { position: relative; display: inline-flex; align-items: center; z-index: 30; }
+.ms-account-chip { display: inline-flex; align-items: center; gap: 7px; font: inherit; font-size: 13px; padding: 4px 10px 4px 4px; border-radius: 999px; border: 1px solid #d9d3c6; background: #fff; color: #22221f; cursor: pointer; max-width: 220px; }
+.ms-account-initial { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; font-weight: 800; font-size: 12px; color: #fff; background: linear-gradient(135deg, #1b6e44, #2b8a59); flex: none; }
+.ms-account-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ms-account-count { display: grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: #b85d19; color: #fff; font-size: 11px; font-weight: 800; }
+.ms-account-menu { position: absolute; right: 0; top: calc(100% + 8px); width: 250px; padding: 12px 14px; border-radius: 14px; background: #fff; border: 1px solid #e6e1d6; box-shadow: 0 18px 40px rgba(0, 0, 0, 0.14); font-size: 13px; }
+.ms-account-menu[hidden] { display: none !important; }
+.ms-account-menu p { margin: 0 0 6px; overflow-wrap: anywhere; }
+.ms-signout-link { color: #8a3a1e; }
+.ms-signup-form { text-align: left; margin: 6px 0 10px; }
+.ms-signup-form label { display: block; font-size: 12px; font-weight: 700; margin: 10px 0 4px; }
+.ms-signup-form input { box-sizing: border-box; width: 100%; font: inherit; font-size: 14px; padding: 10px 12px; border: 1px solid #d9d3c6; border-radius: 10px; background: #fff; }
+.ms-signup-form input:focus { outline: 2px solid #2f5fb3; outline-offset: 1px; }
+.ms-signup-form .ms-primary { width: 100%; margin-top: 12px; }
+.ms-signup-error { min-height: 1em; margin: 6px 0 0; font-size: 12px; color: #8a3a1e; }
+.ms-signup-reason { margin: 0 0 4px; font-size: 14px; color: #4a4741; }
+.ms-demo-user { margin: 2px auto 8px; text-align: center; }
+
+/* Demo checkout */
+.ms-checkout-summary { display: grid; gap: 6px; margin: 10px 0 12px; padding: 12px 14px; border-radius: 12px; background: #f7f4ee; border: 1px solid #e6e1d6; }
+.ms-checkout-summary div { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; }
+.ms-checkout-summary span { color: #6b6860; }
+.ms-checkout-summary strong { overflow-wrap: anywhere; text-align: right; }
+.ms-checkout-note { margin: 0 0 12px; padding: 8px 12px; border-radius: 10px; background: #fff8ec; border: 1px solid #efcfb5; font-size: 12px; color: #6b4410; }
+.ms-pay { width: 100%; }
+
+/* Recommendation triage */
+.ms-triage { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.ms-triage button { font: inherit; font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 999px; border: 1px solid #d9d3c6; background: #fff; color: #4a4741; cursor: pointer; }
+.ms-triage .ms-triage-accept:hover, .ms-triage .ms-triage-accept[aria-pressed="true"] { border-color: #1b6e44; color: #fff; background: #1b6e44; }
+.ms-triage .ms-triage-dismiss:hover { border-color: #8a3a1e; color: #8a3a1e; }
+.ms-triage .ms-triage-archive:hover { border-color: #6a3fa0; color: #6a3fa0; }
+.ms-accepted { box-shadow: inset 4px 0 0 #1b6e44; }
+.ms-restore { display: block; margin: 6px 0 0; font-size: 12px; }
+.ms-actions { width: min(560px, calc(100vw - 32px)); max-width: none; }
+.ms-actions h3 { margin: 14px 0 6px; font-size: 14px; text-transform: uppercase; letter-spacing: 0.06em; color: #6b6860; }
+.ms-actions-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.ms-actions-list li { padding: 10px 12px; border-radius: 12px; border: 1px solid #e6e1d6; background: #fcfbf8; }
+.ms-actions-list strong { display: block; font-size: 14px; margin-bottom: 4px; }
+.ms-actions-row { display: flex; flex-wrap: wrap; gap: 14px; }
+.ms-actions-row .ms-link { margin: 0; display: inline; }
+.ms-remove { color: #8a3a1e; }
+@media (max-width: 640px) { .ms-account-label { display: none; } .ms-account-chip { padding-right: 6px; } }
+.ms-chip.fresh { background: #e7eefb; color: #24498c; }
+.ms-watch li.fresh { border-color: #bcd0f0; background: #f4f7fd; }
