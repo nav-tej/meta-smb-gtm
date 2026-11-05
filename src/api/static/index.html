@@ -947,6 +947,7 @@
 </style>
   <link rel="stylesheet" href="/static/portal-journey.css">
   <link rel="stylesheet" href="/static/muse-shell.css">
+  <link rel="stylesheet" href="/static/pricing-modal.css">
   <script src="/static/muse-shell.js" defer></script>
 </head>
 <body>
@@ -997,6 +998,26 @@
       </div>
     </div>
   </aside>
+
+  <!-- Logged-Out Hero Banner with Gradient Mesh -->
+  <section class="logged-out-hero" id="loggedOutHero" aria-label="Hero Overview">
+    <div class="logged-out-hero-inner">
+      <div class="logged-out-eyebrow">✦ AI Growth Copilot for Creators &amp; Fine Artists</div>
+      <h1>See what AI-powered growth looks like.</h1>
+      <p class="hero-subtitle">Turn competitor research into high-converting Meta ads, gallery-ready scene visuals, and ranked weekly actions—in minutes, without agency fees.</p>
+      <div class="logged-out-hero-ctas">
+        <a href="#journey" class="hero-btn-primary" id="heroStartFreeBtn">Start Free with 5 Runs →</a>
+        <button type="button" class="hero-btn-secondary" id="heroOpenPricingBtn" data-open-pricing>View Pricing &amp; Plans</button>
+        <button type="button" class="hero-btn-ghost" data-open-tour>▶ 20-Second Interactive Tour</button>
+      </div>
+      <div class="logged-out-hero-features">
+        <span>⚡ <strong>5 free runs</strong> included</span>
+        <span>🎯 <strong>4 competitors</strong> analyzed</span>
+        <span>✨ <strong>Collector room</strong> staging</span>
+        <span>🔒 <strong>No credit card</strong> required</span>
+      </div>
+    </div>
+  </section>
 
   <main class="shell">
     <section id="journey" class="journey" aria-label="Your growth loop">
@@ -1761,6 +1782,186 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
       <form method="dialog" style="text-align:right;">
         <button type="submit" class="btn btn-dark">Got It</button>
       </form>
+    </div>
+  </dialog>
+
+  <!-- Standalone Pricing Modal Dialog per Hackathon Requirements -->
+  <dialog id="pricingModal" class="pricing-dialog" aria-labelledby="pricingModalTitle">
+    <div class="pricing-container">
+      <button type="button" class="pricing-close-btn" id="closePricingModal" aria-label="Close pricing modal">×</button>
+
+      <div class="pricing-header">
+        <span class="pricing-badge" id="pricingEyebrow">✦ Transparent Plans for Creators</span>
+        <h2 id="pricingModalTitle">Supercharge Your Meta &amp; Shop Growth</h2>
+        <p id="pricingSubtitle">From independent artists to high-volume studios—scale your creative and competitor intelligence without agency fees.</p>
+      </div>
+
+      <div class="pricing-switch-wrap">
+        <div class="pricing-switch" role="radiogroup" aria-label="Billing frequency">
+          <button type="button" class="pricing-switch-btn active" id="billingMonthly" role="radio" aria-checked="true">Monthly Billing</button>
+          <button type="button" class="pricing-switch-btn" id="billingAnnual" role="radio" aria-checked="false">Annual (Save 20%)</button>
+        </div>
+        <span class="pricing-discount-badge">Save up to $240/yr</span>
+      </div>
+
+      <!-- 4 Tier Glassmorphism Cards -->
+      <div class="pricing-grid">
+        <!-- Tier 1: Free -->
+        <div class="tier-card" data-tier="free">
+          <h3 class="tier-name">Free Trial</h3>
+          <p class="tier-desc">Get started risk-free. Explore Muse's intelligence on sample or custom listings.</p>
+          <div class="tier-price-box">
+            <div class="tier-price">
+              <strong>$0</strong>
+              <span class="period">forever</span>
+            </div>
+            <span class="tier-price-note">No credit card required</span>
+          </div>
+          <ul class="tier-features">
+            <li><span class="tier-check check-green">✓</span> <span><strong>5 free runs</strong> included</span></li>
+            <li><span class="tier-check check-green">✓</span> <span><strong>3 competitors</strong> tracked</span></li>
+            <li><span class="tier-check check-green">✓</span> <span>Meta Muse ad generator</span></li>
+            <li><span class="tier-check check-green">✓</span> <span>Collector room staging</span></li>
+            <li><span class="tier-check check-green">✓</span> <span>Standard export formats</span></li>
+          </ul>
+          <button type="button" class="tier-cta cta-free" data-tier-action="free">Current Plan (5 Runs)</button>
+        </div>
+
+        <!-- Tier 2: Growth -->
+        <div class="tier-card" data-tier="growth">
+          <h3 class="tier-name">Growth</h3>
+          <p class="tier-desc">One-time refill or light posting sprint. Perfect for seasonal product launches.</p>
+          <div class="tier-price-box">
+            <div class="tier-price">
+              <strong>$9</strong>
+              <span class="period">one-time</span>
+            </div>
+            <span class="tier-price-note">10 runs never expire</span>
+          </div>
+          <ul class="tier-features">
+            <li><span class="tier-check check-blue">✓</span> <span><strong>10 runs</strong> included</span></li>
+            <li><span class="tier-check check-blue">✓</span> <span><strong>3 competitors</strong> tracked</span></li>
+            <li><span class="tier-check check-blue">✓</span> <span>Meta Muse ad copy &amp; visuals</span></li>
+            <li><span class="tier-check check-blue">✓</span> <span>Audience hook discovery</span></li>
+            <li><span class="tier-check check-blue">✓</span> <span>Priority image generation</span></li>
+          </ul>
+          <button type="button" class="tier-cta cta-growth" data-tier-action="growth">Get Growth Pack · $9</button>
+        </div>
+
+        <!-- Tier 3: Pro (Featured) -->
+        <div class="tier-card featured" data-tier="pro">
+          <span class="tier-ribbon">Most Popular</span>
+          <h3 class="tier-name">Pro</h3>
+          <p class="tier-desc">Active SMB creators &amp; independent brands scaling their weekly revenue.</p>
+          <div class="tier-price-box">
+            <div class="tier-price">
+              <strong class="pro-price-display">$29</strong>
+              <span class="period pro-period-display">/month</span>
+            </div>
+            <span class="tier-price-note pro-note-display">50 runs/mo · billed monthly</span>
+          </div>
+          <ul class="tier-features">
+            <li><span class="tier-check check-orange">✓</span> <span><strong>50 runs / month</strong></span></li>
+            <li><span class="tier-check check-orange">✓</span> <span><strong>Daily growth briefs</strong> &amp; shifts</span></li>
+            <li><span class="tier-check check-orange">✓</span> <span><strong>10 competitors</strong> tracked</span></li>
+            <li><span class="tier-check check-orange">✓</span> <span>Autonomous bid &amp; budget advice</span></li>
+            <li><span class="tier-check check-orange">✓</span> <span>Multi-scene collector mockups</span></li>
+            <li><span class="tier-check check-orange">✓</span> <span>Brand memory &amp; voice retention</span></li>
+          </ul>
+          <button type="button" class="tier-cta cta-pro" data-tier-action="pro">Upgrade to Pro · $29/mo</button>
+        </div>
+
+        <!-- Tier 4: Studio -->
+        <div class="tier-card" data-tier="studio">
+          <h3 class="tier-name">Studio</h3>
+          <p class="tier-desc">Agencies, galleries, and high-volume sellers needing unlimited creative throughput.</p>
+          <div class="tier-price-box">
+            <div class="tier-price">
+              <strong class="studio-price-display">$99</strong>
+              <span class="period studio-period-display">/month</span>
+            </div>
+            <span class="tier-price-note studio-note-display">Unlimited runs · billed monthly</span>
+          </div>
+          <ul class="tier-features">
+            <li><span class="tier-check check-gold">✓</span> <span><strong>Unlimited runs</strong> &amp; generations</span></li>
+            <li><span class="tier-check check-gold">✓</span> <span><strong>Unlimited competitors</strong></span></li>
+            <li><span class="tier-check check-gold">✓</span> <span>Multi-brand workspaces</span></li>
+            <li><span class="tier-check check-gold">✓</span> <span>Custom audience telemetry</span></li>
+            <li><span class="tier-check check-gold">✓</span> <span>Dedicated VIP rendering queue</span></li>
+          </ul>
+          <button type="button" class="tier-cta cta-studio" data-tier-action="studio">Get Studio · $99/mo</button>
+        </div>
+      </div>
+
+      <!-- Feature Comparison Breakdown Table -->
+      <div class="pricing-comparison">
+        <h3>Full Plan &amp; Feature Comparison</h3>
+        <div class="comparison-table-wrap">
+          <table class="comparison-table">
+            <thead>
+              <tr>
+                <th>Feature / Capability</th>
+                <th>Free</th>
+                <th>Growth</th>
+                <th class="col-highlight">Pro (Recommended)</th>
+                <th>Studio</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Monthly Runs / Generations</strong></td>
+                <td>5 total</td>
+                <td>10 one-time</td>
+                <td class="col-highlight">50 / month</td>
+                <td>Unlimited</td>
+              </tr>
+              <tr>
+                <td><strong>Monitored Competitors</strong></td>
+                <td>3 shops</td>
+                <td>3 shops</td>
+                <td class="col-highlight">10 shops</td>
+                <td>Unlimited</td>
+              </tr>
+              <tr>
+                <td><strong>Daily Growth Brief &amp; Shifts</strong></td>
+                <td><span class="table-dash">—</span></td>
+                <td><span class="table-dash">—</span></td>
+                <td class="col-highlight"><span class="table-check">✓</span> Included</td>
+                <td><span class="table-check">✓</span> Real-time</td>
+              </tr>
+              <tr>
+                <td><strong>Collector Room Staging</strong></td>
+                <td>Standard</td>
+                <td>Standard</td>
+                <td class="col-highlight"><span class="table-check">✓</span> Multi-scene</td>
+                <td><span class="table-check">✓</span> 4K Ultra</td>
+              </tr>
+              <tr>
+                <td><strong>Meta Ad Copy &amp; Angle Variations</strong></td>
+                <td>2 angles</td>
+                <td>3 angles</td>
+                <td class="col-highlight">5 angles + hooks</td>
+                <td>Unlimited + A/B</td>
+              </tr>
+              <tr>
+                <td><strong>Brand Memory &amp; Style Continuity</strong></td>
+                <td>Session only</td>
+                <td>Session only</td>
+                <td class="col-highlight"><span class="table-check">✓</span> Persistent</td>
+                <td><span class="table-check">✓</span> Multi-brand</td>
+              </tr>
+              <tr>
+                <td><strong>Budget &amp; Bidding Strategy</strong></td>
+                <td>Basic</td>
+                <td>Basic</td>
+                <td class="col-highlight"><span class="table-check">✓</span> Advanced</td>
+                <td><span class="table-check">✓</span> Automated</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="pricing-footer-note">All plans backed by Meta Muse Spark 1.3 &amp; Muse Image 1.0. Cancel or change your subscription anytime.</p>
+      </div>
     </div>
   </dialog>
 
@@ -2693,6 +2894,187 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
           });
         }
       } catch (_) {}
+    }
+
+    // Standalone Pricing Modal & Logged-Out Hero Interactivity
+    const pricingModal = typeof document !== 'undefined' && document.getElementById ? document.getElementById('pricingModal') : null;
+    let currentBillingAnnual = false;
+
+    function updatePricingBilling(annual) {
+      currentBillingAnnual = annual;
+      const btnMonthly = document.getElementById('billingMonthly');
+      const btnAnnual = document.getElementById('billingAnnual');
+      const proPrice = document.querySelector('.pro-price-display');
+      const proPeriod = document.querySelector('.pro-period-display');
+      const proNote = document.querySelector('.pro-note-display');
+      const studioPrice = document.querySelector('.studio-price-display');
+      const studioPeriod = document.querySelector('.studio-period-display');
+      const studioNote = document.querySelector('.studio-note-display');
+      const proCta = document.querySelector('[data-tier-action="pro"]');
+      const studioCta = document.querySelector('[data-tier-action="studio"]');
+
+      if (btnMonthly) {
+        btnMonthly.classList.toggle('active', !annual);
+        btnMonthly.setAttribute('aria-checked', String(!annual));
+      }
+      if (btnAnnual) {
+        btnAnnual.classList.toggle('active', annual);
+        btnAnnual.setAttribute('aria-checked', String(annual));
+      }
+
+      if (annual) {
+        if (proPrice) proPrice.textContent = '$23';
+        if (proPeriod) proPeriod.textContent = '/month';
+        if (proNote) proNote.textContent = '50 runs/mo · $278/yr (save $70/yr)';
+        if (proCta) proCta.textContent = 'Upgrade to Pro · $23/mo (billed annually)';
+
+        if (studioPrice) studioPrice.textContent = '$79';
+        if (studioPeriod) studioPeriod.textContent = '/month';
+        if (studioNote) studioNote.textContent = 'Unlimited runs · $948/yr (save $240/yr)';
+        if (studioCta) studioCta.textContent = 'Get Studio · $79/mo (billed annually)';
+      } else {
+        if (proPrice) proPrice.textContent = '$29';
+        if (proPeriod) proPeriod.textContent = '/month';
+        if (proNote) proNote.textContent = '50 runs/mo · billed monthly';
+        if (proCta) proCta.textContent = 'Upgrade to Pro · $29/mo';
+
+        if (studioPrice) studioPrice.textContent = '$99';
+        if (studioPeriod) studioPeriod.textContent = '/month';
+        if (studioNote) studioNote.textContent = 'Unlimited runs · billed monthly';
+        if (studioCta) studioCta.textContent = 'Get Studio · $99/mo';
+      }
+    }
+
+    function openPricingModal(mode = '') {
+      if (!pricingModal) return;
+      const eyebrow = document.getElementById('pricingEyebrow');
+      const title = document.getElementById('pricingModalTitle');
+      const subtitle = document.getElementById('pricingSubtitle');
+      const proCta = document.querySelector('[data-tier-action="pro"]');
+      const growthCta = document.querySelector('[data-tier-action="growth"]');
+
+      if (mode === 'gift') {
+        if (eyebrow) eyebrow.textContent = '✦ Gift a Creator Growth Subscription';
+        if (title) title.textContent = 'Give the Gift of Creative Velocity';
+        if (subtitle) subtitle.textContent = 'Send a gift subscription or run pack to an artist friend or collaborator.';
+        if (growthCta) growthCta.textContent = 'Gift Growth Pack · $9';
+        if (proCta) proCta.textContent = 'Gift Pro Subscription · $29/mo';
+      } else {
+        if (eyebrow) eyebrow.textContent = '✦ Transparent Plans for Creators';
+        if (title) title.textContent = 'Supercharge Your Meta & Shop Growth';
+        if (subtitle) subtitle.textContent = 'From independent artists to high-volume studios—scale your creative and competitor intelligence without agency fees.';
+        if (growthCta) growthCta.textContent = 'Get Growth Pack · $9';
+        if (proCta) proCta.textContent = currentBillingAnnual ? 'Upgrade to Pro · $23/mo (billed annually)' : 'Upgrade to Pro · $29/mo';
+      }
+
+      if (typeof pricingModal.showModal === 'function') {
+        pricingModal.showModal();
+      } else {
+        pricingModal.setAttribute('open', '');
+      }
+    }
+    window.openPricingModal = openPricingModal;
+
+    // Attach to museShell if present, or hook window.museShell
+    if (typeof window !== 'undefined') {
+      if (window.museShell) {
+        window.museShell.openPricing = (mode) => openPricingModal(mode);
+        window.museShell.openGift = () => openPricingModal('gift');
+      } else if (typeof window.addEventListener === 'function') {
+        window.addEventListener('load', () => {
+          if (window.museShell) {
+            window.museShell.openPricing = (mode) => openPricingModal(mode);
+            window.museShell.openGift = () => openPricingModal('gift');
+          }
+        });
+      }
+    }
+
+    // Event Delegation & Click Bindings
+    if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+      // Billing toggles
+      const btnMonthly = document.getElementById('billingMonthly');
+      if (btnMonthly) btnMonthly.addEventListener('click', () => updatePricingBilling(false));
+      const btnAnnual = document.getElementById('billingAnnual');
+      if (btnAnnual) btnAnnual.addEventListener('click', () => updatePricingBilling(true));
+
+      // Close button
+      const closeBtn = document.getElementById('closePricingModal');
+      if (closeBtn && pricingModal) {
+        closeBtn.addEventListener('click', () => {
+          if (typeof pricingModal.close === 'function') pricingModal.close();
+          else pricingModal.removeAttribute('open');
+        });
+      }
+
+      // Backdrop click
+      if (pricingModal) {
+        pricingModal.addEventListener('click', (event) => {
+          if (event.target === pricingModal) {
+            if (typeof pricingModal.close === 'function') pricingModal.close();
+            else pricingModal.removeAttribute('open');
+          }
+        });
+      }
+
+      // Logged-out Hero Start Free button
+      const heroStartFreeBtn = document.getElementById('heroStartFreeBtn');
+      if (heroStartFreeBtn) {
+        heroStartFreeBtn.addEventListener('click', (e) => {
+          if (window.museShell && typeof window.museShell.openSignup === 'function' && document.body.classList.contains('ms-logged-out')) {
+            e.preventDefault();
+            window.museShell.openSignup();
+          }
+        });
+      }
+
+      // Global click delegation for "Get More Runs", "Gift a Subscription", and [data-open-pricing]
+      document.addEventListener('click', (event) => {
+        const target = event.target;
+        if (!target) return;
+
+        // Check data-open-pricing or hero pricing btn
+        if (target.closest && target.closest('[data-open-pricing]')) {
+          event.preventDefault();
+          openPricingModal();
+          return;
+        }
+
+        // Check text content matches for 'Get More Runs' or 'Gift a Subscription'
+        const txt = (target.textContent || '').trim().toLowerCase();
+        if (txt.includes('get more runs') || (target.classList && target.classList.contains('ms-more'))) {
+          event.preventDefault();
+          openPricingModal();
+          return;
+        }
+        if (txt.includes('gift a subscription') || txt.includes('gift a growth subscription')) {
+          event.preventDefault();
+          openPricingModal('gift');
+          return;
+        }
+
+        // Tier CTA buttons inside pricing modal
+        const tierAction = target.getAttribute && target.getAttribute('data-tier-action');
+        if (tierAction) {
+          event.preventDefault();
+          if (pricingModal && typeof pricingModal.close === 'function') pricingModal.close();
+          else if (pricingModal) pricingModal.removeAttribute('open');
+
+          if (tierAction === 'free') {
+            if (window.museShell && typeof window.museShell.openSignup === 'function' && document.body.classList.contains('ms-logged-out')) {
+              window.museShell.openSignup();
+            } else {
+              showToast('✓ Free trial active: 5 runs on us!');
+            }
+          } else if (tierAction === 'growth') {
+            showToast('✦ Growth Pack (10 runs, $9) simulation ready. Beta demo active!');
+          } else if (tierAction === 'pro') {
+            showToast('✦ Upgraded to Pro Plan (50 runs/mo, daily briefs). Beta demo active!');
+          } else if (tierAction === 'studio') {
+            showToast('✦ Studio Plan (unlimited runs) simulation ready. Beta demo active!');
+          }
+        }
+      });
     }
   </script>
 </body>
