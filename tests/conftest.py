@@ -9,6 +9,7 @@ from typing import Any
 import pytest
 
 import src.clients.meta as meta_module
+import src.config as config_module
 from src.config import Settings, get_settings
 from src.models.bids import AdSetDailyPerformance, CampaignPerformance
 from src.models.intel import CompetitorBrief
@@ -78,6 +79,11 @@ def _never_use_real_meta_key(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     Tests that need a key set a fake one and mock the API with respx.
     """
     monkeypatch.setenv("META_MODEL_API_KEY", "")
+    # Never read .env/.env.local in tests: .env.local is loaded with override=True and could
+    # restore a real key over the blank one above.
+    monkeypatch.setattr(config_module, "load_dotenv", lambda *args, **kwargs: False)
+    # Mocked live results must not leak between tests through the on-disk result cache.
+    monkeypatch.setenv("RESULT_CACHE_ENABLED", "false")
     # Route tests exercise the full app; demo-mode tests turn this back on explicitly
     monkeypatch.setenv("DEMO_MODE", "false")
     monkeypatch.setattr(meta_module, "_shared_client", None)

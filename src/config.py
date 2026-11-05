@@ -24,6 +24,11 @@ class Settings(BaseModel):
     crawler_max_urls: int = 5000
 
     output_dir: str = "outputs"
+
+    # Live Muse results are cached on disk so repeat demo runs do not spend API credit.
+    result_cache_enabled: bool = True
+    result_cache_dir: str = "data/cache"
+    result_cache_ttl_seconds: int = 86400
     log_level: str = "INFO"
 
     # Demo mode serves saved live results so a public deployment can't spend Muse credits.
@@ -62,6 +67,9 @@ def get_settings() -> Settings:
     # Serverless filesystems (Vercel) are read-only except /tmp
     if os.environ.get("VERCEL") and "output_dir" not in values:
         values["output_dir"] = "/tmp/outputs"
+    # Serverless filesystems are read-only outside /tmp; the cache then lasts per instance.
+    if os.environ.get("VERCEL") and "result_cache_dir" not in values:
+        values["result_cache_dir"] = "/tmp/muse-cache"
     if os.environ.get("VERCEL"):
         values["hosted_environment"] = True
     return Settings(**values)

@@ -4,7 +4,7 @@ import base64
 import binascii
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, Field
 
 from src.api.demo import LiveMode, demo_unavailable
@@ -12,7 +12,7 @@ from src.api.media_delivery import MediaResponseTooLargeError, attach_inline_med
 from src.clients.comfyui import SUPPORTED_COMFY_WORKFLOWS, discover_comfy_cli
 from src.clients.meta import MetaAPIError, get_meta_client
 from src.models.creative import CreativeSet, EditableCreativeBrief, GenerateAdsRequest
-from src.services import demo
+from src.services import demo, result_cache
 from src.services.ad_creative import AdCreativeService
 
 router = APIRouter(tags=["creative"])
@@ -84,6 +84,7 @@ async def generate_ads(
     request: GenerateAdsRequest,
     service: Annotated[AdCreativeService, Depends(get_ad_creative_service)],
     live: LiveMode,
+    response: Response,
 ) -> CreativeSet | EditableCreativeBrief:
     """draft=true returns a brief to review (kind="draft"); send it back as `brief` to render."""
     if not live and request.draft:
@@ -91,10 +92,20 @@ async def generate_ads(
     if not live:
         return demo.demo_creative_set(request)
     if request.draft:
-        return await service.draft(request)
-    creative_set = await service.generate(request)
+        return await result_cache.cached(
+            "generate-ads-draft",
+            request,
+            EditableCreativeBrief,
+            lambda: service.draft(request),
+            response,
+        )
+
+    async def render() -> CreativeSet:
+        # Cache the delivered set (with inline media), so a hit needs no output files.
+        return attach_inline_media(await service.generate(request))
+
     try:
-        return attach_inline_media(creative_set)
+        return await result_cache.cached("generate-ads", request, CreativeSet, render, response)
     except MediaResponseTooLargeError as err:
         raise HTTPException(
             status.HTTP_413_CONTENT_TOO_LARGE,

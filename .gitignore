@@ -24,3 +24,6 @@ outputs/
 .vscode/
 .vercel
 .env*
+
+# Cached live Muse results (24h TTL)
+data/cache/

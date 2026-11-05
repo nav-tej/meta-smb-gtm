@@ -2,9 +2,10 @@
 
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Response
 
 from src.api.demo import LiveMode
+from src.services import result_cache
 from src.services.research_targets import ResearchTargets, ResearchTargetsRequest, discover_targets
 
 router = APIRouter(tags=["research"])
@@ -12,13 +13,15 @@ router = APIRouter(tags=["research"])
 
 @router.post("/research-targets", response_model=ResearchTargets)
 async def research_targets(
-    body: ResearchTargetsRequest, request: Request, live: LiveMode
+    body: ResearchTargetsRequest, request: Request, live: LiveMode, response: Response
 ) -> ResearchTargets:
     if not live or request.query_params.get("live", "").lower() not in {"true", "1"}:
         raise HTTPException(
             403, "Personalized discovery needs a live session. Saved research remains available."
         )
-    return await discover_targets(body)
+    return await result_cache.cached(
+        "research-targets", body, ResearchTargets, lambda: discover_targets(body), response
+    )
 
 
 @router.get("/research-example", response_model=ResearchTargets)

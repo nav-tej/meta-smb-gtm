@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Annotated, Any
 from urllib.parse import urlparse
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 from pydantic import BaseModel, Field
 
 from src.api.demo import LiveMode, demo_unavailable
@@ -20,7 +20,7 @@ from src.models.seller import (
     SellerFootprintAudit,
     SellerProfile,
 )
-from src.services import demo
+from src.services import demo, result_cache
 from src.services.competitor_intel import CompetitorIntelService, collect_entries
 from src.services.seller_audit import (
     analyze_social_screenshots,
@@ -65,22 +65,29 @@ async def analyze_competitors(
     request: CompetitorIntelRequest,
     service: Annotated[CompetitorIntelService, Depends(get_competitor_intel_service)],
     live: LiveMode,
+    response: Response,
 ) -> CompetitorBrief:
     if not live:
-        return demo.demo_competitor_brief()
-    return await service.analyze(request)
+        return demo.demo_competitor_brief_for(request.competitor_url)
+    return await result_cache.cached(
+        "analyze-competitors", request, CompetitorBrief, lambda: service.analyze(request), response
+    )
 
 
 @router.post("/audit-seller", response_model=SellerFootprintAudit | SellerDiagnostics)
 async def audit_seller(
     request: AuditSellerRequest,
     live: LiveMode,
+    response: Response,
 ) -> SellerFootprintAudit | SellerDiagnostics:
     if request.deterministic_only or not live:
         return compute_seller_diagnostics(request.profile)
-    return await audit_seller_footprint(
-        request.profile,
-        competitor_brief=request.competitor_brief,
+    return await result_cache.cached(
+        "audit-seller",
+        request,
+        SellerFootprintAudit,
+        lambda: audit_seller_footprint(request.profile, competitor_brief=request.competitor_brief),
+        response,
     )
 
 

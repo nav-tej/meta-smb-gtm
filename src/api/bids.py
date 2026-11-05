@@ -2,13 +2,13 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, Field
 
 from src.api.demo import LiveMode
 from src.models.bids import BidAdviceRequest, BidRecommendation, PerformanceMetrics
 from src.models.intel import CompetitorBrief
-from src.services import demo
+from src.services import demo, result_cache
 from src.services.bid_advisor import BidAdvisorService, compute_metrics, load_campaign_csv
 
 router = APIRouter(tags=["bids"])
@@ -35,10 +35,13 @@ async def bid_advice(
     request: BidAdviceRequest,
     service: Annotated[BidAdvisorService, Depends(get_bid_advisor_service)],
     live: LiveMode,
+    response: Response,
 ) -> BidRecommendation:
     if not live:
         return demo.demo_bid_recommendation()
-    return await service.advise(request)
+    return await result_cache.cached(
+        "bid-advice", request, BidRecommendation, lambda: service.advise(request), response
+    )
 
 
 @router.post("/bid-advice/csv", response_model=BidRecommendation | PerformanceMetrics)
@@ -46,6 +49,7 @@ async def bid_advice_csv(
     request: CsvBidAdviceRequest,
     service: Annotated[BidAdvisorService, Depends(get_bid_advisor_service)],
     live: LiveMode,
+    response: Response,
 ) -> BidRecommendation | PerformanceMetrics:
     try:
         campaign = load_campaign_csv(
@@ -63,10 +67,15 @@ async def bid_advice_csv(
         return compute_metrics(campaign)
     if not live:
         return demo.demo_bid_recommendation()
-    return await service.advise(
-        BidAdviceRequest(
-            campaign=campaign,
-            competitor_brief=request.competitor_brief,
-            seller_goal=request.seller_goal,
-        )
+    advice_request = BidAdviceRequest(
+        campaign=campaign,
+        competitor_brief=request.competitor_brief,
+        seller_goal=request.seller_goal,
+    )
+    return await result_cache.cached(
+        "bid-advice",
+        advice_request,
+        BidRecommendation,
+        lambda: service.advise(advice_request),
+        response,
     )
