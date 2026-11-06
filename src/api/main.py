@@ -95,6 +95,12 @@ async def daily_studio() -> FileResponse:
     return FileResponse(STATIC_DIR / "today.html")
 
 
+@app.get("/digest", include_in_schema=False)
+async def weekly_digest_page() -> FileResponse:
+    """Serve the weekly market digest; it reads /api/v1/weekly-digest in the browser."""
+    return FileResponse(STATIC_DIR / "digest.html")
+
+
 @app.get("/", include_in_schema=False)
 @app.get("/portal", include_in_schema=False)
 async def customer_portal() -> FileResponse:

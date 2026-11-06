@@ -945,12 +945,12 @@
       code, .channel-chip, .finding-item a, .journey a { overflow-wrap: anywhere; }
     }
 </style>
-  <link rel="stylesheet" href="/static/portal-journey.css">
-  <link rel="stylesheet" href="/static/muse-shell.css?v=20261106-resilience">
+  <link rel="stylesheet" href="/static/portal-journey.css?v=20261106-ui2">
+  <link rel="stylesheet" href="/static/muse-shell.css?v=20261106-ui2">
 
   <link rel="stylesheet" href="/static/account.css?v=20261104-polish2">
   <script src="/static/account.js?v=20261104-polish2" defer></script>
-  <script src="/static/muse-shell.js?v=20261106-resilience" defer></script>
+  <script src="/static/muse-shell.js?v=20261106-ui2" defer></script>
 </head>
 <body>
   <!-- Top Bar -->
@@ -964,6 +964,7 @@
     </div>
 
     <div class="topbar-right">
+      <a class="topbar-link" href="/digest">Weekly digest</a>
       <span class="status-pill" title="Interactive demo using saved Muse outputs; no API connection check performed">
         <span class="dot"></span>
         Saved Muse outputs · Interactive demo
@@ -1099,7 +1100,8 @@
             </ul>
             <form class="jr-add" id="addCompetitorForm" novalidate>
               <label for="addCompetitorInput">Add another competitor to analyze</label>
-              <div><input id="addCompetitorInput" type="url" inputmode="url" placeholder="https://their-shop.com" maxlength="300"><button type="submit" class="jr-mini primary">Add</button></div>
+              <div><input id="addCompetitorInput" type="url" inputmode="url" placeholder="https://their-shop.com" maxlength="300" aria-describedby="addCompetitorCost"><button type="submit" class="jr-mini primary" id="addCompetitorBtn">Add · 🪙 1 run</button></div>
+              <p class="jr-add-cost" id="addCompetitorCost">Analyzing a new shop uses 1 run. In this saved demo the shop is added to your list and no run is used.</p>
             </form>
             <p class="jr-note">Public snapshots captured Nov 3, 2026. Only SikhiArt.com has a saved Muse Spark brief; new analyses need a live server.</p>
           </article>
@@ -2166,6 +2168,11 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
           btn.disabled = false;
           btn.title = ready ? 'Generate a new brief · costs 1 run' : 'Sign in to analyze new sellers';
           btn.textContent = 'Request analysis →';
+        } else if (btn.closest('.jr-seller')?.dataset.added) {
+          // No saved snapshot exists for a shop the user added, so it can only be analyzed live.
+          btn.disabled = true;
+          btn.title = 'Analyzing a new shop needs a live server · 1 run';
+          btn.textContent = 'Needs live server';
         } else {
           // Demo mode: analyze from the saved public snapshot (1 run), then re-view free.
           btn.disabled = false;
@@ -2310,13 +2317,15 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
         return;
       }
       input.setCustomValidity('');
+      const live = liveRunsReady();
       const li = document.createElement('li');
       li.className = 'jr-seller added';
+      li.dataset.added = '1';
       const info = document.createElement('div');
       const name = document.createElement('strong');
       name.textContent = url.hostname.replace(/^www\./, '');
       const meta = document.createElement('span');
-      meta.textContent = 'Added by you · analysis needs a live server';
+      meta.textContent = live ? 'Analyzing now · 1 run' : 'Analysis needs a live server';
       info.appendChild(name); info.appendChild(meta);
       const btn = document.createElement('button');
       btn.type = 'button'; btn.className = 'jr-mini js-live-brief'; btn.disabled = true;
@@ -2325,6 +2334,8 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
       document.getElementById('sellerList').appendChild(li);
       input.value = '';
       refreshSellerButtons();
+      if (live) requestBrief(sellerKey(btn), btn);
+      else showToast(`Added ${name.textContent} · analyzing it needs a live server, so no run was used`);
     });
     document.getElementById('addCompetitorInput').addEventListener('input', (event) => event.target.setCustomValidity(''));
 

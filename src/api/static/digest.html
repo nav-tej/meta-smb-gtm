@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#faf8f5">
+  <title>Weekly Market Digest · Muse Growth Studio</title>
+  <link rel="stylesheet" href="/static/digest.css?v=20261106-ui2">
+  <link rel="stylesheet" href="/static/portal-journey.css?v=20261106-ui2">
+  <link rel="stylesheet" href="/static/muse-shell.css?v=20261106-ui2">
+  <link rel="stylesheet" href="/static/account.css?v=20261104-polish2">
+  <script src="/static/account.js?v=20261104-polish2" defer></script>
+  <script src="/static/muse-shell.js?v=20261106-ui2" defer></script>
+  <script src="/static/digest.js?v=20261106-ui2" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/portal">
+      <span class="brand-logo" aria-hidden="true">M</span>
+      <span><span class="brand-title">Muse Growth Studio</span><span class="brand-sub">Weekly market digest</span></span>
+    </a>
+    <div class="topbar-right">
+      <a class="topbar-link" href="/portal">← Back to portal</a>
+      <span class="status-pill" title="Built from the competitor monitor log and your daily brief. No Muse call is made."><span class="dot"></span>Saved data · no Muse call</span>
+    </div>
+  </header>
+
+  <main class="digest" id="digest">
+    <p class="dg-eyebrow" id="digestWeek">This week</p>
+    <h1>Weekly Market Digest</h1>
+    <p class="dg-lede">What changed at the shops you watch, and what to do about it. Built from your competitor checks and daily brief, so reading it never uses a run.</p>
+    <p class="dg-status" id="digestStatus" role="status" aria-live="polite">Loading this week’s digest…</p>
+
+    <section class="dg-hero" aria-labelledby="dgHeroTitle">
+      <p class="dg-hero-tag">This week’s top insight</p>
+      <h2 id="dgHeroTitle">Loading…</h2>
+      <p id="dgHeroBody"></p>
+      <p class="dg-hero-foot"><a class="dg-hero-cta" id="dgHeroLink" href="/portal" hidden>Open →</a><span id="dgHeroSource"></span></p>
+    </section>
+
+    <ul class="dg-stats" id="dgStats" aria-label="This week in numbers"></ul>
+
+    <section class="dg-section" aria-labelledby="dgCompTitle">
+      <div class="dg-section-head"><h2 id="dgCompTitle">Competitor activity</h2><a href="/portal#loop-research">Manage watchlist →</a></div>
+      <div class="dg-grid" id="dgCompetitors"></div>
+    </section>
+
+    <section class="dg-section" id="digestRecos" aria-labelledby="dgRecoTitle">
+      <div class="dg-section-head"><h2 id="dgRecoTitle">Strategic recommendations</h2><a href="/portal#loop-improve">All ranked ideas →</a></div>
+      <ol class="ms-digest-recos" id="dgRecos"></ol>
+      <p class="dg-note" id="dgRecoSource"></p>
+    </section>
+
+    <p class="dg-note" id="dgNote"></p>
+    <noscript><p class="dg-note">This digest needs JavaScript to load this week’s data. <a href="/api/v1/weekly-digest">View the raw weekly digest</a>.</p></noscript>
+  </main>
+</body>
+</html>

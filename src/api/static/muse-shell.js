@@ -1,6 +1,7 @@
 'use strict';
-// Shared app shell for / and /create: demo credits, progress feedback, gift plan, and the portal
-// tour and stage tabs. Everything runs on saved results; nothing here calls a model or takes payment.
+// Shared app shell for /, /create, /today and /digest: demo credits, progress feedback, gift plan,
+// the portal tour and stage tabs, recommendation triage, watchlist and notifications.
+// Everything runs on saved results; nothing here calls a model or takes payment.
 (() => {
   const CREDIT_KEY = 'muse.demoCredits';
   const TOUR_KEY = 'muse.tourSeen';
@@ -33,12 +34,21 @@
 
   // ---------- Toasts ----------
   let toastBox;
-  function toast(message, kind = '') {
+  // `action` ({ label, onClick }) adds one button, e.g. Undo, and keeps the toast up longer.
+  function toast(message, kind = '', action = null) {
     if (!toastBox) { toastBox = el('div', { class: 'ms-toasts', role: 'status', 'aria-live': 'polite' }); document.body.appendChild(toastBox); }
     const item = el('div', { class: `ms-toast ${kind}` }, message);
+    let life = 2600;
+    if (action && typeof action.onClick === 'function') {
+      const button = el('button', { type: 'button', class: 'ms-toast-action' }, action.label || 'Undo');
+      button.addEventListener('click', () => { item.remove(); action.onClick(); });
+      item.append(' ', button);
+      item.classList.add('has-action');
+      life = 5000;
+    }
     toastBox.appendChild(item);
-    setTimeout(() => item.classList.add('out'), 2600);
-    setTimeout(() => item.remove(), 3100);
+    setTimeout(() => item.classList.add('out'), life);
+    setTimeout(() => item.remove(), life + 500);
   }
 
   // ---------- Resilient fetch: friendly errors, retries only where it is safe ----------
@@ -485,7 +495,7 @@
   const readActions = () => { try { const v = JSON.parse(store.get(ACTIONS_KEY) || '{}'); return v && typeof v === 'object' ? v : {}; } catch { return {}; } };
   const writeActions = (v) => store.set(ACTIONS_KEY, JSON.stringify(v));
   const actionId = (text) => { let h = 0; for (const ch of text) h = (h * 31 + ch.charCodeAt(0)) | 0; return `a${(h >>> 0).toString(36)}`; };
-  const TRIAGE_SELECTORS = ['.jr-recos > li', '#insightsContainer > .finding-item', '.try-next li', '#msBrief .ms-move'];
+  const TRIAGE_SELECTORS = ['.jr-recos > li', '#insightsContainer > .finding-item', '.try-next li', '#msBrief .ms-move', '.ms-digest-recos > li'];
   function itemTitle(item) {
     const head = item.querySelector('strong:not(.ms-match-tag)');
     return (head?.textContent || item.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 120);
@@ -494,23 +504,67 @@
     const link = item.querySelector('a[href]');
     return link ? link.getAttribute('href') : '';
   }
-  function setStatus(item, status) {
+  // Relative app links and https only; anything else (javascript:, data:, //host) is dropped.
+  const safeHref = (href, fallback = '') => (typeof href === 'string' && /^(\/(?!\/)|https:\/\/)/.test(href) ? href : fallback);
+  function setStatus(item, status, { note, silent = false } = {}) {
     const id = item.dataset.actionId;
     const all = readActions();
-    if (status) all[id] = { status, title: itemTitle(item), href: itemLink(item), page: location.pathname, at: new Date().toISOString() };
-    else delete all[id];
+    const previous = all[id] ? { ...all[id] } : null;
+    if (status) {
+      all[id] = { ...(previous || {}), status, title: itemTitle(item), href: itemLink(item), page: location.pathname, at: new Date().toISOString() };
+      if (note !== undefined) all[id].note = note;
+    } else delete all[id];
     writeActions(all);
-    applyStatus(item);
-    renderAccount();
+    actionsChanged();
+    if (!status || silent) return;
     const labels = { accepted: 'Added to My actions', dismissed: 'Dismissed', archived: 'Archived' };
-    if (status) toast(`${labels[status]} · ${itemTitle(item).slice(0, 48)}`);
+    const undo = status === 'dismissed' || status === 'archived'
+      ? { label: 'Undo', onClick: () => { const v = readActions(); if (previous) v[id] = previous; else delete v[id]; writeActions(v); actionsChanged(); } }
+      : null;
+    toast(`${labels[status]} · ${itemTitle(item).slice(0, 48)}`, '', undo);
   }
   function applyStatus(item) {
-    const state = readActions()[item.dataset.actionId]?.status || '';
+    const entry = readActions()[item.dataset.actionId];
+    const state = entry?.status || '';
     item.classList.toggle('ms-accepted', state === 'accepted');
     item.hidden = state === 'dismissed' || state === 'archived';
     const accept = item.querySelector('.ms-triage-accept');
     if (accept) { accept.textContent = state === 'accepted' ? '✓ In My actions' : '✓ Accept'; accept.setAttribute('aria-pressed', String(state === 'accepted')); }
+    let noteLine = item.querySelector('.ms-adjust-note');
+    if (state && entry?.note) {
+      if (!noteLine) { noteLine = el('p', { class: 'ms-adjust-note' }); item.querySelector('.ms-triage')?.insertAdjacentElement('beforebegin', noteLine); }
+      noteLine.textContent = `Your tweak: ${entry.note}`;
+    } else noteLine?.remove();
+  }
+  // Adjust: an inline note on the idea. It is saved with the action; no model call, no run.
+  function toggleAdjust(item, button) {
+    const open = item.querySelector('.ms-adjust');
+    if (open) { open.remove(); button.setAttribute('aria-expanded', 'false'); return; }
+    const id = item.dataset.actionId;
+    const inputId = `msAdjust-${id}`;
+    const form = el('form', { class: 'ms-adjust' });
+    form.appendChild(el('label', { for: inputId }, 'How should this idea change for you?'));
+    const row = el('div', { class: 'ms-adjust-row' });
+    const input = el('input', { id: inputId, maxlength: '140', autocomplete: 'off', placeholder: 'e.g. Use my Abstracts series instead' });
+    input.value = readActions()[id]?.note || '';
+    const save = el('button', { type: 'submit', class: 'ms-primary ms-small' }, 'Save tweak');
+    const cancel = el('button', { type: 'button', class: 'ms-secondary ms-small' }, 'Cancel');
+    row.append(input, save, cancel);
+    form.append(row, el('p', { class: 'ms-muted' }, 'Saved with this idea in My actions on this device. No run is used.'));
+    const close = () => { form.remove(); button.setAttribute('aria-expanded', 'false'); button.focus(); };
+    cancel.addEventListener('click', close);
+    form.addEventListener('keydown', (event) => { if (event.key === 'Escape') { event.stopPropagation(); close(); } });
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const note = input.value.trim().replace(/\s+/g, ' ').slice(0, 140);
+      if (!note) { input.focus(); return; }
+      setStatus(item, 'accepted', { note, silent: true });
+      close();
+      toast('Tweak saved · added to My actions');
+    });
+    item.querySelector('.ms-triage')?.insertAdjacentElement('afterend', form);
+    button.setAttribute('aria-expanded', 'true');
+    input.focus();
   }
   function addTriage(item) {
     if (item.querySelector('.ms-triage')) return;
@@ -519,10 +573,12 @@
     const accept = el('button', { type: 'button', class: 'ms-triage-accept' }, '✓ Accept');
     const dismiss = el('button', { type: 'button', class: 'ms-triage-dismiss' }, '✕ Dismiss');
     const archive = el('button', { type: 'button', class: 'ms-triage-archive' }, '⤓ Archive');
+    const adjust = el('button', { type: 'button', class: 'ms-triage-adjust', 'aria-expanded': 'false' }, '✎ Adjust');
     accept.addEventListener('click', () => setStatus(item, readActions()[item.dataset.actionId]?.status === 'accepted' ? '' : 'accepted'));
     dismiss.addEventListener('click', () => setStatus(item, 'dismissed'));
     archive.addEventListener('click', () => setStatus(item, 'archived'));
-    bar.append(accept, dismiss, archive);
+    adjust.addEventListener('click', () => toggleAdjust(item, adjust));
+    bar.append(accept, dismiss, archive, adjust);
     item.appendChild(bar);
     applyStatus(item);
   }
@@ -540,25 +596,68 @@
         const all = readActions();
         [...list.children].forEach((c) => { const st = all[c.dataset?.actionId]?.status; if (st === 'dismissed') delete all[c.dataset.actionId]; });
         writeActions(all);
-        [...list.children].forEach((c) => c.dataset?.actionId && applyStatus(c));
-        addRestore(list);
+        actionsChanged();
       });
       list.insertAdjacentElement('afterend', restore);
     }
     restore.textContent = `Show ${n} dismissed ↺`;
   }
+  function refreshTriage() {
+    for (const sel of TRIAGE_SELECTORS) document.querySelectorAll(sel).forEach(addTriage);
+    new Set([...document.querySelectorAll('[data-action-id]')].map((i) => i.parentElement)).forEach((list) => list && addRestore(list));
+  }
+  // One place that re-syncs every view of the queue after any change.
+  function actionsChanged() {
+    document.querySelectorAll('[data-action-id]').forEach(applyStatus);
+    refreshTriage();
+    renderAccount();
+    renderMyActions();
+    if (actionsDialog?.open) fillActions();
+    renderNotifications();
+  }
   function mountTriage() {
-    const run = () => {
-      for (const sel of TRIAGE_SELECTORS) document.querySelectorAll(sel).forEach(addTriage);
-      new Set([...document.querySelectorAll('[data-action-id]')].map((i) => i.parentElement)).forEach((list) => list && addRestore(list));
-    };
-    run();
-    document.addEventListener('click', (event) => { if (event.target.closest?.('.ms-triage')) setTimeout(run, 0); });
+    refreshTriage();
     const insights = document.getElementById('insightsContainer');
-    if (insights && typeof MutationObserver !== 'undefined') new MutationObserver(() => setTimeout(run, 0)).observe(insights, { childList: true });
-    window.addEventListener('muse:brief-ready', run);
+    if (insights && typeof MutationObserver !== 'undefined') new MutationObserver(() => setTimeout(refreshTriage, 0)).observe(insights, { childList: true });
+    window.addEventListener('muse:brief-ready', refreshTriage);
+  }
+  function actionRow(id, entry, status) {
+    const li = el('li', {});
+    li.appendChild(el('strong', {}, entry.title || 'Saved idea'));
+    if (entry.note) li.appendChild(el('p', { class: 'ms-actions-note' }, `Your tweak: ${entry.note}`));
+    const row = el('div', { class: 'ms-actions-row' });
+    const href = safeHref(entry.href);
+    if (href && status === 'accepted') {
+      const external = href.startsWith('https://');
+      row.appendChild(el('a', { href, class: 'ms-link', ...(external ? { target: '_blank', rel: 'noopener noreferrer' } : {}) }, external ? 'Do it ↗' : 'Do it →'));
+    }
+    const next = { accepted: ['Mark done', 'done'], done: ['Reopen', 'accepted'], archived: ['Restore', 'accepted'] }[status];
+    const move = el('button', { type: 'button', class: 'ms-link' }, next[0]);
+    move.addEventListener('click', () => { const v = readActions(); if (v[id]) v[id] = { ...v[id], status: next[1] }; writeActions(v); actionsChanged(); });
+    const remove = el('button', { type: 'button', class: 'ms-link ms-remove' }, 'Remove');
+    remove.addEventListener('click', () => { const v = readActions(); delete v[id]; writeActions(v); actionsChanged(); });
+    row.append(move, remove);
+    li.appendChild(row);
+    return li;
   }
   let actionsDialog;
+  function fillActions() {
+    const body = actionsDialog.querySelector('.ms-actions-body');
+    body.replaceChildren();
+    const all = readActions();
+    const groups = [['accepted', 'To do'], ['done', 'Done'], ['archived', 'Archived']];
+    let any = false;
+    for (const [status, heading] of groups) {
+      const items = Object.entries(all).filter(([, a]) => a.status === status);
+      if (!items.length) continue;
+      any = true;
+      body.appendChild(el('h3', {}, `${heading} (${items.length})`));
+      const list = el('ul', { class: 'ms-actions-list' });
+      for (const [id, a] of items) list.appendChild(actionRow(id, a, status));
+      body.appendChild(list);
+    }
+    if (!any) body.appendChild(el('p', { class: 'ms-muted' }, 'Accept a recommendation to add it here. Dismissed ideas are hidden; archived ones are kept here for later.'));
+  }
   function openActions() {
     if (!actionsDialog) {
       actionsDialog = el('dialog', { class: 'ms-dialog ms-actions', 'aria-labelledby': 'msActionsTitle' });
@@ -571,35 +670,49 @@
       actionsDialog.addEventListener('click', (event) => { if (event.target === actionsDialog) actionsDialog.close(); });
       document.body.appendChild(actionsDialog);
     }
-    const body = actionsDialog.querySelector('.ms-actions-body');
-    body.replaceChildren();
-    const all = readActions();
-    const groups = [['accepted', 'To do'], ['done', 'Done'], ['archived', 'Archived']];
-    let any = false;
-    for (const [status, heading] of groups) {
-      const items = Object.entries(all).filter(([, a]) => a.status === status);
-      if (!items.length) continue;
-      any = true;
-      body.appendChild(el('h3', {}, `${heading} (${items.length})`));
-      const list = el('ul', { class: 'ms-actions-list' });
-      for (const [id, a] of items) {
-        const li = el('li', {});
-        li.appendChild(el('strong', {}, a.title));
-        const row = el('div', { class: 'ms-actions-row' });
-        if (a.href && status === 'accepted') { const go = el('a', { href: a.href, class: 'ms-link' }, 'Do it →'); row.appendChild(go); }
-        const next = { accepted: ['Mark done', 'done'], done: ['Reopen', 'accepted'], archived: ['Restore', 'accepted'] }[status];
-        const move = el('button', { type: 'button', class: 'ms-link' }, next[0]);
-        move.addEventListener('click', () => { const v = readActions(); v[id] = { ...v[id], status: next[1] }; writeActions(v); openActions(); renderAccount(); document.querySelectorAll(`[data-action-id="${id}"]`).forEach(applyStatus); });
-        const remove = el('button', { type: 'button', class: 'ms-link ms-remove' }, 'Remove');
-        remove.addEventListener('click', () => { const v = readActions(); delete v[id]; writeActions(v); openActions(); renderAccount(); document.querySelectorAll(`[data-action-id="${id}"]`).forEach(applyStatus); });
-        row.append(move, remove);
-        li.appendChild(row);
-        list.appendChild(li);
-      }
-      body.appendChild(list);
-    }
-    if (!any) body.appendChild(el('p', { class: 'ms-muted' }, 'Accept a recommendation to add it here. Dismissed ideas are hidden; archived ones are kept here for later.'));
+    fillActions();
+    if (actionsDialog.open) return;
     if (typeof actionsDialog.showModal === 'function') actionsDialog.showModal(); else actionsDialog.setAttribute('open', '');
+  }
+  // Inline, collapsible queue above the portal's research stage (visible on every stage).
+  let myActionsBox;
+  function mountMyActions() {
+    const anchor = document.getElementById('loop-research');
+    if (!anchor || document.getElementById('myActions')) return;
+    myActionsBox = el('details', { class: 'ms-myactions', id: 'myActions' });
+    const summary = el('summary');
+    summary.append(el('span', { class: 'ms-myactions-title' }, 'My actions'), el('span', { class: 'ms-myactions-count' }), el('span', { class: 'ms-myactions-hint' }));
+    myActionsBox.append(summary, el('div', { class: 'ms-myactions-body' }));
+    anchor.insertAdjacentElement('beforebegin', myActionsBox);
+    renderMyActions();
+    if (Object.values(readActions()).some((a) => a.status === 'accepted')) myActionsBox.open = true;
+  }
+  function renderMyActions() {
+    if (!myActionsBox) return;
+    const entries = Object.entries(readActions());
+    const todo = entries.filter(([, a]) => a.status === 'accepted');
+    const done = entries.filter(([, a]) => a.status === 'done').length;
+    const archived = entries.filter(([, a]) => a.status === 'archived').length;
+    const count = myActionsBox.querySelector('.ms-myactions-count');
+    count.textContent = String(todo.length);
+    count.hidden = !todo.length;
+    myActionsBox.querySelector('.ms-myactions-hint').textContent = todo.length ? 'Saved on this device' : 'Accept an idea to queue it here';
+    const body = myActionsBox.querySelector('.ms-myactions-body');
+    body.replaceChildren();
+    if (todo.length) {
+      const list = el('ul', { class: 'ms-actions-list' });
+      todo.forEach(([id, a]) => list.appendChild(actionRow(id, a, 'accepted')));
+      body.appendChild(list);
+    } else {
+      body.appendChild(el('p', { class: 'ms-muted' }, 'Use ✓ Accept on a ranked idea in Improve (or in the full workspace) to add it here. Dismissed ideas are hidden; archived ones wait in the full list.'));
+    }
+    if (done || archived) {
+      const foot = el('p', { class: 'ms-myactions-foot' }, `${done} done · ${archived} archived · `);
+      const all = el('button', { type: 'button', class: 'ms-link' }, 'See full list →');
+      all.addEventListener('click', openActions);
+      foot.appendChild(all);
+      body.appendChild(foot);
+    }
   }
 
   // ---------- Portal: one stage at a time ----------
@@ -697,10 +810,10 @@
 
   // ---------- /today: daily brief from the latest saved snapshot ----------
   const WATCH = [
-    { name: 'SikhiArt.com', where: 'Own shop · 300 pages', status: 'new', note: '2 new listings in the 30 days before Nov 3: new editions of Mai Bhago ji and Hari Singh Nalwa' },
-    { name: 'Gurinderpreet Kaur', where: 'Fine Art America · 70 listings', status: 'first', note: 'Prints $14–$50. First check, so nothing to compare yet' },
-    { name: 'Manjot Singh Sachdeva', where: 'Fine Art America / Pixels · 105 listings', status: 'first', note: 'Prints $14–$24. First check, so nothing to compare yet' },
-    { name: 'Gurdish Pannu', where: 'Saatchi Art · originals', status: 'first', note: 'Originals, no USD prices listed. First check' },
+    { name: 'SikhiArt.com', where: 'Own shop · 300 pages', status: 'new', badge: '2 new listings', note: '2 new listings in the 30 days before Nov 3: new editions of Mai Bhago ji and Hari Singh Nalwa' },
+    { name: 'Gurinderpreet Kaur', where: 'Fine Art America · 70 listings', status: 'first', badge: 'First check', note: 'Prints $14–$50. First check, so nothing to compare yet' },
+    { name: 'Manjot Singh Sachdeva', where: 'Fine Art America / Pixels · 105 listings', status: 'first', badge: 'First check', note: 'Prints $14–$24. First check, so nothing to compare yet' },
+    { name: 'Gurdish Pannu', where: 'Saatchi Art · originals', status: 'first', badge: 'First check', note: 'Originals, no USD prices listed. First check' },
   ];
   function mountBrief() {
     if (!location.pathname.startsWith('/today')) return;
@@ -871,6 +984,205 @@
   }
 
 
+  // ---------- Shared signals: monitor log, weekly digest, daily brief ----------
+  // All three are free GETs: none crawls or calls a model, so reading them never uses a run.
+  let signals = null;
+  let signalsPromise;
+  function loadSignals() {
+    if (!signalsPromise) {
+      const get = async (url) => {
+        try { const response = await museFetch(url, {}, { retries: 1, timeoutMs: 10000 }); return response.ok ? await response.json() : null; } catch { return null; }
+      };
+      signalsPromise = Promise.all([get('/api/v1/monitor?limit=1'), get('/api/v1/weekly-digest'), get('/api/v1/daily-brief')])
+        .then(([log, digest, brief]) => ({ run: Array.isArray(log?.runs) ? log.runs[0] || null : null, log, digest, brief }));
+    }
+    return signalsPromise;
+  }
+  const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+  const fmtWhen = (iso) => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? '' : d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }); };
+  const KIND_BADGE = { new_listing: ['new', 'new listing'], price_change: ['price', 'price change'], removed_listing: ['removed', 'removed listing'], ad_new: ['ad', 'new ad'], ad_stopped: ['ad', 'stopped ad'] };
+  // [[tone, label], ...] for one competitor's change counts, biggest first.
+  function changeBadges(counts) {
+    return Object.entries(counts || {})
+      .filter(([kind, n]) => KIND_BADGE[kind] && Number(n) > 0)
+      .sort((a, b) => Number(b[1]) - Number(a[1]))
+      .map(([kind, n]) => [KIND_BADGE[kind][0], plural(Number(n), KIND_BADGE[kind][1])]);
+  }
+  // One watched shop: the latest monitor check when there is one, else the saved Nov 3 snapshot.
+  function competitorStatus(name, run) {
+    const check = Array.isArray(run?.competitors) ? run.competitors.find((c) => c?.name === name) : null;
+    if (check) {
+      const badges = check.status === 'error' ? [['error', 'Couldn’t check']] : changeBadges(check.counts);
+      if (!badges.length) badges.push(['none', 'No changes']);
+      const note = check.error || (check.compared_with ? `Compared with ${check.compared_with}` : '');
+      return { badges, when: `Checked ${fmtWhen(run.checked_at)}`, source: 'monitor', note };
+    }
+    const saved = WATCH.find((w) => w.name === name);
+    if (saved) return { badges: [[saved.status === 'new' ? 'new' : 'first', saved.badge]], when: 'Saved snapshot · Nov 3', source: 'snapshot', note: saved.note };
+    return { badges: [['added', 'Added by you']], when: 'Not checked yet', source: 'added', note: '' };
+  }
+
+  // ---------- Portal watchlist: alerts toggle, last checked, change badges ----------
+  // Pausing is a per-device alert preference; the scheduled monitor still checks every shop.
+  const PAUSE_KEY = 'muse.watchPaused';
+  const readPaused = () => { try { const v = JSON.parse(store.get(PAUSE_KEY) || '{}'); return v && typeof v === 'object' ? v : {}; } catch { return {}; } };
+  function setPaused(name, paused) { const v = readPaused(); if (paused) v[name] = true; else delete v[name]; store.set(PAUSE_KEY, JSON.stringify(v)); }
+  const sellerPainters = new Map();
+  function decorateSeller(li) {
+    if (li.querySelector('.ms-watchmeta')) return;
+    const info = li.querySelector(':scope > div');
+    const name = (li.querySelector('strong, a')?.textContent || '').trim();
+    if (!info || !name) return;
+    li.querySelector('.jr-new')?.remove();
+    const meta = el('div', { class: 'ms-watchmeta' });
+    const toggle = el('label', { class: 'toggle-switch', title: 'Pausing mutes this shop’s alerts on this device. Scheduled checks still read its public pages.' });
+    const input = el('input', { type: 'checkbox', 'aria-label': `Alerts for ${name}` });
+    toggle.append(input, el('span', { class: 'slider', 'aria-hidden': 'true' }));
+    const state = el('span', { class: 'ms-watch-state' });
+    const when = el('span', { class: 'ms-watch-time' });
+    const badges = el('span', { class: 'ms-watch-badges' });
+    meta.append(toggle, state, when, badges);
+    info.appendChild(meta);
+    const paint = () => {
+      const paused = !!readPaused()[name];
+      input.checked = !paused;
+      li.classList.toggle('ms-paused', paused);
+      state.textContent = paused ? 'Paused' : 'Active';
+      const status = competitorStatus(name, signals?.run);
+      when.textContent = status.when;
+      badges.title = status.note;
+      badges.replaceChildren(...status.badges.map(([tone, label]) => el('span', { class: `ms-badge ${tone}` }, label)));
+    };
+    input.addEventListener('change', () => {
+      setPaused(name, !input.checked);
+      paint();
+      toast(input.checked ? `Alerts on · ${name}` : `Alerts paused · ${name}`);
+      renderNotifications();
+    });
+    sellerPainters.set(li, paint);
+    paint();
+  }
+  function mountWatchlist() {
+    const list = document.getElementById('sellerList');
+    if (!list) return;
+    const decorateAll = () => list.querySelectorAll(':scope > .jr-seller').forEach(decorateSeller);
+    decorateAll();
+    if (typeof MutationObserver !== 'undefined') new MutationObserver(decorateAll).observe(list, { childList: true });
+    loadSignals().then((loaded) => {
+      signals = loaded;
+      sellerPainters.forEach((paint) => paint());
+      const line = document.querySelector('.jr-watch');
+      if (loaded.run && line) {
+        for (const node of line.childNodes) {
+          if (node.nodeType === 3 && /last checked/.test(node.textContent)) node.textContent = node.textContent.replace(/last checked .*$/, `last checked ${fmtWhen(loaded.run.checked_at)} `);
+        }
+      }
+    });
+  }
+
+  // ---------- Notifications: competitor changes, new ideas, weekly digest ----------
+  const READ_KEY = 'muse.notifRead';
+  const readSeen = () => { try { const v = JSON.parse(store.get(READ_KEY) || '[]'); return new Set(Array.isArray(v) ? v.filter((x) => typeof x === 'string') : []); } catch { return new Set(); } };
+  const writeSeen = (seen) => store.set(READ_KEY, JSON.stringify([...seen].slice(-200)));
+  // Monday of the digest's week, so "digest ready" is one notification per week, not per day.
+  const weekOf = (isoDate) => {
+    const d = new Date(`${String(isoDate).slice(0, 10)}T00:00:00Z`);
+    if (Number.isNaN(d.getTime())) return String(isoDate);
+    d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
+    return d.toISOString().slice(0, 10);
+  };
+  // Pure: the notification list for loaded signals. Ids are stable so read state survives reloads.
+  function notificationItems({ run = null, digest = null, brief = null } = {}, { paused = {}, actions = {} } = {}) {
+    const items = [];
+    if (run && Array.isArray(run.competitors)) {
+      for (const check of run.competitors) {
+        if (!check?.name || paused[check.name]) continue;
+        const badges = changeBadges(check.counts);
+        if (!badges.length) continue;
+        const latest = Array.isArray(check.changes) && check.changes[0] ? String(check.changes[0].title || '') : '';
+        items.push({ id: `change:${run.run_id}:${check.name}`, kind: 'change', label: 'Competitor change', title: `${check.name}: ${badges.map((b) => b[1]).join(', ')}`, body: latest ? `Latest: ${latest}` : '', when: fmtWhen(run.checked_at), href: '/#loop-research' });
+      }
+    } else {
+      for (const w of WATCH) {
+        if (w.status !== 'new' || paused[w.name]) continue;
+        items.push({ id: `snapshot:2026-11-03:${w.name}`, kind: 'change', label: 'Competitor change', title: `${w.name}: ${w.badge}`, body: w.note, when: 'Saved snapshot · Nov 3', href: '/#loop-research' });
+      }
+    }
+    const moves = Array.isArray(brief?.action_items) ? brief.action_items : [];
+    for (const move of moves.slice(0, 3)) {
+      const title = String(move?.title || '').trim();
+      if (!title || actions[actionId(title)]) continue;
+      items.push({ id: `idea:${actionId(title)}`, kind: 'idea', label: 'New recommendation', title, body: String(move.reason || ''), when: '', href: '/digest#digestRecos' });
+    }
+    if (digest?.week_end) {
+      const checks = Number(digest.checks) || 0;
+      const body = checks ? `${plural(Number(digest.total_changes) || 0, 'competitor change')} across ${plural(checks, 'check')}.` : 'This week’s competitor summary and strategy ideas.';
+      items.push({ id: `digest:${weekOf(digest.week_end)}`, kind: 'digest', label: 'Weekly digest ready', title: 'Your weekly market digest is ready', body, when: '', href: '/digest' });
+    }
+    return items;
+  }
+  let bell = null;
+  const currentNotifications = () => notificationItems(signals || {}, { paused: readPaused(), actions: readActions() });
+  function toggleNotifications(force) {
+    if (!bell) return;
+    const open = typeof force === 'boolean' ? force : bell.menu.hidden;
+    bell.menu.hidden = !open;
+    bell.button.setAttribute('aria-expanded', String(open));
+  }
+  function markRead(id) {
+    const seen = readSeen();
+    seen.add(id);
+    writeSeen(seen);
+    renderNotifications();
+  }
+  function renderNotifications() {
+    if (!bell || !signals) return;
+    const items = currentNotifications();
+    const seen = readSeen();
+    const unread = items.filter((n) => !seen.has(n.id)).length;
+    bell.badge.textContent = unread > 9 ? '9+' : String(unread);
+    bell.badge.hidden = !unread;
+    bell.button.setAttribute('aria-label', unread ? `Notifications, ${unread} unread` : 'Notifications');
+    bell.markAll.hidden = !unread;
+    bell.list.replaceChildren();
+    if (!items.length) { bell.list.appendChild(el('li', { class: 'ms-notif-empty' }, 'You’re all caught up.')); return; }
+    for (const n of items) {
+      const li = el('li', { class: `ms-notif-item kind-${n.kind}${seen.has(n.id) ? '' : ' unread'}` });
+      const link = el('a', { href: n.href, class: 'ms-notif-link' });
+      link.appendChild(el('span', { class: 'ms-notif-kind' }, n.label));
+      link.appendChild(el('strong', {}, n.title));
+      if (n.body) link.appendChild(el('span', { class: 'ms-notif-body' }, n.body));
+      if (n.when) link.appendChild(el('span', { class: 'ms-notif-when' }, n.when));
+      link.addEventListener('click', () => { markRead(n.id); toggleNotifications(false); });
+      li.appendChild(link);
+      bell.list.appendChild(li);
+    }
+  }
+  function mountNotifications() {
+    const header = document.querySelector('header.topbar');
+    if (!header || !(document.getElementById('journey') || document.getElementById('digest'))) return;
+    const wrap = el('div', { class: 'ms-notif' });
+    const button = el('button', { type: 'button', class: 'ms-bell', 'aria-haspopup': 'true', 'aria-expanded': 'false', 'aria-controls': 'msNotifMenu', 'aria-label': 'Notifications' });
+    const badge = el('span', { class: 'ms-bell-badge', hidden: '' });
+    button.append(el('span', { class: 'ms-bell-icon', 'aria-hidden': 'true' }, '🔔'), badge);
+    const menu = el('div', { class: 'ms-notif-menu', id: 'msNotifMenu', hidden: '' });
+    const head = el('div', { class: 'ms-notif-head' });
+    const markAll = el('button', { type: 'button', class: 'ms-link' }, 'Mark all read');
+    head.append(el('strong', {}, 'Notifications'), markAll);
+    const list = el('ul', { class: 'ms-notif-list' });
+    list.appendChild(el('li', { class: 'ms-notif-empty' }, 'Checking your watchlist…'));
+    menu.append(head, list, el('p', { class: 'ms-muted ms-notif-foot' }, 'From your watchlist checks and daily brief. Reading these never uses a run.'));
+    wrap.append(button, menu);
+    bell = { wrap, button, badge, menu, list, markAll };
+    button.addEventListener('click', (event) => { event.stopPropagation(); toggleNotifications(); });
+    markAll.addEventListener('click', () => { const seen = readSeen(); currentNotifications().forEach((n) => seen.add(n.id)); writeSeen(seen); renderNotifications(); });
+    document.addEventListener('click', (event) => { if (!wrap.contains(event.target)) toggleNotifications(false); });
+    document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !menu.hidden) { toggleNotifications(false); button.focus(); } });
+    if (pill?.parentNode) pill.insertAdjacentElement('afterend', wrap);
+    else { const anchor = header.querySelector('.status-pill'); if (anchor) anchor.insertAdjacentElement('afterend', wrap); else header.appendChild(wrap); }
+    loadSignals().then((loaded) => { signals = loaded; renderNotifications(); });
+  }
+
   // ---------- Portal workspace: every item gets a next step ----------
   const PIXELS_SHOP = 'https://sarabjit-singh.pixels.com/';
   const ROUTES = [
@@ -1029,6 +1341,8 @@
     removeGates();
     mountCredits();
     mountSession();
+    mountNotifications();
+    mountWatchlist();
     syncCredits();
     window.addEventListener('focus', () => { if (serverCredits) syncCredits(); });
     window.addEventListener('muse:credits-refresh', () => syncCredits());
@@ -1038,10 +1352,10 @@
     mountStages();
     document.querySelectorAll('[data-open-gift]').forEach((node) => node.addEventListener('click', openGift));
     document.querySelectorAll('[data-open-tour]').forEach((node) => node.addEventListener('click', openTour));
+    mountMyActions();
     mountTriage();
-
   }
 
-  window.museShell = { spend, spendLive, canRun, requireRun, syncCredits, fetch: museFetch, errorMessage, hasAccount: hasSession, progress, toast, openGift, openPricing, openSignup, openActions, openTour, showStage };
+  window.museShell = { spend, spendLive, canRun, requireRun, syncCredits, fetch: museFetch, errorMessage, hasAccount: hasSession, progress, toast, openGift, openPricing, openSignup, openActions, openTour, showStage, watchlist: WATCH, signals: loadSignals, competitorStatus, changeBadges, notificationItems, pausedCompetitors: readPaused, toggleNotifications, markRead };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();

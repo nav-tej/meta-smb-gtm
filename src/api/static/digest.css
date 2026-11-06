@@ -1,0 +1,79 @@
+/* Weekly Market Digest. Tokens match the portal (index.html :root) so shared CSS renders the same. */
+:root {
+  --bg: #faf8f5; --surface: #fff; --surface-subtle: #f4f1ea; --text: #181816; --text-muted: #615e57;
+  --border: #e6e1d6; --accent: #b85d19; --gold: #c59341; --gold-soft: #fbf5e6;
+  --success: #1b6e44; --success-soft: #e8f5ee; --c1: #1b6e44;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+  --font-serif: "Instrument Serif", Georgia, "Times New Roman", serif;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 var(--font-sans); }
+a { color: var(--success); }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--success); outline-offset: 2px; }
+
+.topbar { position: sticky; top: 0; z-index: 30; display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.75rem 1.5rem; background: rgba(250, 248, 245, 0.92); backdrop-filter: blur(10px); border-bottom: 1px solid var(--border); }
+.brand { display: flex; align-items: center; gap: 0.75rem; color: inherit; text-decoration: none; }
+.brand > span:last-child { display: grid; }
+.brand-logo { width: 36px; height: 36px; border-radius: 10px; background: linear-gradient(135deg, #181816 0%, #b85d19 100%); color: #fff; display: grid; place-items: center; font-weight: 700; }
+.brand-title { font-weight: 700; letter-spacing: -0.02em; }
+.brand-sub { font-size: 0.75rem; color: var(--text-muted); }
+.topbar-right { display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap; }
+.status-pill { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.32rem 0.7rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; background: var(--surface); border: 1px solid var(--border); }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); }
+
+.digest { max-width: 960px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+.dg-eyebrow { display: inline-block; margin: 0 0 0.5rem; padding: 0.3rem 0.7rem; border-radius: 999px; background: var(--gold-soft); color: #8a5a12; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+.digest h1 { margin: 0 0 0.4rem; font: 400 clamp(2rem, 4vw, 2.8rem)/1.1 var(--font-serif); letter-spacing: -0.02em; }
+.dg-lede { margin: 0 0 1.25rem; max-width: 640px; color: var(--text-muted); }
+.dg-status { margin: 0 0 1rem; font-size: 0.85rem; color: var(--text-muted); }
+.dg-status[hidden] { display: none; }
+
+.dg-hero { position: relative; margin: 0 0 1rem; padding: 1.4rem 1.5rem 1.3rem; border-radius: 16px; border-top: 4px solid var(--gold); color: #fff; background: linear-gradient(135deg, #1b6e44 0%, #24573d 70%, #3d4a2a 100%); box-shadow: 0 10px 30px rgba(27, 110, 68, 0.22); }
+.dg-hero-tag { margin: 0 0 0.45rem; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: #f5d58f; }
+.dg-hero h2 { margin: 0 0 0.4rem; font: 400 clamp(1.4rem, 2.6vw, 1.85rem)/1.2 var(--font-serif); }
+.dg-hero p { margin: 0; opacity: 0.92; }
+.dg-hero-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; margin-top: 0.9rem !important; font-size: 0.78rem; }
+.dg-hero-cta { padding: 0.45rem 0.9rem; border-radius: 10px; background: var(--gold); color: #2a1c05; font-weight: 800; text-decoration: none; }
+.dg-hero-cta:hover { filter: brightness(1.06); }
+.dg-hero-cta[hidden] { display: none; }
+.dg-hero-cta:focus-visible { outline-color: #f5d58f; }
+
+.dg-stats { list-style: none; margin: 0 0 2rem; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.6rem; }
+.dg-stats li { padding: 0.7rem 0.85rem; border-radius: 12px; background: var(--surface); border: 1px solid var(--border); }
+.dg-stats strong { display: block; font-size: 1.5rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.dg-stats span { font-size: 0.75rem; color: var(--text-muted); }
+
+.dg-section { margin-bottom: 2rem; }
+.dg-section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; margin-bottom: 0.75rem; padding-bottom: 0.4rem; border-bottom: 2px solid var(--border); }
+.dg-section-head h2 { margin: 0; font-size: 1.15rem; color: var(--success); }
+.dg-section-head a { font-size: 0.82rem; font-weight: 700; text-decoration: none; }
+.dg-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0.75rem; }
+.dg-card { padding: 0.9rem 1rem; border-radius: 14px; background: var(--surface); border: 1px solid var(--border); border-top: 3px solid var(--gold); display: flex; flex-direction: column; gap: 0.35rem; }
+.dg-card.paused { opacity: 0.7; border-top-color: #cfcabf; }
+.dg-card-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.4rem; }
+.dg-card h3 { margin: 0; font-size: 0.98rem; }
+.dg-badges { display: inline-flex; flex-wrap: wrap; gap: 0.25rem; }
+.dg-where { margin: 0; font-size: 0.76rem; color: var(--text-muted); }
+.dg-lines { margin: 0.15rem 0 0; padding-left: 1.1rem; font-size: 0.84rem; line-height: 1.45; }
+.dg-source { margin: auto 0 0; padding-top: 0.3rem; font-size: 0.7rem; color: var(--text-muted); }
+
+.ms-digest-recos { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.6rem; }
+.ms-digest-recos[hidden] { display: none; }
+.dg-reco { padding: 0.85rem 1rem; border-radius: 14px; background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--success); display: grid; gap: 0.25rem; }
+.dg-reco.medium { border-left-color: var(--gold); }
+.dg-reco.low { border-left-color: #cfcabf; }
+.dg-reco.ms-accepted { background: var(--success-soft); }
+.dg-reco .ms-chip { justify-self: start; }
+.dg-reco strong { font-size: 1rem; }
+.dg-reco p { margin: 0; font-size: 0.86rem; color: #3d3b36; }
+.dg-reco-go { justify-self: start; font-size: 0.84rem; font-weight: 700; text-decoration: none; }
+.dg-reco-go:hover { text-decoration: underline; }
+.dg-reco-source { font-size: 0.72rem; color: var(--text-muted); }
+.dg-note { margin: 0.6rem 0 0; font-size: 0.78rem; color: var(--text-muted); }
+
+@media (max-width: 720px) {
+  .topbar { padding: 0.7rem 0.9rem; flex-wrap: wrap; }
+  .brand-sub { display: none; }
+  .digest { padding: 1.4rem 1rem 3rem; }
+  .dg-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
