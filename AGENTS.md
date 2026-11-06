@@ -265,6 +265,9 @@ Canonical list is `.env.example`. Summary:
 | `DEMO_MODE` | no | Defaults to `true` (serves saved live results in `data/samples/` to protect API credits) |
 | `DEMO_KEY` | live unlock | Header value (`X-Demo-Key` + `?live=true`) to unlock real live Muse API calls in demo mode |
 | `LIVE_CALLS_PER_HOUR` | no | Hourly live call cap when `DEMO_KEY` is used (default `5`) |
+| `RESULT_CACHE_ENABLED` / `RESULT_CACHE_DIR` / `RESULT_CACHE_TTL_SECONDS` | no | 24h route + per-Muse-call cache (`data/cache`, `/tmp/muse-cache` on Vercel) |
+| `CREDITS_ENABLED` / `CREDITS_DIR` / `PRESENTER_CREDITS` / `MAX_CREDIT_BALANCE` | no | Server-side run credits checked before every live Muse call (`/api/v1/credits`) |
+| `MONITOR_DIR` / `MONITOR_COOLDOWN_SECONDS` / `CRON_SECRET` | no | Competitor monitor change log and weekly cron (`/api/v1/monitor`) |
 
 Read env only in `src/config.py`. Everything else imports settings from there.
 
@@ -298,6 +301,17 @@ This app fetches arbitrary URLs, parses untrusted XML, and feeds third-party con
 ---
 
 ## 12. Current status & multi-agent coordination (updated 2026-11-04, afternoon)
+
+### Post-hackathon resilience pass (2026-11-06, Claude)
+- Synthesis Spark calls (competitor brief, seller audit, bid advice, creative brief, content
+  plan) use `SYNTHESIS_OUTPUT_TOKENS=8192`; batch extraction keeps 4096. A truncated reply
+  (`finish_reason=length`) retries once asking for a shorter answer instead of echoing it.
+- `src/clients/meta.py` checks a call-level cache (endpoint + params hash) before every Muse
+  request; routes also fall back to stale cache, then saved demo data, when Muse fails.
+- Server-side credits: `src/services/credits.py`, `/api/v1/credits` (GET, `/spend`, `/add`).
+- `/api/v1/monitor`, `/api/v1/weekly-digest`, and daily brief v2 (overnight changes, top 3
+  actions, trends from the synthetic sample campaign, focus of the day).
+- Known limit: on Vercel the cache, credit ledger and monitor log live in per-instance `/tmp`.
 
 ### Current status (Nov 4, afternoon)
 - Commit c74374d on main, 181 tests pass, pushed to origin

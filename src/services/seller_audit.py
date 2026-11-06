@@ -13,7 +13,7 @@ from collections.abc import Sequence
 
 from openai.types.chat import ChatCompletionMessageParam
 
-from src.clients.meta import MetaClient, get_meta_client
+from src.clients.meta import SYNTHESIS_OUTPUT_TOKENS, MetaClient, get_meta_client
 from src.models.intel import CompetitorBrief, SocialCompetitorSignals
 from src.models.seller import (
     ScreenshotAnalysis,
@@ -137,6 +137,7 @@ async def audit_seller_footprint(
     llm_out = await client.chat_structured(
         messages=messages,
         response_model=SellerFootprintAuditLLM,
+        max_output_tokens=SYNTHESIS_OUTPUT_TOKENS,
     )
     return SellerFootprintAudit(
         seller_name=profile.name,

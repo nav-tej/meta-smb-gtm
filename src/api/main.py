@@ -4,7 +4,8 @@ import logging
 import mimetypes
 from pathlib import Path
 
-from fastapi import APIRouter, FastAPI, Request, status
+from fastapi import APIRouter, FastAPI, HTTPException, Request, status
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -14,8 +15,10 @@ from src.api import (
     billing,
     content_plan,
     creative,
+    credits,
     daily_brief,
     intel,
+    monitor,
     product_reference,
     research_targets,
 )
@@ -23,6 +26,7 @@ from src.clients.comfyui import ComfyUIError
 from src.clients.meta import MetaAPIError
 from src.clients.supabase import SupabaseError
 from src.config import get_settings
+from src.services.credits import CreditsExhaustedError, CreditsUnavailableError
 from src.services.usage_meter import UsageLimitError
 from src.utils.sitemap import SitemapError
 
@@ -104,13 +108,43 @@ async def account_landing() -> FileResponse:
     return FileResponse(STATIC_DIR / "index.html")
 
 
+MUSE_UNAVAILABLE = (
+    "Muse couldn't finish this request right now. Your inputs are safe and saved demo results "
+    "still work. Please try again in a minute."
+)
+# MetaAPIError messages that are written for the seller (input limits), safe to show as-is.
+_USER_FACING_PREFIXES = (
+    "Use ",
+    "Choose ",
+    "Upload ",
+    "This request has too much text",
+    "This image request exceeds",
+    "This trial supports",
+    "Uploaded image exceeds",
+    "Image exceeds",
+    "Unsupported image format",
+    "At least one image",
+    "Muse returned a channel",
+)
+
+
+def public_meta_error(exc: MetaAPIError) -> tuple[int, str]:
+    """(status, message) for a Muse failure, never exposing upstream or validation details."""
+    message = str(exc)
+    if message.startswith(_USER_FACING_PREFIXES) and len(message) <= 240:
+        return status.HTTP_422_UNPROCESSABLE_CONTENT, message
+    if "META_MODEL_API_KEY" in message:
+        return status.HTTP_503_SERVICE_UNAVAILABLE, (
+            "Live Muse is not configured on this server. Saved demo results still work."
+        )
+    return status.HTTP_502_BAD_GATEWAY, MUSE_UNAVAILABLE
+
+
 @app.exception_handler(MetaAPIError)
 async def meta_api_error_handler(request: Request, exc: MetaAPIError) -> JSONResponse:
     logger.error("Meta Model API failure on %s: %s", request.url.path, exc)
-    return JSONResponse(
-        status_code=status.HTTP_502_BAD_GATEWAY,
-        content={"detail": f"Muse model request failed: {exc}"},
-    )
+    code, message = public_meta_error(exc)
+    return JSONResponse(status_code=code, content={"detail": message, "code": "muse_unavailable"})
 
 
 @app.exception_handler(ComfyUIError)
@@ -118,7 +152,69 @@ async def comfyui_error_handler(request: Request, exc: ComfyUIError) -> JSONResp
     logger.error("ComfyUI failure on %s: %s", request.url.path, exc)
     return JSONResponse(
         status_code=status.HTTP_502_BAD_GATEWAY,
-        content={"detail": f"ComfyUI workflow failed: {exc}"},
+        content={
+            "detail": "The image variant workflow is unavailable right now. Try again later.",
+            "code": "workflow_unavailable",
+        },
+    )
+
+
+@app.exception_handler(CreditsExhaustedError)
+async def credits_exhausted_handler(request: Request, exc: CreditsExhaustedError) -> JSONResponse:
+    return JSONResponse(
+        status_code=status.HTTP_402_PAYMENT_REQUIRED,
+        content={
+            "detail": (
+                "You're out of runs. Saved results are still free to view. "
+                "Pick a plan to add more runs."
+            ),
+            "code": "credits_exhausted",
+            "balance": exc.balance,
+        },
+    )
+
+
+@app.exception_handler(CreditsUnavailableError)
+async def credits_unavailable_handler(
+    request: Request, exc: CreditsUnavailableError
+) -> JSONResponse:
+    logger.error("Credit ledger unavailable on %s: %s", request.url.path, exc)
+    return JSONResponse(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        content={
+            "detail": "Run credits can't be checked right now, so live runs are paused. "
+            "Saved demo results still work.",
+            "code": "credits_unavailable",
+        },
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_error_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+    fields = sorted(
+        {".".join(str(p) for p in err.get("loc", ())[1:]) or "request" for err in exc.errors()}
+    )
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+        content={
+            "detail": "Some details need fixing: " + ", ".join(fields[:5])[:200] + ".",
+            "code": "invalid_request",
+            "fields": fields[:20],
+        },
+    )
+
+
+@app.exception_handler(Exception)
+async def unexpected_error_handler(request: Request, exc: Exception) -> JSONResponse:
+    if isinstance(exc, HTTPException):  # pragma: no cover - handled by FastAPI first
+        raise exc
+    logger.exception("Unhandled error on %s", request.url.path)
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={
+            "detail": "Something went wrong on our side. Your work is safe; please try again.",
+            "code": "server_error",
+        },
     )
 
 
@@ -151,6 +247,11 @@ app.include_router(content_plan.router, prefix=API_PREFIX)
 app.include_router(product_reference.router, prefix=API_PREFIX)
 app.include_router(research_targets.router, prefix=API_PREFIX)
 app.include_router(daily_brief.router, prefix=API_PREFIX)
+app.include_router(credits.router, prefix=API_PREFIX)
+app.include_router(monitor.router, prefix=API_PREFIX)
+# Short aliases: /api/credits, /api/monitor, /api/weekly-digest
+app.include_router(credits.router, prefix="/api", include_in_schema=False)
+app.include_router(monitor.router, prefix="/api", include_in_schema=False)
 
 if SAMPLES_DIR.is_dir():
     app.mount("/samples", StaticFiles(directory=str(SAMPLES_DIR)), name="samples")

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import base64
 import binascii
+import hashlib
 import io
 import json
 import logging
@@ -17,6 +18,7 @@ import time
 import wave
 import zlib
 from collections.abc import Sequence
+from contextvars import ContextVar
 from typing import Any, TypeVar
 
 import httpx
@@ -32,7 +34,12 @@ ModelT = TypeVar("ModelT", bound=BaseModel)
 
 # Generous read timeout: a timed-out call may still be billed, and we never auto-retry it
 DEFAULT_TIMEOUT = httpx.Timeout(120.0, connect=10.0)
+# Default output cap (extraction-sized calls). Synthesis calls (briefs, audits, bid advice,
+# creative briefs, content plans) produce long structured JSON and hit 4096 often enough to
+# truncate it mid-object, which then failed to parse and triggered a second paid attempt.
 MAX_SPARK_OUTPUT_TOKENS = 4096
+SYNTHESIS_OUTPUT_TOKENS = 8192
+SPARK_OUTPUT_TOKEN_CEILING = 8192
 MAX_SPARK_TEXT_BYTES = 100_000
 MAX_SPARK_INPUT_TOKENS = 100_000
 SPARK_RESERVATION_MICROS = 250_000
@@ -44,6 +51,58 @@ _CODE_FENCE_RE = re.compile(r"^\s*```(?:json)?\s*(.*?)\s*```\s*$", re.DOTALL | r
 
 class MetaAPIError(Exception):
     """Raised when a Meta Model API request or structured-output parse fails."""
+
+
+# Per-request record of billed provider calls actually sent and of fallbacks served. The live
+# gate (src/api/demo.py) reads it to refund a run when nothing billable happened.
+_call_log: ContextVar[dict[str, list[str]] | None] = ContextVar("muse_call_log", default=None)
+
+
+def track_provider_calls() -> dict[str, list[str]]:
+    """Start recording provider calls and fallbacks for the current request context."""
+    log: dict[str, list[str]] = {"calls": [], "fallbacks": [], "hits": []}
+    _call_log.set(log)
+    return log
+
+
+def _note_provider_call(kind: str) -> None:
+    log = _call_log.get()
+    if log is not None:
+        log["calls"].append(kind)
+
+
+def note_fallback(kind: str) -> None:
+    log = _call_log.get()
+    if log is not None:
+        log["fallbacks"].append(kind)
+
+
+def note_cache_hit(kind: str) -> None:
+    log = _call_log.get()
+    if log is not None:
+        log["hits"].append(kind)
+
+
+def _spark_reservation_micros(max_output_tokens: int) -> int:
+    """Scale the conservative pre-call reservation with the permitted output size."""
+    blocks = -(-max_output_tokens // MAX_SPARK_OUTPUT_TOKENS)
+    return SPARK_RESERVATION_MICROS * max(1, blocks)
+
+
+def _call_cache_get(endpoint: str, payload: Any) -> Any | None:
+    """Look up an identical earlier Muse request (endpoint + parameter hash) before paying."""
+    from src.services import result_cache
+
+    hit = result_cache.get_raw(f"muse-call-{endpoint}", payload)
+    if hit is not None:
+        note_cache_hit(endpoint)
+    return hit
+
+
+def _call_cache_put(endpoint: str, payload: Any, value: Any) -> None:
+    from src.services import result_cache
+
+    result_cache.put_raw(f"muse-call-{endpoint}", payload, value)
 
 
 def _metering_enabled() -> bool:
@@ -320,46 +379,79 @@ class MetaClient:
         *,
         model: str | None = None,
         temperature: float = 0.2,
+        max_output_tokens: int = MAX_SPARK_OUTPUT_TOKENS,
     ) -> ModelT:
         """Call Muse Spark and validate JSON output into `response_model`.
 
         Retries once with the Pydantic validation error appended if the first
-        response fails `model_validate_json`, per AGENTS.md section 6.
+        response fails `model_validate_json`, per AGENTS.md section 6. A response cut off at
+        the output cap is not echoed back (that doubles input cost); the retry asks for a
+        shorter answer instead. Identical requests are answered from the call-level cache.
         """
-        client = self._get_openai()
+        if not 256 <= max_output_tokens <= SPARK_OUTPUT_TOKEN_CEILING:
+            raise MetaAPIError("Unsupported output token limit for Muse Spark.")
         target_model = (model or self._spark_model).strip()
         conversation = _inject_schema_instruction(messages, response_model)
+        cache_payload = {
+            "model": target_model,
+            "messages": conversation,
+            "temperature": temperature,
+            "max_completion_tokens": max_output_tokens,
+        }
+        hit = _call_cache_get("chat", cache_payload)
+        if hit is not None:
+            try:
+                return response_model.model_validate(hit)
+            except ValidationError:
+                logger.warning(
+                    "Ignoring a cached %s that no longer validates", response_model.__name__
+                )
+        client = self._get_openai()
 
         last_validation_err: Exception | None = None
         for attempt in range(2):
-            raw_content = await self._create_chat_completion(
+            raw_content, finish_reason = await self._create_chat_completion(
                 client=client,
                 model=target_model,
                 messages=conversation,
                 temperature=temperature,
+                max_output_tokens=max_output_tokens,
             )
             cleaned = _strip_code_fences(raw_content)
             try:
-                return response_model.model_validate_json(cleaned)
+                result = response_model.model_validate_json(cleaned)
             except ValidationError as err:
                 last_validation_err = err
                 if attempt == 0:
+                    truncated = finish_reason == "length"
                     logger.warning(
-                        "Muse Spark output failed %s validation on attempt 1; retrying once.",
+                        "Muse Spark output failed %s validation on attempt 1%s; retrying once.",
                         response_model.__name__,
+                        " (hit the output token cap)" if truncated else "",
                     )
-                    conversation = [
-                        *conversation,
-                        {"role": "assistant", "content": raw_content},
-                        {
-                            "role": "user",
-                            "content": (
-                                "Your previous JSON did not validate against the required schema. "
-                                f"Validation errors:\n{err}\n"
-                                "Return ONLY a corrected JSON object matching the schema."
-                            ),
-                        },
-                    ]
+                    if truncated:
+                        retry_note = (
+                            "Your previous JSON was cut off at the output length limit. "
+                            "Return the complete JSON object again, more concisely: shorter "
+                            "strings and only the most important list items."
+                        )
+                        conversation = [*conversation, {"role": "user", "content": retry_note}]
+                    else:
+                        conversation = [
+                            *conversation,
+                            {"role": "assistant", "content": raw_content},
+                            {
+                                "role": "user",
+                                "content": (
+                                    "Your previous JSON did not validate against the required "
+                                    f"schema. Validation errors:\n{err}\n"
+                                    "Return ONLY a corrected JSON object matching the schema."
+                                ),
+                            },
+                        ]
+                continue
+            _call_cache_put("chat", cache_payload, result.model_dump(mode="json"))
+            return result
 
         raise MetaAPIError(
             f"Muse Spark output failed {response_model.__name__} validation after retry: "
@@ -375,6 +467,7 @@ class MetaClient:
         response_model: type[ModelT],
         model: str | None = None,
         temperature: float = 0.2,
+        max_output_tokens: int = MAX_SPARK_OUTPUT_TOKENS,
     ) -> ModelT:
         """Send multimodal text + images (e.g. IG/FB/Marketplace screenshots) to Muse Spark."""
         if not images:
@@ -397,6 +490,7 @@ class MetaClient:
             response_model=response_model,
             model=model,
             temperature=temperature,
+            max_output_tokens=max_output_tokens,
         )
 
     async def _create_chat_completion(
@@ -406,25 +500,27 @@ class MetaClient:
         model: str,
         messages: list[ChatCompletionMessageParam],
         temperature: float,
-    ) -> str:
+        max_output_tokens: int = MAX_SPARK_OUTPUT_TOKENS,
+    ) -> tuple[str, str | None]:
         metered = _metering_enabled()
         _require_metered_model(model, "muse-spark-1.3")
         has_images = False
         count_input: list[dict[str, Any]] = []
         if metered:
             has_images, count_input = _bounded_chat_input(messages)
-        await _reserve_provider("text", model, SPARK_RESERVATION_MICROS)
+        await _reserve_provider("text", model, _spark_reservation_micros(max_output_tokens))
         if has_images:
             await self._check_vision_tokens(model, count_input)
         call_client = client.with_options(max_retries=0) if metered else client
         started = time.monotonic()
+        _note_provider_call("chat")
         try:
             completion = await call_client.chat.completions.create(
                 model=model,
                 messages=messages,
                 temperature=temperature,
                 response_format={"type": "json_object"},
-                max_completion_tokens=MAX_SPARK_OUTPUT_TOKENS,
+                max_completion_tokens=max_output_tokens,
             )
         except APIError as err:
             logger.warning(
@@ -447,10 +543,17 @@ class MetaClient:
         )
         if not completion.choices:
             raise MetaAPIError("Meta Model API returned no completion choices.")
-        content: Any = completion.choices[0].message.content
+        choice = completion.choices[0]
+        content: Any = choice.message.content
+        finish_reason = getattr(choice, "finish_reason", None)
+        if finish_reason == "length":
+            logger.warning(
+                "Muse Spark output hit the %d-token cap; JSON is likely truncated.",
+                max_output_tokens,
+            )
         if not isinstance(content, str) or not content.strip():
             raise MetaAPIError("Meta Model API returned an empty message content.")
-        return content
+        return content, finish_reason if isinstance(finish_reason, str) else None
 
     async def _check_vision_tokens(self, model: str, count_input: list[dict[str, Any]]) -> None:
         """Count media input before inference; never guess tokens from image dimensions."""
@@ -503,9 +606,13 @@ class MetaClient:
         _require_metered_model(self._image_model, "muse-image-1.0")
         if _metering_enabled():
             payload["n"] = 1
+        hit = _call_cache_get("images-generations", payload)
+        if isinstance(hit, dict) and isinstance(hit.get("b64"), str):
+            return base64.b64decode(hit["b64"])
         await _reserve_provider("image", self._image_model, IMAGE_RESERVATION_MICROS)
 
         started = time.monotonic()
+        _note_provider_call("image")
         try:
             response = await self._http_client.post(
                 f"{self._base_url}/images/generations",
@@ -524,7 +631,9 @@ class MetaClient:
         if response.status_code != 200:
             raise MetaAPIError(f"Muse Image error (status={response.status_code}).")
 
-        return await self._extract_image_bytes(response.json())
+        image = await self._extract_image_bytes(response.json())
+        _call_cache_put("images-generations", payload, {"b64": base64.b64encode(image).decode()})
+        return image
 
     async def edit_image(
         self,
@@ -544,8 +653,12 @@ class MetaClient:
         _require_metered_model(self._image_model, "muse-image-1.0")
         if _metering_enabled():
             payload["n"] = 1
+        hit = _call_cache_get("images-edits", payload)
+        if isinstance(hit, dict) and isinstance(hit.get("b64"), str):
+            return base64.b64decode(hit["b64"])
         await _reserve_provider("image", self._image_model, IMAGE_RESERVATION_MICROS)
         started = time.monotonic()
+        _note_provider_call("image-edit")
         try:
             response = await self._http_client.post(
                 f"{self._base_url}/images/edits",
@@ -564,7 +677,9 @@ class MetaClient:
         if response.status_code != 200:
             raise MetaAPIError(f"Muse Image edit error (status={response.status_code}).")
 
-        return await self._extract_image_bytes(response.json())
+        image = await self._extract_image_bytes(response.json())
+        _call_cache_put("images-edits", payload, {"b64": base64.b64encode(image).decode()})
+        return image
 
     async def generate_image_workflow(
         self,
@@ -606,8 +721,12 @@ class MetaClient:
                     "enable_shell": False,
                 }
             ]
+        hit = _call_cache_get("responses-image", payload)
+        if isinstance(hit, dict) and isinstance(hit.get("b64"), str):
+            return base64.b64decode(hit["b64"]), str(hit.get("reasoning") or "")
         await _reserve_provider("image", self._image_model, IMAGE_RESERVATION_MICROS)
         started = time.monotonic()
+        _note_provider_call("image-workflow")
         try:
             response = await self._http_client.post(
                 f"{self._base_url}/responses",
@@ -653,7 +772,17 @@ class MetaClient:
 
         if not image_b64:
             raise MetaAPIError("Muse Image workflow response did not include an image result.")
-        return base64.b64decode(image_b64), "\n".join(reasoning_parts)
+        try:
+            image = base64.b64decode(image_b64, validate=True)
+        except (binascii.Error, ValueError) as err:
+            raise MetaAPIError("Muse Image workflow returned invalid image data.") from err
+        reasoning = "\n".join(reasoning_parts)
+        _call_cache_put(
+            "responses-image",
+            payload,
+            {"b64": base64.b64encode(image).decode(), "reasoning": reasoning},
+        )
+        return image, reasoning
 
     async def transcribe_audio(
         self,
@@ -667,7 +796,12 @@ class MetaClient:
         _require_metered_model(model, "muse-voice-transcribe-1.0")
         if _metering_enabled():
             _validate_bounded_voice(audio_bytes)
+        cache_payload = {"model": model, "audio_sha256": hashlib.sha256(audio_bytes).hexdigest()}
+        hit = _call_cache_get("audio-transcriptions", cache_payload)
+        if isinstance(hit, dict) and isinstance(hit.get("text"), str):
+            return hit["text"]
         await _reserve_provider("voice", model, VOICE_RESERVATION_MICROS)
+        _note_provider_call("voice")
         try:
             response = await self._http_client.post(
                 f"{self._base_url}/audio/transcriptions",
@@ -685,6 +819,7 @@ class MetaClient:
         text = body.get("text") if isinstance(body, dict) else None
         if not isinstance(text, str):
             raise MetaAPIError("Muse Voice Transcribe response missing 'text'.")
+        _call_cache_put("audio-transcriptions", cache_payload, {"text": text.strip()})
         return text.strip()
 
     async def _extract_image_bytes(self, body: Any) -> bytes:
@@ -723,8 +858,12 @@ class MetaClient:
             ],
         }
         _require_metered_model(self._sam_model, "sam-3.1")
+        hit = _call_cache_get("responses-sam", payload)
+        if isinstance(hit, dict) and isinstance(hit.get("b64"), str):
+            return base64.b64decode(hit["b64"])
         await _reserve_provider("sam", self._sam_model, SAM_RESERVATION_MICROS)
         started = time.monotonic()
+        _note_provider_call("sam")
         try:
             response = await self._http_client.post(
                 f"{self._base_url}/responses",
@@ -746,7 +885,7 @@ class MetaClient:
         content_type = response.headers.get("content-type", "").lower()
         if content_type.startswith("image/"):
             _detect_image_mime(response.content)
-            return response.content
+            return self._remember_mask(payload, response.content)
 
         try:
             body = response.json()
@@ -755,7 +894,7 @@ class MetaClient:
         if isinstance(body, dict):
             rendered_mask = _extract_sam_mask_from_responses(body)
             if rendered_mask is not None:
-                return rendered_mask
+                return self._remember_mask(payload, rendered_mask)
 
             data = body.get("data")
             first = data[0] if isinstance(data, list) and data else None
@@ -770,9 +909,14 @@ class MetaClient:
                 except (binascii.Error, ValueError) as err:
                     raise MetaAPIError("SAM 3.1 returned invalid base64 mask bytes.") from err
                 _detect_image_mime(mask_bytes)
-                return mask_bytes
+                return self._remember_mask(payload, mask_bytes)
 
         raise MetaAPIError("SAM 3.1 response did not contain mask bytes.")
+
+    @staticmethod
+    def _remember_mask(payload: dict[str, Any], mask: bytes) -> bytes:
+        _call_cache_put("responses-sam", payload, {"b64": base64.b64encode(mask).decode()})
+        return mask
 
 
 _shared_client: MetaClient | None = None
@@ -793,6 +937,7 @@ async def chat_structured(
     model: str | None = None,
     temperature: float = 0.2,
     client: MetaClient | None = None,
+    max_output_tokens: int = MAX_SPARK_OUTPUT_TOKENS,
 ) -> ModelT:
     """Convenience helper that runs `MetaClient.chat_structured` on the shared client."""
     active_client = client or get_meta_client()
@@ -801,4 +946,5 @@ async def chat_structured(
         response_model=response_model,
         model=model,
         temperature=temperature,
+        max_output_tokens=max_output_tokens,
     )

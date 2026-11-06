@@ -143,15 +143,18 @@ def test_bid_advice(
 
 @respx.mock
 @pytest.mark.usefixtures("real_bid_service")
-def test_bid_advice_meta_failure_is_502(client: TestClient, bid_payload: dict[str, Any]) -> None:
+def test_bid_advice_meta_failure_falls_back_to_saved_advice(
+    client: TestClient, bid_payload: dict[str, Any]
+) -> None:
     respx.post(f"{META_BASE_URL}/chat/completions").mock(
         return_value=httpx.Response(401, json={"error": {"message": "bad key"}})
     )
 
     response = client.post("/api/v1/bid-advice", json=bid_payload)
 
-    assert response.status_code == 502
-    assert "status=401" in response.json()["detail"]
+    assert response.status_code == 200
+    assert response.headers["x-muse-fallback"] == "demo"
+    assert "status=401" not in response.text
 
 
 def test_bid_advice_rejects_empty_campaign(client: TestClient, bid_payload: dict[str, Any]) -> None:

@@ -25,7 +25,7 @@ from urllib.parse import urlparse
 import httpx
 from openai.types.chat import ChatCompletionMessageParam
 
-from src.clients.meta import MetaClient, chat_structured
+from src.clients.meta import SYNTHESIS_OUTPUT_TOKENS, MetaClient, chat_structured
 from src.config import get_settings
 from src.models.intel import (
     COMPUTED_SIGNALS_SOURCE,
@@ -916,6 +916,7 @@ async def build_brief(
         messages=messages,
         response_model=CompetitorBriefLLMOutput,
         client=meta_client,
+        max_output_tokens=SYNTHESIS_OUTPUT_TOKENS,
     )
 
     checker = _CitationChecker(shown)

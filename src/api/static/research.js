@@ -25,7 +25,7 @@
       const response = await fetch('/api/v1/' + path + '?live=true', { method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json', ...(key ? {'X-Demo-Key':key} : {})}, body:JSON.stringify(body), signal:controller.signal });
       const data = await response.json(); if (!response.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'Research could not finish. Your previous results are kept.'); return data;
     } catch (error) { if (error.name === 'AbortError') throw new Error('Research timed out and may still be processing. Check completion before running again.'); throw error; }
-    finally { clearTimeout(timer); window.museAccount?.refresh?.().catch(() => {}); }
+    finally { clearTimeout(timer); window.museAccount?.refresh?.().catch(() => {}); window.museShell?.syncCredits?.(); }
   }
   function render() {
     const list = $('researchTargets'); list.replaceChildren();

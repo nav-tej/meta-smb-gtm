@@ -25,5 +25,7 @@ outputs/
 .vercel
 .env*
 
-# Cached live Muse results (24h TTL)
+# Cached live Muse results (24h TTL), server credit ledger, monitor change log
 data/cache/
+data/credits/
+data/monitor/

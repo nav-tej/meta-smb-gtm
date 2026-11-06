@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 
-from src.clients.meta import MetaAPIError, MetaClient, get_meta_client
+from src.clients.meta import SYNTHESIS_OUTPUT_TOKENS, MetaAPIError, MetaClient, get_meta_client
 from src.models.content_plan import (
     Channel,
     ContentInsight,
@@ -213,6 +213,7 @@ class ContentPlanService:
                 },
             ],
             response_model=ContentPlanDraft,
+            max_output_tokens=SYNTHESIS_OUTPUT_TOKENS,
         )
         if draft.recommended_channel not in request.channels or any(
             post.channel not in request.channels for post in draft.posts

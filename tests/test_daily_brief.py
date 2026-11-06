@@ -73,5 +73,7 @@ def test_route_caches_the_brief_for_the_day(cache_on: Path) -> None:
     assert first.status_code == second.status_code == refreshed.status_code == 200
     assert first.headers["x-muse-cache"] == "miss"
     assert second.headers["x-muse-cache"] == "hit"
-    assert refreshed.headers["x-muse-cache"] == "miss"
+    # Same inputs: a refresh keeps today's brief instead of regenerating it.
+    assert refreshed.headers["x-muse-cache"] == "hit"
+    assert refreshed.headers["x-muse-brief"] == "unchanged"
     assert first.json()["generated_at"] == second.json()["generated_at"]

@@ -186,7 +186,7 @@
     ctx.fillStyle = '#263d35'; ctx.font = '46px Georgia'; wrap(ctx, state.headline || state.product.name || 'Your next shop post', 80, height - 280, 920, 55, 3); ctx.font = '25px sans-serif'; ctx.fillText((state.product.price || '').slice(0, 45), 80, height - 90); ctx.textAlign = 'right'; ctx.fillText('Discover the story', 1000, height - 90); return canvas;
   }
   function spendLive(label) {
-    try { if (window.museShell?.spend) window.museShell.spend(label); } catch {}
+    try { if (window.museShell?.spendLive) window.museShell.spendLive(label); else if (window.museShell?.spend) window.museShell.spend(label); } catch {}
     try { if (window.museAccount?.refresh) window.museAccount.refresh().catch(() => {}); } catch {}
   }
   function setBusy(busy) { state.busy = busy; document.querySelectorAll('button').forEach((b) => { b.disabled = busy; }); for (const id of [...Object.keys(fields), 'promotionDestination', 'postInstagram', 'postFacebook', 'shopUrl', 'headline', 'caption', 'scene', 'productPhoto', 'liveMode', 'unlockKey', 'reviewed']) $(id).disabled = busy; $('backButton').disabled = busy || state.step === 0; $('draftButton').setAttribute('aria-busy', String(busy)); $('generateButton').setAttribute('aria-busy', String(busy)); }

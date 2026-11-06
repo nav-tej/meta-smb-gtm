@@ -24,7 +24,7 @@ import httpx
 from openai.types.chat import ChatCompletionMessageParam
 
 from src.clients.comfyui import ComfyUIClient, ComfyUIError, get_comfyui_client
-from src.clients.meta import MetaAPIError, MetaClient, get_meta_client
+from src.clients.meta import SYNTHESIS_OUTPUT_TOKENS, MetaAPIError, MetaClient, get_meta_client
 from src.config import get_settings
 from src.models.creative import (
     Creative,
@@ -123,7 +123,9 @@ async def load_product_image(
         try:
             decoded = base64.b64decode(raw_b64, validate=True)
         except binascii.Error as err:
-            raise MetaAPIError(f"Invalid base64 product image: {err}") from err
+            raise MetaAPIError(
+                "Upload the product photo again: the image data was not valid."
+            ) from err
         try:
             return _validate_image_magic(decoded)
         except ValueError as err:
@@ -218,7 +220,11 @@ async def write_brief(
         {"role": "system", "content": CREATIVE_BRIEF_SYSTEM_PROMPT},
         {"role": "user", "content": user_prompt},
     ]
-    return await client.chat_structured(messages=messages, response_model=CreativeBrief)
+    return await client.chat_structured(
+        messages=messages,
+        response_model=CreativeBrief,
+        max_output_tokens=SYNTHESIS_OUTPUT_TOKENS,
+    )
 
 
 async def _run_comfyui_krea_variant(

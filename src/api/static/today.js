@@ -50,7 +50,11 @@
   async function jsonRequest(path, payload, live = false) {
     const control = new AbortController(); const timer = setTimeout(() => control.abort(), live ? 285000 : 45000);
     try {
-      const response = await fetch(path + (live ? '?live=true' : ''), { method: 'POST', headers: { 'Content-Type': 'application/json', ...(live ? { 'X-Demo-Key': state.key } : {}) }, body: JSON.stringify(payload), signal: control.signal });
+      const init = { method: 'POST', headers: { 'Content-Type': 'application/json', ...(live ? { 'X-Demo-Key': state.key } : {}) }, body: JSON.stringify(payload), signal: control.signal };
+      const shell = window.museShell;
+      // Saved-mode requests retry on network/5xx errors; billed live requests never auto-retry.
+      const response = !live && shell?.fetch ? await shell.fetch(path, init, { safe: true, timeoutMs: 45000 }) : await fetch(path + (live ? '?live=true' : ''), init);
+      if (live) { shell?.syncCredits?.(); if (response.headers?.get?.('X-Muse-Fallback')) shell?.toast?.('Live Muse was unavailable, so saved results are shown. No run was used.', 'warn'); }
       let data; try { data = await response.json(); } catch { throw new Error('The server could not finish. Your edits are still here.'); }
       if (!response.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'Check the item details and try again.');
       return data;

@@ -70,7 +70,12 @@ async def analyze_competitors(
     if not live:
         return demo.demo_competitor_brief_for(request.competitor_url)
     return await result_cache.cached(
-        "analyze-competitors", request, CompetitorBrief, lambda: service.analyze(request), response
+        "analyze-competitors",
+        request,
+        CompetitorBrief,
+        lambda: service.analyze(request),
+        response,
+        fallback=lambda: demo.demo_competitor_brief_for(request.competitor_url),
     )
 
 
@@ -88,6 +93,7 @@ async def audit_seller(
         SellerFootprintAudit,
         lambda: audit_seller_footprint(request.profile, competitor_brief=request.competitor_brief),
         response,
+        fallback=lambda: compute_seller_diagnostics(request.profile),
     )
 
 
@@ -194,7 +200,9 @@ async def ingest_storefront(request: IngestStorefrontRequest) -> dict[str, Any]:
 
 
 @router.post("/audit-screenshot", response_model=ScreenshotAnalysis)
-async def audit_screenshot(request: ScreenshotAuditRequest, live: LiveMode) -> ScreenshotAnalysis:
+async def audit_screenshot(
+    request: ScreenshotAuditRequest, live: LiveMode, response: Response
+) -> ScreenshotAnalysis:
     """Run Muse Spark 1.3 Vision on an uploaded IG, FB, Saatchi, Etsy, or website screenshot."""
     if not live:
         raise demo_unavailable("Screenshot analysis")
@@ -204,8 +212,14 @@ async def audit_screenshot(request: ScreenshotAuditRequest, live: LiveMode) -> S
     try:
         img_bytes = base64.b64decode(raw, validate=True)
     except binascii.Error as err:
-        raise MetaAPIError(f"Invalid base64 screenshot: {err}") from err
-    return await analyze_social_screenshots([img_bytes], context=request.context)
+        raise MetaAPIError("Upload the screenshot again: the image data was not valid.") from err
+    return await result_cache.cached(
+        "audit-screenshot",
+        request,
+        ScreenshotAnalysis,
+        lambda: analyze_social_screenshots([img_bytes], context=request.context),
+        response,
+    )
 
 
 def _read_sample_json(filename: str) -> dict[str, Any]:

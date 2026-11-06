@@ -96,6 +96,15 @@ By default, the application runs with **`DEMO_MODE=true`**:
 - **Guarded Live Calls:** Passing `?live=true` with the `X-Demo-Key` header allows real upstream API execution against `api.meta.ai/v1`, protected by an in-memory hourly quota (`LIVE_CALLS_PER_HOUR`).
 - **Testing:** The test suite pins `DEMO_MODE=false` in `tests/conftest.py` with fully mocked `respx` responses to ensure complete offline verification.
 
+### Spending guards, caching and fallbacks
+
+- **Server-side credits** (`GET /api/v1/credits`, `POST /api/v1/credits/spend`, `POST /api/v1/credits/add`): every live Muse request reserves one credit *before* any billed call and gets it back on a cache hit, a failure or a fallback. Out of credits returns HTTP 402 with a plain message. Browsers start with `TRIAL_RUNS`; presenter (`X-Demo-Key`) requests share `PRESENTER_CREDITS`. Demo plan "purchases" add runs without charging anything; custom top-ups need the presenter key.
+- **24-hour cache, two layers:** whole live responses per route, and every individual Muse call (chat, image generation/edit, SAM, voice) keyed by endpoint + a hash of its parameters, checked before paying.
+- **Graceful fallbacks:** if Muse fails, a route serves the newest cached result for the same request (`X-Muse-Cache: stale`), then the saved demo result (`X-Muse-Fallback: demo`). Errors never expose upstream details or stack traces. Ad generation for your own photo has no demo fallback, because sample art for someone else's product would be misleading.
+- **Output cap:** synthesis calls allow 8,192 output tokens (extraction calls keep 4,096). A reply cut off at the cap is retried once with a request for a shorter answer, not re-sent in full.
+- **Competitor monitor** (`GET/POST /api/v1/monitor`, `GET /api/v1/weekly-digest`): diffs each watched shop's public pages against its last snapshot (new listings, removed listings, price updates; ad changes when `META_ADS_ACCESS_TOKEN` is set) with no Muse call. A Vercel Cron runs it weekly. The daily brief (`GET /api/v1/daily-brief`) folds in overnight changes, top 3 actions, sample-campaign trends and a focus of the day, and is rebuilt at most once a day unless its inputs change.
+- **Known limit on Vercel:** the cache, credit ledger and monitor log live in `/tmp`, which is per function instance and wiped on a cold start. Treat them as best-effort there; durable storage would need Supabase (accounts already supported) or a shared store such as Vercel Blob or Redis.
+
 ---
 
 ## 5. Quickstart & Local Setup

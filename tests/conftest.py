@@ -72,7 +72,7 @@ def chat_completion(content: str) -> dict[str, Any]:
 
 
 @pytest.fixture(autouse=True)
-def _never_use_real_meta_key(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+def _never_use_real_meta_key(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Iterator[None]:
     """Tests must never spend Muse credits, even with a real key in .env.
 
     An empty env var wins over .env (python-dotenv doesn't override set variables).
@@ -84,6 +84,9 @@ def _never_use_real_meta_key(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     monkeypatch.setattr(config_module, "load_dotenv", lambda *args, **kwargs: False)
     # Mocked live results must not leak between tests through the on-disk result cache.
     monkeypatch.setenv("RESULT_CACHE_ENABLED", "false")
+    # Server credit ledger and monitor log go to a per-test temp dir, never the repo.
+    monkeypatch.setenv("CREDITS_DIR", str(tmp_path / "credits"))
+    monkeypatch.setenv("MONITOR_DIR", str(tmp_path / "monitor"))
     # Route tests exercise the full app; demo-mode tests turn this back on explicitly
     monkeypatch.setenv("DEMO_MODE", "false")
     monkeypatch.setattr(meta_module, "_shared_client", None)

@@ -71,7 +71,8 @@ async def transcribe_voice(request: VoiceNoteRequest, live: LiveMode) -> dict[st
     try:
         audio_bytes = base64.b64decode(raw, validate=True)
     except binascii.Error as err:
-        raise MetaAPIError(f"Invalid base64 audio payload: {err}") from err
+        raise MetaAPIError("Upload the voice note again: the audio data was not valid.") from err
+    # The Meta client checks its call-level cache (keyed by the audio hash) before paying.
     transcript = await get_meta_client().transcribe_audio(audio_bytes, filename=request.filename)
     return {"transcript": transcript, "model": "muse-voice-transcribe-1.0"}
 
@@ -91,6 +92,8 @@ async def generate_ads(
         return demo.demo_creative_draft(request)
     if not live:
         return demo.demo_creative_set(request)
+    # No demo fallback here: saved sample art for someone else's product would mislead. A
+    # failed live call serves the last cached result for the same request, else a friendly error.
     if request.draft:
         return await result_cache.cached(
             "generate-ads-draft",

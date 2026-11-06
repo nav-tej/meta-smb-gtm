@@ -40,7 +40,12 @@ async def bid_advice(
     if not live:
         return demo.demo_bid_recommendation()
     return await result_cache.cached(
-        "bid-advice", request, BidRecommendation, lambda: service.advise(request), response
+        "bid-advice",
+        request,
+        BidRecommendation,
+        lambda: service.advise(request),
+        response,
+        fallback=demo.demo_bid_recommendation,
     )
 
 
@@ -78,4 +83,5 @@ async def bid_advice_csv(
         BidRecommendation,
         lambda: service.advise(advice_request),
         response,
+        fallback=demo.demo_bid_recommendation,
     )

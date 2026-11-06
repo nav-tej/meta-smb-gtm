@@ -29,6 +29,18 @@ class Settings(BaseModel):
     result_cache_enabled: bool = True
     result_cache_dir: str = "data/cache"
     result_cache_ttl_seconds: int = 86400
+
+    # Server-side run credits for live Muse calls (see src/services/credits.py). On Vercel the
+    # ledger lives in /tmp, so it lasts per function instance; Supabase accounts are durable.
+    credits_enabled: bool = True
+    credits_dir: str = "data/credits"
+    presenter_credits: int = 20
+    max_credit_balance: int = 5000
+
+    # Competitor monitor change log and latest snapshots (no Muse call; public crawl only).
+    monitor_dir: str = "data/monitor"
+    monitor_cooldown_seconds: int = 6 * 3600
+    cron_secret: str = ""
     log_level: str = "INFO"
 
     # Demo mode serves saved live results so a public deployment can't spend Muse credits.
@@ -70,6 +82,10 @@ def get_settings() -> Settings:
     # Serverless filesystems are read-only outside /tmp; the cache then lasts per instance.
     if os.environ.get("VERCEL") and "result_cache_dir" not in values:
         values["result_cache_dir"] = "/tmp/muse-cache"
+    if os.environ.get("VERCEL") and "credits_dir" not in values:
+        values["credits_dir"] = "/tmp/muse-credits"
+    if os.environ.get("VERCEL") and "monitor_dir" not in values:
+        values["monitor_dir"] = "/tmp/muse-monitor"
     if os.environ.get("VERCEL"):
         values["hosted_environment"] = True
     return Settings(**values)

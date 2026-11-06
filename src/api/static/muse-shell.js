@@ -41,7 +41,53 @@
     setTimeout(() => item.remove(), 3100);
   }
 
-  // ---------- Demo credits ----------
+  // ---------- Resilient fetch: friendly errors, retries only where it is safe ----------
+  // Retries happen on network errors and 502/503/504, and only for GETs or requests marked
+  // safe (saved-mode calls). Billed live calls (?live=true) are never retried automatically.
+  const RETRY_STATUS = new Set([502, 503, 504]);
+  const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  const STATUS_MESSAGES = {
+    402: 'You are out of runs. Saved results are still free to view.',
+    403: 'This needs a live session. Saved results still work.',
+    413: 'That upload is too large. Try a smaller image.',
+    415: 'That request was not in the expected format. Please try again.',
+    422: 'Some details need fixing before this can run.',
+    429: 'Too many live runs this hour. Saved results still work; try again later.',
+    500: 'Something went wrong on our side. Your work is safe; please try again.',
+    502: 'Muse could not finish this right now. Your inputs are safe; try again in a minute.',
+    503: 'This service is busy or not configured. Saved results still work.',
+    504: 'This took too long. Your inputs are safe; try again in a minute.',
+  };
+  async function errorMessage(response, fallback = 'Something went wrong. Please try again.') {
+    let detail = '';
+    try { const body = await response.clone().json(); if (typeof body?.detail === 'string') detail = body.detail; else if (typeof body?.detail?.message === 'string') detail = body.detail.message; } catch { /* not JSON */ }
+    // Never show stack traces or HTML error pages; keep server messages short and plain.
+    if (detail && detail.length <= 400 && !/traceback|exception|<html/i.test(detail)) return detail;
+    return STATUS_MESSAGES[response.status] || fallback;
+  }
+  async function museFetch(url, options = {}, { retries = 2, safe, timeoutMs = 30000 } = {}) {
+    const method = String(options.method || 'GET').toUpperCase();
+    const billed = /[?&]live=(true|1)\b/.test(String(url));
+    const canRetry = !billed && (safe ?? method === 'GET');
+    const attempts = canRetry ? retries + 1 : 1;
+    let lastError;
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+      const controller = typeof AbortController === 'function' ? new AbortController() : null;
+      const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+      try {
+        const response = await fetch(url, { credentials: 'same-origin', ...options, ...(controller && !options.signal ? { signal: controller.signal } : {}) });
+        if (!RETRY_STATUS.has(response.status) || attempt === attempts - 1) return response;
+        lastError = new Error(await errorMessage(response));
+      } catch (error) {
+        lastError = error?.name === 'AbortError' ? new Error(STATUS_MESSAGES[504]) : new Error('You seem to be offline or the server is unreachable. Your work is safe; try again.');
+        if (attempt === attempts - 1) throw lastError;
+      } finally { if (timer) clearTimeout(timer); }
+      await wait(400 * 3 ** attempt);
+    }
+    throw lastError;
+  }
+
+  // ---------- Run credits: the server decides; localStorage is only an offline fallback ----------
   const loadCredits = () => { const n = Number.parseInt(store.get(creditKey()) ?? '', 10); return Number.isFinite(n) && n >= 0 ? n : START_CREDITS; };
   let credits = loadCredits();
   const saveCredits = () => store.set(creditKey(), String(credits));
@@ -56,12 +102,47 @@
     if (label) label.textContent = credits === 0 ? ' · Get more runs' : (credits === 1 ? ' run' : ' runs');
     if (bump && !reducedMotion) { pill.classList.remove('bump'); void pill.offsetWidth; pill.classList.add('bump'); }
   }
+  let serverCredits = false;
+  let creditNote = '';
+  function applyServerCredits(data) {
+    if (!data || data.source !== 'server' || typeof data.balance !== 'number') return false;
+    serverCredits = true;
+    credits = Math.max(0, data.balance);
+    creditNote = data.persistent === false ? String(data.note || '') : '';
+    saveCredits();
+    renderCredits();
+    const noteNode = pill?.querySelector('.ms-credit-note');
+    if (noteNode) noteNode.textContent = creditNote;
+    return true;
+  }
+  async function syncCredits() {
+    try {
+      const response = await museFetch('/api/v1/credits', {}, { retries: 1, timeoutMs: 8000 });
+      if (response.ok) return applyServerCredits(await response.json());
+    } catch { /* offline: keep the browser's last known balance */ }
+    return false;
+  }
+  async function spendOnServer(label) {
+    try {
+      const response = await museFetch('/api/v1/credits/spend', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ label: String(label).slice(0, 80) }) }, { safe: false, timeoutMs: 8000 });
+      if (response.status === 402) { credits = 0; saveCredits(); renderCredits(true); toast(await errorMessage(response), 'warn'); openPricing(); return; }
+      if (response.ok) applyServerCredits(await response.json());
+    } catch { /* offline: the optimistic local count stands until the next sync */ }
+  }
   function spend(label) {
     if (serverMode()) return; // The server counts real runs; saved actions stay free.
     if (!hasSession()) return;
     if (credits === 0) { toast('No runs left. Pick a plan, or reset the demo credits.', 'warn'); openPricing(); return; }
     credits -= 1; saveCredits(); renderCredits(true);
     toast(`−1 run · ${label}`);
+    if (serverCredits) spendOnServer(label);
+  }
+  // A live Muse call is charged by the server's live gate (and refunded on cache hits or
+  // failures), so the browser only re-reads the balance instead of spending again.
+  function spendLive(label) {
+    if (serverMode()) return;
+    if (serverCredits) { syncCredits().then(() => toast(`Live run · ${label} · ${credits} left`)); return; }
+    spend(label);
   }
   // Gate for any run (analysis, generation, refinement). Returns false when the visitor must
   // sign up or buy more runs first. Server accounts count their own runs.
@@ -107,7 +188,8 @@
       menu = el('div', { class: 'ms-credits-menu', hidden: '' });
       menu.appendChild(el('strong', {}, 'Runs'));
       menu.appendChild(el('p', {}, '1 run = one competitor analysis, refinement, re-run or ad scene. Viewing results you already have is free.'));
-      menu.appendChild(el('p', { class: 'ms-muted' }, 'Demo account: runs are stored in this browser. Repeat live results come from a 24-hour cache, so they never spend Muse API credit twice.'));
+      menu.appendChild(el('p', { class: 'ms-muted' }, 'Runs are checked on the server before any live Muse call. Repeat live results come from a 24-hour cache and give the run back, so they never spend Muse API credit twice.'));
+      menu.appendChild(el('p', { class: 'ms-muted ms-credit-note' }, creditNote));
       const more = el('button', { type: 'button', class: 'ms-link ms-more' }, 'Get more runs →');
       more.addEventListener('click', () => { closeMenu(); openPricing(); });
       menu.appendChild(more);
@@ -199,7 +281,7 @@
     const note = pricingDialog.querySelector('.ms-muted');
     if (note) note.textContent = serverMode()
       ? 'Secure checkout via Stripe. 1 run = one competitor analysis, ad generation or budget review.'
-      : 'Demo checkout: no card is needed and no payment is taken; runs are added to this browser. 1 run = one analysis, refinement, re-run or ad scene.';
+      : 'Demo checkout: no card is needed and no payment is taken; runs are added to your demo balance on this server. 1 run = one analysis, refinement, re-run or ad scene.';
   }
   let pricingDialog;
   function openPricing(mode = '') {
@@ -253,7 +335,7 @@
       checkoutDialog.appendChild(el('h2', { id: 'msCheckoutTitle' }));
       const summary = el('div', { class: 'ms-checkout-summary' });
       checkoutDialog.appendChild(summary);
-      checkoutDialog.appendChild(el('p', { class: 'ms-checkout-note' }, 'This is a demo: no card is needed, nothing is charged, and no payment details are collected. Runs are added to this browser.'));
+      checkoutDialog.appendChild(el('p', { class: 'ms-checkout-note' }, 'This is a demo: no card is needed, nothing is charged, and no payment details are collected. Runs are added to your demo balance on this server.'));
       const pay = el('button', { type: 'button', class: 'ms-primary ms-pay' });
       checkoutDialog.appendChild(pay);
       checkoutDialog.addEventListener('click', (event) => { if (event.target === checkoutDialog) checkoutDialog.close(); });
@@ -271,7 +353,16 @@
     pay.onclick = async () => {
       pay.disabled = true;
       await progress('Completing demo purchase', ['Confirming the plan', 'Adding runs to your account']);
-      credits += PLAN_RUNS[plan.id] || 0; saveCredits(); renderCredits(true);
+      let added = false;
+      if (serverCredits) {
+        try {
+          const response = await museFetch('/api/v1/credits/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ plan: plan.id }) }, { safe: false, timeoutMs: 8000 });
+          if (response.ok) added = applyServerCredits(await response.json());
+          else { toast(await errorMessage(response), 'warn'); pay.disabled = false; return; }
+        } catch (error) { toast(error.message, 'warn'); pay.disabled = false; return; }
+      }
+      if (!added) { credits += PLAN_RUNS[plan.id] || 0; saveCredits(); }
+      renderCredits(true);
       const history = account.purchases || [];
       history.push({ plan: plan.id, runs: PLAN_RUNS[plan.id], at: new Date().toISOString() });
       store.set(ACCOUNT_KEY, JSON.stringify({ ...account, purchases: history.slice(-20) }));
@@ -314,7 +405,7 @@
       const demo = el('button', { type: 'button', class: 'ms-link ms-demo-user' }, 'Or continue as the demo user (Art of Sarabjit Singh) →');
       demo.addEventListener('click', () => { createAccount('demo@artofsarabjitsingh.example', 'Art of Sarabjit Singh'); signupDialog.close(); });
       signupDialog.appendChild(demo);
-      signupDialog.appendChild(el('p', { class: 'ms-muted' }, 'Demo mode: your account and runs are saved in this browser only. No email is sent and no password is stored.'));
+      signupDialog.appendChild(el('p', { class: 'ms-muted' }, 'Demo mode: your account is saved in this browser and your runs are counted on the server. No email is sent and no password is stored.'));
       signupDialog.addEventListener('click', (event) => { if (event.target === signupDialog) signupDialog.close(); });
       document.body.appendChild(signupDialog);
     }
@@ -328,7 +419,8 @@
     const existing = store.get(`${CREDIT_KEY}:${email}`);
     store.set(ACCOUNT_KEY, JSON.stringify({ email, name, created: new Date().toISOString(), purchases: [] }));
     credits = loadCredits();
-    if (existing === null) { credits = START_CREDITS; saveCredits(); }
+    if (existing === null && !serverCredits) { credits = START_CREDITS; saveCredits(); }
+    if (serverCredits) syncCredits();
     renderAccount();
     renderCredits(true);
     toast(existing === null ? `Welcome${name ? `, ${name}` : ''}! ${credits} free runs are ready.` : `Welcome back! ${credits} runs left.`);
@@ -620,19 +712,19 @@
     const titleBox = el('div');
     titleBox.appendChild(el('p', { class: 'ms-eyebrow' }, `Your daily growth brief · ${today}`));
     titleBox.appendChild(el('h2', { id: 'msBriefTitle' }, 'What changed at the shops you watch'));
-    titleBox.appendChild(el('p', { class: 'ms-brief-plan' }, 'Planned: a fresh brief delivered every morning. Today’s is built from the Nov 3 snapshot.'));
+    titleBox.appendChild(el('p', { class: 'ms-brief-plan' }, 'Built once a day from your watchlist, the competitor monitor and campaign trends. No Muse credit is used to read it.'));
     const meta = el('p', { class: 'ms-brief-meta' });
     meta.appendChild(el('span', { class: 'ms-dot', 'aria-hidden': 'true' }));
     meta.appendChild(document.createTextNode('Watchlist: 4 competitors · 6 shop pages · last checked Nov 3 · social accounts not checked yet'));
     titleBox.appendChild(meta);
-    const recheck = el('button', { type: 'button', class: 'ms-secondary ms-small', title: 'Rebuild today’s brief from saved and cached data · 1 run' }, 'Re-check now');
+    const recheck = el('button', { type: 'button', class: 'ms-secondary ms-small', title: 'Check competitors’ public pages and rebuild today’s brief · 1 run' }, 'Re-check now');
     const toggle = el('button', { type: 'button', class: 'ms-link ms-brief-toggle', 'aria-expanded': 'true', 'aria-controls': 'msBriefBody' }, 'Hide');
     const actions = el('div', { class: 'ms-brief-actions' });
     actions.append(recheck, toggle);
     head.append(titleBox, actions);
     const body = el('div', { class: 'ms-brief-body', id: 'msBriefBody' });
     const list = el('ul', { class: 'ms-watch' });
-    const CHIP = { new: 'New', first: 'First check', fresh: 'Fresh Muse brief' };
+    const CHIP = { new: 'New', first: 'First check', fresh: 'Fresh Muse brief', changed: 'Changed' };
     const renderItems = (items) => {
       list.replaceChildren();
       for (const item of items) {
@@ -646,35 +738,125 @@
       }
     };
     renderItems(WATCH);
+    const statusLine = el('p', { class: 'ms-brief-status', role: 'status', 'aria-live': 'polite' }, 'Loading today’s brief…');
+    const retry = el('button', { type: 'button', class: 'ms-link ms-brief-retry', hidden: '' }, 'Try again');
+    const statusRow = el('div', { class: 'ms-brief-statusrow' });
+    statusRow.append(statusLine, retry);
     const sourceNote = el('p', { class: 'ms-muted ms-brief-source' }, 'From saved public snapshots captured Nov 3. Muse checks again when you run a re-check; it does not watch continuously.');
-    const loadBrief = async (refresh = false) => {
-      try {
-        const response = await fetch(`/api/v1/daily-brief${refresh ? '?refresh=true' : ''}`);
-        if (!response.ok) throw new Error(String(response.status));
-        const brief = await response.json();
-        if (Array.isArray(brief.items) && brief.items.length) renderItems(brief.items);
-        const built = brief.generated_at ? new Date(brief.generated_at).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) : '';
-        sourceNote.textContent = `${String(brief.source || '')}${built ? ` Generated ${built}; cached for today.` : ''}`;
-        return true;
-      } catch { return false; }
+    // Focus of the day (server-ranked; the saved snapshot move is shown until the brief loads).
+    const move = el('div', { class: 'ms-move' });
+    const moveText = el('div');
+    const moveChip = el('span', { class: 'ms-chip high' }, 'Focus of the day · high impact');
+    const moveTitle = el('strong', {}, 'Feature your Empowering Women series');
+    const moveReason = el('span', { class: 'ms-note' }, 'SikhiArt keeps adding warrior and guru editions but has no group for women’s stories.');
+    moveText.append(moveChip, moveTitle, moveReason);
+    const go = el('a', { class: 'ms-primary ms-small', href: '/create?goal=story' }, 'Make this post →');
+    move.append(moveText, go);
+    const safeHref = (href) => (typeof href === 'string' && /^\/(?!\/)/.test(href) ? href : '/create');
+    const goLabel = (href) => (href.startsWith('/create') ? 'Make this post →' : 'Open →');
+    const columns = el('div', { class: 'ms-brief-columns' });
+    const overnightBox = el('section', { class: 'ms-brief-card', 'aria-label': 'Overnight competitor changes' });
+    const actionsBox = el('section', { class: 'ms-brief-card', 'aria-label': 'Top 3 actions' });
+    const trendsBox = el('section', { class: 'ms-brief-card', 'aria-label': 'Performance trends' });
+    columns.append(actionsBox, overnightBox, trendsBox);
+    const weekly = el('p', { class: 'ms-muted ms-weekly' });
+    const card = (box, title, rows, empty, note = '') => {
+      box.replaceChildren(el('h3', {}, title));
+      if (!rows.length) box.appendChild(el('p', { class: 'ms-muted' }, empty));
+      else { const ul = el('ul', {}); rows.forEach((row) => ul.appendChild(row)); box.appendChild(ul); }
+      if (note) box.appendChild(el('p', { class: 'ms-muted ms-card-note' }, note));
     };
+    const renderBrief = (brief) => {
+      if (Array.isArray(brief.items) && brief.items.length) renderItems(brief.items);
+      const focus = brief.focus || brief.move;
+      if (focus?.title) {
+        moveChip.textContent = `Focus of the day · ${focus.impact || 'high'} impact`;
+        moveTitle.textContent = String(focus.title);
+        moveReason.textContent = String(focus.reason || '');
+        const href = safeHref(focus.href);
+        go.setAttribute('href', href);
+        go.textContent = goLabel(href);
+      }
+      const actions = Array.isArray(brief.action_items) ? brief.action_items.slice(0, 3) : [];
+      card(actionsBox, 'Top 3 actions', actions.map((item, index) => {
+        const li = el('li', { class: `ms-action ${item.impact || ''}` });
+        const link = el('a', { href: safeHref(item.href) }, `${index + 1}. ${String(item.title || '')}`);
+        li.append(link, el('span', { class: 'ms-note' }, String(item.reason || '')));
+        if (item.source) li.appendChild(el('span', { class: 'ms-where' }, String(item.source)));
+        return li;
+      }), 'No actions today.');
+      const changes = Array.isArray(brief.overnight_changes) ? brief.overnight_changes : [];
+      card(overnightBox, 'Overnight changes', changes.map((change) => {
+        const li = el('li', { class: `ms-change ${change.kind || ''}` });
+        li.appendChild(el('span', { class: 'ms-note' }, String(change.text || '')));
+        return li;
+      }), String(brief.overnight_note || 'No competitor changes logged overnight.'), changes.length ? String(brief.overnight_note || '') : '');
+      const trends = Array.isArray(brief.trends) ? brief.trends : [];
+      card(trendsBox, 'Performance trends', trends.map((trend) => {
+        const arrow = trend.direction === 'up' ? '▲' : trend.direction === 'down' ? '▼' : '•';
+        const tone = trend.good === true ? 'good' : trend.good === false ? 'bad' : '';
+        const li = el('li', { class: `ms-trend ${tone}` });
+        li.append(el('strong', {}, `${arrow} ${String(trend.value || '')}`), el('span', {}, ` ${String(trend.label || '')}`));
+        if (trend.note) li.appendChild(el('span', { class: 'ms-note' }, String(trend.note)));
+        return li;
+      }), 'Add campaign data to see trends.', String(brief.trends_source || ''));
+      if (brief.overnight_note) meta.lastChild.textContent = `Watchlist: 4 competitors · ${brief.overnight_note}`;
+      const built = brief.generated_at ? new Date(brief.generated_at).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) : '';
+      sourceNote.textContent = `${String(brief.source || '')}${built ? ` Generated ${built}; cached for today.` : ''}`;
+    };
+    const setLoading = (loading, message = '') => {
+      section.classList.toggle('ms-loading', loading);
+      body.setAttribute('aria-busy', String(loading));
+      statusLine.textContent = message;
+      statusLine.hidden = !message;
+    };
+    const loadBrief = async (refresh = false) => {
+      setLoading(true, refresh ? 'Rebuilding today’s brief…' : 'Loading today’s brief…');
+      retry.hidden = true;
+      try {
+        const response = await museFetch(`/api/v1/daily-brief${refresh ? '?refresh=true' : ''}`, {}, { retries: 2, timeoutMs: 15000 });
+        if (!response.ok) throw new Error(await errorMessage(response, 'Could not load today’s brief.'));
+        renderBrief(await response.json());
+        setLoading(false);
+        return true;
+      } catch (error) {
+        setLoading(false, `${error.message || 'Could not load today’s brief.'} Showing the saved brief.`);
+        retry.hidden = false;
+        return false;
+      }
+    };
+    const loadWeekly = async () => {
+      try {
+        const response = await museFetch('/api/v1/weekly-digest', {}, { retries: 1, timeoutMs: 10000 });
+        if (!response.ok) return;
+        const digest = await response.json();
+        const first = Array.isArray(digest.highlights) && digest.highlights[0] ? ` Biggest: ${digest.highlights[0]}.` : '';
+        weekly.textContent = digest.checks ? `This week: ${digest.total_changes} competitor change(s) across ${digest.checks} check(s).${first}` : String(digest.note || '');
+      } catch { /* the weekly line is optional */ }
+    };
+    retry.addEventListener('click', () => { loadBrief(false); loadWeekly(); });
     recheck.addEventListener('click', async () => {
       if (!requireRun('Brief re-check')) return;
       recheck.disabled = true;
-      await progress('Re-checking your watchlist', ['Reading saved snapshots', 'Looking for fresh Muse analyses', 'Ranking today’s move']);
+      recheck.textContent = 'Checking…';
+      let monitorNote = '';
+      const monitorRun = (async () => {
+        try {
+          const response = await museFetch('/api/v1/monitor', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }, { safe: false, timeoutMs: 170000 });
+          if (!response.ok) monitorNote = await errorMessage(response, 'The competitor check could not run.');
+          else if (response.headers.get('X-Muse-Monitor') === 'cooldown') monitorNote = 'Competitors were checked recently, so the latest check was reused.';
+        } catch (error) { monitorNote = error.message; }
+      })();
+      await Promise.all([monitorRun, progress('Re-checking your watchlist', ['Reading each competitor’s public pages', 'Comparing with the last snapshot', 'Ranking today’s actions'], 2400)]);
       const ok = await loadBrief(true);
+      loadWeekly();
       recheck.disabled = false;
-      toast(ok ? 'Brief rebuilt from saved and cached data' : 'Could not rebuild the brief; showing the saved one.', ok ? '' : 'warn');
+      recheck.textContent = 'Re-check now';
+      toast(ok ? (monitorNote || 'Brief rebuilt with the latest competitor check') : 'Could not rebuild the brief; showing the saved one.', ok && !monitorNote ? '' : 'warn');
     });
     loadBrief(false);
-    const move = el('div', { class: 'ms-move' });
-    const moveText = el('div');
-    moveText.appendChild(el('span', { class: 'ms-chip high' }, 'Today’s move · high impact'));
-    moveText.appendChild(el('strong', {}, 'Feature your Empowering Women series'));
-    moveText.appendChild(el('span', { class: 'ms-note' }, 'SikhiArt keeps adding warrior and guru editions but has no group for women’s stories.'));
-    const go = el('a', { class: 'ms-primary ms-small', href: '/create?goal=story' }, 'Make this post →');
-    move.append(moveText, go);
-    body.append(list, move);
+    loadWeekly();
+    body.append(statusRow, move, columns, list, weekly);
     body.appendChild(sourceNote);
     section.append(head, body);
     toggle.addEventListener('click', () => {
@@ -847,6 +1029,9 @@
     removeGates();
     mountCredits();
     mountSession();
+    syncCredits();
+    window.addEventListener('focus', () => { if (serverCredits) syncCredits(); });
+    window.addEventListener('muse:credits-refresh', () => syncCredits());
     if (document.getElementById('journey') || location.pathname.startsWith('/today')) mountBrief();
     mountActions();
     mountRefine();
@@ -857,6 +1042,6 @@
 
   }
 
-  window.museShell = { spend, canRun, requireRun, hasAccount: hasSession, progress, toast, openGift, openPricing, openSignup, openActions, openTour, showStage };
+  window.museShell = { spend, spendLive, canRun, requireRun, syncCredits, fetch: museFetch, errorMessage, hasAccount: hasSession, progress, toast, openGift, openPricing, openSignup, openActions, openTour, showStage };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();

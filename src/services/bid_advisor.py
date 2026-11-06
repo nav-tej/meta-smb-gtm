@@ -20,7 +20,12 @@ from datetime import date
 
 from openai.types.chat import ChatCompletionMessageParam
 
-from src.clients.meta import MetaClient, chat_structured, get_meta_client
+from src.clients.meta import (
+    SYNTHESIS_OUTPUT_TOKENS,
+    MetaClient,
+    chat_structured,
+    get_meta_client,
+)
 from src.models.bids import (
     AdSetDailyPerformance,
     AdSetMetrics,
@@ -425,7 +430,10 @@ async def advise(
         target_cpa=request.target_cpa,
     )
     llm_output = await chat_structured(
-        messages=messages, response_model=BidRecommendationLLMOutput, client=client
+        messages=messages,
+        response_model=BidRecommendationLLMOutput,
+        client=client,
+        max_output_tokens=SYNTHESIS_OUTPUT_TOKENS,
     )
     return _finalize(llm_output, metrics, request.competitor_brief, client.spark_model)
 

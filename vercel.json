@@ -6,5 +6,16 @@
       "includeFiles": "{src,data/samples}/**"
     }
   },
-  "rewrites": [{ "source": "/(.*)", "destination": "/api/index" }]
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/api/index"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/v1/monitor/run",
+      "schedule": "0 14 * * 1"
+    }
+  ]
 }

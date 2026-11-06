@@ -112,7 +112,29 @@
 .ms-move > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .ms-move strong { font-size: 15px; }
 .ms-brief .ms-muted { margin: 8px 0 0; }
-@media (max-width: 900px) { .ms-watch { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.ms-watch li.changed { border-color: #efcfb5; background: #fdf5ee; }
+.ms-chip.changed { background: #fbeadf; color: #8a4a1f; }
+.ms-brief-statusrow { display: flex; align-items: center; gap: 10px; min-height: 0; }
+.ms-brief-status { margin: 10px 0 0; font-size: 13px; color: #6b6860; }
+.ms-brief-status[hidden] { display: none; }
+.ms-brief-retry { margin-top: 10px; }
+.ms-brief.ms-loading .ms-brief-columns, .ms-brief.ms-loading .ms-move { opacity: 0.55; transition: opacity 0.2s ease; }
+.ms-brief.ms-loading .ms-brief-status::before { content: ""; display: inline-block; width: 10px; height: 10px; margin-right: 8px; border-radius: 50%; border: 2px solid #c9c3b6; border-top-color: #263d35; vertical-align: -1px; animation: ms-spin 0.8s linear infinite; }
+@keyframes ms-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .ms-brief.ms-loading .ms-brief-status::before { animation: none; } }
+.ms-brief .ms-move { margin-top: 12px; }
+.ms-brief-columns { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 12px 0 0; }
+.ms-brief-card { padding: 12px 14px; border-radius: 14px; background: #fff; border: 1px solid #e6e1d6; min-width: 0; }
+.ms-brief-card h3 { margin: 0 0 6px; font-size: 13px; letter-spacing: 0.02em; text-transform: uppercase; color: #6b6860; }
+.ms-brief-card ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.ms-brief-card li { display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+.ms-brief-card li a { color: #263d35; font-weight: 600; text-decoration: none; }
+.ms-brief-card li a:hover { text-decoration: underline; }
+.ms-brief-card .ms-card-note { margin: 8px 0 0; font-size: 11px; }
+.ms-trend.good strong { color: #2f7a4b; }
+.ms-trend.bad strong { color: #a2462a; }
+.ms-weekly { margin: 4px 0 0; }
+@media (max-width: 900px) { .ms-watch { grid-template-columns: repeat(2, minmax(0, 1fr)); } .ms-brief-columns { grid-template-columns: 1fr; } }
 @media (max-width: 560px) {
   .ms-brief { margin: 12px 12px 6px; padding: 14px; }
   .ms-brief-head { flex-direction: column; }
