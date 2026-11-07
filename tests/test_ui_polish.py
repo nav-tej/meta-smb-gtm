@@ -64,3 +64,41 @@ def test_shell_ui_contract() -> None:
     )
     assert result.returncode == 0, f"STDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}"
     assert "UI POLISH CONTRACT PASSED" in result.stdout
+
+
+def _phone_css() -> str:
+    css = (ROOT / "src/api/static/muse-shell.css").read_text()
+    start = css.index("Phones (≤640px)")
+    return css[start:]
+
+
+def test_phone_header_collapses_only_on_portal_and_digest(client: TestClient) -> None:
+    portal = client.get("/portal").text
+    assert '<header class="topbar ms-topbar">' in portal
+    # The watchlist bar and logged-out hero are styled from pricing-modal.css.
+    assert "/static/pricing-modal.css" in portal
+    assert '<header class="topbar ms-topbar">' in client.get("/digest").text
+    # /create keeps its own header; the phone menu must not restyle it.
+    assert "ms-topbar" not in client.get("/create").text
+    script = (ROOT / "src/api/static/muse-shell.js").read_text()
+    assert "function mountMobileNav()" in script
+    assert "mountMobileNav();" in script
+    assert "document.querySelector('header.ms-topbar')" in script
+
+
+def test_phone_css_covers_padding_dropdowns_and_tap_targets() -> None:
+    css = _phone_css()
+    assert "@media (max-width: 640px)" in css
+    assert ".ms-topbar .topbar-right { display: contents; }" in css
+    assert ".shell { padding: 16px 16px 32px !important; }" in css
+    assert ".monitoring-right { display: flex !important;" in css
+    assert ".logged-out-hero-ctas { flex-direction: column;" in css
+    assert ".ms-triage button { min-height: 44px;" in css
+    # Header dropdowns are pinned near-full-width instead of fixed-width popovers.
+    assert ".ms-notif-menu, .ms-credits-menu { position: fixed; left: 12px; right: 12px;" in css
+    assert ".ms-account-menu { position: fixed; left: 12px; right: 12px;" in css
+    # Generic .topbar rules would leak into /create; phone header rules stay scoped.
+    for line in css.splitlines():
+        stripped = line.strip()
+        if stripped.startswith(".topbar") and "{" in stripped:
+            raise AssertionError(f"unscoped header rule: {stripped}")

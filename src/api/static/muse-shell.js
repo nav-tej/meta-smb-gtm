@@ -1080,6 +1080,31 @@
     });
   }
 
+  // ---------- Phone header: one compact row plus a menu for everything else ----------
+  // Only headers marked .ms-topbar (portal, digest) collapse; CSS decides which items stay in the row.
+  let closeMobileNav = () => {};
+  function mountMobileNav() {
+    const header = document.querySelector('header.ms-topbar');
+    const right = header?.querySelector('.topbar-right');
+    if (!header || !right || header.querySelector('.ms-menu-btn')) return;
+    const button = el('button', { type: 'button', class: 'ms-menu-btn', 'aria-expanded': 'false', 'aria-label': 'Open menu' });
+    button.appendChild(el('span', { class: 'ms-menu-icon', 'aria-hidden': 'true' }));
+    right.appendChild(button);
+    const setOpen = (open) => {
+      header.classList.toggle('ms-nav-open', open);
+      button.setAttribute('aria-expanded', String(open));
+      button.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+      if (open) toggleNotifications(false);
+    };
+    closeMobileNav = () => { if (header.classList.contains('ms-nav-open')) setOpen(false); };
+    button.addEventListener('click', (event) => { event.stopPropagation(); setOpen(!header.classList.contains('ms-nav-open')); });
+    document.addEventListener('click', (event) => { if (!header.contains(event.target)) closeMobileNav(); });
+    document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && header.classList.contains('ms-nav-open')) { setOpen(false); button.focus(); } });
+    // Choosing something in the menu closes it (dialogs and links take over from there).
+    header.addEventListener('click', (event) => { if (event.target.closest('.topbar-link, #openLocalEngineBtn, .workspace-btn, .ma-account-button')) closeMobileNav(); });
+    window.matchMedia?.('(min-width: 641px)').addEventListener?.('change', (event) => { if (event.matches) closeMobileNav(); });
+  }
+
   // ---------- Notifications: competitor changes, new ideas, weekly digest ----------
   const READ_KEY = 'muse.notifRead';
   const readSeen = () => { try { const v = JSON.parse(store.get(READ_KEY) || '[]'); return new Set(Array.isArray(v) ? v.filter((x) => typeof x === 'string') : []); } catch { return new Set(); } };
@@ -1126,6 +1151,7 @@
   function toggleNotifications(force) {
     if (!bell) return;
     const open = typeof force === 'boolean' ? force : bell.menu.hidden;
+    if (open) closeMobileNav();
     bell.menu.hidden = !open;
     bell.button.setAttribute('aria-expanded', String(open));
   }
@@ -1342,6 +1368,7 @@
     mountCredits();
     mountSession();
     mountNotifications();
+    mountMobileNav();
     mountWatchlist();
     syncCredits();
     window.addEventListener('focus', () => { if (serverCredits) syncCredits(); });

@@ -323,6 +323,130 @@
 .ms-badge.ad { background: #e7eefb; color: #24498c; }
 .ms-badge.added { background: #f3eefb; color: #5b3d8f; }
 .ms-badge.paused { background: #ecebe8; color: #6b6860; }
+
+/* ==========================================================================
+   Phones (≤640px). Base styles are desktop-first; this block makes the portal
+   and digest work on a 375px screen: one compact header row with a menu,
+   16px side padding everywhere, full-width cards and 44px tap targets.
+   ========================================================================== */
+.ms-menu-btn { display: none; }
+@media (max-width: 980px) {
+  .ms-topbar { flex-wrap: wrap; gap: 12px; }
+  .ms-topbar .topbar-right { flex-wrap: wrap; min-width: 0; gap: 8px; }
+}
 @media (max-width: 640px) {
-  .ms-notif-menu { position: fixed; left: 12px; right: 12px; top: 64px; width: auto; }
+  /* 1. Header: brand + credits + bell + menu in one row; the rest opens as a menu below. */
+  .ms-topbar { position: sticky; top: 0; z-index: 40; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 16px; }
+  .ms-topbar .brand { flex: 1 1 0; min-width: 0; order: 0; gap: 10px; }
+  .ms-topbar .brand > div, .ms-topbar .brand > span:last-child { min-width: 0; }
+  .ms-topbar .brand-logo { width: 34px; height: 34px; flex: none; }
+  .ms-topbar .brand-title { display: block; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ms-topbar .brand-sub { display: none; }
+  .ms-topbar .topbar-right { display: contents; }
+  .ms-topbar .ms-credits { order: 1; }
+  .ms-topbar .ms-credits-btn { min-height: 44px; padding: 0 12px; }
+  .ms-topbar .ms-credits-label { display: none; }
+  .ms-topbar .ms-notif { order: 2; }
+  .ms-topbar .ms-bell { width: 44px; height: 44px; }
+  .ms-menu-btn { order: 3; display: grid; place-items: center; width: 44px; height: 44px; flex: none; border-radius: 12px; border: 1px solid #e6e1d6; background: #fff; cursor: pointer; }
+  .ms-menu-btn:focus-visible { outline: 2px solid #1b6e44; outline-offset: 2px; }
+  .ms-menu-icon, .ms-menu-icon::before, .ms-menu-icon::after { display: block; width: 18px; height: 2px; border-radius: 2px; background: #22221f; transition: transform 0.2s ease, background 0.2s ease; }
+  .ms-menu-icon { position: relative; }
+  .ms-menu-icon::before, .ms-menu-icon::after { content: ""; position: absolute; left: 0; }
+  .ms-menu-icon::before { top: -6px; }
+  .ms-menu-icon::after { top: 6px; }
+  .ms-nav-open .ms-menu-icon { background: transparent; }
+  .ms-nav-open .ms-menu-icon::before { transform: translateY(6px) rotate(45deg); }
+  .ms-nav-open .ms-menu-icon::after { transform: translateY(-6px) rotate(-45deg); }
+  /* Menu items: hidden until the menu is open, then one full-width row each. */
+  .ms-topbar .topbar-link, .ms-topbar .workspace-btn, .ms-topbar .ms-account, .ms-topbar #openLocalEngineBtn,
+  .ms-topbar .status-pill, .ms-topbar > .ma-account-controls { display: none; }
+  .ms-nav-open .topbar-link, .ms-nav-open .workspace-btn, .ms-nav-open .ms-account, .ms-nav-open #openLocalEngineBtn,
+  .ms-nav-open .status-pill, .ms-nav-open > .ma-account-controls {
+    display: flex; flex: 1 1 100%; align-items: center; min-height: 48px; margin: 0; box-sizing: border-box;
+  }
+  .ms-nav-open .topbar-link { order: 10; margin-top: 4px; padding: 0 14px; border-radius: 12px; border: 1px solid #e6e1d6; background: #fff; font-size: 15px; }
+  .ms-nav-open .ms-account { order: 11; }
+  .ms-nav-open .ms-account > button { flex: 1; min-height: 48px; justify-content: center; font-size: 15px; }
+  .ms-nav-open .ms-account-chip { max-width: none; justify-content: flex-start; }
+  .ms-nav-open > .ma-account-controls { order: 12; justify-content: space-between; }
+  /* account.js hides its children (not the container) when server accounts are off. */
+  .ms-nav-open > .ma-account-controls:not(:has(> :not([hidden]))) { display: none; }
+  .ms-nav-open .workspace-btn { order: 13; max-width: none; padding: 0 14px; border-radius: 12px; justify-content: flex-start; }
+  .ms-nav-open #openLocalEngineBtn { order: 14; padding: 0 14px !important; border-radius: 12px; font-size: 14px !important; justify-content: flex-start; }
+  .ms-nav-open .status-pill { order: 15; min-height: 40px; padding: 0 14px; border-radius: 12px; white-space: normal; background: transparent; border-style: dashed; }
+  .ms-nav-open { max-height: 100dvh; overflow-y: auto; box-shadow: 0 12px 30px rgba(0, 0, 0, 0.12); }
+
+  /* 8. Dropdowns from the header: nearly full width, pinned under the header row. */
+  .ms-notif-menu, .ms-credits-menu { position: fixed; left: 12px; right: 12px; top: 68px; width: auto; max-height: calc(100dvh - 84px); overflow-y: auto; }
+  .ms-nav-open .ms-account-menu { position: static; width: auto; margin-top: 8px; flex-basis: 100%; box-shadow: none; }
+  .ms-account-menu { position: fixed; left: 12px; right: 12px; top: 68px; width: auto; }
+  .ms-notif-link { padding: 12px 12px 12px 16px; }
+  .ms-notif-head .ms-link { min-height: 44px; display: inline-flex; align-items: center; }
+
+  /* 2. Consistent 16px side padding. */
+  .shell { padding: 16px 16px 32px !important; }
+  .logged-out-hero { padding: 2.25rem 16px 2.5rem !important; }
+  .logged-out-hero-inner { padding: 0; }
+  .digest { padding: 1.25rem 16px 3rem; }
+
+  /* 3. Watchlist bar: full width with its status pills wrapping underneath. */
+  .monitoring-bar { padding: 10px 16px !important; }
+  .monitoring-inner { flex-direction: column; align-items: stretch; gap: 8px; }
+  .monitoring-left { flex-wrap: wrap; min-width: 0; gap: 6px 8px; }
+  .monitoring-title { flex: 1 1 100%; }
+  .monitoring-right { display: flex !important; flex-wrap: wrap; gap: 6px; }
+
+  /* 4. Hero links stack, full width. */
+  .logged-out-hero-ctas { flex-direction: column; align-items: stretch; gap: 10px; }
+  .logged-out-hero-ctas > * { width: 100%; min-height: 48px; box-sizing: border-box; justify-content: center; text-align: center; }
+  .logged-out-hero h1 { overflow-wrap: break-word; }
+  .logged-out-hero-features { align-items: flex-start; text-align: left; }
+
+  /* 5. Cards fill the width: single-column rows, slimmer stage gutters. */
+  .jr-stage { padding: 14px 10px !important; }
+  .jr-row, .jr-row.three, .jr-row.create, .jr-row.improve, .jr-grid, .jr-next-grid { grid-template-columns: minmax(0, 1fr) !important; }
+  .jr-card, .jr-next-card, .jr-row > *, .dg-card, .card, .hero-card { width: 100%; max-width: none; min-width: 0; box-sizing: border-box; }
+  .jr-hero { grid-template-columns: minmax(0, 1fr); }
+  .dg-grid { grid-template-columns: minmax(0, 1fr); }
+
+  /* Ranked ideas: number sits beside the impact chip so the text uses the full card width. */
+  .jr-recos li { padding: 14px !important; }
+  .jr-recos li::before { left: 14px !important; top: 12px !important; }
+  .jr-recos .jr-impact { margin-left: 38px; min-height: 28px; display: inline-flex; align-items: center; justify-self: start; }
+
+  /* 7. Tap targets: at least 44px on everything people tap often. */
+  .ms-triage { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .ms-triage button { min-height: 44px; font-size: 13px; padding: 0 10px; }
+  .jr-mini, .jr-action, .ms-restore, .ms-do, .ms-adjust-row button, .ms-adjust-row input { min-height: 44px; }
+  /* Full workspace buttons and refine chips. */
+  .btn, .ms-rerun, .ms-refine-row button, .ms-refine-row input, .jr-tour-btn { min-height: 44px; }
+  .ms-refine-chips button { min-height: 44px; padding: 0 14px; }
+  .ms-refine-chips { gap: 8px; }
+  .jr-mini { padding: 0 12px; display: inline-flex; align-items: center; justify-content: center; }
+  .jr-action { display: flex; align-items: center; justify-content: center; }
+  .jr-add > div { flex-wrap: wrap; }
+  .jr-add input { flex: 1 1 100%; min-height: 44px; }
+  .jr-add .jr-mini { flex: 1 1 100%; }
+  .jr-seller { align-items: stretch; }
+  .jr-seller > .jr-mini { width: 100%; }
+  .jr-recos a, .dg-reco-go, .dg-hero-cta, .dg-section-head a { display: inline-flex; align-items: center; min-height: 44px; }
+  .ms-actions-row { gap: 4px 18px; }
+  .ms-actions-row .ms-link, .ms-myactions-foot .ms-link, .ms-restore { display: inline-flex; align-items: center; min-height: 44px; }
+  .ms-myactions > summary { min-height: 52px; flex-wrap: wrap; }
+  .ms-myactions > summary::after { order: 2; }
+  .ms-myactions-hint { order: 3; flex-basis: 100%; }
+  .ms-close { min-width: 44px; min-height: 44px; }
+  /* Watchlist alert toggle: larger switch with a 44px hit area. */
+  .toggle-switch { width: 44px; height: 26px; margin: 9px 0; }
+  .toggle-switch::before { content: ""; position: absolute; inset: -9px -4px; }
+  .toggle-switch .slider { border-radius: 26px; }
+  .toggle-switch .slider::before { width: 20px; height: 20px; }
+  .toggle-switch input:checked + .slider::before { transform: translateX(18px); }
+
+  /* General phone hygiene. */
+  input, select, textarea { font-size: 16px; }
+  dialog { max-width: calc(100vw - 24px); max-height: 90dvh; overflow-y: auto; }
+  .ms-toasts { left: 16px; right: 16px; transform: none; bottom: 24px; }
+  .ms-toast { white-space: normal; text-align: center; }
 }
