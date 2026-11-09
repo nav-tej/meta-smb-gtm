@@ -153,3 +153,11 @@ Pricing dialog (muse-shell.js) now offers only Starter Monthly ($12) and Starter
 - Real sandbox flow (`scripts/stripe_sandbox_flow.py`): Stripe accepted the app's Checkout params (month/year); test-card monthly+annual subscriptions active, declined card incomplete, cancellation; 9 real events normalized by the app and replayed twice into schema+migration on local Postgres → Starter 20 runs resetting monthly; declined/canceled stay trial. Synthetic customers deleted; webhook paused during run and re-enabled.
 - Committed **de14143** from a clean worktree (Antigravity's in-progress footer/legal files excluded) after `make check` **359 passed**; pushed to main; production deployed (meta-smb-3z7m3q4ew…, aliased meta-smb-gtm.vercel.app): pages 200, billing/status available:false, account UI off (demo), live without key 403, assets `?v=20261109-billing`.
 - Preview redeployed from de14143: https://meta-smb-agcekwj4s-navtejs-6321s-projects.vercel.app — `/account/me` configured:true, billing/status available:true; webhook repointed (same secret), signed probe 200. Local mirror check: signed-out "Choose Starter" → "Sign in to pick a plan." + account dialog on top; no checkout call.
+
+## Resume checkpoint: 2026-11-09 (Claude), Stripe LIVE on production
+- Done: live catalog + webhook via `scripts/stripe_setup.py --live --env production --push-vercel`;
+  ACCOUNTS_REQUIRED=true on Production; production redeployed (commit 6754784).
+- Verified: billing/status `{"available":true}`, account/me `configured:true`, checkout signed-out
+  401, webhook unsigned 400 / signed probe 200, live webhook enabled (livemode True).
+- Next: Nav real-card purchase then refund; verify billing rows + webhook delivery after it.
+  Roll the live secret key (pasted in chat) and rerun the push. Hermes preview E2E still pending.
