@@ -93,3 +93,6 @@ Migration applied to Supabase (verified; rollback file tested locally). Starter 
 - PostHog: off until POSTHOG_KEY set. Browser events (auth_dialog_opened, signup_submitted, signed_in, email_confirmed, plans_viewed, checkout_started/failed/returned, live_run_completed, runs_exhausted, cta_clicked) + server subscription_paid/checkout_completed/payment_failed/subscription_canceled from verified webhooks. No recordings, DNT honoured, identified by account ID only, URL tokens scrubbed. Privacy page discloses PostHog.
 - Preview env now has META_MODEL_API_KEY (shared $100 DB cap; Vercel-login protected) so a paid preview account can run live Muse.
 - 380 tests pass.
+
+### PostHog enabled — Claude, November 9
+Key read via the PostHog connector from the org's only project, **nav-dev** (US, id 325503; shared with nplusalpha.com/nplus1ventures.com — filter `app = muse-growth-studio`). POSTHOG_KEY/POSTHOG_HOST set in .env and Vercel Production + Preview; both redeployed (preview webhook repointed). Verified in PostHog: production `$pageview`, `cta_clicked`, `$autocapture`, `plans_viewed` arrived tagged with the app, query strings stripped from URLs.
