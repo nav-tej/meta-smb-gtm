@@ -65,6 +65,14 @@ class Settings(BaseModel):
     # subscriptions. Price IDs come from the Stripe dashboard (test or live).
     stripe_secret_key: str = ""
     stripe_webhook_secret: str = ""
+    # Email (Resend): weekly competitor digest and operator alerts. Off without an API key and a
+    # token secret. EMAIL_FROM must use a domain verified in Resend.
+    resend_api_key: str = ""
+    email_from: str = "Muse Growth Studio <digest@nplusalpha.com>"
+    email_reply_to: str = "help@nplusalpha.com"
+    email_token_secret: str = ""
+    email_postal_address: str = ""
+    alert_email: str = "help@nplusalpha.com"
     # PostHog product analytics: off unless a project key is set. The key is public by design.
     posthog_key: str = ""
     posthog_host: str = "https://us.i.posthog.com"

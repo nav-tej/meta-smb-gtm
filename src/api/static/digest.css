@@ -77,3 +77,20 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--success); outli
   .digest { padding: 1.4rem 1rem 3rem; }
   .dg-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* Email digest sign-up */
+.dg-email-notice { padding: 0.7rem 0.9rem; border-radius: 10px; background: var(--success-soft); color: var(--success); font-weight: 600; }
+.dg-email-notice.warn { background: var(--gold-soft); color: #8a5a12; }
+.dg-subscribe { padding: 1.25rem 1.4rem; border: 1px solid var(--border); border-top: 4px solid var(--success); border-radius: 16px; background: var(--surface); }
+.dg-subscribe h2 { margin: 0 0 0.35rem; }
+.dg-sub-lede { margin: 0 0 1rem; color: var(--text-muted); max-width: 640px; }
+.dg-sub-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem 1rem; }
+.dg-sub-form label { display: grid; gap: 0.3rem; font-size: 0.85rem; font-weight: 600; }
+.dg-sub-form label span { font-weight: 400; color: var(--text-muted); }
+.dg-sub-form input { min-height: 44px; padding: 0.55rem 0.7rem; border: 1px solid var(--border); border-radius: 10px; font: inherit; background: var(--bg); }
+.dg-sub-form input:focus-visible { outline: 2px solid var(--success); outline-offset: 1px; }
+.dg-sub-form button { grid-column: 1 / -1; justify-self: start; min-height: 44px; padding: 0.6rem 1.2rem; border: 0; border-radius: 10px; background: var(--success); color: #fff; font: 600 0.95rem var(--font-sans); cursor: pointer; }
+.dg-sub-form button[disabled] { opacity: 0.6; cursor: wait; }
+.dg-sub-status, .dg-sub-fine { grid-column: 1 / -1; margin: 0; font-size: 0.85rem; color: var(--text-muted); }
+.dg-sub-status.error { color: #9b2c1c; }
+@media (max-width: 640px) { .dg-sub-form { grid-template-columns: 1fr; } .dg-sub-form button { justify-self: stretch; } }

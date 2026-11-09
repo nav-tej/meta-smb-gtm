@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#faf8f5">
   <title>Weekly Market Digest · Muse Growth Studio</title>
-  <link rel="stylesheet" href="/static/digest.css?v=20261106-ui2">
+  <link rel="stylesheet" href="/static/digest.css?v=20261109-sub">
   <link rel="stylesheet" href="/static/portal-journey.css?v=20261106-ui2">
   <link rel="stylesheet" href="/static/muse-shell.css?v=20261109-ux3">
   <link rel="stylesheet" href="/static/account.css?v=20261109-ux">
@@ -13,6 +13,7 @@
   <script src="/static/account.js?v=20261109-hd2" defer></script>
   <script src="/static/muse-shell.js?v=20261109-hd1" defer></script>
   <script src="/static/digest.js?v=20261106-ui2" defer></script>
+  <script src="/static/digest-signup.js?v=20261109-1" defer></script>
 </head>
 <body>
   <header class="topbar ms-topbar">
@@ -50,6 +51,21 @@
       <div class="dg-section-head"><h2 id="dgRecoTitle">Strategic recommendations</h2><a href="/portal#loop-improve">All ranked ideas →</a></div>
       <ol class="ms-digest-recos" id="dgRecos"></ol>
       <p class="dg-note" id="dgRecoSource"></p>
+    </section>
+
+    <p class="dg-status dg-email-notice" id="digestEmailNotice" role="status" aria-live="polite" hidden></p>
+    <section class="dg-section dg-subscribe" id="digestSignup" aria-labelledby="dgSubTitle" hidden>
+      <h2 id="dgSubTitle">Get your own digest every Monday</h2>
+      <p class="dg-sub-lede">Add up to 3 competitor shops (Shopify, Fine Art America or any public shop page). Each Monday we check their public pages and email you new listings, removals and price changes. Free, no runs used, unsubscribe anytime.</p>
+      <form id="digestSignupForm" class="dg-sub-form" novalidate>
+        <label>Your email<input type="email" name="email" required autocomplete="email" maxlength="254"></label>
+        <label>Competitor shop<input type="text" inputmode="url" name="shop" required maxlength="300" placeholder="https://competitor-shop.com"></label>
+        <label>Another shop <span>(optional)</span><input type="text" inputmode="url" name="shop" maxlength="300"></label>
+        <label>Another shop <span>(optional)</span><input type="text" inputmode="url" name="shop" maxlength="300"></label>
+        <button type="submit" data-track="digest_subscribe">Email me the digest</button>
+        <p class="dg-sub-status" id="digestSignupStatus" role="status" aria-live="polite"></p>
+        <p class="dg-sub-fine">We only read public pages and store your email and shop links to send this digest. See our <a href="/static/legal/privacy.html">Privacy Policy</a>.</p>
+      </form>
     </section>
 
     <p class="dg-note" id="dgNote"></p>

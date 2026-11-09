@@ -16,6 +16,10 @@
     {
       "path": "/api/v1/monitor/run",
       "schedule": "0 14 * * 1"
+    },
+    {
+      "path": "/api/v1/digest/send",
+      "schedule": "0 15 * * 1"
     }
   ]
 }

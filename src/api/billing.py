@@ -18,6 +18,7 @@ from starlette.concurrency import run_in_threadpool
 
 from src.clients.supabase import get_supabase_client
 from src.config import get_settings
+from src.services import alerts
 from src.services.accounts import resolve_account
 
 logger = logging.getLogger(__name__)
@@ -341,6 +342,11 @@ async def webhook(request: Request) -> dict[str, bool]:
             getattr(event, "id", "?"),
             getattr(event, "type", "?"),
             type(err).__name__,
+        )
+        await alerts.alert(
+            "Stripe webhook not recorded",
+            f"Event {getattr(event, 'id', '?')} ({getattr(event, 'type', '?')}) failed with "
+            f"{type(err).__name__}. Stripe retries for 3 days; check Supabase and Vercel logs.",
         )
         raise HTTPException(503, "Billing event could not be applied. Retry later.") from err
     if data is not None and not result.get("duplicate"):
