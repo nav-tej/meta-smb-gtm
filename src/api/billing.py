@@ -8,6 +8,7 @@ invoices grant runs (via the webhook); checkout and portal links never grant any
 
 from __future__ import annotations
 
+import logging
 from typing import Any, Literal
 from uuid import UUID
 
@@ -19,6 +20,7 @@ from src.clients.supabase import get_supabase_client
 from src.config import get_settings
 from src.services.accounts import resolve_account
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/billing", tags=["billing"])
 
 _PLANS = {
@@ -323,6 +325,7 @@ async def webhook(request: Request) -> dict[str, bool]:
             payload, request.headers.get("stripe-signature", ""), settings.stripe_webhook_secret
         )
     except Exception as err:
+        logger.warning("Rejected a Stripe webhook with an invalid signature.")
         raise HTTPException(400, "Invalid webhook signature.") from err
     try:
         data = await _billing_event(_plain(event), _stripe())
@@ -332,6 +335,13 @@ async def webhook(request: Request) -> dict[str, bool]:
                 raise ValueError("Billing event rejected")
     except Exception as err:
         # Retry on provider/database failure; never acknowledge a lost entitlement write.
+        # Stripe retries for up to 3 days; this ERROR line is what monitoring alerts on.
+        logger.error(
+            "BILLING_WEBHOOK_FAILED event=%s type=%s error=%s",
+            getattr(event, "id", "?"),
+            getattr(event, "type", "?"),
+            type(err).__name__,
+        )
         raise HTTPException(503, "Billing event could not be applied. Retry later.") from err
     if data is not None and not result.get("duplicate"):
         await _report_billing_event(data)

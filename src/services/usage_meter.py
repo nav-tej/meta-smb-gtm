@@ -50,6 +50,12 @@ def current_operation_id() -> str | None:
     return context.operation_id if context else None
 
 
+def current_user_id() -> str | None:
+    """The server-verified account behind the current live run, if any."""
+    context = _request_context.get()
+    return context.user_id if context else None
+
+
 async def _rpc(name: str, params: dict[str, Any]) -> dict[str, Any]:
     # Lazy import keeps this service independent of auth-route initialization.
     try:

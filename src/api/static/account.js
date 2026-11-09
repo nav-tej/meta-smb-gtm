@@ -334,6 +334,34 @@
     catch { renderAccount(); }
     return copy(snapshot);
   })();
+  // Back from Stripe Checkout (/account?billing=success|cancelled). The redirect itself grants
+  // nothing: the plan appears once Stripe's verified webhook is recorded, so wait for it here.
+  const note = (text, kind = '') => { try { window.museShell?.toast?.(text, kind); } catch {} };
+  async function checkoutReturn() {
+    const params = new URLSearchParams(location.search);
+    const result = params.get('billing');
+    if (result !== 'success' && result !== 'cancelled') return;
+    params.delete('billing');
+    try { history.replaceState(null, '', location.pathname + (params.size ? `?${params}` : '') + location.hash); } catch {}
+    if (result === 'cancelled') { note('Checkout cancelled. Nothing was charged.'); return; }
+    note('Payment received. Activating your plan…');
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      await new Promise(resolve => setTimeout(resolve, attempt ? 3000 : 500));
+      try { await refresh(); } catch { continue; }
+      const plan = snapshot.usage?.plan;
+      if (plan && plan !== 'trial') {
+        note(`Your ${plan[0].toUpperCase()}${plan.slice(1)} plan is active: ${snapshot.usage.remaining ?? 'unlimited'} runs available.`);
+        track('plan_activated', { plan });
+        return;
+      }
+      if (!snapshot.user) break;
+    }
+    if (!dialog) mount();
+    if (!snapshot.user) { open('signin', 'Payment received. Sign in with the account you used at checkout to see your plan.'); return; }
+    track('plan_activation_slow');
+    open('account', 'Your payment went through, but activation is taking longer than usual. Refresh this page in a minute. If your plan still shows the trial, email help@nplusalpha.com; you will not be charged twice.');
+  }
+  readyPromise.then(checkoutReturn).catch(() => {});
   window.museAccount = Object.freeze({
     ready: () => readyPromise, refresh, open, liveReady, getSnapshot: () => copy(snapshot), saveWorkspace, loadWorkspace, signout
   });

@@ -149,3 +149,12 @@ def test_browser_handles_expiry_fallbacks_and_refunds_for_every_live_call() -> N
     assert "Your session ended before Muse started, so no run was used." in script
     assert "Live Muse was unavailable, so saved results are shown. No run was used." in script
     assert "refresh().catch" in script
+
+
+def test_checkout_return_waits_for_the_verified_webhook() -> None:
+    script = (Path(__file__).resolve().parents[1] / "src/api/static/account.js").read_text()
+    assert "readyPromise.then(checkoutReturn)" in script
+    assert "Checkout cancelled. Nothing was charged." in script
+    assert "you will not be charged twice" in script
+    billing = (Path(__file__).resolve().parents[1] / "src/api/billing.py").read_text()
+    assert "BILLING_WEBHOOK_FAILED" in billing

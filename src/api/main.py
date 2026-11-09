@@ -19,6 +19,7 @@ from src.api import (
     credits,
     daily_brief,
     intel,
+    media,
     monitor,
     product_reference,
     research_targets,
@@ -249,6 +250,7 @@ async def supabase_error_handler(request: Request, exc: SupabaseError) -> JSONRe
 app.include_router(health_router)
 app.include_router(health_router, prefix=API_PREFIX)
 app.include_router(accounts.router, prefix=API_PREFIX)
+app.include_router(media.router, prefix=API_PREFIX)
 app.include_router(analytics.router, prefix=API_PREFIX)
 app.include_router(billing.router, prefix=API_PREFIX)
 app.include_router(intel.router, prefix=API_PREFIX)

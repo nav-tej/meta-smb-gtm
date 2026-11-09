@@ -205,6 +205,13 @@ class Creative(BaseModel):
     media_mime_type: Literal["image/png", "image/jpeg", "image/webp"] | None = Field(
         default=None, description="MIME type detected from the image bytes, not the extension."
     )
+    media_asset_url: str | None = Field(
+        default=None,
+        description=(
+            "Same-origin URL of the durable copy in the signed-in owner's account "
+            "(/api/v1/account/media/...). Survives new server instances; None when not stored."
+        ),
+    )
 
 
 class CreativeSet(BaseModel):

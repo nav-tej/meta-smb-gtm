@@ -117,6 +117,65 @@ class SupabaseClient:
             raise SupabaseError(503, "Account service returned an invalid response.")
         return result
 
+    async def _storage(
+        self, method: str, path: str, *, content: bytes | None = None, **kwargs: Any
+    ) -> httpx.Response:
+        settings = get_settings()
+        key = getattr(settings, "supabase_secret_key", "")
+        base_url = getattr(settings, "supabase_url", "").rstrip("/")
+        if not key or not base_url:
+            raise SupabaseError(503, "Storage is not configured yet.")
+        headers = {"apikey": key, **kwargs.pop("headers", {})}
+        if key.startswith("eyJ"):
+            headers["Authorization"] = f"Bearer {key}"
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=False) as http:
+                return await http.request(
+                    method,
+                    f"{base_url}/storage/v1/{path}",
+                    content=content,
+                    headers=headers,
+                    **kwargs,
+                )
+        except httpx.HTTPError as err:
+            raise SupabaseError(503, "Storage is unavailable. Try again shortly.") from err
+
+    async def put_object(self, bucket: str, name: str, data: bytes, mime: str) -> None:
+        """Store a new object (never overwrites). Server key only."""
+        result = await self._storage(
+            "POST",
+            f"object/{bucket}/{name}",
+            content=data,
+            headers={"Content-Type": mime, "x-upsert": "false"},
+        )
+        if result.is_error:
+            raise SupabaseError(503, "Storage did not accept the file.")
+
+    async def get_object(self, bucket: str, name: str) -> bytes | None:
+        """Read an object's bytes, or None when it does not exist."""
+        result = await self._storage("GET", f"object/{bucket}/{name}")
+        if result.status_code in {400, 404}:
+            return None
+        if result.is_error:
+            raise SupabaseError(503, "Storage is unavailable. Try again shortly.")
+        return result.content
+
+    async def list_objects(self, bucket: str, prefix: str) -> list[str]:
+        """Names of objects directly under prefix/ (up to 1000)."""
+        result = await self._storage(
+            "POST", f"object/list/{bucket}", json={"prefix": prefix, "limit": 1000}
+        )
+        if result.is_error:
+            raise SupabaseError(503, "Storage is unavailable. Try again shortly.")
+        return [f"{prefix}/{item['name']}" for item in result.json() if item.get("id")]
+
+    async def delete_objects(self, bucket: str, names: list[str]) -> None:
+        if not names:
+            return
+        result = await self._storage("DELETE", f"object/{bucket}", json={"prefixes": names})
+        if result.is_error:
+            raise SupabaseError(503, "Storage is unavailable. Try again shortly.")
+
 
 @lru_cache
 def get_supabase_client() -> SupabaseClient:

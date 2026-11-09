@@ -12,7 +12,7 @@ from src.api.media_delivery import MediaResponseTooLargeError, attach_inline_med
 from src.clients.comfyui import SUPPORTED_COMFY_WORKFLOWS, discover_comfy_cli
 from src.clients.meta import MetaAPIError, get_meta_client
 from src.models.creative import CreativeSet, EditableCreativeBrief, GenerateAdsRequest
-from src.services import demo, result_cache
+from src.services import demo, media_store, result_cache, usage_meter
 from src.services.ad_creative import AdCreativeService
 
 router = APIRouter(tags=["creative"])
@@ -108,7 +108,7 @@ async def generate_ads(
         return attach_inline_media(await service.generate(request))
 
     try:
-        return await result_cache.cached("generate-ads", request, CreativeSet, render, response)
+        result = await result_cache.cached("generate-ads", request, CreativeSet, render, response)
     except MediaResponseTooLargeError as err:
         raise HTTPException(
             status.HTTP_413_CONTENT_TOO_LARGE,
@@ -119,3 +119,8 @@ async def generate_ads(
                 "limit_bytes": err.limit_bytes,
             },
         ) from err
+    # Signed-in accounts also get a durable copy (per user, so a shared cache hit is re-stored).
+    owner = usage_meter.current_user_id()
+    if owner and isinstance(result, CreativeSet):
+        result = await media_store.store_creatives(result, owner)
+    return result
