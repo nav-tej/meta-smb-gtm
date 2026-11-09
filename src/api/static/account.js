@@ -6,6 +6,7 @@
   let snapshot = { configured: false, user: null, usage: null, live_available: false };
   let accountEpoch = 0;
   let workspaceVersion = 0;
+  let workspaceOwner = null;
   let mode = 'signin';
   let busy = false;
   let dialog;
@@ -35,12 +36,12 @@
     message.textContent = text;
     message.className = error ? 'ma-message ma-error' : 'ma-message';
   }
-  async function request(path, method = 'GET', body) {
+  async function request(path, method = 'GET', body, extraHeaders = {}) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 15000);
     try {
       const response = await fetch(root + path, {
-        method, credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+        method, credentials: 'same-origin', headers: { 'Content-Type': 'application/json', ...extraHeaders },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }), signal: controller.signal
       });
       let data = {};
@@ -63,7 +64,7 @@
       id: data.user.id, email: String(data.user.email || ''), email_verified: data.user.email_verified === true
     } : null;
     snapshot = { configured: data?.configured === true, user, usage: data?.usage || null, live_available: data?.live_available === true };
-    if (previous !== (user?.id || null)) { accountEpoch += 1; workspaceVersion = 0; }
+    if (previous !== (user?.id || null)) { accountEpoch += 1; workspaceVersion = 0; workspaceOwner = null; }
     renderAccount();
     const detail = copy(snapshot);
     window.dispatchEvent(new CustomEvent('muse:account-change', { detail }));
@@ -171,26 +172,48 @@
     } catch (error) { setBusy(false); open('account'); say(error.message, true); }
     finally { setBusy(false); }
   }
-  function requireAccount() {
+  function requireAccount(expectedOwner) {
     if (!snapshot.user) { open('signup', 'Sign in to save or load your own workspace. Your draft stays here.'); throw new Error('Sign in to access your saved workspace.'); }
+    if (expectedOwner !== undefined && expectedOwner !== snapshot.user.id) {
+      const error = new Error('The account changed. Load the workspace again.');
+      error.status = 409;
+      throw error;
+    }
     return { owner: snapshot.user.id, epoch: accountEpoch };
   }
-  function stillOwner(start) { return start.epoch === accountEpoch && start.owner === snapshot.user?.id; }
-  async function loadWorkspace() {
-    const start = requireAccount();
-    const data = await request('/workspace');
-    if (!stillOwner(start)) throw new Error('The account changed. Load the workspace again.');
+  function stillOwner(start, responseOwner) {
+    return start.epoch === accountEpoch && start.owner === snapshot.user?.id && (responseOwner === undefined || responseOwner === start.owner);
+  }
+  async function loadWorkspace(expectedOwner) {
+    const start = requireAccount(expectedOwner);
+    const data = await request('/workspace', 'GET', undefined, { 'X-Muse-Owner': start.owner });
+    if (!stillOwner(start, data?.owner_id)) {
+      const error = new Error('The account changed. Load the workspace again.');
+      error.status = 409;
+      throw error;
+    }
     workspaceVersion = Number.isSafeInteger(data.version) ? data.version : 0;
+    workspaceOwner = start.owner;
     return copy(data);
   }
-  async function saveWorkspace(documentValue) {
-    const start = requireAccount();
+  async function saveWorkspace(documentValue, expectedOwner) {
+    const start = requireAccount(expectedOwner);
+    if (workspaceOwner !== null && workspaceOwner !== start.owner) {
+      const error = new Error('The account changed while saving. Reload your workspace.');
+      error.status = 409;
+      throw error;
+    }
     const encoded = JSON.stringify(documentValue);
     if (!encoded || encoded.length > 3000000) throw new Error('This draft is too large to save. Download the image separately.');
     if (/"(?:key|access_token|refresh_token|service_role_key|service_key|unlockKey|unlock_key|demo_key|authorization)"\s*:/i.test(encoded)) throw new Error('Save draft content only, without account or presenter keys.');
-    const data = await request('/workspace', 'PUT', { document: JSON.parse(encoded), expected_version: workspaceVersion });
-    if (!stillOwner(start)) throw new Error('The account changed while saving. Reload your workspace.');
+    const data = await request('/workspace', 'PUT', { document: JSON.parse(encoded), expected_version: workspaceVersion, expected_owner: start.owner }, { 'X-Muse-Owner': start.owner });
+    if (!stillOwner(start, data?.owner_id)) {
+      const error = new Error('The account changed while saving. Reload your workspace.');
+      error.status = 409;
+      throw error;
+    }
     workspaceVersion = Number.isSafeInteger(data.version) ? data.version : workspaceVersion;
+    workspaceOwner = start.owner;
     return copy(data);
   }
   async function callback() {
@@ -240,6 +263,20 @@
     const refreshButton = node('button', { type: 'button', class: 'ma-refresh' }, 'Refresh account');
     refreshButton.addEventListener('click', async () => { if (busy) return; setBusy(true); try { await refresh(); setMode(snapshot.user ? 'account' : 'signin', 'Account refreshed.'); } catch (error) { say(error.message, true); } finally { setBusy(false); } });
     dialog.append(close, title, description, tabs, form, recover, message, refreshButton);
+    dialog.addEventListener('keydown', event => {
+      if (event.key !== 'Tab') return;
+      const focusables = [...dialog.querySelectorAll('button:not([hidden]):not([disabled]), input:not([hidden]):not([disabled]), [tabindex]:not([tabindex="-1"])')].filter(el => !el.closest('[hidden]'));
+      if (!focusables.length) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (event.shiftKey && (document.activeElement === first || !dialog.contains(document.activeElement))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (document.activeElement === last || !dialog.contains(document.activeElement))) {
+        event.preventDefault();
+        first.focus();
+      }
+    });
     dialog.addEventListener('cancel', event => { if (busy) event.preventDefault(); else password.value = ''; });
     document.body.append(dialog); renderAccount();
   }

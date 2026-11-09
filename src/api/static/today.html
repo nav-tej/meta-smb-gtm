@@ -1,9 +1,18 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f6f3eb"><title>Muse · Your daily post</title><link rel="stylesheet" href="/static/today.css?v=20261104-polish2"><link rel="stylesheet" href="/static/muse-shell.css?v=20261107-mobile2"><link rel="stylesheet" href="/static/account.css?v=20261104-polish2"><script src="/static/account.js?v=20261104-polish2" defer></script><script src="/static/muse-shell.js?v=20261107-mobile2" defer></script><script src="/static/today.js?v=20261106-resilience" defer></script><script src="/static/research.js?v=20261106-resilience" defer></script></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f6f3eb"><title>Muse · Your daily post</title><link rel="stylesheet" href="/static/today.css?v=20261104-polish2"><link rel="stylesheet" href="/static/muse-shell.css?v=20261109-billing"><link rel="stylesheet" href="/static/account.css?v=20261104-polish2"><script src="/static/account.js?v=20261104-polish2" defer></script><script src="/static/muse-shell.js?v=20261109-billing" defer></script><script src="/static/today.js?v=20261107-recovery?v=20261106-resilience" defer></script><script src="/static/research.js?v=20261106-resilience" defer></script></head>
 <body>
 <header><a class="brand" href="/today"><i>m</i> muse</a><span id="saveStatus">Your daily studio</span><nav style="display:flex;gap:16px;align-items:center"><a href="/">← Your plan</a><a href="/create">Full studio ↗</a></nav></header>
+<p id="draftBoundaryStatus" role="status" aria-live="polite"></p>
 <main>
+<section aria-label="Draft storage">
+<p id="draftStatus" role="status" aria-live="polite">Checking device draft…</p>
+<button type="button" id="saveAccountDraft">Save to account</button>
+<button type="button" id="loadAccountDraft">Load from account</button>
+<button type="button" id="downloadDraft">Download draft backup</button>
+<button type="button" id="recoverDraft">Recover previous device draft</button>
+<button type="button" id="replaceAccountDraft" hidden>Replace account draft with this draft</button>
+</section>
   <div class="intro"><div><p class="eyebrow">A LITTLE MARKETING. BACK TO MAKING.</p><h1>One good post today.</h1><p id="dailyReason">Start with your work. We’ll help with the words.</p></div><button class="quiet" id="openSetup">Change item or goal</button></div>
   <div id="notice" role="status" aria-live="polite" hidden></div>
   <section class="desk" aria-label="Today's post">

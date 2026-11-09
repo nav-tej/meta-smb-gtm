@@ -324,7 +324,7 @@ async function trigger(id, eventName = 'click') {
   assert.equal(snap.product.name, '');
   assert.equal(snap.product.seller, '');
   assert.equal(snap.product.price, '');
-  assert.equal(getNode('productFactNote').textContent, 'Your photo stays in this tab. A live request sends it to Muse only when you choose to generate.');
+  assert.equal(getNode('productFactNote').textContent, 'Your photo is saved on this device when storage is available. A live request sends it to Muse only when you choose to generate.');
 
   console.log('--- TEST 2: Edited Headline and Caption Appear in Exports ---');
   // Set custom product fields

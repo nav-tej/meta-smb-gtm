@@ -1,5 +1,33 @@
 # AGENTS.md
 
+## Active launch sprint, November 7–8, 2026
+
+Read [the launch plan](docs/launch/PLAN.md) and [current assignments](docs/launch/STATUS.md) before editing. These supersede historical sprint assignments and file reservations below for launch work. User authorized parallel corrective work and launch preparation. Codex coordinates integration and release. Respect exclusive write scopes, preserve existing changes, and report evidence in your own launch status. External agent assignments are pending until acknowledged. Keep paid calls and remote mutations within the authorization boundaries in the plan.
+
+
+### Required progress checkpoints
+
+Nav requires restartable logs for all launch agents, including after usage-limit interruptions.
+- Darwin owns docs/launch/BILLING.md, Boyle owns docs/launch/DRAFTS.md, and Popper owns docs/launch/QA.md. Coordinator maintains docs/launch/STATUS.md.
+- Write a dated Resume checkpoint when starting or resuming, after every meaningful edit or test, before long operations, and before handoff. Checkpoint proactively because an abrupt usage limit can prevent a final write.
+- Include task/state, changed file paths, completed work, exact verification commands/results, blockers, next executable step, and running process/session IDs when applicable. Distinguish verified facts from plans. Never log secrets.
+- Resume by reading this file, PLAN.md, STATUS.md and the agent's checkpoint, then inspect current diffs and process state before continuing. Preserve other agents' edits and avoid repeating verified work.
+- A usage-limit failure means interrupted, not completed. Coordinator records it and reuses the same assignment on resume.
+
+
+### Cross-agent takeover
+
+Claude, Gemini/Antigravity and Hermes may resume launch work from this repository. Read docs/launch/PLAN.md, STATUS.md and the relevant BILLING.md, DRAFTS.md or QA.md checkpoint first. CLAUDE.md and GEMINI.md link to this file; other agents should explicitly open AGENTS.md.
+
+1. Inspect git status/diff and current evidence. Uncommitted work on this Mac is part of the handoff.
+2. Confirm the current owner has stopped or yielded before editing its scope. A stale timestamp or queued message alone does not establish that the owner stopped. If ownership is unclear, do read-only review and request coordination.
+3. Claim the interrupted assignment in STATUS.md with your agent name, date/time, previous owner, exact file scope and next step. Preserve prior history. Claiming a Markdown row is coordination, not an atomic lock; recheck before edits and use an isolated worktree for concurrent work.
+4. Continue the existing task log, adding your identity and checkpoint. Verify current behavior before relying on prior claims. Follow the same scope, verification and approval boundaries.
+5. Before yielding, record remaining steps and explicitly release ownership. The coordinator verifies integration and deployment.
+
+Suggested handoffs when their owner yields: Claude can take billing review, Antigravity can take editor persistence, and Hermes can take the reproducible QA/novice rehearsal. These are mappings, not confirmed dispatches. On another machine, sync the exact changes and logs first; git pull alone cannot obtain uncommitted work.
+
+
 Context for any AI coding agent working in this repo (Claude Code, Gemini CLI, Qwen Code, Hermes, or a local model). `CLAUDE.md`, `GEMINI.md`, and `QWEN.md` are symlinks to this file, so there is one source of truth. Read it fully before making changes.
 
 

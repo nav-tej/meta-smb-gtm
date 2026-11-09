@@ -44,7 +44,7 @@ PRESENTER = "presenter"
 REPO_ROOT = Path(__file__).resolve().parents[2]
 _COOKIE_RE = re.compile(r"^[A-Za-z0-9_-]{32,64}$")
 # Demo checkout plans (nothing is charged); arbitrary top-ups need the admin key.
-DEMO_PLAN_RUNS = {"starter": 10, "growth": 50, "unlimited": 999}
+DEMO_PLAN_RUNS = {"starter": 20, "growth": 50, "unlimited": 999}
 HISTORY_LIMIT = 25
 
 

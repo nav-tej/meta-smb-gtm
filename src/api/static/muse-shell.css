@@ -189,7 +189,7 @@
 /* Planned pricing */
 .ms-pricing { width: min(820px, calc(100vw - 32px)); }
 .ms-pricing-gift { margin: 0 0 10px; font-size: 14px; color: #6a3fa0; font-weight: 650; }
-.ms-plans { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 12px 0; }
+.ms-plans { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 12px 0; }
 .ms-plan { position: relative; display: flex; flex-direction: column; gap: 4px; padding: 16px; border-radius: 16px; border: 1px solid #e6e1d6; background: #fcfbf8; }
 .ms-plan.featured { border: 2px solid #b85d19; background: #fff8f2; box-shadow: 0 12px 28px rgba(184, 93, 25, 0.16); }
 .ms-plan-tag { position: absolute; top: -10px; left: 16px; font-size: 10px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #fff; background: #b85d19; padding: 3px 9px; border-radius: 999px; }

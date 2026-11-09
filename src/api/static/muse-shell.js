@@ -248,13 +248,14 @@
   }
 
   // ---------- Pricing ----------
-  const PLAN_RUNS = { starter: 10, growth: 50, unlimited: 999 };
+  // Starter is the only plan on sale; Growth/Unlimited return when they have Stripe prices.
+  const PLAN_RUNS = { starter: 20, growth: 50, unlimited: 999 };
+  const STARTER_POINTS = ['20 Muse runs every month', 'Competitor analysis and ready-to-post ads', 'Cancel anytime'];
   const PLANS = [
-    { id: 'starter', name: 'Starter', price: '$9', per: 'one-time', runs: '10 runs', points: ['Competitor analysis', 'Ready-to-post ads', 'Ranked next moves'] },
-    { id: 'growth', name: 'Growth', price: '$29', per: '/month', runs: '50 runs a month', points: ['Everything in Starter', 'Daily growth brief', 'Budget advice for ads'], featured: true },
-    { id: 'unlimited', name: 'Unlimited', price: '$99', per: '/month', runs: 'Unlimited runs', points: ['Everything in Growth', 'Unlimited competitors', 'Priority support'] },
+    { id: 'starter', interval: 'month', name: 'Starter · Monthly', price: '$12', per: '/month', runs: '20 runs a month', points: STARTER_POINTS },
+    { id: 'starter', interval: 'year', name: 'Starter · Annual', price: '$9', per: '/month, billed $108 yearly', runs: '20 runs a month · save 25%', points: STARTER_POINTS, featured: true, tag: 'Best value' },
   ];
-  async function buyPlan(plan, button) {
+  async function buyPlan(plan, interval, button) {
     const snap = serverSnapshot();
     if (!snap?.configured) return;
     if (!snap.user) { toast('Sign in to pick a plan.'); window.museAccount.open('signup'); return; }
@@ -263,24 +264,40 @@
     try {
       const response = await fetch('/api/v1/billing/checkout', {
         method: 'POST', credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ plan }),
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ plan, interval }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.url) throw new Error(data.detail || 'Checkout failed.');
       location.href = data.url;
     } catch (error) { toast(error.message, 'warn'); button.disabled = false; }
   }
+  // Real checkout is offered only when the server says payments can be taken and recorded.
+  let billingStatus = null;
+  async function loadBillingStatus() {
+    if (billingStatus) return billingStatus;
+    try {
+      const response = await fetch('/api/v1/billing/status', { credentials: 'same-origin' });
+      billingStatus = response.ok ? await response.json() : { available: false };
+    } catch { billingStatus = { available: false }; }
+    return billingStatus;
+  }
   function refreshPlanButtons() {
     if (!pricingDialog) return;
+    const comingSoon = serverMode() && billingStatus?.available !== true;
     pricingDialog.querySelectorAll('.ms-plan').forEach((card, index) => {
       const plan = PLANS[index];
       const button = card.querySelector('button');
       if (!plan || !button) return;
-      if (serverMode()) {
+      if (comingSoon) {
+        button.disabled = true;
+        button.textContent = 'Coming soon';
+        button.title = 'Paid plans open soon';
+        button.onclick = null;
+      } else if (serverMode()) {
         button.disabled = false;
         button.removeAttribute('title');
         button.textContent = `Choose ${plan.name}`;
-        button.onclick = () => buyPlan(plan.id, button);
+        button.onclick = () => buyPlan(plan.id, plan.interval, button);
       } else {
         button.disabled = false;
         button.title = 'Demo checkout: no payment is taken';
@@ -289,8 +306,9 @@
       }
     });
     const note = pricingDialog.querySelector('.ms-muted');
+    if (note && comingSoon) { note.textContent = 'Paid plans open soon. Your 3 free Muse runs work now.'; return; }
     if (note) note.textContent = serverMode()
-      ? 'Secure checkout via Stripe. 1 run = one competitor analysis, ad generation or budget review.'
+      ? 'Secure checkout via Stripe for n Plus Alpha LLC. Cancel anytime; runs reset monthly. 1 run = one competitor analysis, ad generation or budget review.'
       : 'Demo checkout: no card is needed and no payment is taken; runs are added to your demo balance on this server. 1 run = one analysis, refinement, re-run or ad scene.';
   }
   let pricingDialog;
@@ -306,7 +324,7 @@
       const grid = el('div', { class: 'ms-plans' });
       for (const plan of PLANS) {
         const card = el('div', { class: `ms-plan${plan.featured ? ' featured' : ''}` });
-        if (plan.featured) card.appendChild(el('span', { class: 'ms-plan-tag' }, 'Most popular'));
+        if (plan.featured) card.appendChild(el('span', { class: 'ms-plan-tag' }, plan.tag || 'Most popular'));
         card.appendChild(el('strong', { class: 'ms-plan-name' }, plan.name));
         const price = el('p', { class: 'ms-plan-price' }, plan.price);
         price.appendChild(el('small', {}, ` ${plan.per}`));
@@ -324,6 +342,7 @@
       document.body.appendChild(pricingDialog);
     }
     refreshPlanButtons();
+    if (serverMode() && !billingStatus) loadBillingStatus().then(refreshPlanButtons);
     pricingDialog.querySelector('h2').textContent = mode === 'gift' ? 'Gift a subscription' : 'Get more runs';
     const giftLine = pricingDialog.querySelector('.ms-pricing-gift');
     giftLine.textContent = mode === 'gift' ? 'Any plan can be sent as a gift to a maker you love.' : '';
@@ -393,8 +412,8 @@
       const close = el('button', { type: 'button', class: 'ms-close', 'aria-label': 'Close' }, '×');
       close.addEventListener('click', () => signupDialog.close());
       signupDialog.appendChild(close);
-      signupDialog.appendChild(el('p', { class: 'ms-eyebrow' }, 'Free to start · 3 runs'));
-      signupDialog.appendChild(el('h2', { id: 'msSignupTitle' }, 'Create your free account'));
+      signupDialog.appendChild(el('p', { class: 'ms-eyebrow' }, 'Demo profile · this browser only'));
+      signupDialog.appendChild(el('h2', { id: 'msSignupTitle' }, 'Try a demo profile'));
       signupDialog.appendChild(el('p', { class: 'ms-signup-reason' }));
       const form = el('form', { class: 'ms-signup-form', novalidate: '' });
       form.appendChild(el('label', { for: 'msSignupEmail' }, 'Email'));
@@ -402,7 +421,7 @@
       form.appendChild(el('label', { for: 'msSignupName' }, 'Shop or name (optional)'));
       form.appendChild(el('input', { id: 'msSignupName', type: 'text', autocomplete: 'organization', maxlength: '80', placeholder: 'Art of Sarabjit Singh' }));
       form.appendChild(el('p', { class: 'ms-signup-error', role: 'alert' }));
-      form.appendChild(el('button', { type: 'submit', class: 'ms-primary' }, 'Create free account'));
+      form.appendChild(el('button', { type: 'submit', class: 'ms-primary' }, 'Create demo profile'));
       form.addEventListener('submit', (event) => {
         event.preventDefault();
         const email = form.querySelector('#msSignupEmail').value.trim().toLowerCase();
@@ -450,7 +469,7 @@
     accountSlot.replaceChildren();
     if (pill) pill.hidden = !account;
     if (!account) {
-      const btn = el('button', { type: 'button', class: 'ms-primary ms-small ms-signup-btn' }, 'Sign up free');
+      const btn = el('button', { type: 'button', class: 'ms-primary ms-small ms-signup-btn' }, 'Try demo profile');
       btn.addEventListener('click', () => openSignup());
       accountSlot.appendChild(btn);
       return;

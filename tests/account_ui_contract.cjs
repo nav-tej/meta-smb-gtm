@@ -85,10 +85,27 @@ function harness(hash = '') {
 
   // A guest draft cannot overwrite cloud data before the current version is loaded.
   await assert.rejects(h.api.saveWorkspace({ caption: 'guest draft' }), /newer draft/);
-  const loaded = await h.api.loadWorkspace(); assert.equal(loaded.document.caption, 'Previous saved draft');
-  const saved = await h.api.saveWorkspace({ caption: 'My edited words' }); assert.equal(saved.version, 8);
+  await assert.rejects(h.api.loadWorkspace('user-b'), /account changed/);
+  await assert.rejects(h.api.saveWorkspace({ caption: 'wrong owner' }, 'user-b'), /account changed/);
+  const loaded = await h.api.loadWorkspace('user-a'); assert.equal(loaded.document.caption, 'Previous saved draft');
+  assert.equal(h.calls.at(-1).options.headers['X-Muse-Owner'], 'user-a');
+  const saved = await h.api.saveWorkspace({ caption: 'My edited words' }, 'user-a'); assert.equal(saved.version, 8);
   assert.equal(h.calls.at(-1).payload.expected_version, 7);
+  assert.equal(h.calls.at(-1).payload.expected_owner, 'user-a');
+  assert.equal(h.calls.at(-1).options.headers['X-Muse-Owner'], 'user-a');
   await assert.rejects(h.api.saveWorkspace({ demo_key: 'must-not-save' }), /without account or presenter keys/);
+
+  // A response returning a different owner_id or an A->B->A bounce must be rejected.
+  h.deferLoad(resolve => resolve(h.response({ document: { private: 'user-b' }, version: 9, owner_id: 'user-b' })));
+  await assert.rejects(h.api.loadWorkspace('user-a'), /account changed/);
+  let releaseAba;
+  h.deferLoad(resolve => { releaseAba = resolve; }); const pendingAba = h.api.loadWorkspace('user-a');
+  await new Promise(resolve => setImmediate(resolve));
+  h.setAccount(h.signed('user-b')); await h.api.refresh();
+  h.setAccount(h.signed('user-a')); await h.api.refresh();
+  releaseAba(h.response({ document: { private: 'stale-user-a' }, version: 8, owner_id: 'user-a' }));
+  await assert.rejects(pendingAba, /account changed/);
+  h.deferLoad(null);
 
   // A delayed user A response must not become user B's workspace.
   let release;

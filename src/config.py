@@ -65,7 +65,8 @@ class Settings(BaseModel):
     # subscriptions. Price IDs come from the Stripe dashboard (test or live).
     stripe_secret_key: str = ""
     stripe_webhook_secret: str = ""
-    stripe_price_starter: str = ""
+    stripe_price_starter_monthly: str = ""
+    stripe_price_starter_annual: str = ""
     stripe_price_growth: str = ""
     stripe_price_unlimited: str = ""
 
@@ -88,4 +89,7 @@ def get_settings() -> Settings:
         values["monitor_dir"] = "/tmp/muse-monitor"
     if os.environ.get("VERCEL"):
         values["hosted_environment"] = True
+    # Each preview deployment has its own URL; send Stripe redirects back to it, not production.
+    if os.environ.get("VERCEL_ENV") == "preview" and os.environ.get("VERCEL_URL"):
+        values.setdefault("app_url", f"https://{os.environ['VERCEL_URL']}")
     return Settings(**values)

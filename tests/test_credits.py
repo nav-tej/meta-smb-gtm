@@ -138,7 +138,7 @@ def test_demo_plan_adds_runs_but_custom_amount_needs_admin_when_hosted(
     get_settings.cache_clear()
     client = TestClient(app, base_url="https://testserver")
     added = client.post("/api/v1/credits/add", json={"plan": "starter"})
-    assert added.json()["balance"] == 13
+    assert added.json()["balance"] == 23  # 3 trial + 20 Starter runs
     assert added.json()["persistent"] is False and added.json()["note"]
     assert client.post("/api/v1/credits/add", json={"amount": 50}).status_code == 403
     admin = client.post(

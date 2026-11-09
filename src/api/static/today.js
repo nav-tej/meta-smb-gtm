@@ -7,32 +7,160 @@
   const originalSample = '/samples/ek_onkar_original.jpg';
   const initialProduct = () => ({ title: 'Ek Onkar', description: 'An artwork by Sarabjit Singh exploring connection and equality through color and form.', seller: 'Art of Sarabjit Singh', collection: '', price: '', destination_url: 'https://sarabjit-singh.pixels.com/', destination: 'pixels' });
   const state = { product: initialProduct(), original: originalSample, image: originalSample, imageMode: 'original', source: 'Suggested from the artist example', channel: 'instagram', format: 'image', goal: 'visits', salesGoal: null, performance: null, plans: {}, edits: {}, selected: 0, posted: {}, offers: {}, busy: false, revision: 0, paint: 0, live: false, key: '', readiness: null };
-  let setupBackup = null;
-  const safeURL = value => { try { const u = new URL(value); return ['https:', 'http:'].includes(u.protocol) && !u.username && !u.password ? u.href : ''; } catch { return ''; } };
-  const inline = value => typeof value === 'string' && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(value) && value.length <= 2100000;
-  const imageSource = value => inline(value) || /^\/samples\/[a-zA-Z0-9_.-]+$/.test(value || '');
-  function notice(message, error = false) { $('notice').hidden = false; $('notice').textContent = message; $('notice').className = error ? 'error' : ''; }
-  function persist() {
-    try { localStorage.setItem(storageKey, JSON.stringify({ product: state.product, original: state.original, image: state.image, imageMode: state.imageMode, source: state.source, channel: state.channel, format: state.format, goal: state.goal, salesGoal: state.salesGoal, performance: state.performance, plans: state.plans, edits: state.edits, posted: state.posted, offers: state.offers })); $('saveStatus').textContent = 'Saved on this device'; }
-    catch { $('saveStatus').textContent = 'Download before closing this tab'; }
-  }
-  function restore() {
-    try {
-      const data = JSON.parse(localStorage.getItem(storageKey) || 'null');
-      if (!data || typeof data.product?.title !== 'string' || (data.original !== '' && !imageSource(data.original))) return;
+
+  const draftNamespace = 'daily';
+  function editorDocument() { return { schema: 1, ...Object.fromEntries(['product', 'original', 'image', 'imageMode', 'source', 'channel', 'selected', 'format', 'goal', 'salesGoal', 'performance', 'plans', 'edits', 'posted', 'offers'].map(key => [key, state[key]])) }; }
+  const isDraftObject = value => !!value && typeof value === 'object' && !Array.isArray(value);
+  function applyDocument(data) {
+    if (!data || (data.schema !== undefined && data.schema !== 1) || typeof data.product?.title !== 'string' || (data.original !== '' && !imageSource(data.original))) throw new Error('Unsupported daily draft.');
+    for (const key of ['plans', 'edits', 'posted', 'offers']) if (data[key] !== undefined && !isDraftObject(data[key])) throw new Error('Invalid daily draft fields.');
+    state.plans = {}; state.edits = {}; state.posted = {}; state.offers = {}; state.performance = null; state.salesGoal = null;
       for (const key of ['product', 'original', 'source', 'salesGoal', 'performance', 'posted', 'offers']) if (data[key] !== undefined) state[key] = data[key];
       state.channel = Object.hasOwn(names, data.channel) ? data.channel : 'instagram';
       state.format = ['image', 'video', 'text'].includes(data.format) ? data.format : 'image';
       state.goal = ['visits', 'inquiries', 'sales'].includes(data.goal) ? data.goal : 'visits';
       if (data.plans && typeof data.plans === 'object') state.plans = data.plans;
       if (data.edits && typeof data.edits === 'object') state.edits = data.edits;
+      const posts = state.plans[state.channel]?.posts;
+      state.selected = Array.isArray(posts) && Number.isInteger(data.selected) && data.selected >= 0 && data.selected < posts.length ? data.selected : 0;
       state.image = imageSource(data.image) ? data.image : state.original;
       state.imageMode = data.imageMode === 'live' ? 'live' : 'original';
       state.product.destination_url = safeURL(state.product.destination_url);
       if (!Object.hasOwn(shops, state.product.destination)) state.product.destination = 'other';
-      $('saveStatus').textContent = 'Restored from this device';
-    } catch { /* A blocked or full local store does not block the daily flow. */ }
+
+    state.revision += 1; $('reviewed').checked = false; populateSetup(); render();
   }
+  function persist() { persistDraft(); }
+
+  // Editor-local adapter: keep this contract aligned in creator.js and today.js.
+  let draftReady = false, draftOwner = null, draftEpoch = 0, cloudBusy = false;
+  let cloudBase, conflictValue, recoveryDraft, applyingDraft = false;
+  const cloneDraft = value => JSON.parse(JSON.stringify(value));
+  const draftStatus = text => { $('draftStatus').textContent = text; };
+  const deviceKey = () => `muse-editor-v1:${draftNamespace}:${draftOwner ? 'account:' + encodeURIComponent(draftOwner) : 'guest'}`;
+  function persistDraft() {
+    if (!draftReady || applyingDraft) return;
+    try { localStorage.setItem(deviceKey(), JSON.stringify(editorDocument())); draftStatus('Saved on this device. Account saving is manual.'); return true; }
+    catch { draftStatus('Device storage failed or is full. Download a draft backup now, or save to your account before closing.'); return false; }
+  }
+  function installDocument(data) {
+    const previous = cloneDraft(editorDocument());
+    applyingDraft = true;
+    try { applyDocument(cloneDraft(data)); }
+    catch (error) { applyDocument(previous); throw error; }
+    finally { applyingDraft = false; }
+  }
+  function recoverDevice() {
+    try {
+      const raw = localStorage.getItem(deviceKey()) || (!draftOwner ? localStorage.getItem(storageKey) : null);
+      if (raw) { installDocument(JSON.parse(raw)); draftStatus('Recovered this device’s draft. Review before sharing.'); }
+    } catch { draftStatus('Could not recover device storage. Keep this tab open; download a backup or load your account draft.'); }
+  }
+  function currentOwner(epoch, owner) {
+    return draftReady && epoch === draftEpoch && owner === draftOwner && owner === window.museAccount?.getSnapshot()?.user?.id;
+  }
+  async function accountDraft(action) {
+    const api = window.museAccount;
+    if (!draftReady || cloudBusy || state.busy) return;
+    if (!draftOwner || !api) { api?.open?.('signin'); draftStatus('Sign in, then choose Save to account or Load from account. Device drafts are not transferred automatically.'); return; }
+    const epoch = draftEpoch, owner = draftOwner;
+    const local = cloneDraft(editorDocument());
+    cloudBusy = true;
+    try {
+      await api.refresh?.();
+      if (!currentOwner(epoch, owner)) return;
+      // Always read first: preserve every other editor and unknown workspace field.
+      const workspace = await api.loadWorkspace(owner);
+      if (workspace?.owner_id !== undefined && workspace.owner_id !== owner) {
+        const error = new Error('The account changed in another tab. Reload your workspace.');
+        error.status = 409;
+        throw error;
+      }
+      await api.refresh?.();
+      if (!currentOwner(epoch, owner)) return;
+      const documentValue = workspace.document || {};
+      if (!isDraftObject(documentValue) || (documentValue.documents !== undefined && !isDraftObject(documentValue.documents))) throw new Error('Unsupported account workspace. Nothing was replaced.');
+      const remote = documentValue.documents?.[draftNamespace];
+      const fingerprint = JSON.stringify(remote);
+      if (action === 'load') {
+        if (state.busy || JSON.stringify(editorDocument()) !== JSON.stringify(local)) { draftStatus('Your draft changed while loading. Retry Load from account when ready; your edits are intact.'); return; }
+        if (!remote) { draftStatus('No account draft for this editor yet. Save this draft first.'); return; }
+        // Backup must succeed before replacing unsaved work.
+        if (fingerprint === JSON.stringify(local)) { cloudBase = fingerprint; draftStatus('Account draft loaded (already matches this device; previous backup unchanged).'); return; }
+        localStorage.setItem(deviceKey() + ':before-load', JSON.stringify(local));
+        recoveryDraft = cloneDraft(local); $('recoverDraft').hidden = false;
+        installDocument(remote); cloudBase = fingerprint; conflictValue = undefined;
+        $('replaceAccountDraft').hidden = true;
+        if (persistDraft()) draftStatus('Account draft loaded. Recover previous device draft if needed.');
+      } else {
+        if ((remote !== undefined || cloudBase !== undefined) && fingerprint !== JSON.stringify(local) && fingerprint !== cloudBase && !(action === 'replace' && fingerprint === conflictValue)) {
+          conflictValue = fingerprint; $('replaceAccountDraft').hidden = false;
+          draftStatus('A different account draft exists. Download a backup, then Load from account or explicitly Replace account draft. Your device draft is unchanged.'); return;
+        }
+        if (!currentOwner(epoch, owner)) return;
+        // Refresh again after the GET to catch account changes in another tab.
+        await api.refresh?.();
+        if (!currentOwner(epoch, owner)) return;
+        const saved = await api.saveWorkspace({ ...documentValue, documents: { ...documentValue.documents, [draftNamespace]: local } }, owner);
+        if (saved?.owner_id !== undefined && saved.owner_id !== owner) {
+          const error = new Error('The account changed while saving. Reload your workspace.');
+          error.status = 409;
+          throw error;
+        }
+        if (!currentOwner(epoch, owner)) return;
+        cloudBase = JSON.stringify(local); conflictValue = undefined; $('replaceAccountDraft').hidden = true;
+        draftStatus('Saved to your account. Later edits stay on this device until you save again.');
+      }
+    } catch (error) {
+      if (/account changed/i.test(error?.message || '')) api.refresh?.().catch?.(() => {});
+      if (!currentOwner(epoch, owner)) return;
+      if (/account changed/i.test(error?.message || '')) { conflictValue = undefined; $('replaceAccountDraft').hidden = true; draftStatus('Account changed in another tab. Your draft is intact on this device; reload or sign back into your original account.'); }
+      else if (error.status === 409) { conflictValue = undefined; $('replaceAccountDraft').hidden = true; draftStatus('Save conflict: another device saved first. Your draft is intact. Download a backup, then Load from account or Save to account to compare again.'); }
+      else draftStatus(`Account operation failed. Your draft is intact. Retry, or download a backup before closing. ${error.message || ''}`);
+    } finally { cloudBusy = false; }
+  }
+  function initDrafts() {
+    $('saveAccountDraft').addEventListener('click', () => accountDraft('save'));
+    $('loadAccountDraft').addEventListener('click', () => accountDraft('load'));
+    $('replaceAccountDraft').addEventListener('click', () => accountDraft('replace'));
+    $('downloadDraft').addEventListener('click', () => saveBlob(new Blob([JSON.stringify(editorDocument())], { type: 'application/json' }), 'draft-backup.json'));
+    $('recoverDraft').addEventListener('click', () => {
+      if (!draftReady || cloudBusy || state.busy) return;
+      try { const prior = recoveryDraft || JSON.parse(localStorage.getItem(deviceKey() + ':before-load') || 'null'); if (prior) { installDocument(prior); persistDraft(); } else draftStatus('No previous device draft is available.'); }
+      catch { draftStatus('Could not recover the previous draft. Keep your downloaded backup.'); }
+    });
+    const start = () => {
+      draftOwner = window.museAccount?.getSnapshot()?.user?.id || null;
+      draftReady = true; recoverDevice();
+      window.addEventListener?.('muse:account-change', event => {
+        if ((event.detail?.user?.id || null) === draftOwner) {
+          if (!draftReady) {
+            draftEpoch += 1; cloudBase = undefined; conflictValue = undefined; $('replaceAccountDraft').hidden = true;
+            draftReady = true; document.querySelector?.('main')?.removeAttribute('hidden');
+            $('draftBoundaryStatus').textContent = ''; persistDraft();
+          }
+          return;
+        }
+        const stored = persistDraft();
+        // A new document lifetime prevents pending editor jobs from writing under a new owner.
+        draftReady = false; draftEpoch += 1; state.revision += 1; state.paint += 1; state.key = ''; state.live = false;
+        document.querySelector?.('main')?.setAttribute('hidden', '');
+        draftStatus('Account changed. Reloading the editor for this account…');
+        document.querySelectorAll('dialog').forEach(dialog => dialog.close());
+        if (stored) window.location?.reload();
+        else $('draftBoundaryStatus').textContent = 'Unsaved work is held privately in this tab because device storage failed. Do not close it. Sign back into the previous account to recover and download it.';
+      });
+    };
+    if (window.museAccount?.ready) window.museAccount.ready().then(start);
+    else start();
+    window.addEventListener?.('pagehide', persistDraft);
+    window.addEventListener?.('pageshow', event => { if (event.persisted) window.location?.reload(); });
+  }
+  let setupBackup = null;
+  const safeURL = value => { try { const u = new URL(value); return ['https:', 'http:'].includes(u.protocol) && !u.username && !u.password ? u.href : ''; } catch { return ''; } };
+  const inline = value => typeof value === 'string' && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(value) && value.length <= 2100000;
+  const imageSource = value => inline(value) || /^\/samples\/[a-zA-Z0-9_.-]+$/.test(value || '');
+  function notice(message, error = false) { $('notice').hidden = false; $('notice').textContent = message; $('notice').className = error ? 'error' : ''; }
   function lock(busy) { state.busy = busy; document.querySelectorAll('button, input, select, textarea').forEach(el => { el.disabled = busy; }); document.body.classList.toggle('exporting', busy); }
   function invalidate() { state.revision += 1; $('reviewed').checked = false; }
   function currentPlan() { return state.plans[state.channel]; }
@@ -41,9 +169,9 @@
   function currentCopy() { return { hook: $('postHook').value.trim(), caption: $('postCaption').value.trim() }; }
   function saveEdit() { state.edits[editKey()] = currentCopy(); invalidate(); $('copyCount').textContent = `${$('postCaption').value.length} characters`; persist(); paint(); }
   function formatCopy(post) {
-    if (!post) return { hook: state.product.title, caption: state.product.description };
     const stored = state.edits[editKey()];
     if (stored) return stored;
+    if (!post) return { hook: state.product.title, caption: state.product.description };
     return { hook: post.hook, caption: post.caption };
   }
   function postIdentity() { return JSON.stringify([state.product.title, state.product.destination_url, state.channel, state.format, state.selected, currentCopy()]); }
@@ -197,13 +325,16 @@
     $('itemHint').textContent = `${shops[next]} keeps its own price and link. Choose a matching listing; other shops may carry different work.`;
   }
   async function useReference(url) {
+    const ownerEpoch = draftEpoch;
     const safe = safeURL(url); if (!safe) throw new Error('Enter a complete shop or listing link.');
     const data = await jsonRequest('/api/v1/product-reference', { url: safe });
+    if (ownerEpoch !== draftEpoch) return;
     state.product = { title: data.title || new URL(safe).hostname, description: data.description || '', price: data.price_hint || '', seller: new URL(safe).hostname, destination_url: safeURL(data.url) || safe, destination: 'other', collection: '' };
     state.original = inline(data.image_data_url) ? data.image_data_url : ''; state.image = state.original; state.imageMode = 'original'; state.offers = {}; state.plans = {}; state.edits = {}; state.selected = 0; state.performance = null; state.source = `From ${new URL(safe).hostname} · check product facts`; invalidate(); populateSetup(); $('importStatus').textContent = data.source_note || 'Listing ready. Check the item and photo.';
   }
   async function readListing() { if (state.busy) return; lock(true); try { await useReference($('shopUrl').value); notice('Listing selected. Check its details, then use this item.'); } catch (error) { $('importStatus').textContent = error.message; } finally { lock(false); } }
   async function findItems() {
+    const ownerEpoch = draftEpoch;
     if (state.busy) return; const url = safeURL($('shopUrl').value.trim()); if (!url) { $('importStatus').textContent = 'Enter a full shop URL.'; return; }
     lock(true); $('importStatus').textContent = 'Finding a product for your next post…'; $('importItems').replaceChildren();
     try {
@@ -215,9 +346,10 @@
     } catch (error) { $('importStatus').textContent = error.message; } finally { lock(false); }
   }
   async function upload(file) {
+    const ownerEpoch = draftEpoch;
     if (!file || state.busy) return; if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 10000000) { notice('Choose a JPEG, PNG or WebP under 10 MB.', true); return; }
     const url = URL.createObjectURL(file); lock(true);
-    try { const image = await loadImage(url); const canvas = document.createElement('canvas'); const scale = Math.min(1, 1400 / Math.max(image.width, image.height)); canvas.width = Math.round(image.width * scale); canvas.height = Math.round(image.height * scale); const ctx = canvas.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height); ctx.drawImage(image, 0, 0, canvas.width, canvas.height); const data = canvas.toDataURL('image/jpeg', .8); if (!inline(data)) throw new Error('Try a smaller photo.'); state.original = data; state.image = data; state.imageMode = 'original'; invalidate(); render(); persist(); notice('Photo ready. Check your post and take it with you.'); }
+    try { const image = await loadImage(url); if (ownerEpoch !== draftEpoch) return; const canvas = document.createElement('canvas'); const scale = Math.min(1, 1400 / Math.max(image.width, image.height)); canvas.width = Math.round(image.width * scale); canvas.height = Math.round(image.height * scale); const ctx = canvas.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height); ctx.drawImage(image, 0, 0, canvas.width, canvas.height); const data = canvas.toDataURL('image/jpeg', .8); if (!inline(data)) throw new Error('Try a smaller photo.'); state.original = data; state.image = data; state.imageMode = 'original'; invalidate(); render(); persist(); notice('Photo ready. Check your post and take it with you.'); }
     catch (error) { notice(error.message, true); } finally { URL.revokeObjectURL(url); lock(false); }
   }
   function liveReady() {
@@ -226,14 +358,16 @@
     if (state.readiness.default_mode !== 'live' && !state.key) { notice('Enter the demo unlock key in Muse settings.', true); return false; } return true;
   }
   async function museImage() {
+    const ownerEpoch = draftEpoch;
     if (state.busy || !liveReady()) return; if (!state.original) { notice('Add your original photo first.', true); return; }
     lock(true); notice('Muse is creating a new scene. This is a billed image request…');
     try {
       let data = state.original; if (!inline(data)) { const response = await fetch(data); if (!response.ok) throw new Error('Could not load your source photo.'); data = await new Promise((resolve, reject) => { response.blob().then(blob => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(blob); }).catch(reject); }); }
       const copy = currentCopy(); const prompt = $('scenePrompt').value.trim(); if (!prompt || !copy.hook || !copy.caption) throw new Error('Add a scene, opening line and caption first.');
+      if (ownerEpoch !== draftEpoch) return;
       const response = await jsonRequest('/api/v1/generate-ads', { product: { title: state.product.title, description: state.product.description, price: state.product.price || undefined, image_base64: data }, draft: false, placements: ['instagram_feed'], variants_per_placement: 1, use_comfyui: false, muse_workflow_mode: 'product_visuals', brief: { product_title: state.product.title, positioning_hook: copy.hook, estimated_paid_calls: 1, preserve_product_note: 'Compare with original before posting.', variants: [{ variant_id: 'daily1', placement: 'instagram_feed', include: true, headline: copy.hook.slice(0, 120), primary_text: copy.caption.slice(0, 600), image_prompt: prompt }] } }, true);
       const creative = response.creatives?.[0]; if (!creative || String(creative.produced_by).startsWith('demo-cache') || !inline(creative.media_data_url)) throw new Error('No usable new image delivered. Check completion before regenerating. Your original is still here.');
-      await loadImage(creative.media_data_url); state.image = creative.media_data_url; state.imageMode = 'live'; invalidate(); render(); persist(); notice('Muse scene ready. Compare the artwork with your original before using it.');
+      await loadImage(creative.media_data_url); if (ownerEpoch !== draftEpoch) return; state.image = creative.media_data_url; state.imageMode = 'live'; invalidate(); render(); persist(); notice('Muse scene ready. Compare the artwork with your original before using it.');
     } catch (error) { notice(error.message, true); } finally { lock(false); }
   }
   for (const id of ['openSetup', 'changeItem']) $(id).addEventListener('click', openSetup);
@@ -255,7 +389,8 @@
   $('unlockKey').addEventListener('input', () => { state.key = $('unlockKey').value.trim(); }); $('liveMode').addEventListener('change', () => { state.live = $('liveMode').checked; });
   $('musePlan').addEventListener('click', () => buildPlan(true, true)); $('museImage').addEventListener('click', museImage);
   $('useOriginal').addEventListener('click', () => { if (state.busy) return; state.image = state.original; state.imageMode = 'original'; invalidate(); render(); persist(); });
-  restore(); populateSetup(); render(); buildPlan();
+  populateSetup(); render(); initDrafts();
+  if (window.museAccount?.ready) window.museAccount.ready().then(() => buildPlan()); else buildPlan();
   fetch('/api/v1/readiness').then(response => response.json()).then(data => { state.readiness = data; $('readinessNote').textContent = data.provider_key_configured ? 'Muse configured, not yet verified here. Starter plans use no credits. Live image uses one Muse Image request; this flow does not run SAM.' : 'No Muse provider key configured. Starter posts and downloads work without it.'; }).catch(() => { $('readinessNote').textContent = 'Could not check server configuration. Your draft is still available.'; });
   window.museDailySnapshot = () => JSON.parse(JSON.stringify({ product: state.product, channel: state.channel, format: state.format, copy: currentCopy(), plan: currentPlan(), performance: state.performance, imageMode: state.imageMode, source: state.source }));
 })();

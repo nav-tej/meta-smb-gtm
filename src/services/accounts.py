@@ -169,16 +169,46 @@ async def snapshot(account: AccountSession | None) -> dict[str, Any]:
     return result
 
 
+def verify_workspace_owner(
+    account: AccountSession,
+    header_owner: str | None = None,
+    body_owner: str | None = None,
+    *,
+    require_binding: bool = False,
+) -> None:
+    """Enforce that workspace reads/writes match the tab's expected account owner."""
+    normalized_header = header_owner.strip() if isinstance(header_owner, str) else None
+    normalized_body = body_owner.strip() if isinstance(body_owner, str) else None
+    if require_binding and not normalized_header and not normalized_body:
+        raise HTTPException(
+            409, "The account changed while saving. Reload your workspace before saving."
+        )
+    if normalized_header is not None and normalized_header != account.user_id:
+        raise HTTPException(
+            409, "The account changed in another tab. Reload your workspace before continuing."
+        )
+    if normalized_body is not None and normalized_body != account.user_id:
+        raise HTTPException(
+            409, "The account changed while saving. Reload your workspace before saving."
+        )
+
+
 async def load_workspace(account: AccountSession) -> dict[str, Any]:
     """Retrieve only the server-verified creator's saved document."""
     rows = await get_supabase_client().workspace(account.user_id)
-    return rows[0] if rows else {"document": None, "version": 0}
+    row = rows[0] if rows else {"document": None, "version": 0}
+    return {**row, "owner_id": account.user_id}
 
 
 async def save_workspace(
-    account: AccountSession, document: dict[str, Any], expected_version: int | None
+    account: AccountSession,
+    document: dict[str, Any],
+    expected_version: int | None,
+    expected_owner: str | None = None,
 ) -> dict[str, Any]:
-    """Persist a bounded document with an atomic version comparison."""
+    """Persist a bounded document with an atomic version and owner comparison."""
+    if expected_owner is not None:
+        verify_workspace_owner(account, body_owner=expected_owner)
     if len(json.dumps(document, ensure_ascii=False, allow_nan=False).encode()) > 3 * 1024 * 1024:
         raise HTTPException(413, "Save a smaller workspace.")
     result = await get_supabase_client().rpc(
@@ -198,4 +228,4 @@ async def save_workspace(
             413: "Save a smaller workspace.",
         }
         raise HTTPException(status, messages.get(status, "Workspace saving is unavailable."))
-    return {"version": result["version"], "document": document}
+    return {"version": result["version"], "document": document, "owner_id": account.user_id}

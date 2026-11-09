@@ -98,10 +98,23 @@ function harness(saved = null) {
   h.node('reviewed').checked = true; const before = h.blobs.length; await h.fire('getPost'); assert.equal(h.blobs.length, before); assert.match(h.node('notice').textContent, /photo/);
 
   // A saved custom item without its image must never restore the unrelated artist example.
-  const restored = harness(JSON.parse(h.store.get('muse-daily-v1'))); await restored.flush();
+  const restored = harness(JSON.parse(h.store.get('muse-editor-v1:daily:guest'))); await restored.flush();
   assert.equal(restored.snapshot().product.title, 'Handmade bowl');
   assert.equal(restored.node('noPhoto').hidden, false);
   assert(!JSON.stringify(restored.snapshot()).includes('Ek Onkar'));
+
+  // Refresh must restore the selected post and its edits, including older drafts.
+  const selection = harness(); await selection.flush();
+  await selection.fire(selection.node('planCards').children[2]);
+  selection.node('postCaption').value = 'Third post edited';
+  await selection.fire('postCaption', 'input');
+  const savedSelection = JSON.parse(selection.store.get('muse-editor-v1:daily:guest'));
+  assert.equal(savedSelection.selected, 2);
+  const afterRefresh = harness(savedSelection); await afterRefresh.flush();
+  assert.equal(afterRefresh.node('postCaption').value, 'Third post edited');
+  delete savedSelection.selected;
+  const legacy = harness(savedSelection); await legacy.flush();
+  assert.notEqual(legacy.node('postCaption').value, 'Third post edited');
 
   console.log('DAILY STUDIO CONTRACT PASSED');
 })().catch(error => { console.error(error); process.exitCode = 1; });

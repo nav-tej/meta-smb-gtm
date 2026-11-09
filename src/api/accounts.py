@@ -20,6 +20,7 @@ from src.services.accounts import (
     snapshot,
     trusted_mutation,
     verify_token,
+    verify_workspace_owner,
 )
 
 
@@ -70,6 +71,7 @@ class WorkspaceRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     document: dict[str, Any]
     expected_version: int | None = Field(default=None, ge=0, strict=True)
+    expected_owner: str | None = Field(default=None, min_length=1, max_length=128)
 
 
 Mutation = Annotated[None, Depends(trusted_mutation)]
@@ -157,6 +159,7 @@ async def password(
 async def workspace(request: Request, response: Response) -> dict[str, Any]:
     account = await resolve_account(request, response, require_verified=True)
     assert account is not None
+    verify_workspace_owner(account, request.headers.get("x-muse-owner"))
     response.headers["Cache-Control"] = "no-store"
     return await load_workspace(account)
 
@@ -167,5 +170,11 @@ async def update_workspace(
 ) -> dict[str, Any]:
     account = await resolve_account(request, response, require_verified=True)
     assert account is not None
+    verify_workspace_owner(
+        account,
+        request.headers.get("x-muse-owner"),
+        body.expected_owner,
+        require_binding=True,
+    )
     response.headers["Cache-Control"] = "no-store"
-    return await save_workspace(account, body.document, body.expected_version)
+    return await save_workspace(account, body.document, body.expected_version, body.expected_owner)
