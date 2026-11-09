@@ -23,7 +23,7 @@ Seller: **n Plus Alpha LLC**. Plan on sale: **Muse Starter**, $12/month or $108/
 - Stripe **sandbox** "n Plus Alpha LLC sandbox": product + prices `muse_starter_monthly`,
   `muse_starter_annual`; webhook `we_1UZnpQLcBUBSf7XVC77zsu9n` (metadata `muse_env=preview`, 9 events).
 - Vercel **Preview** env: Stripe test key, both price IDs, webhook secret, Supabase settings.
-  **No Muse key** on Preview, so preview runs cannot spend the Muse balance.
+  Preview also has META_MODEL_API_KEY (added Nov 9 so a paid preview account can run live Muse; it shares the $100 credit_pool cap with production; preview URLs need a Vercel login).
 - Preview URLs require a Vercel login. Stripe gets through with the project's automation bypass
   token in the webhook URL (stored in local `.env` as `VERCEL_AUTOMATION_BYPASS_SECRET`; revoke
   in Vercel → Settings → Deployment Protection).

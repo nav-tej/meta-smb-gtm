@@ -161,3 +161,18 @@ Pricing dialog (muse-shell.js) now offers only Starter Monthly ($12) and Starter
   401, webhook unsigned 400 / signed probe 200, live webhook enabled (livemode True).
 - Next: Nav real-card purchase then refund; verify billing rows + webhook delivery after it.
   Roll the live secret key (pasted in chat) and rerun the push. Hermes preview E2E still pending.
+
+## Resume checkpoint: 2026-11-09 ~13:10 PT (Claude), launch hardening
+- Commits c93eaeb + 1f2eda0, deployed to production (meta-smb-kd8z08z7g → meta-smb-gtm.vercel.app) from a clean worktree; `make check` 403 passed there.
+- Supabase migrations applied: `run_refunds` (failed/refunded/abandoned runs no longer count; verified constraint + usage RPC) and `media_storage` (private bucket `muse-media`; verified upload, owner-only read, delete with a throwaway owner).
+- Production smoke: pages 200, billing available, account configured, media endpoint 401 signed out / 404 bad name, live run 401 signed out.
+- Next: uptime + error alerts, deletion procedure doc, runbook reconcile, Resend weekly digest subscription. Antigravity owns editor wiring of `media_asset_url` (STATUS.md).
+
+## Resume checkpoint: 2026-11-09 ~14:20 PT (Claude), durable state, email digest, operations
+- Commits 1b958ca (monitor history mirrored to private `muse-state` bucket) and 5dae81b (weekly competitor digest by email via Resend, operator alerts, OPERATIONS.md, privacy update). Deployed to production from a clean worktree (`make check` 418 passed there).
+- Supabase migrations applied: `durable_state` (bucket), `digest_subscribers` (table + service-role-only RPCs; anon cannot execute; advisors show only expected INFO "RLS no policy" on private tables).
+- Production verified: pages 200; billing available; account configured; `/api/v1/digest/subscription` available:false (no RESEND_API_KEY yet), subscribe → 503 "Email digests open soon."; `/digest/send` 403 without cron; one presenter-key monitor run stored changelog + 4 snapshots in `muse-state`.
+- EMAIL_TOKEN_SECRET generated and set (local .env + Vercel Production, sensitive). Stale "no Muse key on Preview" line in STRIPE_GO_LIVE.md corrected.
+- Not pushed: `.github/workflows/uptime.yml` (git token lacks `workflow` scope; file left untracked for Nav).
+- Nav actions: RESEND_API_KEY + verified sending domain, EMAIL_POSTAL_ADDRESS, push uptime workflow, Muse credit_pool cap decision (OPERATIONS.md), Stripe key rotation (Nav).
+- Ownership: Claude releases billing.py, account.js, media/durable/digest files after this checkpoint except as noted in STATUS.md. Antigravity has uncommitted static-file work causing 3 local test failures (portal demo, creator import, today studio); committed main is green.
