@@ -15,15 +15,17 @@ from fastapi import APIRouter, Header, HTTPException, Query, Request, Response
 from src.api.demo import valid_demo_key
 from src.config import get_settings
 from src.services import competitor_monitor as monitor
+from src.services import durable_state
 
 router = APIRouter(tags=["monitor"])
 
 
 @router.get("/monitor", response_model=monitor.ChangeLog)
-def get_change_log(
+async def get_change_log(
     limit: Annotated[int, Query(ge=1, le=60)] = 10,
 ) -> monitor.ChangeLog:
     """The stored change log, newest run first. Never crawls."""
+    await durable_state.hydrate_monitor()
     log = monitor.load_changelog()
     log.runs = log.runs[:limit]
     return log
@@ -31,6 +33,7 @@ def get_change_log(
 
 async def _run_or_cooldown(response: Response, *, bypass: bool, trigger: str) -> monitor.MonitorRun:
     settings = get_settings()
+    await durable_state.hydrate_monitor(force=True)
     since = monitor.seconds_since_last_run()
     cooling = since is not None and since < settings.monitor_cooldown_seconds
     if cooling and not bypass:
@@ -39,7 +42,9 @@ async def _run_or_cooldown(response: Response, *, bypass: bool, trigger: str) ->
             response.headers["X-Muse-Monitor"] = "cooldown"
             return latest[0]
     response.headers["X-Muse-Monitor"] = "ran"
-    return await monitor.run_monitor(trigger=trigger)  # type: ignore[arg-type]
+    run = await monitor.run_monitor(trigger=trigger)  # type: ignore[arg-type]
+    await durable_state.flush_monitor()
+    return run
 
 
 @router.post("/monitor", response_model=monitor.MonitorRun)
@@ -71,6 +76,7 @@ async def cron_check(
 
 
 @router.get("/weekly-digest", response_model=monitor.WeeklyDigest)
-def get_weekly_digest() -> monitor.WeeklyDigest:
+async def get_weekly_digest() -> monitor.WeeklyDigest:
     """The last 7 days of competitor changes, from the monitor change log."""
+    await durable_state.hydrate_monitor()
     return monitor.weekly_digest()

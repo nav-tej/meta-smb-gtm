@@ -7,8 +7,8 @@ listings and price updates. Ad changes are compared through the Meta Ad Library 
 META_ADS_ACCESS_TOKEN is set; otherwise they are reported as not checked, never guessed.
 
 Storage: MONITOR_DIR holds `changelog.json` (newest runs first) and `snapshots/<slug>.json`.
-On Vercel this is /tmp, so the log and snapshots last per function instance and are lost on a
-cold start (the next run then compares against the saved Nov 3 snapshot again).
+On Vercel this is /tmp; with Supabase configured the routes mirror these files to the private
+`muse-state` bucket (src/services/durable_state.py), so history survives new instances.
 """
 
 from __future__ import annotations
@@ -165,14 +165,16 @@ def load_changelog() -> ChangeLog:
                 runs.append(MonitorRun.model_validate(item))
             except ValueError:
                 continue
-    hosted = get_settings().hosted_environment
+    from src.services import durable_state  # lazy: durable_state imports this module
+
+    temporary = get_settings().hosted_environment and not durable_state.enabled()
     return ChangeLog(
         runs=runs,
         last_checked_at=runs[0].checked_at if runs else None,
-        persistent=not hosted,
+        persistent=not temporary,
         note=(
             "Monitor history is kept per server instance on the hosted demo and can reset."
-            if hosted
+            if temporary
             else ""
         ),
     )

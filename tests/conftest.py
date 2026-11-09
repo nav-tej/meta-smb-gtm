@@ -118,3 +118,12 @@ def test_settings() -> Settings:
 @pytest.fixture
 def brief_json() -> dict[str, Any]:
     return json.loads((FIXTURES / "competitor_brief.json").read_text())
+
+
+@pytest.fixture(autouse=True)
+def _no_durable_state_network(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Tests never reach Supabase Storage, even when .env.local has real credentials."""
+    from src.services import durable_state
+
+    durable_state.reset()
+    monkeypatch.setattr(durable_state, "enabled", lambda: False)

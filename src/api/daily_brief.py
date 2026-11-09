@@ -4,6 +4,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Query, Response
 
+from src.services import durable_state
 from src.services.daily_brief import DailyBrief, daily_brief
 
 router = APIRouter(tags=["daily"])
@@ -16,4 +17,5 @@ async def get_daily_brief(
         bool, Query(description="Rebuild today's brief from saved and cached data.")
     ] = False,
 ) -> DailyBrief:
+    await durable_state.hydrate_monitor()
     return await daily_brief(refresh=refresh, response=response)

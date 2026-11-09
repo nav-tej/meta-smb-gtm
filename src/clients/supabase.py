@@ -140,13 +140,15 @@ class SupabaseClient:
         except httpx.HTTPError as err:
             raise SupabaseError(503, "Storage is unavailable. Try again shortly.") from err
 
-    async def put_object(self, bucket: str, name: str, data: bytes, mime: str) -> None:
-        """Store a new object (never overwrites). Server key only."""
+    async def put_object(
+        self, bucket: str, name: str, data: bytes, mime: str, *, upsert: bool = False
+    ) -> None:
+        """Store an object (overwrites only with upsert=True). Server key only."""
         result = await self._storage(
             "POST",
             f"object/{bucket}/{name}",
             content=data,
-            headers={"Content-Type": mime, "x-upsert": "false"},
+            headers={"Content-Type": mime, "x-upsert": "true" if upsert else "false"},
         )
         if result.is_error:
             raise SupabaseError(503, "Storage did not accept the file.")
