@@ -125,6 +125,16 @@ function harness(editor, store = new Map(), initialOwner = 'A') {
     aba.block(true); aba.switchOwner('B'); aba.switchOwner('A'); aba.block(false);
     resolveAba({ document: { documents: {} }, version: 1, owner_id: 'A' }); await pendingAba;
     assert.equal(aba.writes.length, 0);
-    console.log(`${editor}: recovery, namespace merge, conflict, storage failure and account isolation passed`);
+    // Durable media_asset_url in account workspace loads and persists without inline data URL bloat.
+    const mediaDraft = JSON.parse(JSON.stringify(other));
+    const assetUrl = '/api/v1/account/media/0123456789abcdef0123456789abcdef.png';
+    mediaDraft.image = assetUrl;
+    if (editor === 'creator') mediaDraft.imageKind = 'live'; else mediaDraft.imageMode = 'live';
+    const mediaHarness = harness(editor); await flush();
+    mediaHarness.remote({ document: { documents: { [ns]: mediaDraft } }, version: 50, owner_id: 'A' });
+    await mediaHarness.fire('loadAccountDraft');
+    const savedMediaDoc = JSON.parse(mediaHarness.store.get(key));
+    assert.equal(savedMediaDoc.image, assetUrl);
+    console.log(`${editor}: recovery, namespace merge, conflict, storage failure, media_asset_url and account isolation passed`);
   }
 })().catch(error => { console.error(error); process.exitCode = 1; });

@@ -8,7 +8,7 @@
   function editorDocument() { return { schema: 1, ...Object.fromEntries(draftFields.map(key => [key, state[key]])), offers, channels: postingChannels(), step: state.step }; }
   const isDraftObject = value => !!value && typeof value === 'object' && !Array.isArray(value);
   function applyDocument(data) {
-    if (data?.schema !== 1 || typeof data.product?.name !== 'string' || !Object.hasOwn(goals, data.goal) || !['original', 'image', 'sampleImage'].every(key => !data[key] || samplePath(data[key]) || validInline(data[key]))) throw new Error('Unsupported creator draft.');
+    if (data?.schema !== 1 || typeof data.product?.name !== 'string' || !Object.hasOwn(goals, data.goal) || !['original', 'image', 'sampleImage'].every(key => !data[key] || samplePath(data[key]) || mediaAssetPath(data[key]) || validInline(data[key]))) throw new Error('Unsupported creator draft.');
     if (!isDraftObject(data.offers || {}) || !Array.isArray(data.channels) || ['headline', 'caption', 'scene', 'provenance'].some(key => typeof data[key] !== 'string')) throw new Error('Invalid creator draft fields.');
     state.artwork = null;
     for (const key of draftFields) if (data[key] !== undefined) state[key] = cloneDraft(data[key]);
@@ -199,7 +199,9 @@
   };
   const safeLink = (value) => { try { const u = new URL(value); return ['https:', 'http:'].includes(u.protocol) ? u.href : ''; } catch { return ''; } };
   const samplePath = (value) => typeof value === 'string' && /^\/samples\/[a-zA-Z0-9_.-]+$/.test(value) ? value : '';
+  const mediaAssetPath = (value) => typeof value === 'string' && /^\/api\/v1\/account\/media\/[0-9a-f]{32}\.(png|jpg|webp)$/.test(value) ? value : '';
   const validInline = (value) => typeof value === 'string' && /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(value) && value.length < 4000000;
+  const isOfflineNow = () => Boolean(window.museShell?.isOffline?.() || (typeof navigator !== 'undefined' && navigator.onLine === false));
   function notify(message, kind = '') { $('notice').hidden = false; $('notice').textContent = message; $('notice').className = `notice ${kind}`; }
   function sync() {
     for (const [id, key] of Object.entries(fields)) state.product[key] = $(id).value.trim();
@@ -237,7 +239,21 @@
     $('productImageCaption').textContent = workspace === 'sarabjit_singh' ? 'Ek Onkar · original artwork preview. Source: Art of Sarabjit Singh.' : 'Illustrative product image generated for the example shop.';
     updateChoices(); refreshPreview();
   }
-  function updateChoices() { $('artistExample').classList.toggle('selected', !state.custom && state.workspace === 'sarabjit_singh'); $('ceramicsExample').classList.toggle('selected', !state.custom && state.workspace === 'etsy_ceramics'); $('customProduct').classList.toggle('selected', state.custom); }
+  function updateChoices() {
+    const isArtist = !state.custom && state.workspace === 'sarabjit_singh';
+    const isCeramics = !state.custom && state.workspace === 'etsy_ceramics';
+    $('artistExample').classList.toggle('selected', isArtist);
+    $('artistExample').setAttribute('aria-pressed', String(isArtist));
+    $('ceramicsExample').classList.toggle('selected', isCeramics);
+    $('ceramicsExample').setAttribute('aria-pressed', String(isCeramics));
+    $('customProduct').classList.toggle('selected', state.custom);
+    $('customProduct').setAttribute('aria-pressed', String(state.custom));
+    document.querySelectorAll('[data-goal]').forEach((b) => {
+      const active = b.dataset.goal === state.goal;
+      b.classList.toggle('selected', active);
+      b.setAttribute('aria-pressed', String(active));
+    });
+  }
   function originalLayout() { state.image = state.original; state.imageKind = 'original'; state.provenance = state.custom ? 'Original-photo layout. No personalized image generated.' : state.workspace === 'etsy_ceramics' ? 'Original example layout using a saved AI product image.' : 'Layout using the original artwork preview. No new image generated.'; refreshPreview(); }
   function newProduct() {
     if (state.busy) return;
@@ -285,16 +301,27 @@
     if (state.busy) return;
     const url = safeLink($('shopUrl').value.trim());
     if (!url) { notify('Enter your shop website starting with https://.', 'error'); $('shopUrl').focus(); return; }
-    setBusy(true); $('importResults').hidden = true; notify('Looking for public product listings… This can take a little while.', 'busy');
+    if (isOfflineNow()) { notify('You appear to be offline. Your work is saved on this device — reconnect and try again.', 'error'); return; }
+    setBusy(true, 'importProducts'); $('importResults').hidden = true; notify('Looking for public product listings… This can take a little while.', 'busy');
     const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), 45000);
     try {
       const response = await fetch('/api/v1/ingest-storefront', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ business_name: ((state.custom ? $('sellerName').value.trim() : '') || new URL(url).hostname.replace(/^www\./, '')).slice(0, 160), website_url: url, max_urls_per_source: 30 }), signal: controller.signal });
       let data = {}; try { data = await response.json(); } catch { /* Gateways may return an HTML timeout page. */ }
-      if (!response.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'We could not read that shop website. You can still enter the details below.');
+      if (!response.ok) {
+        if (response.status === 401 || response.status === 403) throw new Error('Your session expired. Sign in again or enter the product details below.');
+        throw new Error(typeof data.detail === 'string' && !/<html|traceback/i.test(data.detail) ? data.detail : 'We could not read that shop website. You can still enter the details below.');
+      }
       if (ownerEpoch !== draftEpoch) return; const items = data.discovered_catalog_items || []; showImportedItems(items, data.business_name || 'your shop');
       const fetched = (data.channels || []).some((channel) => channel.status === 'fetched');
       notify(items.length ? `Found ${items.length} public listing${items.length === 1 ? '' : 's'}. Choose one to bring its details into your post.` : fetched ? 'We reached your website but did not find product listings. You can enter details below.' : 'This site did not allow automatic reading. You can still enter details below or try your own website.');
-    } catch (error) { notify(error.name === 'AbortError' ? 'This shop is taking too long to respond. Try again later or enter the details below.' : `${error.message} Your work is still here.`, 'error'); }
+    } catch (error) {
+      const msg = error.name === 'AbortError'
+        ? 'This shop is taking too long to respond. Try again later or enter the details below.'
+        : isOfflineNow() || /failed to fetch|networkerror/i.test(error?.message || '')
+          ? 'You appear to be offline or the site could not be reached. Your work is still here.'
+          : `${error.message} Your work is still here.`;
+      notify(msg, 'error');
+    }
     finally { clearTimeout(timer); setBusy(false); }
   }
   function validateProduct() { sync(); if (!state.product.name) { notify('Give your product a name first.', 'error'); $('productName').focus(); return false; } if (!state.original) { $('moreDetails').open = true; notify('Add a product photo first. Open “More details” to upload it.', 'error'); return false; } if (state.product.link && !safeLink(state.product.link)) { $('moreDetails').open = true; notify('Use a complete http:// or https:// product link, or leave it empty.', 'error'); $('productLink').focus(); return false; } return true; }
@@ -336,14 +363,60 @@
     try { if (window.museShell?.spendLive) window.museShell.spendLive(label); else if (window.museShell?.spend) window.museShell.spend(label); } catch {}
     try { if (window.museAccount?.refresh) window.museAccount.refresh().catch(() => {}); } catch {}
   }
-  function setBusy(busy) { state.busy = busy; document.querySelectorAll('button').forEach((b) => { b.disabled = busy; }); for (const id of [...Object.keys(fields), 'promotionDestination', 'postInstagram', 'postFacebook', 'shopUrl', 'headline', 'caption', 'scene', 'productPhoto', 'liveMode', 'unlockKey', 'reviewed']) $(id).disabled = busy; $('backButton').disabled = busy || state.step === 0; $('draftButton').setAttribute('aria-busy', String(busy)); $('generateButton').setAttribute('aria-busy', String(busy)); }
+  let lockedFocus = null;
+  function setBusy(busy, activeId = '') {
+    if (busy && document.activeElement && document.activeElement !== document.body) {
+      lockedFocus = document.activeElement;
+    }
+    state.busy = busy;
+    document.querySelectorAll('button').forEach((b) => { b.disabled = busy; });
+    for (const id of [...Object.keys(fields), 'promotionDestination', 'postInstagram', 'postFacebook', 'shopUrl', 'headline', 'caption', 'scene', 'productPhoto', 'liveMode', 'unlockKey', 'reviewed']) $(id).disabled = busy;
+    $('backButton').disabled = busy || state.step === 0;
+    const importBusy = busy && activeId === 'importProducts';
+    const editorBusy = busy && activeId !== 'importProducts';
+    $('importProducts').setAttribute('aria-busy', String(importBusy));
+    $('draftButton').setAttribute('aria-busy', String(editorBusy));
+    $('generateButton').setAttribute('aria-busy', String(editorBusy));
+    if (!busy && lockedFocus && document.contains(lockedFocus) && !lockedFocus.disabled) {
+      try { lockedFocus.focus({ preventScroll: true }); } catch {}
+      lockedFocus = null;
+    }
+  }
   async function request(payload) {
+    if (isOfflineNow()) throw new Error('You appear to be offline. Your edits are saved on this device — reconnect and try again.');
     const encoded = JSON.stringify(payload); if (new TextEncoder().encode(encoded).length > 3500000) throw new Error('This photo and text are too large together. Choose a smaller image.');
     // Account mode: live runs come from the signed-in account's plan; liveReady() shows sign-in/quota prompts.
     if (state.live && state.accountLive && window.museAccount?.liveReady && !window.museAccount.liveReady()) throw new Error('Sign in with a confirmed email and runs left to create with Muse.');
     const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), 285000);
-    try { const response = await fetch('/api/v1/generate-ads' + (state.live ? '?live=true' : ''), { method: 'POST', headers: { 'Content-Type': 'application/json', ...(state.live && state.key ? { 'X-Demo-Key': state.key } : {}) }, body: encoded, signal: controller.signal }); if (!response.ok) { let detail = ''; try { const body = await response.json(); detail = typeof body.detail === 'string' ? body.detail.slice(0, 350) : body.detail?.error === 'media_response_too_large' ? 'Muse finished, but the image was too large to send to this tab. Your original photo is still here. Ask the presenter to check saved output before trying again; do not rerun yet.' : ''; } catch {} throw new Error(detail || `Muse could not complete this request (${response.status}). Your edits are still here.`); } return await response.json(); }
-    catch (error) { if (error.name === 'AbortError') throw new Error('This request timed out. It may still be processing and may be billed. Your edits are safe; check completion before generating again.'); throw error; } finally { clearTimeout(timer); }
+    try {
+      const response = await fetch('/api/v1/generate-ads' + (state.live ? '?live=true' : ''), { method: 'POST', headers: { 'Content-Type': 'application/json', ...(state.live && state.key ? { 'X-Demo-Key': state.key } : {}) }, body: encoded, signal: controller.signal });
+      if (!response.ok) {
+        let detail = '';
+        try {
+          const body = await response.json();
+          detail = typeof body.detail === 'string' && !/<html|traceback/i.test(body.detail)
+            ? body.detail.slice(0, 350)
+            : body.detail?.error === 'media_response_too_large'
+              ? 'Muse finished, but the image was too large to send to this tab. Your original photo is still here. Ask the presenter to check saved output before trying again; do not rerun yet.'
+              : '';
+        } catch {}
+        if (response.status === 401 || response.status === 403) {
+          throw new Error(detail || 'Your session expired before Muse started, so no run was used. Sign in again; your edits are still here.');
+        }
+        if (response.status === 402 || response.status === 429) {
+          throw new Error(detail || 'You have reached your current run allowance. Check your plan or wait a moment — your edits are still here.');
+        }
+        if (response.status >= 500) {
+          throw new Error(detail || 'Muse is temporarily unavailable right now. No run was used and your edits are still here — please try again shortly.');
+        }
+        throw new Error(detail || 'Muse could not complete this request right now. Your edits are still here.');
+      }
+      return await response.json();
+    } catch (error) {
+      if (error.name === 'AbortError') throw new Error('This request timed out. It may still be processing and may be billed. Your edits are safe; check completion before generating again.');
+      if (isOfflineNow() || /failed to fetch|networkerror/i.test(error?.message || '')) throw new Error('You appear to be offline or the server could not be reached. Your edits are safe on this device — reconnect and try again.');
+      throw error;
+    } finally { clearTimeout(timer); }
   }
   async function sourceData() { if (validInline(state.original)) return state.original; const response = await fetch(state.original); if (!response.ok) throw new Error('Could not load the original photo.'); const blob = await response.blob(); return await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(blob); }); }
   function productPayload() { return { title: state.product.name, description: state.product.description, price: state.product.price || undefined, brand_notes: `Seller: ${state.product.seller}. Goal: ${goals[state.goal][0]}. Destination: ${destinations[state.product.destination]}. Series: ${state.product.collection || 'Not assigned'}. Only use supplied product facts. Never assume the same artwork or price exists in another shop. Never invent scarcity, materials or reviews. For this artist, Etsy is closed. Do not recommend Etsy or state a price unless it is supplied for the selected destination.` }; }
@@ -390,8 +463,23 @@
       const result = await request({ product, draft: false, placements: ['instagram_feed'], variants_per_placement: 1, use_comfyui: false, muse_workflow_mode: 'product_visuals', brief: { product_title: state.product.name, positioning_hook: goals[state.goal][0], preserve_product_note: 'Compare generated product details against the original before publishing.', estimated_paid_calls: 1, variants: [{ variant_id: 'v1', include: true, placement: 'instagram_feed', headline: state.headline, primary_text: state.caption, image_prompt: state.scene, target_audience: 'People interested in this product and the maker’s story', angle_rationale: 'Seller-selected promotion goal' }] } });
       const creative = result.creatives?.[0]; if (!creative) throw new Error('Muse returned no image. Your original-photo layout is still available.');
       if (String(creative.produced_by).startsWith('demo-cache')) throw new Error('The server returned a saved example, not a new image. Live mode was not confirmed. Your original is still available.');
-      if (!validInline(creative.media_data_url)) throw new Error('Muse completed the request, but this server has not delivered a usable inline image. Do not generate again yet; ask the presenter to check image delivery.');
-      await imageElement(creative.media_data_url); if (ownerEpoch !== draftEpoch) return; state.image = creative.media_data_url; state.imageKind = 'live'; state.provenance = `Generated with ${creative.produced_by || 'Muse'}. Review the artwork against the original. Product details can change; room and frame are staging only.`; $('reviewed').checked = false; refreshPreview(); spendLive('Live Muse scene'); notify('Your new scene is ready. Compare details with the original, or choose “Use original photo”. Check the draft storage status before closing this tab.');
+      const assetUrl = mediaAssetPath(creative.media_asset_url);
+      const inlineUrl = validInline(creative.media_data_url) ? creative.media_data_url : '';
+      const nextImage = assetUrl || inlineUrl;
+      if (!nextImage) throw new Error('Muse completed the request, but this server has not delivered a usable inline image. Do not generate again yet; ask the presenter to check image delivery.');
+      let chosenImage = nextImage;
+      try {
+        await imageElement(chosenImage);
+      } catch (imgErr) {
+        if (assetUrl && inlineUrl) {
+          chosenImage = inlineUrl;
+          await imageElement(chosenImage);
+        } else {
+          throw imgErr;
+        }
+      }
+      if (ownerEpoch !== draftEpoch) return;
+      state.image = chosenImage; state.imageKind = 'live'; state.provenance = `Generated with ${creative.produced_by || 'Muse'}. Review the artwork against the original. Product details can change; room and frame are staging only.`; $('reviewed').checked = false; refreshPreview(); spendLive('Live Muse scene'); notify('Your new scene is ready. Compare details with the original, or choose “Use original photo”. Check the draft storage status before closing this tab.');
     } catch (error) { try { window.museAccount?.refresh?.().catch(() => {}); } catch {} notify(error.message, 'error'); } finally { setBusy(false); }
   }
   function saveBlob(blob, suffix) { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `${(state.product.name || 'promotion').replace(/[^a-z0-9]+/gi, '-').slice(0, 60)}-${suffix}`; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
@@ -404,8 +492,43 @@
   for (const id of ['postInstagram', 'postFacebook']) $(id).addEventListener('change', changed);
   $('downloadInstructions').addEventListener('click', () => { if (state.busy || !$('reviewed').checked || !postingChannels().length) { notify('Review your post and choose a posting channel before downloading instructions.', 'error'); return; } const pack = campaignPack(); saveBlob(new Blob([`${pack.product.name}\n${$('postingSummary').textContent}\n\n${pack.headline}\n\n${pack.caption}\n\n${pack.posting_checklist.map((line, i) => `${i + 1}. ${line}`).join('\n\n')}`], { type: 'text/plain' }), 'posting-instructions.txt'); });
   $('productPhoto').addEventListener('change', async (event) => { if (state.busy) return; try { await upload(event.target.files?.[0]); } catch (e) { notify(e.message, 'error'); } });
-  document.querySelectorAll('[data-step]').forEach((el) => el.addEventListener('click', () => go(Number(el.dataset.step))));
-  document.querySelectorAll('[data-goal]').forEach((el) => el.addEventListener('click', () => { state.goal = el.dataset.goal; document.querySelectorAll('[data-goal]').forEach((b) => b.classList.toggle('selected', b === el)); $('ideaTitle').textContent = goals[state.goal][0]; $('ideaReason').textContent = goals[state.goal][1]; if (!state.copyEdited) starter(); sync(); refreshPreview(); $('reviewed').checked = false; }));
+  const stepButtons = [...document.querySelectorAll('[data-step]')];
+  stepButtons.forEach((el, idx) => {
+    el.addEventListener('click', () => go(Number(el.dataset.step)));
+    el.addEventListener('keydown', (event) => {
+      const delta = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
+      if (!delta) return;
+      event.preventDefault();
+      const next = stepButtons[(idx + delta + stepButtons.length) % stepButtons.length];
+      go(Number(next.dataset.step));
+      if (Number(next.dataset.step) === state.step) next.focus();
+    });
+  });
+  const goalButtons = [...document.querySelectorAll('[data-goal]')];
+  goalButtons.forEach((el, idx) => {
+    el.addEventListener('click', () => {
+      state.goal = el.dataset.goal;
+      goalButtons.forEach((b) => {
+        const active = b === el;
+        b.classList.toggle('selected', active);
+        b.setAttribute('aria-pressed', String(active));
+      });
+      $('ideaTitle').textContent = goals[state.goal][0];
+      $('ideaReason').textContent = goals[state.goal][1];
+      if (!state.copyEdited) starter();
+      sync();
+      refreshPreview();
+      $('reviewed').checked = false;
+    });
+    el.addEventListener('keydown', (event) => {
+      const delta = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
+      if (!delta) return;
+      event.preventDefault();
+      const next = goalButtons[(idx + delta + goalButtons.length) % goalButtons.length];
+      next.click();
+      next.focus();
+    });
+  });
   $('nextButton').addEventListener('click', () => go(Math.min(3, state.step + 1))); $('backButton').addEventListener('click', () => go(Math.max(0, state.step - 1))); $('originalButton').addEventListener('click', () => { originalLayout(); $('reviewed').checked = false; }); $('draftButton').addEventListener('click', draft); $('generateButton').addEventListener('click', generate);
   $('downloadFeed').addEventListener('click', () => download(1350)); $('downloadStory').addEventListener('click', () => download(1920)); $('downloadPack').addEventListener('click', () => { if (state.busy) return; if (!$('reviewed').checked) { notify('Review your product details and wording before downloading.', 'error'); return; } saveBlob(new Blob([JSON.stringify(campaignPack(), null, 2)], { type: 'application/json' }), 'campaign.json'); });
   $('copyCaption').addEventListener('click', async () => { sync(); try { await navigator.clipboard.writeText(`${state.headline}\n\n${state.caption}${safeLink(state.product.link) ? '\n\n' + safeLink(state.product.link) : ''}`); notify('Your current caption and link are copied.'); } catch { notify('Clipboard access is unavailable. Select and copy your caption from the edit screen.', 'error'); } });

@@ -59,8 +59,10 @@
   const RETRY_STATUS = new Set([502, 503, 504]);
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const STATUS_MESSAGES = {
+    401: 'Your session expired. Sign in again to continue — your work is safe on this device.',
     402: 'You are out of runs. Saved results are still free to view.',
     403: 'This needs a live session. Saved results still work.',
+    408: 'Muse is taking longer than expected. Your inputs are safe; try again in a minute.',
     413: 'That upload is too large. Try a smaller image.',
     415: 'That request was not in the expected format. Please try again.',
     422: 'Some details need fixing before this can run.',
@@ -70,14 +72,40 @@
     503: 'This service is busy or not configured. Saved results still work.',
     504: 'This took too long. Your inputs are safe; try again in a minute.',
   };
+  let forcedOffline = false;
+  function isOffline() {
+    if (forcedOffline) return true;
+    return typeof navigator !== 'undefined' && navigator.onLine === false;
+  }
+  function friendlyError(errorOrMessage, status = 0, fallback = 'Something went wrong. Your work is safe; please try again.') {
+    if (isOffline()) return 'You appear to be offline. Your work is saved on this device — reconnect and try again.';
+    const raw = typeof errorOrMessage === 'string' ? errorOrMessage : (errorOrMessage?.message || '');
+    if (errorOrMessage?.name === 'AbortError' || status === 504 || status === 408 || /timed?\s*out/i.test(raw)) {
+      return STATUS_MESSAGES[504];
+    }
+    if (status === 401) return STATUS_MESSAGES[401];
+    if (status && STATUS_MESSAGES[status] && (!raw || /traceback|exception|<html|<!doctype|http\s*\d{3}|failed to fetch|networkerror/i.test(raw))) {
+      return STATUS_MESSAGES[status];
+    }
+    if (raw && raw.length <= 400 && !/traceback|exception|<html|<!doctype|failed to fetch|networkerror|load failed/i.test(raw)) {
+      return raw;
+    }
+    if (status && STATUS_MESSAGES[status]) return STATUS_MESSAGES[status];
+    return fallback;
+  }
   async function errorMessage(response, fallback = 'Something went wrong. Please try again.') {
     let detail = '';
     try { const body = await response.clone().json(); if (typeof body?.detail === 'string') detail = body.detail; else if (typeof body?.detail?.message === 'string') detail = body.detail.message; } catch { /* not JSON */ }
     // Never show stack traces or HTML error pages; keep server messages short and plain.
-    if (detail && detail.length <= 400 && !/traceback|exception|<html/i.test(detail)) return detail;
+    if (detail && detail.length <= 400 && !/traceback|exception|<html|<!doctype/i.test(detail)) return detail;
     return STATUS_MESSAGES[response.status] || fallback;
   }
   async function museFetch(url, options = {}, { retries = 2, safe, timeoutMs = 30000 } = {}) {
+    if (isOffline()) {
+      const err = new Error('You appear to be offline. Your work is saved on this device — reconnect and try again.');
+      err.code = 'OFFLINE';
+      throw err;
+    }
     const method = String(options.method || 'GET').toUpperCase();
     const billed = /[?&]live=(true|1)\b/.test(String(url));
     const canRetry = !billed && (safe ?? method === 'GET');
@@ -88,10 +116,15 @@
       const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
       try {
         const response = await fetch(url, { credentials: 'same-origin', ...options, ...(controller && !options.signal ? { signal: controller.signal } : {}) });
+        if (response.status === 401 && serverSnapshot()?.user) {
+          window.museAccount?.open?.('signin', 'Your session expired. Sign in again — your work is still on this device.');
+        }
         if (!RETRY_STATUS.has(response.status) || attempt === attempts - 1) return response;
         lastError = new Error(await errorMessage(response));
       } catch (error) {
-        lastError = error?.name === 'AbortError' ? new Error(STATUS_MESSAGES[504]) : new Error('You seem to be offline or the server is unreachable. Your work is safe; try again.');
+        lastError = error?.name === 'AbortError'
+          ? new Error(STATUS_MESSAGES[504])
+          : new Error(isOffline() ? 'You appear to be offline. Your work is saved on this device — reconnect and try again.' : 'You seem to be offline or the server is unreachable. Your work is safe; try again.');
         if (attempt === attempts - 1) throw lastError;
       } finally { if (timer) clearTimeout(timer); }
       await wait(400 * 3 ** attempt);
@@ -1423,10 +1456,123 @@
     setTimeout(() => document.querySelectorAll('.reveal-on-scroll:not(.revealed)').forEach((x) => x.classList.add('revealed')), 900);
   }
 
+  // ---------- Network Offline Banner ----------
+  let offlineBannerNode = null;
+  function setOfflineState(offline) {
+    forcedOffline = Boolean(offline);
+    updateOfflineBanner(forcedOffline);
+  }
+  function updateOfflineBanner(announceOnline = false) {
+    const offline = isOffline();
+    if (!offlineBannerNode && document.body) {
+      offlineBannerNode = el(
+        'div',
+        {
+          id: 'msOfflineBanner',
+          class: 'ms-offline-banner',
+          role: 'status',
+          'aria-live': 'polite',
+          hidden: '',
+        },
+        'You appear to be offline. Your work is saved on this device — reconnect to generate with Muse.'
+      );
+      document.body.prepend(offlineBannerNode);
+    }
+    if (!offlineBannerNode) return;
+    if (offline) {
+      offlineBannerNode.removeAttribute('hidden');
+      offlineBannerNode.hidden = false;
+    } else {
+      offlineBannerNode.setAttribute('hidden', '');
+      offlineBannerNode.hidden = true;
+      if (announceOnline) toast('Back online. You can continue with Muse.');
+    }
+  }
+  function mountOfflineBanner() {
+    updateOfflineBanner(false);
+    window.addEventListener('offline', () => updateOfflineBanner(false));
+    window.addEventListener('online', () => { forcedOffline = false; updateOfflineBanner(true); });
+  }
+
+  // ---------- Universal Modal Focus Management & Keyboard Trap ----------
+  const FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), summary, [tabindex]:not([tabindex="-1"])';
+  function focusableInside(dialog) {
+    if (!dialog) return [];
+    return [...dialog.querySelectorAll(FOCUSABLE_SELECTOR)].filter(
+      (node) => !node.hidden && !node.closest('[hidden]') && node.getClientRects?.().length !== 0
+    );
+  }
+  function bindDialogFocusReturn(dialog) {
+    if (!dialog || dialog.__msFocusBound) return;
+    dialog.__msFocusBound = true;
+    dialog.addEventListener('close', () => {
+      const opener = dialog.__msOpener;
+      dialog.__msOpener = null;
+      if (opener && typeof opener.focus === 'function' && document.contains(opener)) {
+        try { opener.focus({ preventScroll: true }); } catch { try { opener.focus(); } catch {} }
+      }
+    });
+  }
+  function mountDialogAccessibility() {
+    if (typeof HTMLDialogElement !== 'undefined' && HTMLDialogElement.prototype.showModal && !HTMLDialogElement.prototype.__msWrapped) {
+      const origShowModal = HTMLDialogElement.prototype.showModal;
+      const wrapped = function (...args) {
+        if (!this.open) {
+          this.__msOpener = document.activeElement;
+        }
+        this.setAttribute('aria-modal', 'true');
+        bindDialogFocusReturn(this);
+        const res = origShowModal.apply(this, args);
+        queueMicrotask(() => {
+          if (!this.open) return;
+          if (!this.contains(document.activeElement) || document.activeElement === this) {
+            const auto = this.querySelector('[autofocus]:not([disabled])');
+            const items = focusableInside(this);
+            const target = auto || items[0] || this;
+            if (target === this && !this.hasAttribute('tabindex')) this.setAttribute('tabindex', '-1');
+            try { target.focus({ preventScroll: true }); } catch { try { target.focus(); } catch {} }
+          }
+        });
+        return res;
+      };
+      wrapped.__msWrapped = true;
+      HTMLDialogElement.prototype.showModal = wrapped;
+    }
+    document.querySelectorAll('dialog').forEach((d) => {
+      d.setAttribute('aria-modal', 'true');
+      bindDialogFocusReturn(d);
+    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key !== 'Tab') return;
+      const openDialogs = [...document.querySelectorAll('dialog[open]')];
+      const topDialog = openDialogs[openDialogs.length - 1];
+      if (!topDialog || topDialog.classList.contains('ma-dialog')) return;
+      const items = focusableInside(topDialog);
+      if (!items.length) {
+        event.preventDefault();
+        return;
+      }
+      const first = items[0];
+      const last = items[items.length - 1];
+      const active = document.activeElement;
+      if (event.shiftKey) {
+        if (active === first || !topDialog.contains(active)) {
+          event.preventDefault();
+          last.focus();
+        }
+      } else if (active === last || !topDialog.contains(active)) {
+        event.preventDefault();
+        first.focus();
+      }
+    });
+  }
+
   function init() {
     revealFallback();
     // The daily desk stays focused on the post; research lives in the portal.
     removeGates();
+    mountOfflineBanner();
+    mountDialogAccessibility();
     mountCredits();
     mountSession();
     mountNotifications();
@@ -1446,6 +1592,6 @@
     mountTriage();
   }
 
-  window.museShell = { spend, spendLive, canRun, requireRun, syncCredits, fetch: museFetch, errorMessage, hasAccount: hasSession, progress, toast, openGift, openPricing, openSignup, openActions, openTour, showStage, watchlist: WATCH, signals: loadSignals, competitorStatus, changeBadges, notificationItems, pausedCompetitors: readPaused, toggleNotifications, markRead };
+  window.museShell = { spend, spendLive, canRun, requireRun, syncCredits, fetch: museFetch, errorMessage, friendlyError, isOffline, setOfflineState, hasAccount: hasSession, progress, toast, openGift, openPricing, openSignup, openActions, openTour, showStage, watchlist: WATCH, signals: loadSignals, competitorStatus, changeBadges, notificationItems, pausedCompetitors: readPaused, toggleNotifications, markRead };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();

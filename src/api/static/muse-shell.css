@@ -455,3 +455,96 @@
   .ms-toasts { left: 16px; right: 16px; transform: none; bottom: 24px; }
   .ms-toast { white-space: normal; text-align: center; }
 }
+
+/* ---------- Network Offline Banner, Loading Indicators, Section Transitions & Focus ---------- */
+.ms-offline-banner {
+  position: sticky;
+  top: 0;
+  z-index: 250;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 10px 16px;
+  background: #231d12;
+  color: #f6ead4;
+  border-bottom: 1px solid rgba(197, 147, 65, 0.48);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  text-align: center;
+}
+.ms-offline-banner[hidden] { display: none !important; }
+.ms-offline-banner::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #c59341;
+  box-shadow: 0 0 0 3px rgba(197, 147, 65, 0.24);
+  flex: none;
+}
+
+@keyframes msInlineSpin { to { transform: rotate(360deg); } }
+button[aria-busy="true"],
+.btn[aria-busy="true"],
+label[aria-busy="true"] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: progress !important;
+}
+button[aria-busy="true"]::before,
+.btn[aria-busy="true"]::before,
+label[aria-busy="true"]::before {
+  content: "";
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(197, 147, 65, 0.32);
+  border-top-color: #c59341;
+  animation: msInlineSpin 0.75s linear infinite;
+  flex: none;
+}
+.primary[aria-busy="true"]::before,
+.btn-primary[aria-busy="true"]::before,
+.hero-btn-primary[aria-busy="true"]::before {
+  border-color: rgba(255, 255, 255, 0.35);
+  border-top-color: #ffffff;
+}
+
+@keyframes msSectionEnter {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.panel.active,
+[data-panel]:not([hidden]),
+#workspaceDetail[style*="block"] {
+  animation: msSectionEnter 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible,
+[role="tab"]:focus-visible {
+  outline: 2px solid #c59341;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button[aria-busy="true"]::before,
+  .btn[aria-busy="true"]::before,
+  label[aria-busy="true"]::before {
+    animation: none;
+  }
+  .panel.active,
+  [data-panel]:not([hidden]),
+  #workspaceDetail[style*="block"] {
+    animation: none;
+  }
+}
+

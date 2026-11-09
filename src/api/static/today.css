@@ -763,3 +763,31 @@ footer {
 .research-workspace input,.research-workspace textarea {width:100%;margin:6px 0 12px;}
 .research-target {border-top:1px solid var(--line);padding:16px 0;}
 .research-target p {margin:8px 0;}
+
+@keyframes todaySpin { to { transform: rotate(360deg); } }
+#notice.busy,
+#importStatus.busy,
+#researchStatus.busy {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+#notice.busy::before,
+#importStatus.busy::before,
+#researchStatus.busy::before {
+  content: "";
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(27, 110, 68, 0.25);
+  border-top-color: #1b6e44;
+  animation: todaySpin 0.8s linear infinite;
+  flex: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  #notice.busy::before,
+  #importStatus.busy::before,
+  #researchStatus.busy::before {
+    animation: none;
+  }
+}

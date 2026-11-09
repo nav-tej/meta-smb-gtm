@@ -158,10 +158,26 @@
   }
   let setupBackup = null;
   const safeURL = value => { try { const u = new URL(value); return ['https:', 'http:'].includes(u.protocol) && !u.username && !u.password ? u.href : ''; } catch { return ''; } };
-  const inline = value => typeof value === 'string' && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(value) && value.length <= 2100000;
-  const imageSource = value => inline(value) || /^\/samples\/[a-zA-Z0-9_.-]+$/.test(value || '');
-  function notice(message, error = false) { $('notice').hidden = false; $('notice').textContent = message; $('notice').className = error ? 'error' : ''; }
-  function lock(busy) { state.busy = busy; document.querySelectorAll('button, input, select, textarea').forEach(el => { el.disabled = busy; }); document.body.classList.toggle('exporting', busy); }
+  const inline = value => typeof value === 'string' && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(value) && value.length <= 4000000;
+  const mediaAsset = value => typeof value === 'string' && /^\/api\/v1\/account\/media\/[0-9a-f]{32}\.(png|jpg|webp)$/.test(value);
+  const imageSource = value => inline(value) || mediaAsset(value) || /^\/samples\/[a-zA-Z0-9_.-]+$/.test(value || '');
+  const isOfflineNow = () => Boolean(window.museShell?.isOffline?.() || (typeof navigator !== 'undefined' && navigator.onLine === false));
+  function notice(message, error = false, busy = false) { $('notice').hidden = false; $('notice').textContent = message; $('notice').className = error ? 'error' : (busy ? 'busy' : ''); }
+  const BUSY_BUTTONS = ['musePlan', 'museImage', 'findItems', 'readListing', 'getPost'];
+  let lockedFocus = null;
+  function lock(busy, activeId = '') {
+    if (busy && document.activeElement && document.activeElement !== document.body) {
+      lockedFocus = document.activeElement;
+    }
+    state.busy = busy;
+    document.querySelectorAll('button, input, select, textarea').forEach(el => { el.disabled = busy; });
+    for (const id of BUSY_BUTTONS) $(id)?.setAttribute('aria-busy', String(Boolean(busy && activeId === id)));
+    document.body.classList.toggle('exporting', busy);
+    if (!busy && lockedFocus && document.contains(lockedFocus) && !lockedFocus.disabled) {
+      try { lockedFocus.focus({ preventScroll: true }); } catch {}
+      lockedFocus = null;
+    }
+  }
   function invalidate() { state.revision += 1; $('reviewed').checked = false; }
   function currentPlan() { return state.plans[state.channel]; }
   function currentPost() { return currentPlan()?.posts?.[state.selected] || null; }
@@ -176,6 +192,7 @@
   }
   function postIdentity() { return JSON.stringify([state.product.title, state.product.destination_url, state.channel, state.format, state.selected, currentCopy()]); }
   async function jsonRequest(path, payload, live = false) {
+    if (isOfflineNow()) throw new Error('You appear to be offline. Your edits are saved on this device — reconnect and try again.');
     const control = new AbortController(); const timer = setTimeout(() => control.abort(), live ? 285000 : 45000);
     try {
       const init = { method: 'POST', headers: { 'Content-Type': 'application/json', ...(live && state.key ? { 'X-Demo-Key': state.key } : {}) }, body: JSON.stringify(payload), signal: control.signal };
@@ -184,9 +201,19 @@
       const response = !live && shell?.fetch ? await shell.fetch(path, init, { safe: true, timeoutMs: 45000 }) : await fetch(path + (live ? '?live=true' : ''), init);
       if (live) { shell?.syncCredits?.(); if (response.headers?.get?.('X-Muse-Fallback')) shell?.toast?.('Live Muse was unavailable, so saved results are shown. No run was used.', 'warn'); }
       let data; try { data = await response.json(); } catch { throw new Error('The server could not finish. Your edits are still here.'); }
-      if (!response.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'Check the item details and try again.');
+      if (!response.ok) {
+        const detail = typeof data.detail === 'string' && !/<html|traceback/i.test(data.detail) ? data.detail : '';
+        if (response.status === 401 || response.status === 403) throw new Error(detail || 'Your session expired before Muse started, so no run was used. Sign in again; your edits are still here.');
+        if (response.status === 402 || response.status === 429) throw new Error(detail || 'You have reached your current run allowance. Check your plan or wait a moment — your edits are still here.');
+        if (response.status >= 500) throw new Error(detail || 'Muse is temporarily unavailable right now. No run was used and your edits are still here — please try again shortly.');
+        throw new Error(detail || 'Check the item details and try again.');
+      }
       return data;
-    } catch (error) { if (error.name === 'AbortError') throw new Error(live ? 'Muse timed out and may still be processing. Check completion before paying for another request.' : 'That site is taking too long. Enter your item below.'); throw error; }
+    } catch (error) {
+      if (error.name === 'AbortError') throw new Error(live ? 'Muse timed out and may still be processing. Check completion before paying for another request.' : 'That site is taking too long. Enter your item below.');
+      if (isOfflineNow() || /failed to fetch|networkerror/i.test(error?.message || '')) throw new Error('You appear to be offline or the server could not be reached. Your edits are still here — reconnect and try again.');
+      throw error;
+    }
     finally { clearTimeout(timer); }
   }
   function planPayload(live) { return { product: { title: state.product.title, description: state.product.description, price: state.product.price || undefined, destination_url: safeURL(state.product.destination_url) || undefined, seller: state.product.seller, collection: state.product.collection }, channels: [state.channel], goal: state.goal, sales_goal: state.salesGoal || undefined, performance: state.performance || undefined, use_muse: live }; }
@@ -195,7 +222,7 @@
     if (live && !liveReady()) return;
     if (!force && !live && currentPlan()) { render(); return; }
     const channel = state.channel; const revision = state.revision;
-    lock(true); if (live) notice('Muse is writing three posts from your item and goal…');
+    lock(true, live ? 'musePlan' : ''); if (live) notice('Muse is writing three posts from your item and goal…', false, true);
     try {
       const plan = await jsonRequest('/api/v1/content-plan', planPayload(live), live);
       if (!Array.isArray(plan.posts) || plan.posts.length !== 3) throw new Error('No usable plan came back. Your existing post is unchanged.');
@@ -231,12 +258,25 @@
     $('postedStatus').textContent = state.posted[postIdentity()] ? 'Marked posted on this device' : '';
     $('noPhoto').hidden = !!state.image || state.format === 'text';
     $('planCards').replaceChildren();
-    for (const [i, item] of (plan?.posts || []).entries()) {
-      const button = document.createElement('button'); button.className = 'plan-card'; button.setAttribute('aria-pressed', String(i === state.selected));
+    const postsList = plan?.posts || [];
+    for (const [i, item] of postsList.entries()) {
+      const button = document.createElement('button'); button.type = 'button'; button.className = 'plan-card'; button.setAttribute('aria-pressed', String(i === state.selected));
       const timing = document.createElement('span'); timing.textContent = `${item.day_offset === 0 ? 'TODAY' : `IN ${item.day_offset} DAYS`} · ${names[item.channel]} · ${(i === state.selected ? state.format : item.format).toUpperCase()}`;
       const title = document.createElement('strong'); title.textContent = state.edits[`${state.channel}:${i}:${item.format}`]?.hook || item.hook;
       const tip = document.createElement('span'); tip.textContent = item.posting_tip;
-      button.append(timing, title, tip); button.addEventListener('click', () => { if (state.busy) return; state.selected = i; state.format = item.format; invalidate(); render(); persist(); }); $('planCards').append(button);
+      button.append(timing, title, tip);
+      button.addEventListener('click', () => { if (state.busy) return; state.selected = i; state.format = item.format; invalidate(); render(); persist(); });
+      button.addEventListener('keydown', event => {
+        const delta = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
+        if (!delta || !postsList.length || state.busy) return;
+        event.preventDefault();
+        const nextIdx = (i + delta + postsList.length) % postsList.length;
+        state.selected = nextIdx;
+        state.format = postsList[nextIdx].format;
+        invalidate(); render(); persist();
+        $('planCards').querySelectorAll('.plan-card')[nextIdx]?.focus();
+      });
+      $('planCards').append(button);
     }
     $('insightTitle').textContent = state.performance ? `${state.performance.clicks} shop clicks · ${state.performance.sales} sales` : 'Give people one clear next step.';
     $('insightAction').textContent = plan?.insight?.next_action || 'Post once, then note the visits or inquiries it brings.';
@@ -293,10 +333,10 @@
     });
   }
   async function getPost() {
-    if (state.busy || !reviewed()) return; lock(true);
+    if (state.busy || !reviewed()) return; lock(true, 'getPost');
     try {
       if (state.format === 'text') { await copyText(); notice('Text ready. Paste it into your post.'); return; }
-      notice(state.format === 'video' ? 'Preparing your six-second clip… Keep this tab open.' : 'Preparing your post…');
+      notice(state.format === 'video' ? 'Preparing your six-second clip… Keep this tab open.' : 'Preparing your post…', false, true);
       const blob = state.format === 'video' ? await makeClip() : await new Promise(async (resolve, reject) => { try { (await layout(1350)).toBlob(value => value ? resolve(value) : reject(new Error('Could not export the image.')), 'image/png'); } catch (error) { reject(error); } });
       saveBlob(blob, state.format === 'video' ? `clip.${blob.type === 'video/mp4' ? 'mp4' : 'webm'}` : 'feed.png'); const copied = await copyText();
       notice(`${state.format === 'video' ? 'Clip' : 'Image'} downloaded. ${copied ? 'Caption copied' : 'Caption downloaded'} — open ${names[state.channel]} and add your post.`);
@@ -332,18 +372,24 @@
     state.product = { title: data.title || new URL(safe).hostname, description: data.description || '', price: data.price_hint || '', seller: new URL(safe).hostname, destination_url: safeURL(data.url) || safe, destination: 'other', collection: '' };
     state.original = inline(data.image_data_url) ? data.image_data_url : ''; state.image = state.original; state.imageMode = 'original'; state.offers = {}; state.plans = {}; state.edits = {}; state.selected = 0; state.performance = null; state.source = `From ${new URL(safe).hostname} · check product facts`; invalidate(); populateSetup(); $('importStatus').textContent = data.source_note || 'Listing ready. Check the item and photo.';
   }
-  async function readListing() { if (state.busy) return; lock(true); try { await useReference($('shopUrl').value); notice('Listing selected. Check its details, then use this item.'); } catch (error) { $('importStatus').textContent = error.message; } finally { lock(false); } }
+  async function readListing() {
+    if (state.busy) return;
+    lock(true, 'readListing'); $('importStatus').classList?.add?.('busy'); $('importStatus').textContent = 'Reading listing details…';
+    try { await useReference($('shopUrl').value); notice('Listing selected. Check its details, then use this item.'); }
+    catch (error) { $('importStatus').textContent = error.message; }
+    finally { $('importStatus').classList?.remove?.('busy'); lock(false); }
+  }
   async function findItems() {
     const ownerEpoch = draftEpoch;
     if (state.busy) return; const url = safeURL($('shopUrl').value.trim()); if (!url) { $('importStatus').textContent = 'Enter a full shop URL.'; return; }
-    lock(true); $('importStatus').textContent = 'Finding a product for your next post…'; $('importItems').replaceChildren();
+    lock(true, 'findItems'); $('importStatus').classList?.add?.('busy'); $('importStatus').textContent = 'Finding a product for your next post…'; $('importItems').replaceChildren();
     try {
       const data = await jsonRequest('/api/v1/ingest-storefront', { website_url: url, business_name: new URL(url).hostname, max_urls_per_source: 20 });
       const items = (data.discovered_catalog_items || []).filter(item => safeURL(item.url)); const products = items.filter(item => ['products', 'listings'].includes(item.bucket)); const choices = products.length ? products : items;
       if (!choices.length) { $('importStatus').textContent = 'No items found. Paste a product link or enter one below.'; return; }
-      for (const [i, item] of choices.entries()) { const button = document.createElement('button'); button.type = 'button'; button.textContent = `${i === 0 ? 'Suggested: ' : ''}${item.title || 'View listing'}`; button.addEventListener('click', async () => { if (state.busy) return; lock(true); try { await useReference(item.url); } catch (error) { $('importStatus').textContent = error.message; } finally { lock(false); } }); $('importItems').append(button); }
+      for (const [i, item] of choices.entries()) { const button = document.createElement('button'); button.type = 'button'; button.textContent = `${i === 0 ? 'Suggested: ' : ''}${item.title || 'View listing'}`; button.addEventListener('click', async () => { if (state.busy) return; lock(true, 'readListing'); try { await useReference(item.url); } catch (error) { $('importStatus').textContent = error.message; } finally { lock(false); } }); $('importItems').append(button); }
       await useReference(choices[0].url); $('importStatus').textContent = 'First product listing selected. Change it below or use this item.';
-    } catch (error) { $('importStatus').textContent = error.message; } finally { lock(false); }
+    } catch (error) { $('importStatus').textContent = error.message; } finally { $('importStatus').classList?.remove?.('busy'); lock(false); }
   }
   async function upload(file) {
     const ownerEpoch = draftEpoch;
@@ -369,14 +415,30 @@
   async function museImage() {
     const ownerEpoch = draftEpoch;
     if (state.busy || !liveReady()) return; if (!state.original) { notice('Add your original photo first.', true); return; }
-    lock(true); notice('Muse is creating a new scene. This is a billed image request…');
+    lock(true, 'museImage'); notice('Muse is creating a new scene. This is a billed image request…', false, true);
     try {
       let data = state.original; if (!inline(data)) { const response = await fetch(data); if (!response.ok) throw new Error('Could not load your source photo.'); data = await new Promise((resolve, reject) => { response.blob().then(blob => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(blob); }).catch(reject); }); }
       const copy = currentCopy(); const prompt = $('scenePrompt').value.trim(); if (!prompt || !copy.hook || !copy.caption) throw new Error('Add a scene, opening line and caption first.');
       if (ownerEpoch !== draftEpoch) return;
       const response = await jsonRequest('/api/v1/generate-ads', { product: { title: state.product.title, description: state.product.description, price: state.product.price || undefined, image_base64: data }, draft: false, placements: ['instagram_feed'], variants_per_placement: 1, use_comfyui: false, muse_workflow_mode: 'product_visuals', brief: { product_title: state.product.title, positioning_hook: copy.hook, estimated_paid_calls: 1, preserve_product_note: 'Compare with original before posting.', variants: [{ variant_id: 'daily1', placement: 'instagram_feed', include: true, headline: copy.hook.slice(0, 120), primary_text: copy.caption.slice(0, 600), image_prompt: prompt }] } }, true);
-      const creative = response.creatives?.[0]; if (!creative || String(creative.produced_by).startsWith('demo-cache') || !inline(creative.media_data_url)) throw new Error('No usable new image delivered. Check completion before regenerating. Your original is still here.');
-      await loadImage(creative.media_data_url); if (ownerEpoch !== draftEpoch) return; state.image = creative.media_data_url; state.imageMode = 'live'; invalidate(); render(); persist(); notice('Muse scene ready. Compare the artwork with your original before using it.');
+      const creative = response.creatives?.[0];
+      const assetUrl = mediaAsset(creative?.media_asset_url) ? creative.media_asset_url : '';
+      const inlineUrl = inline(creative?.media_data_url) ? creative.media_data_url : '';
+      const nextImage = assetUrl || inlineUrl;
+      if (!creative || String(creative.produced_by).startsWith('demo-cache') || !nextImage) throw new Error('No usable new image delivered. Check completion before regenerating. Your original is still here.');
+      let chosenImage = nextImage;
+      try {
+        await loadImage(chosenImage);
+      } catch (imgErr) {
+        if (assetUrl && inlineUrl) {
+          chosenImage = inlineUrl;
+          await loadImage(chosenImage);
+        } else {
+          throw imgErr;
+        }
+      }
+      if (ownerEpoch !== draftEpoch) return;
+      state.image = chosenImage; state.imageMode = 'live'; invalidate(); render(); persist(); notice('Muse scene ready. Compare the artwork with your original before using it.');
     } catch (error) { notice(error.message, true); } finally { lock(false); }
   }
   for (const id of ['openSetup', 'changeItem']) $(id).addEventListener('click', openSetup);
@@ -387,7 +449,25 @@
   $('findItems').addEventListener('click', findItems); $('readListing').addEventListener('click', readListing);
   $('photo').addEventListener('change', event => upload(event.target.files?.[0]));
   for (const id of ['postHook', 'postCaption']) $(id).addEventListener('input', saveEdit);
-  document.querySelectorAll('[data-channel]').forEach(button => button.addEventListener('click', async () => { if (state.busy) return; state.channel = button.dataset.channel; state.selected = 0; state.format = state.channel === 'tiktok' ? 'video' : state.channel === 'x' ? 'text' : 'image'; invalidate(); await buildPlan(); persist(); }));
+  const channelButtons = [...document.querySelectorAll('[data-channel]')];
+  channelButtons.forEach((button, idx) => {
+    button.addEventListener('click', async () => {
+      if (state.busy) return;
+      state.channel = button.dataset.channel;
+      state.selected = 0;
+      state.format = state.channel === 'tiktok' ? 'video' : state.channel === 'x' ? 'text' : 'image';
+      channelButtons.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.channel === state.channel)));
+      invalidate(); await buildPlan(); persist();
+    });
+    button.addEventListener('keydown', event => {
+      const delta = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
+      if (!delta || state.busy) return;
+      event.preventDefault();
+      const next = channelButtons[(idx + delta + channelButtons.length) % channelButtons.length];
+      next.focus();
+      next.click();
+    });
+  });
   $('format').addEventListener('change', () => { state.format = $('format').value; invalidate(); render(); persist(); });
   $('getPost').addEventListener('click', getPost);
   $('copyOnly').addEventListener('click', async () => { if (state.busy || !reviewed()) return; const copied = await copyText(); notice(copied ? 'Post copied. Paste it into your channel.' : 'Caption downloaded.'); });
