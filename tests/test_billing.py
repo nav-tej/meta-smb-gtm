@@ -802,6 +802,7 @@ def test_billing_sql_regressions_on_local_postgres() -> None:
     for script, marker in (
         ("tests/billing_sql_regression.mjs", "SQL regressions passed"),
         ("tests/billing_sql_rollback.mjs", "ROLLBACK OK"),
+        ("tests/run_refunds_sql.mjs", "run-refund SQL checks passed"),
     ):
         result = subprocess.run(
             [node, str(root / script)], capture_output=True, text=True, timeout=120, check=False

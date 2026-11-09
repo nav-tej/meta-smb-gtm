@@ -131,7 +131,7 @@ async def finish_operation(status: str = "completed", *, operation_id: str | Non
     target = operation_id or (context.operation_id if context else None)
     try:
         if target is not None:
-            if status not in {"completed", "failed"}:
+            if status not in {"completed", "failed", "refunded"}:
                 raise UsageLimitError(400, "Invalid completion status.")
             await _rpc(
                 "muse_finish_operation",

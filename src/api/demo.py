@@ -6,6 +6,9 @@ With DEMO_MODE on, routes that call Muse serve saved live results instead. A rea
 LIVE_CALLS_PER_HOUR. The cap is held in memory, so on serverless hosts it applies per running
 instance (cold starts reset it); it bounds abuse rather than enforcing an exact global quota.
 
+Account runs are finished as completed, refunded (cache hit or saved fallback, no new result) or
+failed (the route raised), and only completed runs count against the plan.
+
 Every non-account live request also spends one server-side credit (src/services/credits.py),
 reserved before the route runs. It is refunded if the request made no billable Muse call (a
 cache hit), failed, or was answered by a cached/demo fallback.
@@ -95,6 +98,13 @@ async def _spend_credit(
         credits.commit(hold)
 
 
+def run_outcome(log: dict[str, list[str]]) -> str:
+    """How a finished account run is recorded: completed (counts) or refunded (given back)."""
+    if log["fallbacks"] or (log["hits"] and not log["calls"]):
+        return "refunded"
+    return "completed"
+
+
 async def live_mode(
     request: Request,
     response: Response,
@@ -134,10 +144,15 @@ async def live_mode(
             account.user_id,
             operation_id,
         )
+        log = track_provider_calls()
+        outcome = "failed"
         try:
             yield True
+            outcome = run_outcome(log)
         finally:
-            await usage_meter.finish_operation("completed", operation_id=operation_id)
+            # Only runs that delivered a new Muse result count against the plan; failed runs,
+            # cache hits and saved fallbacks are given back (supabase/migrations/run_refunds.sql).
+            await usage_meter.finish_operation(outcome, operation_id=operation_id)
         return
     if not valid_demo_key(x_demo_key):
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Live calls need a valid X-Demo-Key.")

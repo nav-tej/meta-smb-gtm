@@ -37,6 +37,7 @@
     message.textContent = text;
     message.className = error ? 'ma-message ma-error' : 'ma-message';
   }
+  const AUTH_PATHS = new Set(['/me', '/signin', '/signup', '/recover', '/password', '/callback', '/signout']);
   async function request(path, method = 'GET', body, extraHeaders = {}) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 15000);
@@ -51,6 +52,7 @@
         const detail = typeof data.detail === 'string' ? data.detail : data.detail?.message;
         const error = new Error(detail || (response.status === 429 ? 'Your current allowance is used. Try again when it resets.' : response.status === 409 ? 'A newer draft is saved. Load it before saving again.' : 'We could not complete that request. Your draft is still here.'));
         error.status = response.status;
+        if (response.status === 401 && snapshot.user && !AUTH_PATHS.has(path)) sessionEnded('Your session ended, so this was not saved to your account. Sign in again; your draft is still on this device.');
         throw error;
       }
       return data;
@@ -291,6 +293,40 @@
     });
     dialog.addEventListener('cancel', event => { if (busy) event.preventDefault(); else password.value = ''; });
     document.body.append(dialog); renderAccount();
+  }
+  // A sign-in that lapsed while the tab was open: show it once, keep the draft, ask to sign in.
+  let endedNotice = 0;
+  // The account snapshot is left alone, so signing back into the same account keeps the
+  // editors' draft in place (a different account goes through the normal switch protection).
+  function sessionEnded(text) {
+    if (Date.now() - endedNotice < 5000 || busy) return;
+    endedNotice = Date.now();
+    if (!dialog) mount();
+    if (!dialog) return;
+    track('session_expired');
+    setMode('signin', text);
+    if (snapshot.user?.email) email.value = snapshot.user.email;
+    if (!dialog.open) dialog.showModal();
+  }
+  // Every live Muse request, whichever page made it: refresh the run count afterwards (failed runs
+  // and saved fallbacks are given back on the server), say when a saved result stood in for a new
+  // one, and handle a session that ended before the run started.
+  const nativeFetch = window.fetch?.bind(window);
+  if (nativeFetch) {
+    window.fetch = async (input, init) => {
+      const url = typeof input === 'string' ? input : input?.url || '';
+      if (!/[?&]live=(true|1)\b/.test(url)) return nativeFetch(input, init);
+      const response = await nativeFetch(input, init);
+      try {
+        if (snapshot.configured) {
+          if (response.status === 401 && snapshot.user) sessionEnded('Your session ended before Muse started, so no run was used. Sign in again; your draft is still here.');
+          else if (response.headers.get('X-Muse-Fallback')) window.museShell?.toast?.('Live Muse was unavailable, so saved results are shown. No run was used.', 'warn');
+          else if (!response.ok && response.status >= 500) window.museShell?.toast?.('Muse could not finish this run, so it was not counted. Your work is still here.', 'warn');
+          if (snapshot.user) setTimeout(() => { refresh().catch(() => {}); }, 1500);
+        }
+      } catch { /* observing never breaks the request */ }
+      return response;
+    };
   }
   mount();
   const readyPromise = (async () => {

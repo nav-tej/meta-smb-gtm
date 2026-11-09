@@ -37,6 +37,8 @@
   // `action` ({ label, onClick }) adds one button, e.g. Undo, and keeps the toast up longer.
   function toast(message, kind = '', action = null) {
     if (!toastBox) { toastBox = el('div', { class: 'ms-toasts', role: 'status', 'aria-live': 'polite' }); document.body.appendChild(toastBox); }
+    // Repeated clicks refresh the visible toast instead of stacking copies of it.
+    for (const shown of toastBox.querySelectorAll('.ms-toast:not(.out)')) if (shown.firstChild?.nodeValue === message) shown.remove();
     const item = el('div', { class: `ms-toast ${kind}` }, message);
     let life = 2600;
     if (action && typeof action.onClick === 'function') {
@@ -259,8 +261,9 @@
   async function buyPlan(plan, interval, button) {
     const snap = serverSnapshot();
     if (!snap?.configured) return;
-    if (!snap.user) { toast('Sign in to pick a plan.'); window.museAccount.open('signup'); return; }
-    if (!snap.user.email_verified) { toast('Confirm your email first.'); window.museAccount.open('account'); return; }
+    // Hand over to the account dialog (one message, no toast hidden behind two stacked modals).
+    if (!snap.user) { pricingDialog?.close(); window.museAccount.open('signup', 'Create a free account or sign in, then pick your plan.'); return; }
+    if (!snap.user.email_verified) { pricingDialog?.close(); window.museAccount.open('account', 'Confirm your email using the signup link, then pick your plan.'); return; }
     button.disabled = true;
     window.museTrack?.('checkout_started', { plan, interval });
     try {
