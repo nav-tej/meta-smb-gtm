@@ -70,3 +70,17 @@ Completed legal pages (`src/api/static/legal/terms.html`, `privacy.html`, `refun
 
 ### Stripe sandbox on preview — Claude, November 9
 Migration applied to Supabase (verified; rollback file tested locally). Starter $12/mo or $108/yr, 20 runs/month. Preview https://meta-smb-j0guughgt-navtejs-6321s-projects.vercel.app has Stripe test + Supabase settings, no Muse key; webhook verified through Vercel bypass. `make check` 354 passed. Waiting on Nav's sandbox checkout. Production unchanged. Nothing committed. Checklist: [STRIPE_GO_LIVE.md](STRIPE_GO_LIVE.md).
+
+### Release state & pending — Claude, November 9 ~00:45 PST
+**Shipped to production (meta-smb-gtm.vercel.app):** `de14143` billing/drafts/QA, `94f7df1` seller footer + draft Terms/Privacy/Refunds (Antigravity). Production is demo mode (ACCOUNTS_REQUIRED unset), billing off (`/billing/status` available:false), live Muse presenter-only (DEMO_KEY). `make check` 367 passed in a clean worktree.
+**Preview (Vercel-login protected):** https://meta-smb-ragltv125-navtejs-6321s-projects.vercel.app — real accounts + Stripe sandbox, no Muse key; webhook repointed. Re-run `scripts/stripe_setup.py --env preview --webhook-url …` after each preview deploy (STRIPE_GO_LIVE.md).
+
+**Pending, in priority order**
+1. Nav: sandbox purchase on the preview (sign up, confirm email, Starter, card 4242…); Claude then verifies DB rows + Stripe deliveries. This is also the first real-auth test (signup/confirm/signin).
+2. Paid runs need `ACCOUNTS_REQUIRED=true` in production; until then a subscription cannot unlock live Muse there. Enabling it changes every visitor's experience (real sign-in instead of demo) and needs Nav's go-ahead after item 1 + password reset/session expiry checks.
+3. Nav: review the 7 `[NAV TO CONFIRM]` items in the legal pages (LEGAL.md); they are publicly visible as drafts now.
+4. Stripe live switch: STRIPE_GO_LIVE.md (purge sandbox rows first; preview and production share Supabase).
+5. Ops gates: error alerting/uptime check, data-deletion procedure owner, real-device Safari/phone checks.
+6. Durability: generated media, result cache, presenter credits and monitor log live in per-instance /tmp on Vercel.
+7. Minor: "Sign in to pick a plan." toast shows twice.
+8. Requested: PostHog analytics (needs project key; privacy page must disclose it).
