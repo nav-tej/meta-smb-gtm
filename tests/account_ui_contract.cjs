@@ -34,6 +34,7 @@ function harness(hash = '') {
       const suffix = url.replace('/api/v1/account', '');
       if (suffix === '/me') return response(account);
       if (suffix === '/signup') return response({ message: 'Check your email to confirm your account.', authenticated: false });
+      if (suffix === '/oauth') return response({ provider: 'google', url: 'https://auth.example.test/oauth/google' });
       if (suffix === '/signin') { if (failSignin) return response({ detail: 'Invalid credentials.' }, 401); account = signed('user-a'); return response(account); }
       if (suffix === '/signout') { account = anonymous(); return response({ message: 'Signed out.' }); }
       if (suffix === '/session') { account = signed('confirmed'); return response(account); }
@@ -130,5 +131,22 @@ function harness(hash = '') {
   assert(!code.includes('localStorage')); assert(!code.includes('sessionStorage'));
   callback.ids.get('ma-password').value = 'updated-long-password'; await callback.fire(callback.form(), 'submit');
   assert(callback.calls.some(call => call.url === '/api/v1/account/password'));
+
+  // Google OAuth button is shown in signup/signin modes and initiates same-origin OAuth redirect.
+  const google = harness(); await google.api.ready();
+  google.api.open('signup');
+  const googleBtn = google.button('Continue with Google');
+  assert(googleBtn && !googleBtn.hidden);
+  await google.fire(googleBtn, 'click');
+  assert.equal(google.calls.at(-1).url, '/api/v1/account/oauth');
+  assert.deepEqual(google.calls.at(-1).payload, { provider: 'google', next: '/account' });
+  assert.equal(google.context.window.location.href, 'https://auth.example.test/oauth/google');
+
+  // Google OAuth callback hash sets session and opens ready account view.
+  const googleCb = harness('#access_token=google-access&refresh_token=google-refresh&provider_token=google-provider');
+  await googleCb.api.ready();
+  assert.equal(googleCb.order[0], 'clear-hash');
+  assert.equal(googleCb.calls[0].url, '/api/v1/account/session');
+  assert(googleCb.nodes.some(element => element.textContent.includes('Signed in with Google')));
   console.log('ACCOUNT UI CONTRACT PASSED');
 })().catch(error => { console.error(error); process.exitCode = 1; });

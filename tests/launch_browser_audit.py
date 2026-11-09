@@ -162,6 +162,9 @@ class Audit:
             "/api/v1/monitor": {"changes": []},
             "/api/v1/weekly-digest": {},
             "/api/v1/daily-brief": {},
+            "/api/v1/analytics/config": {"enabled": False},
+            "/api/v1/billing/status": {"available": False, "intervals": []},
+            "/api/v1/digest/subscription": {"available": False},
         }
         if req.method == "GET" and path in fixtures:
             route.fulfill(json=fixtures[path])

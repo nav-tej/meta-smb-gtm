@@ -58,6 +58,8 @@ class Settings(BaseModel):
     supabase_url: str = ""
     supabase_publishable_key: str = ""
     supabase_secret_key: str = ""
+    google_client_id: str = ""
+    google_client_secret: str = ""
     app_url: str = "https://meta-smb-gtm.vercel.app"
     account_cookie_secure: bool = True
 
@@ -87,7 +89,11 @@ def get_settings() -> Settings:
     load_dotenv()
     load_dotenv(".env.local", override=True)
     fields = Settings.model_fields
-    values = {name: os.environ[name.upper()] for name in fields if os.environ.get(name.upper())}
+    values = {
+        name: os.environ[name.upper()].strip()
+        for name in fields
+        if os.environ.get(name.upper()) and os.environ[name.upper()].strip()
+    }
     # Serverless filesystems (Vercel) are read-only except /tmp
     if os.environ.get("VERCEL") and "output_dir" not in values:
         values["output_dir"] = "/tmp/outputs"

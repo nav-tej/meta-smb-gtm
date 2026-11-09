@@ -3,21 +3,24 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from src.clients.supabase import SupabaseError, get_supabase_client
 from src.config import get_settings
 from src.services.accounts import (
     clear_cookies,
+    complete_google_oauth,
     load_workspace,
     resolve_account,
     save_workspace,
     set_cookies,
     snapshot,
+    start_google_oauth,
     trusted_mutation,
     verify_token,
     verify_workspace_owner,
@@ -74,6 +77,12 @@ class WorkspaceRequest(BaseModel):
     expected_owner: str | None = Field(default=None, min_length=1, max_length=128)
 
 
+class OAuthRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    provider: Literal["google"] = "google"
+    next: str | None = Field(default="/account", max_length=64)
+
+
 Mutation = Annotated[None, Depends(trusted_mutation)]
 
 
@@ -89,12 +98,84 @@ async def me(request: Request, response: Response) -> dict[str, Any]:
 
 
 @router.post("/signup")
-async def signup(body: SignupRequest, _: Mutation) -> dict[str, Any]:
-    await get_supabase_client().auth("signup?" + callback_query(), "POST", body.model_dump())
-    return {
-        "message": "Check your email to confirm your account, then sign in.",
-        "authenticated": False,
-    }
+async def signup(body: SignupRequest, response: Response, _: Mutation) -> dict[str, Any]:
+    response.headers["Cache-Control"] = "no-store"
+    payload = body.model_dump()
+    already_exists = False
+    try:
+        await get_supabase_client().auth(
+            "admin/users",
+            "POST",
+            {"email": body.email, "password": body.password, "email_confirm": True},
+            secret=True,
+        )
+    except SupabaseError as err:
+        if err.status_code == 401:
+            already_exists = True
+        else:
+            await get_supabase_client().auth("signup?" + callback_query(), "POST", payload)
+            return {
+                "message": "Check your email to confirm your account, then sign in.",
+                "authenticated": False,
+            }
+
+    try:
+        tokens = await get_supabase_client().auth("token?grant_type=password", "POST", payload)
+    except SupabaseError as err:
+        if already_exists and err.status_code == 401:
+            raise HTTPException(
+                409,
+                "An account with this email already exists. Sign in or reset your password.",
+            ) from err
+        raise
+    account = await verify_token(tokens.get("access_token", ""))
+    result = await snapshot(account)
+    set_cookies(response, tokens)
+    return result
+
+
+@router.post("/oauth")
+async def oauth_start(
+    body: OAuthRequest, request: Request, response: Response, _: Mutation
+) -> dict[str, str]:
+    response.headers["Cache-Control"] = "no-store"
+    url = await start_google_oauth(request, response, body.next)
+    return {"provider": body.provider, "url": url}
+
+
+@router.get("/oauth/google")
+async def oauth_google_redirect(request: Request) -> RedirectResponse:
+    probe = Response()
+    try:
+        url = await start_google_oauth(request, probe, request.query_params.get("next"))
+    except HTTPException as exc:
+        err_query = urlencode({"oauth_error": str(exc.detail)})
+        return RedirectResponse(
+            f"/account?{err_query}", status_code=302, headers={"Cache-Control": "no-store"}
+        )
+    redirect = RedirectResponse(url, status_code=302, headers={"Cache-Control": "no-store"})
+    for header, value in probe.raw_headers:
+        if header.lower() == b"set-cookie":
+            redirect.raw_headers.append((header, value))
+    return redirect
+
+
+@router.get("/oauth/google/callback")
+async def oauth_google_callback(request: Request) -> RedirectResponse:
+    target, tokens, error_msg = await complete_google_oauth(
+        request,
+        request.query_params.get("code"),
+        request.query_params.get("state"),
+        request.query_params.get("error"),
+    )
+    query = urlencode({"oauth_error": error_msg} if error_msg else {"oauth": "google"})
+    redirect = RedirectResponse(
+        f"{target}?{query}", status_code=302, headers={"Cache-Control": "no-store"}
+    )
+    redirect.delete_cookie("muse_oauth_state", path="/")
+    if tokens is not None:
+        set_cookies(redirect, tokens)
+    return redirect
 
 
 @router.post("/signin")

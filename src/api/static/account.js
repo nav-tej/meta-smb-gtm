@@ -20,6 +20,8 @@
   let submit;
   let message;
   let tabs;
+  let googleButton;
+  let divider;
   let recover;
   let accountButton;
   let signupButton;
@@ -37,7 +39,7 @@
     message.textContent = text;
     message.className = error ? 'ma-message ma-error' : 'ma-message';
   }
-  const AUTH_PATHS = new Set(['/me', '/signin', '/signup', '/recover', '/password', '/callback', '/signout']);
+  const AUTH_PATHS = new Set(['/me', '/signin', '/signup', '/oauth', '/recover', '/password', '/callback', '/signout']);
   async function request(path, method = 'GET', body, extraHeaders = {}) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 15000);
@@ -101,14 +103,18 @@
     if (!form) return;
     form.querySelectorAll('button, input').forEach(element => { element.disabled = value; });
     submit.setAttribute('aria-busy', String(value));
+    if (googleButton) { googleButton.disabled = value; googleButton.setAttribute('aria-busy', String(value)); }
     if (signoutButton) signoutButton.disabled = value;
   }
   function setMode(next, text = '') {
     mode = ['signin', 'signup', 'recover', 'password', 'account'].includes(next) ? next : 'signin';
     const signedIn = mode === 'account';
     const passwordOnly = mode === 'password';
+    const showGoogle = !signedIn && !passwordOnly && mode !== 'recover';
     title.textContent = { signin: 'Welcome back.', signup: 'Make it your studio.', recover: 'Reset your password.', password: 'Choose a new password.', account: 'Your Muse account' }[mode];
     description.textContent = signedIn ? `${snapshot.user?.email || ''}${snapshot.user?.email_verified ? ' · email confirmed' : ' · confirm your email to generate'}` : mode === 'signup' ? 'Save your work and unlock 3 free Muse runs.' : mode === 'recover' ? 'We’ll send a password reset link if an account exists.' : passwordOnly ? 'Use at least 12 characters. Your draft stays here.' : 'Sign in to generate with Muse and save your work.';
+    if (googleButton) googleButton.hidden = !showGoogle;
+    if (divider) divider.hidden = !showGoogle;
     emailLabel.hidden = passwordOnly || signedIn;
     email.hidden = passwordOnly || signedIn;
     email.required = !passwordOnly && !signedIn;
@@ -163,7 +169,13 @@
       } else if (selectedMode === 'signup') {
         const result = await request('/signup', 'POST', { email: emailValue, password: passwordValue });
         track('signup_submitted');
-        setMode('signin', result.message || 'Check your inbox to confirm your email, then sign in.');
+        if (result?.user) {
+          update(result);
+          track('signed_in');
+          password.value = ''; dialog.close();
+        } else {
+          setMode('signin', result.message || 'Check your inbox to confirm your email, then sign in.');
+        }
       } else if (selectedMode === 'recover') {
         const result = await request('/recover', 'POST', { email: emailValue });
         track('password_reset_requested');
@@ -174,6 +186,24 @@
       }
     } catch (error) { track('auth_failed', { mode: selectedMode, status: error.status || 0 }); say(error.message, true); }
     finally { password.value = ''; setBusy(false); }
+  }
+  async function onGoogle() {
+    if (busy) return;
+    if (!snapshot.configured) { say('Account setup is unavailable on this server. Please try again later.', true); return; }
+    setBusy(true); say('Redirecting to Google…');
+    try {
+      track('oauth_started', { provider: 'google', mode });
+      const result = await request('/oauth', 'POST', { provider: 'google', next: window.location?.pathname || '/account' });
+      if (result?.url) {
+        if (typeof window.location?.assign === 'function') window.location.assign(result.url);
+        else if (window.location) window.location.href = result.url;
+        return;
+      }
+      say('Google sign-in is unavailable right now. Use your email and password below.', true);
+    } catch (error) {
+      track('auth_failed', { mode: 'google', status: error.status || 0 });
+      say(error.message, true);
+    } finally { setBusy(false); }
   }
   async function signout() {
     if (busy) return;
@@ -234,7 +264,20 @@
     const access = hash.get('access_token');
     const refreshToken = hash.get('refresh_token');
     const recovery = hash.get('type') === 'recovery';
+    const providerToken = hash.get('provider_token');
     const callbackError = hash.get('error_description') || hash.get('error');
+    const query = new URLSearchParams(window.location.search || '');
+    const oauthProvider = query.get('oauth');
+    const oauthError = query.get('oauth_error');
+    if (oauthProvider || oauthError) {
+      query.delete('oauth'); query.delete('oauth_error');
+      try { history.replaceState(null, '', window.location.pathname + (query.size ? `?${query}` : '') + window.location.hash); } catch {}
+      try { await refresh(); } catch {}
+      if (oauthError) { open('signin', oauthError); return true; }
+      track('signed_in', { provider: oauthProvider });
+      open('account', 'Signed in with Google. Your account is ready.');
+      return true;
+    }
     if (!access && !refreshToken && !callbackError) return false;
     // Remove credentials from the visible URL before any network transmission.
     history.replaceState(null, '', window.location.pathname + window.location.search);
@@ -243,6 +286,7 @@
     try {
       update(await request('/session', 'POST', { access_token: access, refresh_token: refreshToken }));
       if (recovery) open('password');
+      else if (providerToken) { track('signed_in', { provider: 'google' }); open('account', 'Signed in with Google. Your account is ready.'); }
       else { track('email_confirmed'); open('account', 'Email confirmed. Your account is ready.'); }
     } catch { try { await refresh(); } catch {} open('signin', 'We could not complete that sign-in link. Please sign in again.'); }
     return true;
@@ -267,6 +311,9 @@
     const signinTab = node('button', { type: 'button' }, 'Sign in');
     const signupTab = node('button', { type: 'button' }, 'Create account');
     signinTab.addEventListener('click', () => { if (!busy) setMode('signin'); }); signupTab.addEventListener('click', () => { if (!busy) setMode('signup'); }); tabs.append(signinTab, signupTab);
+    googleButton = node('button', { type: 'button', class: 'ma-google' }, 'Continue with Google');
+    googleButton.addEventListener('click', onGoogle);
+    divider = node('p', { class: 'ma-divider' }, 'or use email');
     form = node('form');
     emailLabel = node('label', { for: 'ma-email' }, 'Email'); email = node('input', { id: 'ma-email', type: 'email', autocomplete: 'email', maxlength: '254', required: '' });
     passwordLabel = node('label', { for: 'ma-password' }, 'Password'); password = node('input', { id: 'ma-password', type: 'password', autocomplete: 'current-password', maxlength: '128', required: '' });
@@ -276,7 +323,7 @@
     form.append(emailLabel, email, passwordLabel, password, submit); form.addEventListener('submit', onSubmit);
     const refreshButton = node('button', { type: 'button', class: 'ma-refresh' }, 'Refresh account');
     refreshButton.addEventListener('click', async () => { if (busy) return; setBusy(true); try { await refresh(); setMode(snapshot.user ? 'account' : 'signin', 'Account refreshed.'); } catch (error) { say(error.message, true); } finally { setBusy(false); } });
-    dialog.append(close, title, description, tabs, form, recover, message, refreshButton);
+    dialog.append(close, title, description, tabs, googleButton, divider, form, recover, message, refreshButton);
     dialog.addEventListener('keydown', event => {
       if (event.key !== 'Tab') return;
       const focusables = [...dialog.querySelectorAll('button:not([hidden]):not([disabled]), input:not([hidden]):not([disabled]), [tabindex]:not([tabindex="-1"])')].filter(el => !el.closest('[hidden]'));
