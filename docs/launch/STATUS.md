@@ -96,3 +96,8 @@ Migration applied to Supabase (verified; rollback file tested locally). Starter 
 
 ### PostHog enabled — Claude, November 9
 Key read via the PostHog connector from the org's only project, **nav-dev** (US, id 325503; shared with nplusalpha.com/nplus1ventures.com — filter `app = muse-growth-studio`). POSTHOG_KEY/POSTHOG_HOST set in .env and Vercel Production + Preview; both redeployed (preview webhook repointed). Verified in PostHog: production `$pageview`, `cta_clicked`, `$autocapture`, `plans_viewed` arrived tagged with the app, query strings stripped from URLs.
+
+### Legal finalized + Hermes E2E assignment — Claude, November 9
+- Legal pages: all 7 placeholders resolved with standard choices (16+ for accounts, 18+ to buy; runs expire monthly; liability greater of $50 or 12-month fees; governing law California / San Francisco County courts — N Plus Alpha LLC is a California LLC per Nav's Egnyte formation docs; 30-day deletion, tax records up to 7 years; 7-day monthly / 14-day annual unused-run refunds, no prorating; failed runs restored). Added auto-renewal disclosure, termination, changes, children, privacy-rights (CCPA) sections; "Draft" labels removed; fixed claims about a billing portal that does not exist (cancel by email). Not reviewed by a lawyer.
+- Hermes assignment (pending Nav relay): [hermes-e2e-assignment.md](hermes-e2e-assignment.md) — sign up, confirm, buy Starter with Stripe test card, one live generation, duplicate-subscription and re-sign-in checks on the preview. Report in hermes-e2e-report.md.
+- Follow-up: enable Stripe's upcoming-renewal reminder emails before live (terms promise notice of price changes; California auto-renewal rules require annual reminders).

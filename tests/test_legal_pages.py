@@ -17,42 +17,42 @@ client = TestClient(app)
             "/static/legal/terms.html",
             "Terms of Service",
             (
-                "Draft — last updated November 9, 2026",
+                "Last updated November 9, 2026",
                 "n Plus Alpha LLC",
                 "help@nplusalpha.com",
                 "NPLUSALPHA.COM",
                 "$12/month",
                 "$108/year",
                 "20 Muse runs per month",
-                "[NAV TO CONFIRM",
+                "State of California",
             ),
         ),
         (
             "/static/legal/privacy.html",
             "Privacy Policy",
             (
-                "Draft — last updated November 9, 2026",
+                "Last updated November 9, 2026",
                 "n Plus Alpha LLC",
                 "help@nplusalpha.com",
                 "Supabase",
                 "Stripe",
                 "Meta’s Muse Model API",
                 "never sees or stores your full credit card number",
-                "[NAV TO CONFIRM",
+                "within 30 days",
             ),
         ),
         (
             "/static/legal/refunds.html",
             "Cancellation &amp; Refund Policy",
             (
-                "Draft — last updated November 9, 2026",
+                "Last updated November 9, 2026",
                 "n Plus Alpha LLC",
                 "help@nplusalpha.com",
                 "NPLUSALPHA.COM",
                 "$12/month",
                 "$108/year",
                 "free trial of 3 Muse runs",
-                "[NAV TO CONFIRM",
+                "14 days of an annual payment",
             ),
         ),
     ],
@@ -84,3 +84,11 @@ def test_seller_footer_and_legal_links_present_on_all_four_pages(route: str) -> 
     assert 'href="/static/legal/terms.html"' in html
     assert 'href="/static/legal/privacy.html"' in html
     assert 'href="/static/legal/refunds.html"' in html
+
+
+def test_legal_pages_have_no_draft_placeholders() -> None:
+    for name in ("terms", "privacy", "refunds"):
+        html = client.get(f"/static/legal/{name}.html").text
+        assert "NAV TO CONFIRM" not in html and "Draft" not in html, name
+        # No billing portal exists in the app yet, so cancellation goes through support.
+        assert "billing portal" not in html, name
