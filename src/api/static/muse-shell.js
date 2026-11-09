@@ -150,6 +150,7 @@
   // A live Muse call is charged by the server's live gate (and refunded on cache hits or
   // failures), so the browser only re-reads the balance instead of spending again.
   function spendLive(label) {
+    try { window.museTrack?.('live_run_completed', { label: String(label).slice(0, 60), accounts: serverMode() }); } catch {}
     if (serverMode()) return;
     if (serverCredits) { syncCredits().then(() => toast(`Live run · ${label} · ${credits} left`)); return; }
     spend(label);
@@ -213,7 +214,7 @@
     document.addEventListener('click', (event) => { if (!pill.contains(event.target)) closeMenu(); });
     document.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeMenu(); });
     if (!existing) {
-      const anchor = header.querySelector('.mode, .status-pill, #saveStatus');
+      const anchor = header.querySelector('.mode, .status-pill, .topbar-nav, #saveStatus');
       if (anchor) anchor.insertAdjacentElement('afterend', pill); else header.appendChild(pill);
     }
     renderCredits();
@@ -261,13 +262,14 @@
     if (!snap.user) { toast('Sign in to pick a plan.'); window.museAccount.open('signup'); return; }
     if (!snap.user.email_verified) { toast('Confirm your email first.'); window.museAccount.open('account'); return; }
     button.disabled = true;
+    window.museTrack?.('checkout_started', { plan, interval });
     try {
       const response = await fetch('/api/v1/billing/checkout', {
         method: 'POST', credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ plan, interval }),
       });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok || !data.url) throw new Error(data.detail || 'Checkout failed.');
+      if (!response.ok || !data.url) { window.museTrack?.('checkout_failed', { plan, interval, status: response.status }); throw new Error(data.detail || 'Checkout failed.'); }
       location.href = data.url;
     } catch (error) { toast(error.message, 'warn'); button.disabled = false; }
   }
@@ -298,6 +300,7 @@
         button.removeAttribute('title');
         button.textContent = `Choose ${plan.name}`;
         button.onclick = () => buyPlan(plan.id, plan.interval, button);
+        button.setAttribute('data-track', `plan_${plan.interval}`);
       } else {
         button.disabled = false;
         button.title = 'Demo checkout: no payment is taken';
@@ -343,6 +346,7 @@
     }
     refreshPlanButtons();
     if (serverMode() && !billingStatus) loadBillingStatus().then(refreshPlanButtons);
+    window.museTrack?.('plans_viewed', { mode: mode || 'plans', accounts: serverMode(), signed_in: !!serverSnapshot()?.user });
     pricingDialog.querySelector('h2').textContent = mode === 'gift' ? 'Gift a subscription' : 'Get more runs';
     const giftLine = pricingDialog.querySelector('.ms-pricing-gift');
     giftLine.textContent = mode === 'gift' ? 'Any plan can be sent as a gift to a maker you love.' : '';
@@ -1102,6 +1106,42 @@
   // ---------- Phone header: one compact row plus a menu for everything else ----------
   // Only headers marked .ms-topbar (portal, digest) collapse; CSS decides which items stay in the row.
   let closeMobileNav = () => {};
+  // ---------- Hero and nav: plans and sign-up are always one click away ----------
+  function updateHeroCtas() {
+    const primary = document.querySelector('[data-hero-primary]');
+    const accountStep = document.querySelector('[data-hero-account]');
+    if (!primary) return;
+    const snap = serverSnapshot();
+    const signedOut = serverMode() && !snap?.user;
+    if (signedOut) {
+      primary.textContent = 'Create free account →';
+      primary.setAttribute('href', '#create-account');
+      primary.dataset.action = 'signup';
+    } else {
+      primary.textContent = 'Make today’s post →';
+      primary.setAttribute('href', '/today');
+      delete primary.dataset.action;
+    }
+    const subtitle = document.querySelector('[data-hero-subtitle]');
+    if (subtitle && !serverMode()) subtitle.textContent = 'Prepare a post, see what similar sellers do, and get your next best move. Everything here runs on saved Muse results, free.';
+    if (accountStep) {
+      const [, strong, detail] = accountStep.children;
+      if (!serverMode()) { strong.textContent = 'Try a demo profile'; detail.textContent = 'Saved results, in this browser'; }
+      else if (snap?.user && snap.usage && Number.isFinite(snap.usage.remaining)) { strong.textContent = `${Math.max(0, snap.usage.remaining)} of ${snap.usage.limit} runs left`; detail.textContent = 'Your account'; }
+      else { strong.textContent = '3 live Muse runs'; detail.textContent = 'On your own products'; }
+    }
+  }
+  function mountPlanLinks() {
+    document.addEventListener('click', (event) => {
+      const plans = event.target.closest('[data-open-pricing]');
+      if (plans) { event.preventDefault(); openPricing(); return; }
+      const primary = event.target.closest('[data-hero-primary][data-action="signup"]');
+      if (primary && window.museAccount?.open) { event.preventDefault(); window.museAccount.open('signup'); }
+    });
+    window.addEventListener('account-change', updateHeroCtas);
+    updateHeroCtas();
+  }
+
   function mountMobileNav() {
     const header = document.querySelector('header.ms-topbar');
     const right = header?.querySelector('.topbar-right');
@@ -1224,7 +1264,7 @@
     document.addEventListener('click', (event) => { if (!wrap.contains(event.target)) toggleNotifications(false); });
     document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !menu.hidden) { toggleNotifications(false); button.focus(); } });
     if (pill?.parentNode) pill.insertAdjacentElement('afterend', wrap);
-    else { const anchor = header.querySelector('.status-pill'); if (anchor) anchor.insertAdjacentElement('afterend', wrap); else header.appendChild(wrap); }
+    else { const anchor = header.querySelector('.status-pill, .topbar-nav'); if (anchor) anchor.insertAdjacentElement('afterend', wrap); else header.appendChild(wrap); }
     loadSignals().then((loaded) => { signals = loaded; renderNotifications(); });
   }
 
@@ -1388,6 +1428,7 @@
     mountSession();
     mountNotifications();
     mountMobileNav();
+    mountPlanLinks();
     mountWatchlist();
     syncCredits();
     window.addEventListener('focus', () => { if (serverCredits) syncCredits(); });

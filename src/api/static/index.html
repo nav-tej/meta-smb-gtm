@@ -96,6 +96,20 @@
       align-items: center;
       gap: 0.65rem;
       flex-wrap: wrap;
+      margin-left: auto;
+    }
+
+    .topbar-nav { display: flex; align-items: center; gap: 0.25rem; }
+    .topbar-nav .topbar-link { border: 0; background: none; font: inherit; font-size: 0.86rem; cursor: pointer; padding: 0.45rem 0.6rem; border-radius: 8px; }
+    .topbar-nav .topbar-link:hover { background: rgba(27, 110, 68, 0.08); }
+    .topbar-nav .topbar-plans { color: #8a5a12; font-weight: 750; }
+    .workspace-text { display: grid; line-height: 1.15; text-align: left; }
+    .workspace-kicker { font-size: 0.62rem; font-weight: 750; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
+    .workspace-caret { color: var(--text-muted); font-size: 0.72rem; }
+    @media (min-width: 1101px) {
+      .ms-topbar { flex-wrap: nowrap; }
+      .ms-topbar .topbar-right { flex-wrap: nowrap; }
+      .ms-topbar .brand-sub { white-space: nowrap; }
     }
 
     .status-pill {
@@ -947,11 +961,12 @@
 </style>
   <link rel="stylesheet" href="/static/portal-journey.css?v=20261106-ui2">
 
-  <link rel="stylesheet" href="/static/pricing-modal.css?v=20261107">
-  <link rel="stylesheet" href="/static/account.css?v=20261104-polish2">
-  <link rel="stylesheet" href="/static/muse-shell.css?v=20261109-billing">
-  <script src="/static/account.js?v=20261104-polish2" defer></script>
-  <script src="/static/muse-shell.js?v=20261109-billing" defer></script>
+  <link rel="stylesheet" href="/static/pricing-modal.css?v=20261109-ux">
+  <link rel="stylesheet" href="/static/account.css?v=20261109-ux">
+  <link rel="stylesheet" href="/static/muse-shell.css?v=20261109-ux3">
+  <script src="/static/analytics.js?v=20261109-ux" defer></script>
+  <script src="/static/account.js?v=20261109-ux2" defer></script>
+  <script src="/static/muse-shell.js?v=20261109-ux2" defer></script>
 </head>
 <body>
   <!-- Top Bar -->
@@ -965,18 +980,15 @@
     </div>
 
     <div class="topbar-right">
-      <a class="topbar-link" href="/digest">Weekly digest</a>
-      <span class="status-pill" title="Interactive demo using saved Muse outputs; no API connection check performed">
-        <span class="dot"></span>
-        Saved Muse outputs · Interactive demo
-      </span>
-      <button type="button" class="btn btn-outline" id="openLocalEngineBtn" style="padding:0.35rem 0.75rem;font-size:0.78rem;">
-        Optional local tools
-      </button>
-      <button type="button" class="workspace-btn" id="openLoginBtn">
+      <nav class="topbar-nav" aria-label="Main">
+        <a class="topbar-link" href="/digest">Weekly digest</a>
+        <button type="button" class="topbar-link topbar-plans" data-open-pricing data-track="nav_plans">Plans &amp; pricing</button>
+        <button type="button" class="topbar-link" id="openLocalEngineBtn" title="Optional local ComfyUI tools">Local tools</button>
+      </nav>
+      <button type="button" class="workspace-btn" id="openLoginBtn" title="Switch the demo shop shown on this page">
         <span class="avatar" id="activeAvatar">SS</span>
-        <span id="activeWorkspaceLabel">Art of Sarabjit Singh</span>
-        <span style="color:var(--text-muted);font-size:0.72rem;">▾ Switch / Login</span>
+        <span class="workspace-text"><span class="workspace-kicker">Demo shop</span><span id="activeWorkspaceLabel">Art of Sarabjit Singh</span></span>
+        <span class="workspace-caret" aria-hidden="true">▾</span>
       </button>
     </div>
   </header>
@@ -1004,24 +1016,25 @@
   </aside>
 
   <!-- Logged-Out Hero Banner with Gradient Mesh -->
-  <section class="logged-out-hero" id="loggedOutHero" aria-label="Hero Overview">
+  <section class="logged-out-hero" id="loggedOutHero" aria-labelledby="heroTitle">
     <div class="logged-out-hero-inner">
-      <div class="logged-out-eyebrow">✦ AI Growth Copilot for Creators &amp; Fine Artists</div>
-      <h1>See what AI-powered growth looks like.</h1>
-      <p class="hero-subtitle">Start with one item. Prepare a post, find your next idea, and bring people to your shop.</p>
+      <div class="logged-out-eyebrow">✦ AI growth copilot for creators &amp; fine artists</div>
+      <h1 id="heroTitle">See what AI-powered growth looks like.</h1>
+      <p class="hero-subtitle" data-hero-subtitle>Prepare a post, see what similar sellers do, and get your next best move. Explore the demo free, then create an account to run Muse on your own products.</p>
       <div class="logged-out-hero-ctas">
-        <a href="/today" class="hero-btn-primary" id="heroStartFreeBtn">Make today’s post →</a>
-        <a class="hero-btn-secondary" href="#journey">Explore the saved research</a>
-        <button type="button" class="hero-btn-ghost" data-open-tour>▶ 20-Second Interactive Tour</button>
+        <a href="/today" class="hero-btn-primary" id="heroStartFreeBtn" data-hero-primary data-track="hero_primary">Make today’s post →</a>
+        <button type="button" class="hero-btn-gold" data-open-pricing data-track="hero_plans">See plans · from $9/mo</button>
+        <a class="hero-btn-ghost" href="#journey">Explore the free demo ↓</a>
+        <button type="button" class="hero-btn-ghost" data-open-tour>▶ 20-second tour</button>
       </div>
-      <div class="logged-out-hero-features">
-        <span>⚡ <strong>Free saved demo</strong></span>
-        <span>🎯 <strong>4 competitors</strong> analyzed</span>
-        <span>✨ <strong>Collector room</strong> staging</span>
-        <span>🔒 <strong>No credit card</strong> required</span>
-      </div>
+      <ol class="hero-path" aria-label="How it works">
+        <li><span class="hero-path-step">Free</span><strong>Explore the demo</strong><span>No account needed</span></li>
+        <li data-hero-account><span class="hero-path-step">Free account</span><strong>3 live Muse runs</strong><span>On your own products</span></li>
+        <li class="is-plan"><span class="hero-path-step">Starter</span><strong>20 runs a month</strong><span>$9/mo billed yearly or $12 monthly · cancel anytime</span></li>
+      </ol>
     </div>
   </section>
+  <p class="hero-bridge"><span>↓ Free demo below: one artist’s research → post → next move · Saved Muse outputs, no account needed</span></p>
 
   <main class="shell">
     <section id="journey" class="journey" aria-label="Your growth loop">

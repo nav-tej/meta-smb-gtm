@@ -65,6 +65,9 @@ class Settings(BaseModel):
     # subscriptions. Price IDs come from the Stripe dashboard (test or live).
     stripe_secret_key: str = ""
     stripe_webhook_secret: str = ""
+    # PostHog product analytics: off unless a project key is set. The key is public by design.
+    posthog_key: str = ""
+    posthog_host: str = "https://us.i.posthog.com"
     stripe_price_starter_monthly: str = ""
     stripe_price_starter_annual: str = ""
     stripe_price_growth: str = ""

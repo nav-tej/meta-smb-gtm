@@ -82,7 +82,7 @@ def test_creator_html_and_static_assets_contract(client: TestClient) -> None:
 
     html = response.text
     assert 'href="/static/creator.css"' in html
-    assert 'src="/static/creator.js"' in html
+    assert 'src="/static/creator.js' in html  # may carry a ?v= cache-busting version
     assert 'data-panel="0"' in html
     assert 'data-panel="3"' in html
 

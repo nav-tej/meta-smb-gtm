@@ -84,3 +84,12 @@ Migration applied to Supabase (verified; rollback file tested locally). Starter 
 6. Durability: generated media, result cache, presenter credits and monitor log live in per-instance /tmp on Vercel.
 7. Minor: "Sign in to pick a plan." toast shows twice.
 8. Requested: PostHog analytics (needs project key; privacy page must disclose it).
+
+### Purchase/sign-up UX, paid live path, PostHog — Claude, November 9
+- Header: one row (nowrap ≥1101px) with Weekly digest, gold "Plans & pricing", Local tools, "Demo shop" chip (was "Switch / Login"), Sign in + green "Create free account" (account mode). Removed the status pill and floating "Saved demo is free". Phone menu: account buttons, then Plans, first.
+- Hero: green primary ("Create free account →" when signed out with accounts; "Make today's post →" otherwise), gold "See plans · from $9/mo", connected Free demo → Free account (3 runs) → Starter (20/month) strip; "No credit card" removed; bridge pill into the saved demo. Copy adapts to demo vs account mode.
+- Fixed paid flow break: /create and /today required the presenter key for live runs even for signed-in paying accounts. Account mode now uses the account's plan (liveReady prompts), auto-enables live for verified users with runs, sends X-Demo-Key only when entered. Out of runs → plans dialog.
+- Pages send Cache-Control: no-cache (stale HTML could reference old scripts after deploys).
+- PostHog: off until POSTHOG_KEY set. Browser events (auth_dialog_opened, signup_submitted, signed_in, email_confirmed, plans_viewed, checkout_started/failed/returned, live_run_completed, runs_exhausted, cta_clicked) + server subscription_paid/checkout_completed/payment_failed/subscription_canceled from verified webhooks. No recordings, DNT honoured, identified by account ID only, URL tokens scrubbed. Privacy page discloses PostHog.
+- Preview env now has META_MODEL_API_KEY (shared $100 DB cap; Vercel-login protected) so a paid preview account can run live Muse.
+- 380 tests pass.

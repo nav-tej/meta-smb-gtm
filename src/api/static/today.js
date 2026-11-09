@@ -178,7 +178,7 @@
   async function jsonRequest(path, payload, live = false) {
     const control = new AbortController(); const timer = setTimeout(() => control.abort(), live ? 285000 : 45000);
     try {
-      const init = { method: 'POST', headers: { 'Content-Type': 'application/json', ...(live ? { 'X-Demo-Key': state.key } : {}) }, body: JSON.stringify(payload), signal: control.signal };
+      const init = { method: 'POST', headers: { 'Content-Type': 'application/json', ...(live && state.key ? { 'X-Demo-Key': state.key } : {}) }, body: JSON.stringify(payload), signal: control.signal };
       const shell = window.museShell;
       // Saved-mode requests retry on network/5xx errors; billed live requests never auto-retry.
       const response = !live && shell?.fetch ? await shell.fetch(path, init, { safe: true, timeoutMs: 45000 }) : await fetch(path + (live ? '?live=true' : ''), init);
@@ -352,7 +352,16 @@
     try { const image = await loadImage(url); if (ownerEpoch !== draftEpoch) return; const canvas = document.createElement('canvas'); const scale = Math.min(1, 1400 / Math.max(image.width, image.height)); canvas.width = Math.round(image.width * scale); canvas.height = Math.round(image.height * scale); const ctx = canvas.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height); ctx.drawImage(image, 0, 0, canvas.width, canvas.height); const data = canvas.toDataURL('image/jpeg', .8); if (!inline(data)) throw new Error('Try a smaller photo.'); state.original = data; state.image = data; state.imageMode = 'original'; invalidate(); render(); persist(); notice('Photo ready. Check your post and take it with you.'); }
     catch (error) { notice(error.message, true); } finally { URL.revokeObjectURL(url); lock(false); }
   }
+  // Signed-in accounts with runs left create live by default; the settings switch still turns it off.
+  function syncAccountLive(snapshot = window.museAccount?.getSnapshot?.()) {
+    if (!state.readiness?.accounts_required || !state.readiness?.provider_key_configured) return;
+    const on = !!(snapshot?.user?.email_verified && snapshot.live_available);
+    state.live = on; const toggle = document.getElementById('liveMode'); if (toggle) toggle.checked = on;
+  }
+  if (typeof window.addEventListener === 'function') window.addEventListener('account-change', (event) => syncAccountLive(event.detail));
   function liveReady() {
+    // Account mode: the signed-in account's plan pays for the run; no presenter key or settings switch.
+    if (state.readiness?.accounts_required && state.readiness?.provider_key_configured) { if (window.museAccount?.liveReady?.() !== true) return false; state.live = true; return true; }
     if (!state.live) { notice('Enable a configured live Muse session in Muse settings first.', true); return false; }
     if (!state.readiness?.provider_key_configured) { notice('This server has no Muse key configured. Starter drafts still work.', true); return false; }
     if (state.readiness.default_mode !== 'live' && !state.key) { notice('Enter the demo unlock key in Muse settings.', true); return false; } return true;
@@ -391,6 +400,6 @@
   $('useOriginal').addEventListener('click', () => { if (state.busy) return; state.image = state.original; state.imageMode = 'original'; invalidate(); render(); persist(); });
   populateSetup(); render(); initDrafts();
   if (window.museAccount?.ready) window.museAccount.ready().then(() => buildPlan()); else buildPlan();
-  fetch('/api/v1/readiness').then(response => response.json()).then(data => { state.readiness = data; $('readinessNote').textContent = data.provider_key_configured ? 'Muse configured, not yet verified here. Starter plans use no credits. Live image uses one Muse Image request; this flow does not run SAM.' : 'No Muse provider key configured. Starter posts and downloads work without it.'; }).catch(() => { $('readinessNote').textContent = 'Could not check server configuration. Your draft is still available.'; });
+  fetch('/api/v1/readiness').then(response => response.json()).then(data => { state.readiness = data; syncAccountLive(); $('readinessNote').textContent = data.provider_key_configured ? 'Muse configured, not yet verified here. Starter plans use no credits. Live image uses one Muse Image request; this flow does not run SAM.' : 'No Muse provider key configured. Starter posts and downloads work without it.'; }).catch(() => { $('readinessNote').textContent = 'Could not check server configuration. Your draft is still available.'; });
   window.museDailySnapshot = () => JSON.parse(JSON.stringify({ product: state.product, channel: state.channel, format: state.format, copy: currentCopy(), plan: currentPlan(), performance: state.performance, imageMode: state.imageMode, source: state.source }));
 })();

@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 
 from src.api import (
     accounts,
+    analytics,
     bids,
     billing,
     content_plan,
@@ -40,6 +41,9 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 API_PREFIX = "/api/v1"
+# Pages must revalidate on every visit; otherwise browsers can keep old HTML that points at
+# old script versions after a deploy. Static assets are versioned with ?v= instead.
+PAGE_HEADERS = {"Cache-Control": "no-cache"}
 REPO_ROOT = Path(__file__).resolve().parents[2]
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 SAMPLES_DIR = REPO_ROOT / "data" / "samples"
@@ -86,32 +90,32 @@ async def readiness() -> dict[str, str | bool | int]:
 @app.get("/create", include_in_schema=False)
 async def creator_studio() -> FileResponse:
     """Serve the guided product-to-post creator journey."""
-    return FileResponse(STATIC_DIR / "creator.html")
+    return FileResponse(STATIC_DIR / "creator.html", headers=PAGE_HEADERS)
 
 
 @app.get("/today", include_in_schema=False)
 async def daily_studio() -> FileResponse:
     """Serve the compact item-to-post daily workspace."""
-    return FileResponse(STATIC_DIR / "today.html")
+    return FileResponse(STATIC_DIR / "today.html", headers=PAGE_HEADERS)
 
 
 @app.get("/digest", include_in_schema=False)
 async def weekly_digest_page() -> FileResponse:
     """Serve the weekly market digest; it reads /api/v1/weekly-digest in the browser."""
-    return FileResponse(STATIC_DIR / "digest.html")
+    return FileResponse(STATIC_DIR / "digest.html", headers=PAGE_HEADERS)
 
 
 @app.get("/", include_in_schema=False)
 @app.get("/portal", include_in_schema=False)
 async def customer_portal() -> FileResponse:
     """Serve the Lovable-style SMB Customer Growth Portal."""
-    return FileResponse(STATIC_DIR / "index.html")
+    return FileResponse(STATIC_DIR / "index.html", headers=PAGE_HEADERS)
 
 
 @app.get("/account", include_in_schema=False)
 async def account_landing() -> FileResponse:
     """Land email-confirmation links; the account dialog completes sign-in."""
-    return FileResponse(STATIC_DIR / "index.html")
+    return FileResponse(STATIC_DIR / "index.html", headers=PAGE_HEADERS)
 
 
 MUSE_UNAVAILABLE = (
@@ -245,6 +249,7 @@ async def supabase_error_handler(request: Request, exc: SupabaseError) -> JSONRe
 app.include_router(health_router)
 app.include_router(health_router, prefix=API_PREFIX)
 app.include_router(accounts.router, prefix=API_PREFIX)
+app.include_router(analytics.router, prefix=API_PREFIX)
 app.include_router(billing.router, prefix=API_PREFIX)
 app.include_router(intel.router, prefix=API_PREFIX)
 app.include_router(creative.router, prefix=API_PREFIX)

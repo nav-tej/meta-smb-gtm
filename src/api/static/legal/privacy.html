@@ -23,11 +23,12 @@
 
     <h2>1. Information we store and process</h2>
     <ul>
-      <li><strong>Account email &amp; sign-in session:</strong> When you create an account, your email address and password authentication are managed via <strong>Supabase</strong>. Sign-in sessions use same-origin HttpOnly cookies (<code>muse_access</code> and <code>muse_refresh</code>). We do not use third-party advertising trackers.</li>
+      <li><strong>Account email &amp; sign-in session:</strong> When you create an account, your email address and password authentication are managed via <strong>Supabase</strong>. Sign-in sessions use same-origin HttpOnly cookies (<code>muse_access</code> and <code>muse_refresh</code>). We do not use advertising trackers.</li>
       <li><strong>Saved drafts:</strong> While you edit on <code>/today</code> or <code>/create</code>, your draft is saved in your browser’s local storage on your device. When you sign in and click <strong>Save to account</strong>, your workspace draft is stored in our Supabase database tied to your account ID so you can load it on another device.</li>
       <li><strong>Product photos, prompts &amp; AI generation:</strong> When you run a live AI generation or analysis, the product photo, text prompt, or public storefront information you submit is sent to <strong>Meta’s Muse Model API</strong> (<code>api.meta.ai</code>) to generate your copy, image, or brief (and to a configured ComfyUI server if optional variant workflows are used). Saved demo mode does not send your photos to external AI providers.</li>
       <li><strong>Payment &amp; billing records:</strong> Payments are processed by <strong>Stripe</strong>. n Plus Alpha LLC never sees or stores your full credit card number. We store your Stripe customer ID, subscription ID, billing period dates, and plan status in Supabase to provide your monthly runs.</li>
       <li><strong>Usage counts &amp; rate limiting:</strong> We store your run count, operation reservation records, and a hashed network identifier (SHA-256 IP hash) in Supabase to enforce plan run limits and prevent automated abuse.</li>
+      <li><strong>Product analytics:</strong> When enabled, we use <strong>PostHog</strong> to understand how the app is used: pages viewed, buttons clicked, and steps such as signing up, opening plans, starting checkout and completing a run. Signed-in visitors are identified by an internal account ID, never by email. We do not record your screen, we never send what you type, we remove sign-in links and other URL details before sending, and we honor your browser&rsquo;s Do Not Track setting.</li>
     </ul>
 
     <h2>2. Service providers we rely on</h2>
@@ -35,6 +36,7 @@
       <li><strong>Supabase:</strong> Account authentication, workspace draft storage, and usage/subscription accounting.</li>
       <li><strong>Stripe:</strong> Checkout, subscription management, and payment processing (statement descriptor: <strong>NPLUSALPHA.COM</strong>).</li>
       <li><strong>Meta (Muse API):</strong> AI text, vision, segmentation, and image generation when you run live Muse requests.</li>
+      <li><strong>PostHog:</strong> Product analytics (usage events and page views; no session recordings).</li>
       <li><strong>Vercel:</strong> Application hosting and request delivery <span class="confirm-tag">[NAV TO CONFIRM: production hosting provider list]</span>.</li>
     </ul>
 

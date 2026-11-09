@@ -22,6 +22,7 @@
   let tabs;
   let recover;
   let accountButton;
+  let signupButton;
   let signoutButton;
   let quotaLabel;
   const copy = value => JSON.parse(JSON.stringify(value));
@@ -81,11 +82,13 @@
     if (!accountButton) return;
     const user = snapshot.user;
     accountButton.hidden = !snapshot.configured;
-    quotaLabel.hidden = !snapshot.configured;
+    // Signed out: a clear "Create free account" button; run counts only show once signed in.
+    signupButton.hidden = !snapshot.configured || !!user;
+    quotaLabel.hidden = !snapshot.configured || !user;
     accountButton.textContent = user ? 'Your account' : 'Sign in';
     accountButton.setAttribute('aria-label', user ? `Account for ${user.email}` : 'Sign in or create an account');
     signoutButton.hidden = !user;
-    if (!user) quotaLabel.textContent = 'Saved demo is free';
+    if (!user) quotaLabel.textContent = '';
     else if (!user.email_verified) quotaLabel.textContent = 'Confirm your email to generate';
     else if (snapshot.usage && snapshot.usage.plan === 'unlimited' && snapshot.live_available) quotaLabel.textContent = 'Unlimited runs';
     else if (snapshot.usage && Number.isFinite(snapshot.usage.remaining)) quotaLabel.textContent = `${Math.max(0, snapshot.usage.remaining)} of ${snapshot.usage.limit} runs left`;
@@ -119,9 +122,11 @@
     recover.hidden = mode !== 'signin';
     say(text || (signedIn ? quotaLabel.textContent : 'Saved examples remain available without an account.'));
   }
+  const track = (name, props) => { try { window.museTrack?.(name, props); } catch {} };
   function open(next = 'signin', text = '') {
     if (!dialog) mount();
     if (busy || !dialog) return;
+    track('auth_dialog_opened', { mode: snapshot.user && next === 'signin' ? 'account' : next });
     setMode(snapshot.user && next === 'signin' ? 'account' : next, text);
     if (!dialog.open) dialog.showModal();
     if (!snapshot.configured) say('Account setup is unavailable on this server. Your saved demo and draft still work.', true);
@@ -130,7 +135,10 @@
     if (!snapshot.user) { open('signup', 'Create an account or sign in to make a new Muse generation. Your current draft stays here.'); return false; }
     if (!snapshot.user.email_verified) { open('account', 'Confirm your email using the signup link, then refresh your account.'); return false; }
     if (!snapshot.live_available || (snapshot.usage && snapshot.usage.remaining !== null && snapshot.usage.remaining <= 0)) {
-      open('account', snapshot.usage && snapshot.usage.remaining !== null && snapshot.usage.remaining <= 0 ? 'Your three free runs are used. Your saved drafts and downloads remain available. Credit purchases are coming later.' : 'Live generation is temporarily unavailable. Your saved drafts and downloads still work.');
+      const usedUp = snapshot.usage && snapshot.usage.remaining !== null && snapshot.usage.remaining <= 0;
+      if (usedUp) { try { window.museTrack?.('runs_exhausted', { plan: snapshot.usage.plan }); } catch {} }
+      if (usedUp && window.museShell?.openPricing) window.museShell.openPricing();
+      else open('account', usedUp ? (snapshot.usage.plan === 'trial' ? 'Your three free runs are used. Pick a plan for 20 runs a month; saved drafts and downloads stay available.' : 'Your runs for this period are used. They reset monthly; saved drafts and downloads stay available.') : 'Live generation is temporarily unavailable. Your saved drafts and downloads still work.');
       return false;
     }
     return true;
@@ -148,18 +156,21 @@
     try {
       if (selectedMode === 'signin') {
         update(await request('/signin', 'POST', { email: emailValue, password: passwordValue }));
+        track('signed_in');
         password.value = ''; dialog.close();
       } else if (selectedMode === 'signup') {
         const result = await request('/signup', 'POST', { email: emailValue, password: passwordValue });
+        track('signup_submitted');
         setMode('signin', result.message || 'Check your inbox to confirm your email, then sign in.');
       } else if (selectedMode === 'recover') {
         const result = await request('/recover', 'POST', { email: emailValue });
+        track('password_reset_requested');
         setMode('signin', result.message || 'If an account exists, a reset link is on its way.');
       } else if (selectedMode === 'password') {
         await request('/password', 'POST', { password: passwordValue });
         password.value = ''; await refresh(); setMode('account', 'Password updated. Your current draft is unchanged.');
       }
-    } catch (error) { say(error.message, true); }
+    } catch (error) { track('auth_failed', { mode: selectedMode, status: error.status || 0 }); say(error.message, true); }
     finally { password.value = ''; setBusy(false); }
   }
   async function signout() {
@@ -230,7 +241,7 @@
     try {
       update(await request('/session', 'POST', { access_token: access, refresh_token: refreshToken }));
       if (recovery) open('password');
-      else open('account', 'Email confirmed. Your account is ready.');
+      else { track('email_confirmed'); open('account', 'Email confirmed. Your account is ready.'); }
     } catch { try { await refresh(); } catch {} open('signin', 'We could not complete that sign-in link. Please sign in again.'); }
     return true;
   }
@@ -238,12 +249,13 @@
     if (dialog || !document.body) return;
     const container = node('div', { class: 'ma-account-controls' });
     accountButton = node('button', { type: 'button', class: 'ma-account-button' }, 'Sign in');
-    quotaLabel = node('span', { class: 'ma-quota', 'aria-live': 'polite' }, 'Saved demo is free');
+    quotaLabel = node('span', { class: 'ma-quota', 'aria-live': 'polite', hidden: '' }, '');
+    signupButton = node('button', { type: 'button', class: 'ma-signup-button', 'data-track': 'header_signup', hidden: '' }, 'Create free account');
     signoutButton = node('button', { type: 'button', class: 'ma-signout', hidden: '' }, 'Sign out');
-    container.append(quotaLabel, accountButton, signoutButton);
+    container.append(quotaLabel, accountButton, signupButton, signoutButton);
     const header = document.querySelector('header.topbar') || document.querySelector('body > header');
     (header || document.body).append(container);
-    accountButton.addEventListener('click', () => open()); signoutButton.addEventListener('click', signout);
+    accountButton.addEventListener('click', () => open()); signupButton.addEventListener('click', () => open('signup')); signoutButton.addEventListener('click', signout);
     dialog = node('dialog', { class: 'ma-dialog', 'aria-labelledby': 'ma-title' });
     const close = node('button', { type: 'button', class: 'ma-close', 'aria-label': 'Close account dialog' }, '×');
     close.addEventListener('click', () => { if (!busy) { password.value = ''; dialog.close(); } });

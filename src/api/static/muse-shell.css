@@ -369,7 +369,12 @@
   .ms-nav-open .ms-account { order: 11; }
   .ms-nav-open .ms-account > button { flex: 1; min-height: 48px; justify-content: center; font-size: 15px; }
   .ms-nav-open .ms-account-chip { max-width: none; justify-content: flex-start; }
-  .ms-nav-open > .ma-account-controls { order: 12; justify-content: space-between; }
+  /* Sign-up and plans lead the phone menu; the nav wrapper dissolves into one row per link. */
+  .ms-topbar .topbar-nav { display: contents; }
+  .ms-nav-open .ms-account:not(:has(> :not([hidden]))) { display: none; }
+  .ms-nav-open > .ma-account-controls { order: 8; justify-content: stretch; gap: 8px; flex-wrap: nowrap; }
+  .ms-nav-open > .ma-account-controls > button:not([hidden]) { flex: 1 1 0; min-height: 48px; font-size: 15px; justify-content: center; }
+  .ms-nav-open .topbar-plans { order: 9; color: #2a1c05; background: #f6e7c4; border-color: #e3c98f; font-weight: 750; }
   /* account.js hides its children (not the container) when server accounts are off. */
   .ms-nav-open > .ma-account-controls:not(:has(> :not([hidden]))) { display: none; }
   .ms-nav-open .workspace-btn { order: 13; max-width: none; padding: 0 14px; border-radius: 12px; justify-content: flex-start; }

@@ -333,4 +333,30 @@ async def webhook(request: Request) -> dict[str, bool]:
     except Exception as err:
         # Retry on provider/database failure; never acknowledge a lost entitlement write.
         raise HTTPException(503, "Billing event could not be applied. Retry later.") from err
+    if data is not None and not result.get("duplicate"):
+        await _report_billing_event(data)
     return {"received": True}
+
+
+_ANALYTICS_EVENTS = {
+    "checkout": "checkout_completed",
+    "paid": "subscription_paid",
+    "failed": "payment_failed",
+}
+
+
+async def _report_billing_event(data: dict[str, Any]) -> None:
+    """Purchase analytics come from verified webhooks, not browser redirects. Best effort."""
+    from src.clients import posthog
+
+    user = data.get("user_id")
+    event = _ANALYTICS_EVENTS.get(data["action"])
+    if data["action"] == "state" and data.get("status") == "canceled":
+        event = "subscription_canceled"
+    if not user or not event or not posthog.enabled():
+        return
+    properties: dict[str, Any] = {"plan": data.get("plan"), "stripe_event": data["kind"]}
+    if data["action"] == "paid":
+        days = (data["period_end"] - data["period_start"]) / 86400
+        properties["interval"] = "year" if days > 300 else "month"
+    await posthog.capture(event, user, properties)
