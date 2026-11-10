@@ -52,7 +52,12 @@ class ResearchDirective(BaseModel):
 
 
 def parse_research_directive(text: str) -> tuple[ResearchDirective | None, str]:
-    """Parse raw seller text into a safe ResearchDirective.
+    """Parse raw seller text into a safe, syntax-only ResearchDirective.
+
+    NOTE (SYNTAX-ONLY): This parser performs text pattern extraction only and does NOT
+    perform network calls, DNS resolution, or SSRF boundary validation. Any future crawler
+    or model component fetching from `competitors_add` MUST validate candidate URLs
+    through `src.utils.sitemap.validate_safe_url` at fetch time.
 
     Returns:
         (directive, explanation_message)
@@ -139,7 +144,8 @@ def parse_research_directive(text: str) -> tuple[ResearchDirective | None, str]:
     elif re.search(r"\b(?:90\s*days?|quarter|three\s+months?)\b", lower_raw):
         timeframe = 90
 
-    # Extract competitor URLs safely if present
+    # Extract candidate competitor URLs (syntax-only check; real fetch-time SSRF guard
+    # is enforced downstream via src.utils.sitemap.validate_safe_url)
     competitors_add: list[str] = []
     url_matches = re.findall(r"https?://[^\s<>\"']+", raw)
     blocked_hosts = ("localhost", "127.0.0.1", "0.0.0.0", "internal")

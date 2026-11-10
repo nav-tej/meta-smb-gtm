@@ -29,7 +29,13 @@ class SuggestionItem(BaseModel):
 
 @router.post("/parse", response_model=DirectiveResponse)
 async def parse_directive_endpoint(body: ParseRequest) -> DirectiveResponse:
-    """Parse seller query into a typed ResearchDirective with prompt injection guardrails."""
+    """Parse seller query into a typed, syntax-only ResearchDirective.
+
+    NOTE (SYNTAX-ONLY): This endpoint performs text parsing and pattern extraction only;
+    it does not execute network fetches, DNS lookups, or crawler execution. Any future
+    fetch consumer of directive.competitors_add must validate candidate URLs with
+    src.utils.sitemap.validate_safe_url at fetch time.
+    """
     directive, summary = parse_research_directive(body.text)
     if not directive:
         raise HTTPException(status_code=400, detail=summary)
