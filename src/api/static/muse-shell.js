@@ -953,10 +953,17 @@
     { name: 'Manjot Singh Sachdeva', where: 'Fine Art America / Pixels · 105 listings', status: 'first', badge: 'First check', note: 'Prints $14–$24. First check, so nothing to compare yet' },
     { name: 'Gurdish Pannu', where: 'Saatchi Art · originals', status: 'first', badge: 'First check', note: 'Originals, no USD prices listed. First check' },
   ];
+  const isSampleShopMode = () => {
+    try {
+      return typeof location !== 'undefined' && new URLSearchParams(location.search).get('workspace') === 'sample';
+    } catch (_) { return false; }
+  };
+
   function mountBrief() {
     if (!location.pathname.startsWith('/today')) return;
     const main = document.querySelector('main');
     if (!main || document.getElementById('msBrief')) return;
+    const isSample = isSampleShopMode();
     const today = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
     const section = el('section', { class: 'ms-brief', id: 'msBrief', 'aria-labelledby': 'msBriefTitle' });
     const head = el('div', { class: 'ms-brief-head' });
@@ -966,7 +973,7 @@
     titleBox.appendChild(el('p', { class: 'ms-brief-plan' }, 'Built once a day from your watchlist, the competitor monitor and campaign trends. No Muse credit is used to read it.'));
     const meta = el('p', { class: 'ms-brief-meta' });
     meta.appendChild(el('span', { class: 'ms-dot', 'aria-hidden': 'true' }));
-    meta.appendChild(document.createTextNode('Watchlist: 4 competitors · 6 shop pages · last checked Nov 3 · social accounts not checked yet'));
+    meta.appendChild(document.createTextNode(isSample ? 'Watchlist: 4 competitors · 6 shop pages · last checked Nov 3 · social accounts not checked yet' : 'Watchlist: Monitored competitors · social accounts not checked yet'));
     titleBox.appendChild(meta);
     const recheck = el('button', { type: 'button', class: 'ms-secondary ms-small', title: 'Check competitors’ public pages and rebuild today’s brief · 1 run' }, 'Re-check now');
     const toggle = el('button', { type: 'button', class: 'ms-link ms-brief-toggle', 'aria-expanded': 'true', 'aria-controls': 'msBriefBody' }, 'Hide');
@@ -988,20 +995,20 @@
         list.appendChild(li);
       }
     };
-    renderItems(WATCH);
+    if (isSample) renderItems(WATCH);
     const statusLine = el('p', { class: 'ms-brief-status', role: 'status', 'aria-live': 'polite' }, 'Loading today’s brief…');
     const retry = el('button', { type: 'button', class: 'ms-link ms-brief-retry', hidden: '' }, 'Try again');
     const statusRow = el('div', { class: 'ms-brief-statusrow' });
     statusRow.append(statusLine, retry);
-    const sourceNote = el('p', { class: 'ms-muted ms-brief-source' }, 'From saved public snapshots captured Nov 3. Muse checks again when you run a re-check; it does not watch continuously.');
+    const sourceNote = el('p', { class: 'ms-muted ms-brief-source' }, isSample ? 'From saved public snapshots captured Nov 3. Muse checks again when you run a re-check; it does not watch continuously.' : 'From your account watchlist. No Muse credit is used to read it.');
     // Focus of the day (server-ranked; the saved snapshot move is shown until the brief loads).
     const move = el('div', { class: 'ms-move' });
     const moveText = el('div');
     const moveChip = el('span', { class: 'ms-chip high' }, 'Focus of the day · high impact');
-    const moveTitle = el('strong', {}, 'Feature your Empowering Women series');
-    const moveReason = el('span', { class: 'ms-note' }, 'SikhiArt keeps adding warrior and guru editions but has no group for women’s stories.');
+    const moveTitle = el('strong', {}, isSample ? 'Feature your Empowering Women series' : 'Feature a collection or new artwork');
+    const moveReason = el('span', { class: 'ms-note' }, isSample ? 'SikhiArt keeps adding warrior and guru editions but has no group for women’s stories.' : 'Highlight unique pieces from your studio and compare with competitor offerings.');
     moveText.append(moveChip, moveTitle, moveReason);
-    const go = el('a', { class: 'ms-primary ms-small', href: '/create?idea=idea-1-empowering-women' }, 'Make this post →');
+    const go = el('a', { class: 'ms-primary ms-small', href: isSample ? '/create?idea=idea-1-empowering-women' : '/create' }, 'Make this post →');
     move.append(moveText, go);
     const safeHref = (href) => (typeof href === 'string' && /^\/(?!\/)/.test(href) ? href : '/create');
     const goLabel = (href) => (href.startsWith('/create') ? 'Make this post →' : 'Open →');

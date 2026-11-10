@@ -2,12 +2,19 @@
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from unittest.mock import patch
 
+import httpx
 import pytest
+from fastapi.testclient import TestClient
 from pydantic import BaseModel
 
+from src.api.main import app
+from src.config import Settings, get_settings
+from src.services.accounts import AccountSession
 from src.services.research_cache import (
     NAMESPACE_AD_PREVIEWS,
     NAMESPACE_COMPETITOR_CRAWL,
@@ -253,3 +260,155 @@ def test_research_cache_migration_files_exist() -> None:
 
     rb_sql = rollback.read_text(encoding="utf-8")
     assert "drop table if exists muse_private.research_cache" in rb_sql
+    # Warning/Limitation: CASCADE destroys all cached rows and dependent relations permanently.
+    assert "cascade" in rb_sql.lower()
+
+
+@pytest.fixture
+def client() -> TestClient:
+    return TestClient(app)
+
+
+def test_route_level_zero_debit_on_cache_hits(
+    monkeypatch: pytest.MonkeyPatch, client: TestClient
+) -> None:
+    """Every route utilizing research cache spends zero runs on cache hits."""
+    monkeypatch.setenv("RESULT_CACHE_ENABLED", "true")
+    # 1. /api/v1/daily-brief cache hit test
+    resp1 = client.get("/api/v1/daily-brief")
+    assert resp1.status_code == 200
+    brief1 = resp1.json()
+    assert "No new Muse call" in brief1["source"] or "0 runs spent" in brief1["source"]
+
+    resp2 = client.get("/api/v1/daily-brief")
+    assert resp2.status_code == 200
+    assert resp2.headers.get("x-muse-cache") == "hit"
+    brief2 = resp2.json()
+    assert brief2["date"] == brief1["date"]
+    assert "No new Muse call" in brief2["source"] or "0 runs spent" in brief2["source"]
+
+    # 2. /api/v1/competitors/ads cache hit test with authenticated account
+    settings_with_token = Settings(meta_ads_access_token="test_token_cache_route")
+    app.dependency_overrides[get_settings] = lambda: settings_with_token
+
+    fake_session = AccountSession(
+        user_id="user_cache_route_1",
+        email="artist@example.com",
+        email_verified=True,
+        access_token="tok",
+        session_id="sess",
+    )
+
+    async def fake_resolve(*_a, **_kw):
+        return fake_session
+
+    monkeypatch.setattr("src.api.intel.resolve_account", fake_resolve)
+
+    live_payload = {
+        "data": [
+            {
+                "id": "99887766",
+                "page_name": "Studio Cache Test",
+                "ad_delivery_start_time": "2026-10-01T00:00:00+0000",
+                "publisher_platforms": ["instagram"],
+                "ad_creative_link_titles": ["Handmade Mugs"],
+                "ad_creative_bodies": ["Wheel-thrown pottery"],
+            }
+        ]
+    }
+    mock_response = httpx.Response(
+        status_code=200,
+        content=json.dumps(live_payload).encode("utf-8"),
+        request=httpx.Request("GET", "https://graph.facebook.com/v21.0/ads_archive"),
+    )
+
+    with patch("httpx.AsyncClient.get", return_value=mock_response) as mock_get:
+        r1 = client.get("/api/v1/competitors/ads?query=Studio+Cache+Test")
+        assert r1.status_code == 200
+        d1 = r1.json()
+        assert d1["is_cached"] is False
+        assert mock_get.call_count == 1
+
+        r2 = client.get("/api/v1/competitors/ads?query=Studio+Cache+Test")
+        assert r2.status_code == 200
+        d2 = r2.json()
+        assert d2["is_cached"] is True
+        # Zero external API calls on cache hit:
+        assert mock_get.call_count == 1
+
+    app.dependency_overrides.clear()
+
+
+def test_per_account_cache_separation(monkeypatch: pytest.MonkeyPatch, client: TestClient) -> None:
+    """Prove that Account A and Account B querying the same resource have distinct cache entries."""
+    settings_with_token = Settings(meta_ads_access_token="test_token_cache_sep")
+    app.dependency_overrides[get_settings] = lambda: settings_with_token
+
+    user_a = AccountSession(
+        user_id="user_alpha_111",
+        email="alpha@studio.test",
+        email_verified=True,
+        access_token="tok_a",
+        session_id="sess_a",
+    )
+    user_b = AccountSession(
+        user_id="user_beta_222",
+        email="beta@studio.test",
+        email_verified=True,
+        access_token="tok_b",
+        session_id="sess_b",
+    )
+
+    active_user = user_a
+
+    async def dynamic_resolve(*_a, **_kw):
+        return active_user
+
+    monkeypatch.setattr("src.api.intel.resolve_account", dynamic_resolve)
+
+    live_payload = {
+        "data": [
+            {
+                "id": "77665544",
+                "page_name": "Shared Competitor",
+                "ad_delivery_start_time": "2026-10-15T00:00:00+0000",
+                "publisher_platforms": ["instagram"],
+                "ad_creative_link_titles": ["Archival Prints"],
+                "ad_creative_bodies": ["Limited editions."],
+            }
+        ]
+    }
+    mock_resp = httpx.Response(
+        status_code=200,
+        content=json.dumps(live_payload).encode("utf-8"),
+        request=httpx.Request("GET", "https://graph.facebook.com/v21.0/ads_archive"),
+    )
+
+    with patch("httpx.AsyncClient.get", return_value=mock_resp) as mock_get:
+        # 1. User A queries -> misses, fetches, stores in User A's account namespace
+        active_user = user_a
+        resp_a1 = client.get("/api/v1/competitors/ads?query=Shared+Competitor")
+        assert resp_a1.status_code == 200
+        assert resp_a1.json()["is_cached"] is False
+        assert mock_get.call_count == 1
+
+        # 2. User A queries again -> hits User A's cache (0 external fetches)
+        resp_a2 = client.get("/api/v1/competitors/ads?query=Shared+Competitor")
+        assert resp_a2.status_code == 200
+        assert resp_a2.json()["is_cached"] is True
+        assert mock_get.call_count == 1
+
+        # 3. User B queries identical query -> MUST MISS (account cache separation)
+        active_user = user_b
+        resp_b1 = client.get("/api/v1/competitors/ads?query=Shared+Competitor")
+        assert resp_b1.status_code == 200
+        assert resp_b1.json()["is_cached"] is False
+        assert mock_get.call_count == 2  # Proves separate fetch and isolated account cache!
+
+        # 4. User B queries again -> hits User B's cache
+        resp_b2 = client.get("/api/v1/competitors/ads?query=Shared+Competitor")
+        assert resp_b2.status_code == 200
+        assert resp_b2.json()["is_cached"] is True
+        assert mock_get.call_count == 2
+
+    app.dependency_overrides.clear()

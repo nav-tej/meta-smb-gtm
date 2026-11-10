@@ -22,13 +22,14 @@ import logging
 import time
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from fastapi import Response
 from pydantic import BaseModel, Field, TypeAdapter
 
 from src.config import get_settings
 from src.services import competitor_monitor, result_cache
+from src.services.accounts import AccountSession, load_workspace
 from src.services.demo import demo_competitor_brief, snapshot_competitor_brief
 
 logger = logging.getLogger(__name__)
@@ -130,10 +131,10 @@ def _age(seconds: float) -> str:
 
 SNAPSHOT_MOVE = DailyMove(
     title="Feature your Empowering Women series",
-    reason="SikhiArt keeps adding warrior and guru editions but has no group for women's stories.",
-    href="/create?idea=idea-1-empowering-women",
+    reason="SikhiArt has warrior and saint groups but none for women; catalog gap.",
+    href="/create",
     impact="high",
-    source="Competitor gap in the saved SikhiArt brief",
+    source="Saved Muse Spark brief (Nov 3)",
 )
 
 
@@ -356,9 +357,56 @@ def _inputs_fingerprint() -> str:
     return json.dumps({"run": runs[0].run_id if runs else None, "fresh": fresh})
 
 
-def build_daily_brief(today: date | None = None, now: datetime | None = None) -> DailyBrief:
+def build_daily_brief(
+    today: date | None = None,
+    now: datetime | None = None,
+    account_workspace: dict[str, Any] | None = None,
+) -> DailyBrief:
     now = now or datetime.now(UTC)
     today = today or now.date()
+
+    # If building for a verified non-sample account workspace, isolate from sample shop terms
+    if account_workspace and account_workspace.get("onboarding", {}).get("business_name"):
+        onb = account_workspace["onboarding"]
+        shop_name = onb.get("business_name") or "Your Studio"
+        user_comps = onb.get("competitors") or []
+        items = [
+            WatchItem(
+                name=c.get("name") or c.get("url", "Competitor"),
+                url=c.get("url", ""),
+                where="Website",
+                snapshot_age="monitored",
+                fresh=False,
+                summary=c.get("reason") or "Watched competitor shop",
+            )
+            for c in user_comps
+        ]
+        move = DailyMove(
+            title=f"Feature a collection from {shop_name}",
+            reason=(
+                f"Highlight your unique pieces and compare catalog gaps with "
+                f"your {len(user_comps)} watched competitors."
+            ),
+            href="/create",
+            impact="high",
+            source=f"Workspace for {shop_name}",
+        )
+        return DailyBrief(
+            date=today.isoformat(),
+            generated_at=now.isoformat(timespec="seconds"),
+            source=f"Built {today.isoformat()} from workspace for {shop_name}. 0 runs spent.",
+            items=items,
+            move=move,
+            fresh_analyses=0,
+            focus=move,
+            action_items=[move],
+            overnight_changes=[],
+            overnight_note=f"Watching {len(user_comps)} competitors for {shop_name}.",
+            trends=[],
+            trends_source=f"Account workspace for {shop_name}",
+            inputs=f"account:{shop_name}",
+        )
+
     items, fresh_count = _guard("watchlist", lambda: _watch_items(today), ([], 0))
     changes, overnight_note = _guard(
         "overnight", lambda: _overnight(now), ([], "Overnight changes are unavailable today.")
@@ -408,7 +456,12 @@ def build_daily_brief(today: date | None = None, now: datetime | None = None) ->
     )
 
 
-async def daily_brief(*, refresh: bool = False, response: Response | None = None) -> DailyBrief:
+async def daily_brief(
+    *,
+    refresh: bool = False,
+    response: Response | None = None,
+    account: AccountSession | None = None,
+) -> DailyBrief:
     """Today's brief: built once per day and reused until its inputs change.
 
     Every read compares the cached brief's input fingerprint (latest monitor run, fresh cached
@@ -416,10 +469,30 @@ async def daily_brief(*, refresh: bool = False, response: Response | None = None
     brief for unchanged data. `refresh` is kept for the Re-check button and behaves the same.
     """
     today = datetime.now(UTC).date()
-    key = {"date": today.isoformat(), "v": BRIEF_VERSION}
+    account_doc = None
+    account_id = None
+    if account:
+        account_id = account.user_id
+        try:
+            ws = await load_workspace(account)
+            account_doc = ws.get("document") or {}
+        except Exception:
+            pass
+
+    is_custom_account = bool(account_doc and account_doc.get("onboarding", {}).get("business_name"))
+    key = {
+        "date": today.isoformat(),
+        "v": BRIEF_VERSION,
+        "account_id": account_id if is_custom_account else "demo",
+    }
     adapter: TypeAdapter[DailyBrief] = TypeAdapter(DailyBrief)
     current = result_cache.load("daily-brief", key, adapter)
-    if current is not None and current.inputs == _guard("inputs", _inputs_fingerprint, ""):
+    expected_inputs = (
+        f"account:{account_doc['onboarding']['business_name']}"
+        if (is_custom_account and account_doc)
+        else _guard("inputs", _inputs_fingerprint, "")
+    )
+    if current is not None and current.inputs == expected_inputs:
         if response is not None:
             response.headers[result_cache.CACHE_HEADER] = "hit"
             if refresh:
@@ -427,6 +500,8 @@ async def daily_brief(*, refresh: bool = False, response: Response | None = None
         return current
 
     async def produce() -> DailyBrief:
+        if is_custom_account and account_doc:
+            return build_daily_brief(today, account_workspace=account_doc)
         return build_daily_brief(today)
 
     return await result_cache.cached(

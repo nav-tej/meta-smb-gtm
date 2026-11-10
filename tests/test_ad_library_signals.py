@@ -20,6 +20,7 @@ from fastapi.testclient import TestClient
 
 from src.api.main import app
 from src.config import Settings, get_settings
+from src.services.accounts import AccountSession
 from src.services.research_cache import set_research_cache_dir
 
 
@@ -53,11 +54,43 @@ def test_no_token_returns_link_out_and_no_fabricated_rows(client: TestClient) ->
     assert "q=Desi+Canvas+Co" in data["public_library_url"]
 
 
-def test_api_zero_records_distinct_from_failure(client: TestClient) -> None:
+def test_token_without_account_returns_link_out_no_fetch(client: TestClient) -> None:
+    """When token is configured without account session, return link-out only with no fetch."""
+    settings_with_token = Settings(meta_ads_access_token="test_token_123")
+    app.dependency_overrides[get_settings] = lambda: settings_with_token
+
+    with patch("httpx.AsyncClient.get") as mock_get:
+        resp = client.get("/api/v1/competitors/ads?query=Desi+Canvas+Co")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "no_token"
+        assert "Sign in" in data["message"]
+        assert data["total_active_ads"] == 0
+        assert data["ads"] == []
+        assert "facebook.com/ads/library" in data["public_library_url"]
+        assert mock_get.call_count == 0
+
+
+def test_api_zero_records_distinct_from_failure(
+    monkeypatch: pytest.MonkeyPatch, client: TestClient
+) -> None:
     """When Meta API call succeeds but returns 0 ads, return 'No ads found via the Meta API.'"""
     settings_with_token = Settings(meta_ads_access_token="test_token_123")
     app.dependency_overrides[get_settings] = lambda: settings_with_token
     empty_payload = {"data": []}
+
+    fake_session = AccountSession(
+        user_id="user_test_123",
+        email="artist@example.com",
+        email_verified=True,
+        access_token="tok",
+        session_id="sess",
+    )
+
+    async def fake_resolve(*_a, **_kw):
+        return fake_session
+
+    monkeypatch.setattr("src.api.intel.resolve_account", fake_resolve)
 
     mock_response = httpx.Response(
         status_code=200,
@@ -76,10 +109,25 @@ def test_api_zero_records_distinct_from_failure(client: TestClient) -> None:
         assert "q=QuietStudioShop" in data["public_library_url"]
 
 
-def test_api_failure_returns_graceful_error_note(client: TestClient) -> None:
+def test_api_failure_returns_graceful_error_note(
+    monkeypatch: pytest.MonkeyPatch, client: TestClient
+) -> None:
     """When Meta API call fails, return error status with different message from API zero."""
     settings_with_token = Settings(meta_ads_access_token="test_token_123")
     app.dependency_overrides[get_settings] = lambda: settings_with_token
+
+    fake_session = AccountSession(
+        user_id="user_test_123",
+        email="artist@example.com",
+        email_verified=True,
+        access_token="tok",
+        session_id="sess",
+    )
+
+    async def fake_resolve(*_a, **_kw):
+        return fake_session
+
+    monkeypatch.setattr("src.api.intel.resolve_account", fake_resolve)
 
     mock_error_resp = httpx.Response(
         status_code=500,
@@ -100,10 +148,23 @@ def test_api_failure_returns_graceful_error_note(client: TestClient) -> None:
         assert "q=ErrorProneBrand" in data["public_library_url"]
 
 
-def test_api_live_records_and_cache(client: TestClient) -> None:
+def test_api_live_records_and_cache(monkeypatch: pytest.MonkeyPatch, client: TestClient) -> None:
     """Live records include start_date and library_url, and second call is cached."""
     settings_with_token = Settings(meta_ads_access_token="test_token_123")
     app.dependency_overrides[get_settings] = lambda: settings_with_token
+
+    fake_session = AccountSession(
+        user_id="user_test_123",
+        email="artist@example.com",
+        email_verified=True,
+        access_token="tok",
+        session_id="sess",
+    )
+
+    async def fake_resolve(*_a, **_kw):
+        return fake_session
+
+    monkeypatch.setattr("src.api.intel.resolve_account", fake_resolve)
     live_payload = {
         "data": [
             {

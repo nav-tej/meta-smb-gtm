@@ -281,8 +281,18 @@ async def get_competitor_ads(
             is_cached=False,
         )
 
-    account = await resolve_account(request, None)
-    account_id = account.id if account else None
+    account = await resolve_account(request, None, require_verified=False)
+    if not account:
+        return CompetitorAdSignalsResponse(
+            query=query,
+            public_library_url=public_url,
+            status="no_token",
+            message="Sign in to query live Meta Ad Library signals. Public link available.",
+            total_active_ads=0,
+            ads=[],
+            is_cached=False,
+        )
+    account_id = account.user_id
 
     async def _fetch() -> SocialCompetitorSignals:
         client = MetaAdLibraryClient(settings=cfg)

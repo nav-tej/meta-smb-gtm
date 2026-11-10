@@ -4,8 +4,13 @@
   const names = { instagram: 'Instagram', facebook: 'Facebook', x: 'X', tiktok: 'TikTok' };
   const shops = { pixels: 'Pixels', fineartamerica: 'Fine Art America', saatchi: 'Saatchi Art', website: 'Artist website', other: 'Your shop' };
   const storageKey = 'muse-daily-v1';
+  const isSampleMode = () => {
+    try {
+      return typeof location !== 'undefined' && new URLSearchParams(location.search).get('workspace') === 'sample';
+    } catch (_) { return false; }
+  };
   const originalSample = '/samples/ek_onkar_original.jpg';
-  const initialProduct = () => ({ title: 'Ek Onkar', description: 'An artwork by Sarabjit Singh exploring connection and equality through color and form.', seller: 'Art of Sarabjit Singh', collection: '', price: '', destination_url: 'https://sarabjit-singh.pixels.com/', destination: 'pixels' });
+  const initialProduct = (shopName) => (shopName && !isSampleMode() ? { title: 'Featured Artwork', description: `Artwork collection by ${shopName}.`, seller: shopName, collection: '', price: '', destination_url: '', destination: 'website' } : { title: 'Ek Onkar', description: 'An artwork by Sarabjit Singh exploring connection and equality through color and form.', seller: 'Art of Sarabjit Singh', collection: '', price: '', destination_url: 'https://sarabjit-singh.pixels.com/', destination: 'pixels' });
   const state = { product: initialProduct(), original: originalSample, image: originalSample, imageMode: 'original', source: 'Suggested from the artist example', channel: 'instagram', format: 'image', goal: 'visits', salesGoal: null, performance: null, plans: {}, edits: {}, selected: 0, posted: {}, offers: {}, busy: false, revision: 0, paint: 0, live: false, key: '', readiness: null };
 
   const draftNamespace = 'daily';
@@ -636,13 +641,45 @@
   populateSetup(); render(); initDrafts();
   const requestedIdea = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('idea') : null;
   const ideaSpec = requestedIdea ? findPreviewSpec(requestedIdea) : null;
-  if (ideaSpec) {
+  if (ideaSpec && (!window.museAccount?.current?.() || isSampleMode())) {
     applyIdea(ideaSpec);
     window.museTrack?.('post_started', { idea_id: requestedIdea, source: 'today' });
   } else {
     window.museTrack?.('post_started', { idea_id: null, goal: state.goal || 'daily', source: 'today' });
   }
-  if (window.museAccount?.ready) window.museAccount.ready().then(() => buildPlan()); else buildPlan();
+  if (window.museAccount?.ready) {
+    window.museAccount.ready().then(async (snap) => {
+      const acc = snap?.user || window.museAccount.getSnapshot()?.user || window.museAccount.current?.();
+      if (acc && !isSampleMode()) {
+        if (state.product.title === 'Ek Onkar') {
+          state.product.title = 'Featured Artwork';
+          state.product.description = 'Fine art collection.';
+          state.original = '';
+          state.image = '';
+          state.source = 'Featured artwork';
+          populateSetup();
+          render();
+        }
+        try {
+          const wsRes = await fetch('/api/v1/account/workspace', { credentials: 'same-origin', headers: { 'x-muse-owner': acc.id } });
+          if (wsRes.ok) {
+            const wsData = await wsRes.json();
+            const shopName = wsData?.document?.onboarding?.business_name;
+            if (shopName) {
+              state.product.seller = shopName;
+              state.product.description = `Fine art collection from ${shopName}.`;
+              state.source = `Featured from ${shopName}`;
+              populateSetup();
+              render();
+            }
+          }
+        } catch (_) {}
+      }
+      buildPlan();
+    });
+  } else {
+    buildPlan();
+  }
   fetch('/api/v1/readiness').then(response => response.json()).then(data => { state.readiness = data; syncAccountLive(); $('readinessNote').textContent = data.provider_key_configured ? 'Muse configured, not yet verified here. Starter plans use no credits. Live image uses one Muse Image request; this flow does not run SAM.' : 'No Muse provider key configured. Starter posts and downloads work without it.'; }).catch(() => { $('readinessNote').textContent = 'Could not check server configuration. Your draft is still available.'; });
   window.museDailySnapshot = () => JSON.parse(JSON.stringify({ product: state.product, channel: state.channel, format: state.format, copy: currentCopy(), plan: currentPlan(), performance: state.performance, imageMode: state.imageMode, source: state.source }));
 })();

@@ -1,10 +1,20 @@
 'use strict';
 (() => {
   const $ = (id) => document.getElementById(id);
-  const state = { accountLive: false, step: 0, presets: null, workspace: 'sarabjit_singh', custom: false, copyEdited: false, sceneEdited: false, goal: 'story', original: '', image: '', imageKind: 'original', sampleImage: '', key: '', live: false, defaultLive: false, readiness: null, busy: false, revision: 0, paint: 0, product: {}, headline: '', caption: '', scene: '', provenance: 'Original-photo layout. No new image generated.', idea_id: null };
+  const state = { accountLive: false, step: 0, presets: null, workspace: 'sarabjit_singh', custom: false, copyEdited: false, sceneEdited: false, goal: 'story', placement: 'instagram_feed', original: '', image: '', imageKind: 'original', sampleImage: '', key: '', live: false, defaultLive: false, readiness: null, busy: false, revision: 0, paint: 0, product: {}, headline: '', caption: '', scene: '', provenance: 'Original-photo layout. No new image generated.', idea_id: null };
 
   const draftNamespace = 'creator';
-  const draftFields = ['workspace', 'custom', 'copyEdited', 'sceneEdited', 'goal', 'original', 'image', 'imageKind', 'sampleImage', 'product', 'headline', 'caption', 'scene', 'provenance', 'artwork', 'idea_id'];
+  const draftFields = ['workspace', 'custom', 'copyEdited', 'sceneEdited', 'goal', 'placement', 'original', 'image', 'imageKind', 'sampleImage', 'product', 'headline', 'caption', 'scene', 'provenance', 'artwork', 'idea_id'];
+  function isSampleMode() {
+    try {
+      return typeof location !== 'undefined' && new URLSearchParams(location.search).get('workspace') === 'sample';
+    } catch (_) { return false; }
+  }
+  function activePlacement() {
+    if (state.placement) return state.placement;
+    if ($('postFacebook')?.checked && !$('postInstagram')?.checked) return 'facebook_feed';
+    return 'instagram_feed';
+  }
   function editorDocument() { return { schema: 1, ...Object.fromEntries(draftFields.map(key => [key, state[key]])), offers, channels: postingChannels(), step: state.step }; }
   const isDraftObject = value => !!value && typeof value === 'object' && !Array.isArray(value);
   function applyDocument(data) {
@@ -354,10 +364,13 @@
         b.setAttribute('aria-pressed', String(active));
       });
     }
-    if (spec.placement === 'facebook_feed') {
+    state.placement = spec.placement || (spec.placement === 'facebook_feed' ? 'facebook_feed' : 'instagram_feed');
+    if (state.placement === 'facebook_feed') {
       $('postFacebook').checked = true;
+      $('postInstagram').checked = false;
     } else {
       $('postInstagram').checked = true;
+      $('postFacebook').checked = false;
     }
     state.revision += 1;
     $('headline').value = state.headline;
@@ -377,6 +390,13 @@
   function changed(event) {
     if (['headline', 'caption'].includes(event?.target?.id)) state.copyEdited = true;
     if (event?.target?.id === 'scene') state.sceneEdited = true;
+    if (['postInstagram', 'postFacebook'].includes(event?.target?.id)) {
+      if ($('postFacebook')?.checked && !$('postInstagram')?.checked) {
+        state.placement = 'facebook_feed';
+      } else if ($('postInstagram')?.checked && !$('postFacebook')?.checked) {
+        state.placement = 'instagram_feed';
+      }
+    }
     state.revision += 1; $('reviewed').checked = false; sync();
     if (state.custom && !state.copyEdited && ['productName', 'productDescription'].includes(event?.target?.id)) starter();
     refreshPreview();
@@ -408,6 +428,11 @@
   function updateChoices() {
     const isArtist = !state.custom && state.workspace === 'sarabjit_singh';
     const isCeramics = !state.custom && state.workspace === 'etsy_ceramics';
+    const hasAccount = !!(window.museAccount?.getSnapshot?.()?.user || window.museAccount?.current?.());
+    if (hasAccount && !isSampleMode()) {
+      if ($('artistExample')) { $('artistExample').hidden = true; if ($('artistExample').style) $('artistExample').style.display = 'none'; }
+      if ($('tryNext')) { $('tryNext').hidden = true; if ($('tryNext').style) $('tryNext').style.display = 'none'; }
+    }
     $('artistExample').classList.toggle('selected', isArtist);
     $('artistExample').setAttribute('aria-pressed', String(isArtist));
     $('ceramicsExample').classList.toggle('selected', isCeramics);
@@ -515,7 +540,24 @@
     $('postingSummary').textContent = `${postingChannels().map((c) => c === 'instagram' ? 'Instagram' : 'Facebook').join(' + ') || 'Choose a posting channel'} → ${destinations[state.product.destination]}${state.product.collection ? ` · ${state.product.collection}` : ''}. ${state.product.price ? `Selected offer: ${state.product.price}.` : 'No price included.'}`;
     $('postingSteps').replaceChildren(); for (const line of postingChecklist()) { const li = document.createElement('li'); li.textContent = line; $('postingSteps').append(li); }
     $('listingLink').textContent = `Check ${destinations[state.product.destination]} destination ↗`;
-    const paint = ++state.paint; drawLayout(1350).then((canvas) => { if (paint !== state.paint) return; const preview = $('previewCanvas'); preview.getContext('2d').clearRect(0, 0, 1080, 1350); preview.getContext('2d').drawImage(canvas, 0, 0); }).catch(() => {});
+    const activePl = activePlacement();
+    const feedBtn = $('downloadFeed');
+    if (feedBtn) {
+      if (activePl === 'facebook_feed') {
+        feedBtn.innerHTML = 'Download Facebook feed image <span>1080 × 1080 PNG</span>';
+      } else {
+        feedBtn.innerHTML = 'Download feed image <span>1080 × 1350 PNG</span>';
+      }
+    }
+    const previewHeight = activePl === 'facebook_feed' ? 1080 : 1350;
+    const paint = ++state.paint; drawLayout(previewHeight).then((canvas) => {
+      if (paint !== state.paint) return;
+      const preview = $('previewCanvas');
+      preview.width = 1080;
+      preview.height = previewHeight;
+      preview.getContext('2d').clearRect(0, 0, 1080, previewHeight);
+      preview.getContext('2d').drawImage(canvas, 0, 0);
+    }).catch(() => {});
   }
   function wrap(ctx, text, x, y, maxWidth, lineHeight, maxLines = 3) {
     const words = String(text).split(/\s+/); let line = ''; let count = 0;
@@ -614,7 +656,7 @@
     if (!state.live) { notify('Saved mode uses editable starter copy. Enable a configured live presenter session to write a new Muse draft.'); return; }
     if (window.museShell?.canRun && !window.museShell.canRun('Fresh Muse draft')) return;
     setBusy(true); notify('Muse is writing your draft. Your current words are kept until the new draft is ready…', 'busy');
-    try { const result = await request({ draft: true, product: productPayload(), competitor_brief: promotionResearchContext(), placements: ['instagram_feed'], variants_per_placement: 1, use_comfyui: false }); if (ownerEpoch !== draftEpoch) return; const variant = result.variants?.[0]; if (!variant) throw new Error('Muse returned no editable draft. Your previous copy is still here.'); state.copyEdited = true; state.sceneEdited = true; state.headline = variant.headline; state.caption = variant.primary_text; state.scene = variant.image_prompt; $('headline').value = state.headline; $('caption').value = state.caption; $('scene').value = state.scene; $('reviewed').checked = false; refreshPreview(); spendLive('Fresh Muse draft'); notify('Fresh Muse draft ready. Read it through and make it sound like you.'); } catch (error) { try { window.museAccount?.refresh?.().catch(() => {}); } catch {} notify(error.message, 'error'); } finally { setBusy(false); }
+    try { const result = await request({ draft: true, product: productPayload(), competitor_brief: promotionResearchContext(), placements: [activePlacement()], variants_per_placement: 1, use_comfyui: false }); if (ownerEpoch !== draftEpoch) return; const variant = result.variants?.[0]; if (!variant) throw new Error('Muse returned no editable draft. Your previous copy is still here.'); state.copyEdited = true; state.sceneEdited = true; state.headline = variant.headline; state.caption = variant.primary_text; state.scene = variant.image_prompt; $('headline').value = state.headline; $('caption').value = state.caption; $('scene').value = state.scene; $('reviewed').checked = false; refreshPreview(); spendLive('Fresh Muse draft'); notify('Fresh Muse draft ready. Read it through and make it sound like you.'); } catch (error) { try { window.museAccount?.refresh?.().catch(() => {}); } catch {} notify(error.message, 'error'); } finally { setBusy(false); }
   }
   async function generate() {
     const ownerEpoch = draftEpoch;
@@ -628,7 +670,8 @@
     try {
       const product = { ...productPayload(), image_base64: await sourceData() };
       if (ownerEpoch !== draftEpoch) return;
-      const result = await request({ product, draft: false, placements: ['instagram_feed'], variants_per_placement: 1, use_comfyui: false, muse_workflow_mode: 'product_visuals', brief: { product_title: state.product.name, positioning_hook: goals[state.goal][0], preserve_product_note: 'Compare generated product details against the original before publishing.', estimated_paid_calls: 1, variants: [{ variant_id: 'v1', include: true, placement: 'instagram_feed', headline: state.headline, primary_text: state.caption, image_prompt: state.scene, target_audience: 'People interested in this product and the maker’s story', angle_rationale: 'Seller-selected promotion goal' }] } });
+      const placement = activePlacement();
+      const result = await request({ product, draft: false, placements: [placement], variants_per_placement: 1, use_comfyui: false, muse_workflow_mode: 'product_visuals', brief: { product_title: state.product.name, positioning_hook: goals[state.goal][0], preserve_product_note: 'Compare generated product details against the original before publishing.', estimated_paid_calls: 1, variants: [{ variant_id: 'v1', include: true, placement: placement, headline: state.headline, primary_text: state.caption, image_prompt: state.scene, target_audience: 'People interested in this product and the maker’s story', angle_rationale: 'Seller-selected promotion goal' }] } });
       const creative = result.creatives?.[0]; if (!creative) throw new Error('Muse returned no image. Your original-photo layout is still available.');
       if (String(creative.produced_by).startsWith('demo-cache')) throw new Error('The server returned a saved example, not a new image. Live mode was not confirmed. Your original is still available.');
       const assetUrl = mediaAssetPath(creative.media_asset_url);
@@ -651,7 +694,27 @@
     } catch (error) { try { window.museAccount?.refresh?.().catch(() => {}); } catch {} notify(error.message, 'error'); } finally { setBusy(false); }
   }
   function saveBlob(blob, suffix) { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `${(state.product.name || 'promotion').replace(/[^a-z0-9]+/gi, '-').slice(0, 60)}-${suffix}`; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
-  async function download(height) { if (state.busy || !validateProduct()) return; if (!$('reviewed').checked) { notify('Review your image and wording before downloading.', 'error'); go(2); return; } setBusy(true); try { sync(); const canvas = await drawLayout(height); const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png')); if (!blob) throw new Error('Could not create the download.'); saveBlob(blob, height === 1350 ? 'feed.png' : 'story.png'); window.museTrack?.('post_downloaded', { placement: height === 1350 ? 'feed' : 'story', page: '/create' }); notify('Image downloaded using your current headline. Copy the matching caption before posting.'); markIdeaExported(); } catch (e) { notify(e.message, 'error'); } finally { setBusy(false); } }
+  async function download(height) {
+    if (state.busy || !validateProduct()) return;
+    if (!$('reviewed').checked) { notify('Review your image and wording before downloading.', 'error'); go(2); return; }
+    setBusy(true);
+    try {
+      sync();
+      const targetHeight = height || (activePlacement() === 'facebook_feed' ? 1080 : activePlacement() === 'instagram_story' ? 1920 : 1350);
+      const canvas = await drawLayout(targetHeight);
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+      if (!blob) throw new Error('Could not create the download.');
+      const suffix = targetHeight === 1350 ? 'feed.png' : targetHeight === 1080 ? 'facebook-feed.png' : 'story.png';
+      saveBlob(blob, suffix);
+      window.museTrack?.('post_downloaded', { placement: activePlacement(), height: targetHeight, page: '/create' });
+      notify('Image downloaded using your current headline. Copy the matching caption before posting.');
+      markIdeaExported();
+    } catch (e) {
+      notify(e.message, 'error');
+    } finally {
+      setBusy(false);
+    }
+  }
   function campaignPack() { sync(); return { product: { ...state.product, link: safeLink(state.product.link) }, goal: state.goal, headline: state.headline, caption: state.caption, scene_prompt: state.scene, image_provenance: state.provenance, mode: state.imageKind, posting_channels: postingChannels(), note: 'Download the image separately. This pack does not launch ads or publish posts. Destination details are kept only in this tab; prices are not synced.', posting_checklist: postingChecklist() }; }
   for (const id of [...Object.keys(fields), 'headline', 'caption', 'scene']) $(id).addEventListener('input', changed);
   $('artistExample').addEventListener('click', () => selectExample('sarabjit_singh')); $('ceramicsExample').addEventListener('click', () => selectExample('etsy_ceramics')); $('customProduct').addEventListener('click', newProduct);
@@ -698,7 +761,7 @@
     });
   });
   $('nextButton').addEventListener('click', () => go(Math.min(3, state.step + 1))); $('backButton').addEventListener('click', () => go(Math.max(0, state.step - 1))); $('originalButton').addEventListener('click', () => { originalLayout(); $('reviewed').checked = false; }); $('draftButton').addEventListener('click', draft); $('generateButton').addEventListener('click', generate);
-  $('downloadFeed').addEventListener('click', () => download(1350)); $('downloadStory').addEventListener('click', () => download(1920)); $('downloadPack').addEventListener('click', () => { if (state.busy) return; if (!$('reviewed').checked) { notify('Review your product details and wording before downloading.', 'error'); return; } saveBlob(new Blob([JSON.stringify(campaignPack(), null, 2)], { type: 'application/json' }), 'campaign.json'); markIdeaExported(); });
+  $('downloadFeed').addEventListener('click', () => download(activePlacement() === 'facebook_feed' ? 1080 : 1350)); $('downloadStory').addEventListener('click', () => download(1920)); $('downloadPack').addEventListener('click', () => { if (state.busy) return; if (!$('reviewed').checked) { notify('Review your product details and wording before downloading.', 'error'); return; } saveBlob(new Blob([JSON.stringify(campaignPack(), null, 2)], { type: 'application/json' }), 'campaign.json'); markIdeaExported(); });
   $('copyCaption').addEventListener('click', async () => { sync(); try { await navigator.clipboard.writeText(`${state.headline}\n\n${state.caption}${safeLink(state.product.link) ? '\n\n' + safeLink(state.product.link) : ''}`); notify('Your current caption and link are copied.'); } catch { notify('Clipboard access is unavailable. Select and copy your caption from the edit screen.', 'error'); } });
   $('unlockKey').addEventListener('input', () => { state.key = $('unlockKey').value.trim(); });
   $('liveMode').addEventListener('change', () => { if ($('liveMode').checked && state.readiness && !state.readiness.provider_key_configured) { $('liveMode').checked = false; notify('The server has no Muse provider key configured. Saved examples still work.', 'error'); } if ($('liveMode').checked && !state.key && !state.defaultLive && !state.accountLive) { $('liveMode').checked = false; notify('Enter the configured demo unlock key first.', 'error'); } state.live = $('liveMode').checked; updateMode(); });
@@ -745,6 +808,51 @@
     if (requestedGoal && Object.hasOwn(goals, requestedGoal)) document.querySelector?.(`[data-goal="${requestedGoal}"]`)?.click();
     window.museTrack?.('post_started', { idea_id: null, goal: requestedGoal || 'default', source: 'creator' });
   }
+  if (window.museAccount?.ready) {
+    window.museAccount.ready().then(async (snap) => {
+      const acc = snap?.user || window.museAccount.getSnapshot()?.user || window.museAccount.current?.();
+      if (acc && !isSampleMode() && !requestedIdea) {
+        if ($('artistExample')) { $('artistExample').hidden = true; if ($('artistExample').style) $('artistExample').style.display = 'none'; }
+        if ($('tryNext')) { $('tryNext').hidden = true; if ($('tryNext').style) $('tryNext').style.display = 'none'; }
+        if (!localDraftPresent()) {
+          state.custom = true;
+          state.product.seller = 'Your Studio';
+          state.product.name = 'Your Artwork';
+          state.product.description = 'Fine art collection.';
+          state.original = '';
+          state.image = '';
+          state.sampleImage = '';
+          state.artwork = null;
+          $('productFactNote').textContent = 'Your photo is saved on this device when storage is available. A live request sends it to Muse only when you choose to generate.';
+          $('productImageCaption').textContent = 'Your product photo will appear here.';
+          originalLayout();
+          setProductFields();
+          starter();
+          updateChoices();
+          $('reviewed').checked = false;
+          refreshPreview();
+          try {
+            const wsRes = await fetch('/api/v1/account/workspace', { credentials: 'same-origin', headers: { 'x-muse-owner': acc.id } });
+            if (wsRes.ok) {
+              const wsData = await wsRes.json();
+              const shopName = wsData?.document?.onboarding?.business_name;
+              if (shopName) {
+                state.product.seller = shopName;
+                state.product.name = `Artwork by ${shopName}`;
+                state.product.description = `Fine art collection from ${shopName}.`;
+                originalLayout();
+                setProductFields();
+                starter();
+                updateChoices();
+                refreshPreview();
+              }
+            }
+          } catch (_) {}
+        }
+      }
+    });
+  }
   // Expose a read-only snapshot for focused offline contract checks; never expose the unlock key.
-  window.museCreatorSnapshot = () => JSON.parse(JSON.stringify(campaignPack()));
+  window.museCreatorSnapshot = () => JSON.parse(JSON.stringify({ ...campaignPack(), placement: activePlacement() }));
+  window.museDrawLayout = (height) => drawLayout(height);
 })();

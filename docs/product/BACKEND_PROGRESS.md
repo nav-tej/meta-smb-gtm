@@ -195,4 +195,39 @@
     - Dynamic substitution of steer input placeholder, chips, refine buttons, and playbook title (`Actionable Playbook for ${shopName}`) when viewing a signed-in workspace.
   - **Verification:** Added `tests/test_non_sample_artist.py` verifying that a watercolor studio account ("Elena Vance Watercolor Studio") completes onboarding and has ZERO sample-shop terms leaked into its workspace, suggestions, or outcomes (all passing).
 
+- [x] **Gate 1 Fix Round (Review 3 HOLD Resolution):**
+  - **Blocker 1 & 2: Authoritative Idempotent Free Onboarding & Same-Browser Account Isolation:**
+    - Added atomic server-side onboarding completion endpoint `POST /api/v1/onboarding/complete-free` returning `used_run=False` and remaining allowance intact.
+    - Scoped onboarding and workspace state strictly to account session on the server; eliminated cross-account leakage across Account A and Account B on the same browser instance.
+    - Verified in `tests/test_review_behaviors.py` and `tests/test_welcome_onboarding.py`.
+  - **Blocker 3: Progress Page & Actual-Plan ROI:**
+    - Corrected dynamic actual-plan cost in `src/api/outcomes.py` and `src/api/static/progress.html`.
+    - Returns honest `net_roi_usd=None` when zero moves are logged; computes net return against actual plan cost ($12 starter, $29 unlimited).
+    - Honest UI label: "Logged on this device" without live claim until server storage is connected.
+  - **Blocker 4: Honest Directive & Digest Copy:**
+    - Replaced inaccurate "applied" and "1 run" claims with `"0 runs (saved to workspace)"` across `DirectiveResponse`, `/api/v1/directives/parse`, and `/api/v1/directives/confirm`.
+    - Updated `src/api/static/llms.txt` to state: "Onboarding is free (0 runs). Weekly market digest reading is free (0 runs). Research directives save to workspace at 0 runs."
+  - **Item 5: Humanizer Preservation:**
+    - Stopped automatic mutation of creative ad copy (`clean_text`) in `src/services/ad_creative.py` (`_run_comfyui_krea_variant` and `to_editable_brief`).
+    - Original headline, primary text, titles, and proper nouns are preserved untouched while humanizer lint suggestions remain available for seller review.
+  - **Item 10: Exact Placement Parity in Creator & Today Studios:**
+    - Bound placement state in `creator.js` and `today.js` to idea specs:
+      - Idea 4 bound to `facebook_feed` (1080×1080 square canvas, dynamic button label `Download Facebook feed image 1080 × 1080 PNG`).
+      - Ideas 1, 2, 3, 5 bound to `instagram_feed` (1080×1350 canvas, `Download feed image 1080 × 1350 PNG`).
+    - Verified placement state, canvas dimensions via `window.museDrawLayout`, export action storage, and telemetry.
+  - **Item 11: Ad Library Signals & Session Binding:**
+    - Enforced verified account session requirement on `GET /api/v1/competitors/ads` via `resolve_account`; unauthenticated callers receive `status="no_token"` with public search link-out.
+    - Meta Ad Library DSA API documentation findings documented: commercial ads restricted to EU/UK targeting under DSA statutory mandates; commercial ads for US independent artists cannot be programmatically fetched via Meta's public API.
+  - **Step 4b: Complete Non-Sample Artist Workspace Isolation:**
+    - Audited and eliminated demo-specific content outside the sample shop.
+    - Fixture account for a landscape watercolor artist ("Elena Vance Watercolor Studio") completes browser onboarding, verifies `/welcome`, `/today`, `/create`, `/progress`, and `/daily-brief` have zero sample terms ("Sikh", "Sarabjit", "Gurpurab", "Vaisakhi", "Ek Onkar", "SikhiArt", "Triton Museum", "Kala Sangam").
+    - Same-browser account switching to a pottery studio ("Oak & Pine Ceramics") verifies zero cross-account leakage.
+    - Hoisted `isSampleMode()` to top scope in `creator.js` and guarded DOM style access for headless harnesses.
+  - **Track E: Research Cache Zero Debit & SQL Rollback Analysis:**
+    - Verified route-level zero debit on cache hits in `tests/test_research_cache.py`: `/api/v1/daily-brief` returns `x-muse-cache: hit` and 0 spent; `/api/v1/competitors/ads` returns `is_cached: True` with 0 external API calls.
+    - Verified per-account cache key isolation for competitor queries.
+    - SQL Rollback Analysis: `supabase/migrations/research_cache_rollback.sql` uses `DROP TABLE IF EXISTS muse_private.research_cache CASCADE;`, which drops all cached records and dependent database objects. Migrations remain unapplied; runtime utilizes local filesystem JSON (`get_research_cache_dir()`).
+  - **Full Quality Gate:**
+    - `make check` passed cleanly: `523 passed, 2 skipped in 49.91s`. Zero paid model calls, zero live deployments, zero migrations applied.
+
 

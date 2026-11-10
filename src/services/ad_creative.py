@@ -38,7 +38,6 @@ from src.models.creative import (
     ProductInfo,
 )
 from src.models.intel import CompetitorBrief
-from src.utils.humanizer import clean_text
 from src.utils.sitemap import DEFAULT_REQUEST_TIMEOUT, ResolverFn, SitemapError, validate_safe_url
 
 logger = logging.getLogger(__name__)
@@ -331,8 +330,8 @@ async def _run_comfyui_krea_variant(
                 placement=placement,
                 image_path=saved_path,
                 prompt=video_prompt if is_video else scene_prompt,
-                headline=clean_text(headline),
-                primary_text=clean_text(primary_text),
+                headline=headline,
+                primary_text=primary_text,
                 produced_by=f"comfyui:{workflow_name}",
                 media_type="video" if is_video else "image",
             )
@@ -364,8 +363,8 @@ def to_editable_brief(brief: CreativeBrief, request: GenerateAdsRequest) -> Edit
                 placement=angle.placement,
                 spec=placement_spec(angle.placement),
                 target_audience=angle.target_audience,
-                headline=clean_text(angle.headline),
-                primary_text=clean_text(angle.primary_text),
+                headline=angle.headline,
+                primary_text=angle.primary_text,
                 image_prompt=angle.scene_prompt,
                 motion_and_audio_prompt=angle.motion_and_audio_prompt,
                 angle_rationale=angle.angle_rationale,

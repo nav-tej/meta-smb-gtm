@@ -410,6 +410,6 @@
   }
   readyPromise.then(checkoutReturn).catch(() => {});
   window.museAccount = Object.freeze({
-    ready: () => readyPromise, refresh, open, liveReady, getSnapshot: () => copy(snapshot), saveWorkspace, loadWorkspace, signout
+    ready: () => readyPromise, refresh, open, liveReady, getSnapshot: () => copy(snapshot), current: () => copy(snapshot.user), saveWorkspace, loadWorkspace, signout
   });
 })();

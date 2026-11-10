@@ -376,7 +376,7 @@ def test_confirm_directive_endpoint_and_workspace_persistence(
     data1 = resp1.json()
     assert data1["status"] == "confirmed"
     assert data1["directive"]["focus"] == "pricing"
-    assert data1["cost"] == "0 runs (re-ranks cached research)"
+    assert data1["cost"] == "0 runs (saved to workspace)"
 
     # Workspace document holds active and 1 saved directive
     doc = workspace_store["document"]

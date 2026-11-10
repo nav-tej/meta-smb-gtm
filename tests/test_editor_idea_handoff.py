@@ -154,26 +154,31 @@ def test_all_5_demo_ideas_in_creator_e2e(live_server_url: str, viewport_width: i
                 "idea-1-empowering-women",
                 "Sikh Women of Strength",
                 "/samples/naam_japo_restored_gallery_live.webp",
+                "instagram_feed",
             ),
             (
                 "idea-2-starter-prints",
                 "Timeless Sikh Heritage Art from $14",
                 "/samples/ek_onkar_collector_room_live.webp",
+                "instagram_feed",
             ),
             (
                 "idea-3-gift-ready",
                 "The Thoughtful Spiritual Gift",
                 "/samples/golden_temple_holiday_gift_live.webp",
+                "instagram_feed",
             ),
             (
                 "idea-4-home-titles",
                 "Listing Optimization: 'For Your Home'",
                 "/samples/kirat_karo_collector_room_live.webp",
+                "facebook_feed",
             ),
             (
                 "idea-5-painting-story",
                 "The Story Behind Ek Onkar",
                 "/samples/diptych_ek_onkar_kirat_karo_live.webp",
+                "instagram_feed",
             ),
         ]
 
@@ -190,7 +195,7 @@ def test_all_5_demo_ideas_in_creator_e2e(live_server_url: str, viewport_width: i
             page.route("*api.meta.ai*", abort_model)
             page.route("*llama.com*", abort_model)
 
-            for idea_id, headline_sub, image_ref in demo_ideas:
+            for idea_id, headline_sub, image_ref, expected_placement in demo_ideas:
                 # 1. Open editor with ?idea=<id>
                 page.goto(f"{{base}}/create?idea={{idea_id}}", wait_until="domcontentloaded")
                 page.locator("#headline").wait_for(state="attached", timeout=5000)
@@ -211,6 +216,26 @@ def test_all_5_demo_ideas_in_creator_e2e(live_server_url: str, viewport_width: i
                     f"Expected why_this evidence in #ideaReason, got: '{{why_this_text}}'"
                 )
 
+                # Verify exact placement parity
+                eval_snap = (
+                    "window.museCreatorSnapshot ? window.museCreatorSnapshot() : null"
+                )
+                snap = page.evaluate(eval_snap)
+                assert snap is not None
+                assert snap.get("placement") == expected_placement, (
+                    f"Expected '{{expected_placement}}', got '{{snap.get('placement')}}'"
+                )
+                if expected_placement == "facebook_feed":
+                    assert page.locator("#postFacebook").is_checked()
+                    assert not page.locator("#postInstagram").is_checked()
+                    btn_text = page.locator("#downloadFeed").inner_text()
+                    assert "1080" in btn_text and "Facebook" in btn_text
+                else:
+                    assert page.locator("#postInstagram").is_checked()
+                    assert not page.locator("#postFacebook").is_checked()
+                    btn_text = page.locator("#downloadFeed").inner_text()
+                    assert "1350" in btn_text
+
                 # Check horizontal overflow
                 overflow = page.evaluate(
                     "document.documentElement.scrollWidth > document.documentElement.clientWidth"
@@ -228,6 +253,32 @@ def test_all_5_demo_ideas_in_creator_e2e(live_server_url: str, viewport_width: i
                 f"{{base}}/create?idea=idea-1-empowering-women",
                 wait_until="domcontentloaded",
             )
+            # Verify feed (1080x1350) and story (1080x1920) canvas dimensions
+            eval_feed = (
+                "async () => {{ const c = await window.museDrawLayout(1350); "
+                "return {{ w: c.width, h: c.height }}; }}"
+            )
+            dims_feed = page.evaluate(eval_feed)
+            assert dims_feed["w"] == 1080 and dims_feed["h"] == 1350, f"Got {{dims_feed}}"
+            eval_story = (
+                "async () => {{ const c = await window.museDrawLayout(1920); "
+                "return {{ w: c.width, h: c.height }}; }}"
+            )
+            dims_story = page.evaluate(eval_story)
+            assert dims_story["w"] == 1080 and dims_story["h"] == 1920, f"Got {{dims_story}}"
+
+            # Verify facebook_feed idea uses square 1080x1080 canvas
+            page.goto(
+                f"{{base}}/create?idea=idea-4-home-titles",
+                wait_until="domcontentloaded",
+            )
+            eval_fb = (
+                "async () => {{ const c = await window.museDrawLayout(1080); "
+                "return {{ w: c.width, h: c.height }}; }}"
+            )
+            dims_fb = page.evaluate(eval_fb)
+            assert dims_fb["w"] == 1080 and dims_fb["h"] == 1080, f"Got {{dims_fb}}"
+
             page.evaluate("document.getElementById('reviewed').checked = true")
             page.evaluate("document.getElementById('downloadPack').click()")
 
@@ -241,8 +292,8 @@ def test_all_5_demo_ideas_in_creator_e2e(live_server_url: str, viewport_width: i
             # Check localStorage muse.actions
             actions_raw = page.evaluate("localStorage.getItem('muse.actions')")
             actions = json.loads(actions_raw or "{{}}")
-            assert "idea-1-empowering-women" in actions
-            assert actions["idea-1-empowering-women"]["status"] == "done"
+            assert "idea-4-home-titles" in actions
+            assert actions["idea-4-home-titles"]["status"] == "done"
 
             # 4. Assert zero model calls
             assert not model_called, "Model API was unexpectedly called during demo mode"

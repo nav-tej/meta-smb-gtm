@@ -125,7 +125,7 @@
 
         <label>
           Move / Idea
-          <input type="text" name="title" id="pgFormTitle" required placeholder="e.g. Mai Bhago Empowering Women post" maxlength="120">
+          <input type="text" name="title" id="pgFormTitle" required placeholder="e.g. Featured collection post or shop update" maxlength="120">
         </label>
 
         <div class="pg-form-row">
@@ -135,7 +135,7 @@
               <option value="instagram_feed">Instagram Feed</option>
               <option value="instagram_story">Instagram Story</option>
               <option value="facebook_feed">Facebook Feed</option>
-              <option value="shop_direct">Shop / Pixels</option>
+              <option value="shop_direct">Online Shop / Direct</option>
             </select>
           </label>
           <label>
@@ -197,6 +197,8 @@
         } catch (_) {}
       }
 
+      let serverSummary = null;
+
       async function syncAccount() {
         try {
           if (window.museAccount && typeof window.museAccount.getSnapshot === 'function') {
@@ -217,6 +219,7 @@
             });
             if (res.ok) {
               const data = await res.json();
+              if (data.summary) serverSummary = data.summary;
               if (Array.isArray(data.outcomes) && data.outcomes.length > 0) {
                 saveOutcomes(data.outcomes);
               }
@@ -265,11 +268,14 @@
           emptyEl.hidden = true;
           listEl.hidden = false;
           listEl.textContent = '';
-          const net = totalRev - 12;
+          const planCost = (serverSummary && typeof serverSummary.plan_cost_usd === 'number') ? serverSummary.plan_cost_usd : 12;
+          const net = (serverSummary && typeof serverSummary.net_roi_usd === 'number') ? serverSummary.net_roi_usd : (totalRev - planCost);
           netEl.textContent = `${net >= 0 ? '+' : ''}$${net.toFixed(0)}`;
           netEl.style.color = net >= 0 ? '#2f6f4f' : '#8a5a12';
           const netSub = $('pgNetReturnSub');
-          if (netSub) netSub.textContent = 'Revenue minus plan cost';
+          if (netSub) {
+            netSub.textContent = planCost > 0 ? `Revenue minus $${planCost.toFixed(0)} plan cost` : 'Revenue (free account · $0 plan)';
+          }
 
           const hoursLogged = (totalMinutes / 60).toFixed(1);
           hoursEl.textContent = `${hoursLogged}h`;

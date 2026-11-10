@@ -15,7 +15,7 @@ Muse Growth Studio helps solo artists, craftspeople, and handmade shop owners un
 - **Account Isolation & Storage:** Account workspaces and profiles are partitioned per user account when signed in. Drafts and logged outcomes on unauthenticated sessions remain stored locally on the seller's device.
 - **Steerable Research & Prompt Safety:** Seller queries are strictly parsed into structured typed directives (`ResearchDirective`) with a 300-character cap. Raw inputs and crawled page text are never concatenated into executable model instructions. Directive parsing is syntax-only, and any candidate URL is validated with SSRF guards at fetch time.
 - **Seller Voice & Humanizer:** Generated copy is checked against seller voice preferences and passed through a deterministic humanizer lint-and-suggest system that flags stock AI clichés while protecting product names, artwork titles, and formatting.
-- **Quota Transparency:** Onboarding costs 1 run for signed-in accounts upon successful workspace build (or 0 runs if the account has no runs or in demo mode). Weekly digest reading is free (0 runs). Re-ranking cached research costs 0 runs.
+- **Quota Transparency:** Onboarding is free (0 runs). Weekly market digest reading is free (0 runs). Research directives save to workspace at 0 runs.
 
 ## Important URLs & Routes
 - Homepage & Loop: https://meta-smb-gtm.vercel.app/

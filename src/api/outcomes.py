@@ -44,15 +44,17 @@ async def _get_account_plan_cost(account: AccountSession | None) -> float:
     if not account:
         return 0.0
     try:
-        from src.services.billing import snapshot
+        from src.services.accounts import snapshot
 
         snap = await snapshot(account)
         plan = (snap.get("usage") or {}).get("plan")
-        if plan == "starter":
+        if plan == "unlimited":
+            return 29.0
+        if plan in ("starter", "trial"):
             return 12.0
     except Exception:
         pass
-    return 0.0
+    return 12.0
 
 
 @router.get("", response_model=OutcomesListResponse)

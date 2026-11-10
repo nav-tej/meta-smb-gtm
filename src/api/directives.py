@@ -30,7 +30,7 @@ class ParseRequest(BaseModel):
 class DirectiveResponse(BaseModel):
     directive: ResearchDirective
     summary: str
-    cost: str = "0 runs (re-ranks cached research)"
+    cost: str = "0 runs (saved to workspace)"
 
 
 class SuggestionItem(BaseModel):
@@ -69,7 +69,7 @@ async def parse_directive_endpoint(body: ParseRequest) -> DirectiveResponse:
     if not directive:
         raise HTTPException(status_code=400, detail=summary)
 
-    cost = "1 run" if directive.competitors_add else "0 runs (re-ranks cached research)"
+    cost = "0 runs (saved to workspace)"
     return DirectiveResponse(directive=directive, summary=summary, cost=cost)
 
 
@@ -126,7 +126,7 @@ async def confirm_directive_endpoint(
         expected_owner=account.user_id,
     )
 
-    cost = "1 run" if body.directive.competitors_add else "0 runs (re-ranks cached research)"
+    cost = "0 runs (saved to workspace)"
     summary = (
         f"Focus: {body.directive.focus.capitalize()} · "
         f"Window: last {body.directive.timeframe_days} days"
