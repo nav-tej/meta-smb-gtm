@@ -329,7 +329,7 @@
         if (discTitle) discTitle.textContent = `Building your workspace uses 1 of your ${runsRemaining} ${runsRemaining === 1 ? 'run' : 'runs'}.`;
         if (discDetail) {
           discDetail.textContent =
-            `This uses 1 of your ${runsRemaining} runs. Muse will read your shop and the competitors you picked to build your personalized growth workspace.`;
+            `This uses 1 of your ${runsRemaining} runs. Muse will read your shop and the competitors you picked to build your growth workspace.`;
         }
         if (finishBtn) finishBtn.textContent = `Build my workspace · 🪙 1 run (${runsRemaining} left)`;
         if (skipBtn) skipBtn.textContent = 'Skip & build workspace · 🪙 1 run';

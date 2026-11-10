@@ -53,11 +53,11 @@
       const runsNotice = $('digestRunsNotice');
       if (runsNotice) {
         if (remaining <= 0) {
-          runsNotice.innerHTML = '0 runs remaining this month. <a href="/#pricing">Get more runs</a>. (Digest paused until runs return)';
+          runsNotice.innerHTML = '0 runs remaining this month. <a href="/#pricing">Get more runs</a>. (Free weekly digest email)';
         } else if (remaining === 1) {
-          runsNotice.innerHTML = '1 run remaining this month. <a href="/#pricing">Get more runs</a>. (Digest pauses automatically at 0 runs)';
+          runsNotice.innerHTML = '1 run remaining this month. <a href="/#pricing">Get more runs</a>. (Free weekly digest email)';
         } else {
-          runsNotice.textContent = `${remaining} runs remaining this month. (Digest pauses automatically at 0 runs)`;
+          runsNotice.textContent = `${remaining} runs remaining this month. (Free weekly digest email)`;
         }
       }
 

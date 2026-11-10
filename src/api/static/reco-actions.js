@@ -1016,7 +1016,7 @@
           } catch (_) {}
           if (steerStatus) {
             steerStatus.hidden = false;
-            steerStatus.textContent = '✓ Research directive confirmed and applied to recommendations from cache.';
+            steerStatus.textContent = '✓ Research directive confirmed and saved on this device (0 runs used).';
           }
           if (directivePreview) directivePreview.hidden = true;
           track('directive_confirmed', { cost: 'free' });
