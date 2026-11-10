@@ -187,3 +187,29 @@ Digest is built but OFF in production (subscription endpoint returns available:f
 Added Track I (steerable research with injection guardrails and usage suggestions), Track J (seller voice profile plus humanizer pass), Track K (weekly active sellers, monthly impact, 30-day trial plan) to [ANTIGRAVITY_HERMES_PRD_RESEARCH.md](ANTIGRAVITY_HERMES_PRD_RESEARCH.md). Resend: nplusalpha.com now verified; `scripts/enable_digest.sh` sender set to digest@nplusalpha.com. Spec only, no code.
 
 - Nav decision, Nov 10: trial is 14 days, aimed at setup and first usage with recommendations. 30-day lift report moves to day 30 of paid accounts. Track K updated.
+
+### Gemini Session 1 Takeover Completion & Handback, November 10 ~01:05 PT
+- **Previous Owner:** Antigravity Session 1 (interrupted by usage limit).
+- **Branch:** `prd-research-previews`
+- **Delivered & Committed:**
+  1. `fe2c827` (Track A): PRD (`docs/product/PRD.md`) covering all 8 sections + Tracks B–H, with every claim/number labeled `[live]`, `[sample]`, or `[estimate]`, Appendix 1 truth table verified in Chromium, and 4 homepage copy accuracy fixes in `src/api/static/index.html`.
+  2. `cce4f62` (Track H): `/welcome` 4-step skippable & resumable signed-in onboarding flow (`welcome.html`, `welcome.js`, `welcome.css`), honest signed-in workspace on `/`, post-auth routing, 1-run charged on completion explainer (what Muse read, what it found, what a run is, runs left, what is cached), 0-run fallback, and `tests/test_welcome_onboarding.py` passing at 375px and 1440px with zero model calls.
+  3. `ec8f235` (Track B): Insight-to-ad previews with 1:1 demo creative specs (`data/demo/previews.json`), `PreviewSpec`, `PreviewEvidence`, and `CompetitorAdCard` in `src/models/creative.py`, `GET /api/v1/previews` in `src/api/creative.py`, interactive modal dialog with placement switcher (`4:5`, `9:16`, `1.91:1`), competitor compare view, copy-ready checklist for non-post moves, HTML5 canvas PNG export, and instructions download (`reco-actions.js`, `reco-actions.css`), and `tests/test_insight_previews.py` passing at 375px and 1440px with zero model calls.
+  4. `65aee6c` (Track G, SEO & Product Events):
+     - SEO head block on `index.html` (title, meta description, canonical, robots `index, follow`, OpenGraph, Twitter card, JSON-LD Schema).
+     - Generated 1200x630 `src/api/static/og-cover.png`.
+     - Unique meta tags on `/today`, `/create`, `/digest`, and `noindex` on `/welcome`.
+     - Product analytics events (`idea_accepted`, `idea_dismissed`, `idea_archived`, `idea_adjusted`, `idea_done`, `post_started`, `post_downloaded`, `live_run_started`, `live_run_completed`, `digest_prompt_shown`, `digest_subscribed`).
+     - Track G front end: inline digest habit prompt `#jrDigestPrompt` under `#loop-improve` on `/` and within `#jrPreviewModal`; `/digest` frequency selector (`weekly`, `biweekly`), topic checkboxes (`prices`, `listings`, `ideas`), account gate notice `#digestAccountGate` (per Revision 4), removed free-text email input, and `#digestAccountInfo` showing email and runs left (pauses automatically at 0 runs).
+     - Hardened onboarding state persistence timing in `welcome.js`.
+     - Added `tests/test_seo_and_digest_ui.py` passing at 375px and 1440px with zero model calls.
+- **Verification:**
+  - `make check` is 100% green: `ruff check .` clean, `ruff format --check .` clean (193 files), `pytest` 435 passed, 2 skipped in 14.64s.
+- **Shipped vs. Fixture-Only vs. Unverified:**
+  - *Shipped (front end):* `/welcome` onboarding, 1:1 insight preview modals/export, SEO head blocks, `og-cover.png`, product analytics events, `/digest` frequency/topic controls and account gating, home page inline digest prompt.
+  - *Fixture-only:* `data/demo/previews.json` (5 demo 1:1 creative preview specs); Playwright tests use fixture APIs with zero paid model calls.
+  - *Unverified:* Live Resend email sending (digest is disabled in production pending environment settings via `scripts/enable_digest.sh`).
+- **Ownership Release:**
+  - Gemini releases ownership of Antigravity Session 1 scope.
+  - No deploy, no push to origin, `DEMO_MODE=true` preserved. Ready for coordinator review and branch integration.
+
