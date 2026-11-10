@@ -1,6 +1,10 @@
 # Launch assignments
 
-Updated November 7, 2026. Target November 8, America/Los_Angeles.
+Updated November 10, 2026. Target November 8, America/Los_Angeles.
+
+### November 10 — Hermes H4 Dead Control Audit + Google OAuth
+- **H4 dead control audit:** Completed. Report at `docs/launch/hermes-research-report.md`. Key findings: 12 controls broken or not in DOM, 9 partially working (sign-in gate), 4 broken (trage buttons show PLANS dialog), 12 working. Phone width 375px: no horizontal overflow.
+- **Google OAuth:** Credentials configured, pushed to Vercel (prod + preview), deployed. API returns correct OAuth URL. Browser navigates to Google sign-in page. User needs to sign in on Google OAuth page to complete flow.
 Canonical plan is [PLAN.md](PLAN.md).
 
 | Work | Agent | State | Evidence / output |
@@ -134,7 +138,8 @@ Completed all 5 Nav-assigned items and coordinated with Claude's server-side `me
 - **Google OAuth sign-in & account creation:** Added `POST /api/v1/account/oauth`, `GET /api/v1/account/oauth/google`, and `GET /api/v1/account/oauth/google/callback` (`src/api/accounts.py`, `src/services/accounts.py`, `src/config.py`) supporting both direct Google OAuth (`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` with HMAC-signed CSRF state and server-side Supabase session minting) and Supabase Auth's Google provider (`external.google` via `/auth/v1/authorize`), plus the `"Continue with Google"` button and callback handling in `src/api/static/account.js` and `src/api/static/account.css`.
 - **Verification:** `make check` passes **423 passed, 2 skipped**, Ruff lint/format clean, and Chromium `launch_account_audit.py` passes **8/8** (`signup-keyboard-surfaces` + 7 `account-*` cases). Deployed `5f4a082` to `https://meta-smb-gtm.vercel.app`.
 - **Hermes Google OAuth credential assignment:** Because `gcloud` CLI has no authenticated account locally and no OAuth client JSON exists on disk, created `scripts/google_oauth_setup.py` and [hermes-google-oauth-assignment.md](hermes-google-oauth-assignment.md) so Hermes can create/download the Google Cloud OAuth 2.0 Web Client in the authenticated browser and run `.venv/bin/python scripts/google_oauth_setup.py --from-json ~/Downloads/client_secret_*.json --push-vercel` + redeploy.
-- **Google OAuth LIVE in Production (November 9 ~23:20 PT, Antigravity):** Nav provided the downloaded OAuth client JSON (`~/Downloads/client_secret_*.json`); ran `scripts/google_oauth_setup.py --from-json ... --push-vercel` to configure `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in `.env` and Vercel (`production` + `preview`), redeployed production (`meta-smb-d08oo7i44` → `https://meta-smb-gtm.vercel.app`), and verified in headless Chromium that clicking **Continue with Google** redirects cleanly to Google's sign-in screen (`Sign in to continue to meta-smb-gtm.vercel.app`). Ownership released.
+|- **Google OAuth LIVE in Production (November 9 ~23:20 PT, Antigravity):** Nav provided the downloaded OAuth client JSON (`~/Downloads/client_secret_*.json`); ran `scripts/google_oauth_setup.py --from-json ... --push-vercel` to configure `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in `.env` and Vercel (`production` + `preview`), redeployed production (`meta-smb-d08oo7i44` → `https://meta-smb-gtm.vercel.app`), and verified in headless Chromium that clicking **Continue with Google** redirects cleanly to Google's sign-in screen (`Sign in to continue to meta-smb-gtm.vercel.app`). Ownership released.
+|- **Google OAuth verified — Hermes, November 10:** Redeployed (`09769c6` → `F5LskrupXxWBJPMWpvUBw3XYe7HU` / `https://meta-smb-gtm.vercel.app`). `POST /api/v1/account/oauth` returns `https://accounts.google.com/o/oauth2/v2/auth?client_id=638631560446-4fbm2teili39eogaef2o6eglk01e1s0b.apps.googleusercontent.com&...&prompt=select_account`. Browser navigated to Google's "Choose an account to continue to Growth Studio" page. Client ID: `638631560446-4fbm2teili39eogaef2o6eglk01e1s0b`. Project: `muse-growth-514307`. Both redirect URIs configured (app callback + Supabase callback `iwatwkiogizfmetiwlqf.supabase.co/auth/v1/callback`).
 
 ### Creative editor follow-up — Codex, November 9
 Nav requested an actionable Antigravity assignment for adjusting outputs and creative previews in demo mode. Read-only source review at 09769c6 found saved-scene asymmetry (/today vs /create), silently swallowed creator preview errors, possible headline truncation, no story-size preview and no editing Undo/Redo. Prepared [ANTIGRAVITY_CREATIVE_EDITOR.md](ANTIGRAVITY_CREATIVE_EDITOR.md): A preview correctness/demo scenes, B reversible design controls, C optional variations. Existing persistence/accessibility work is preserved. Proposed editor-only ownership; dispatch pending Antigravity acknowledgment via Nav. No runtime edits or new test/deployment claims in this planning pass.
@@ -145,5 +150,39 @@ Nav asked for work Antigravity and Hermes can carry while Claude is low on usage
 ### Revision 2 and first-page idea actions — Claude (Cowork), November 9 late
 Added Tracks D (seller preferences), E (caching), F (progress and ROI), G (digest habit) and a two-session Antigravity split to [ANTIGRAVITY_HERMES_PRD_RESEARCH.md](ANTIGRAVITY_HERMES_PRD_RESEARCH.md). Runtime edit on main, uncommitted: new `src/api/static/reco-actions.js` and `reco-actions.css`, two tags in `index.html`. Gives each home page idea Done / Later / Not for me, a sample preview thumbnail and a progress strip, device-local. Verified with `node --check` only. `make check` and browser run NOT done. Not deployed. Next owner must verify or revert.
 
+### Antigravity Session 1 (front end, branch `prd-research-previews`) — Antigravity claims, November 9 ~23:22 PT
+Scope: (1) Verify and commit Claude's `reco-actions.js` / `reco-actions.css` / `index.html` change via `make check`, (2) Track A: `docs/product/PRD.md` + homepage copy accuracy fixes in `src/api/static/index.html`, (3) Track B (including Revision 2 additions and preview correctness from `ANTIGRAVITY_CREATIVE_EDITOR.md`), (4) Track G (inline digest signup at value moments + `/digest` frequency/topic controls). Checkpoints in `docs/product/PRD_PROGRESS.md`. Rules: `DEMO_MODE=true`, no paid model calls, no deploy, no push, no migrations applied, no secret changes.
+
+### Antigravity Session 2 (models and backend, worktree `/tmp/muse-prefs-cache-progress` on branch `prefs-cache-progress`) — Antigravity subagent claims, November 9 ~23:22 PT
+Scope: (1) Track D (`SellerPreferences` in `src/models/seller.py`, deterministic idea ranking/filtering, dismiss reasons, refine chips, onboarding/research panel JS/CSS), (2) Track E (`supabase/migrations/research_cache.sql` file only + `src/services/research_cache.py`), (3) Track F (`Outcome` model, `/progress` page & route, 30s "Log result", CSV import, workspace sync for `muse.actions`, "Your week" digest block), (4) Track C (`BuyerInsight` in `src/models/intel.py`, `data/research/buyer_voice.json` sample fallback, `supabase/migrations/buyer_polls.sql` file only). Checkpoints in `docs/product/BACKEND_PROGRESS.md`. Does not edit `src/api/static/index.html`.
+
 ### Correction and verification — Claude (Cowork), November 9 late
 reco-actions was reduced after finding muse-shell.js already has triage, Adjust and My actions. It now only adds sample preview thumbnails and a read-only moves-done strip. Script tag moved to the head because the first placement broke `tests/portal_demo_smoke.cjs`. Cloud copy: 420 passed, 2 skipped, ruff clean, Chromium 375/1440 pass. `make check` on the Mac still pending. Paste-ready prompts: `.tasks/antigravity-1-assignment.txt`, `.tasks/antigravity-2-assignment.txt`, `.tasks/hermes-queue.md`. `.tasks/claude-snap.tgz` is an empty leftover, safe to delete.
+
+### PostHog dashboard and SEO handoff — Claude (Cowork), November 9 late
+Confirmed production sends to PostHog project nav-dev (325503). Created dashboard "Muse Growth Studio: visit to paid" (id 2329441) with 4 tiles filtered to the production host: visit-to-signup funnel, daily visitors and sign-ups, key actions, top pages. Wrote [SEO_AND_EVENTS_HANDOFF.md](SEO_AND_EVENTS_HANDOFF.md): head block, per-page tags, robots.txt and sitemap routes, product event list. Nothing applied to code. Session 1 owns the index.html and event parts, session 2 the two routes.
+
+### Track H signed-in onboarding — Claude (Cowork), November 9 late
+Nav requirement: signed-in state must differ from demo. Added Revision 3 / Track H to [ANTIGRAVITY_HERMES_PRD_RESEARCH.md](ANTIGRAVITY_HERMES_PRD_RESEARCH.md): 4-step /welcome flow (shop URL, suggested socials, competitor discovery, preferences), routing after auth, workspace onboarding state, honest empty states. Priority now A, H, B, D, F. Spec only, no code. Session 2 owns backend parts, session 1 the /welcome page.
+
+- Nav decision, Nov 9: onboarding costs exactly one run, charged on successful completion, and the completion screen explains the setup from that run. Track H updated.
+
+- Takeover prompt for any agent (Codex, Muse CLI, others) picking up an Antigravity session: `.tasks/takeover-prompt.txt`.
+
+### Digest email state and rules — Claude (Cowork), November 10
+Digest is built but OFF in production (subscription endpoint returns available:false, zero emails in Resend). Claude could not set Vercel production settings: connector returned 403 for listing and creating environment variables. Added `scripts/enable_digest.sh` for Nav to run locally. Nav decisions recorded as Revision 4 in [ANTIGRAVITY_HERMES_PRD_RESEARCH.md](ANTIGRAVITY_HERMES_PRD_RESEARCH.md): account required to subscribe, show runs left, pause digest at zero runs with one notice. Temporary sender digest@nplus1ventures.com; switch to nplusalpha.com after domain verification. No production change made.
+
+- Antigravity out of usage, Nov 10. Gemini takeover prompt for session 1: `.tasks/gemini-takeover.txt`. Session 2 worktree exists at /private/tmp/muse-prefs-cache-progress with no commits yet.
+
+### Gemini claims session 1 takeover, November 9 ~23:52 PT
+- Previous owner: Antigravity Session 1 (interrupted by usage limit).
+- File scope: Track H front end (`src/api/static/welcome.html`, `src/api/static/welcome.js`, `src/api/static/welcome.css`, `src/api/main.py`, `src/api/static/index.html`, `tests/test_welcome_onboarding.py`), Track B insight-to-ad previews (`src/models/creative.py`, `data/demo/previews.json`, `src/api/static/reco-actions.js`, `src/api/static/reco-actions.css`, `tests/test_insight_previews.py`), SEO head block & product events (`src/api/static/index.html`, `src/api/static/analytics.js`, `src/api/static/muse-shell.js`, other static HTML pages), and Track G front end (`src/api/static/digest.html`, `src/api/static/digest.js`, `src/api/static/index.html`).
+- Progress:
+  - Track H front end completed: 4-step onboarding with 1-run charged on completion and explainer breakdown (what Muse read, what it found, what a run is, runs left, what is cached), 0-run fallback, and honest signed-in workspace on `/`.
+  - Verified `make check` (`ruff check .`, `ruff format --check .`, `pytest`): 426 passed, 2 skipped. `tests/test_welcome_onboarding.py` passes cleanly at 375px and 1440px alongside `tests/test_portal_demo.py` and `tests/test_ui_polish.py`.
+- Next step: Commit Track H, then proceed to Track B (insight-to-ad previews).
+
+### Revision 5 — Claude (Cowork), November 10
+Added Track I (steerable research with injection guardrails and usage suggestions), Track J (seller voice profile plus humanizer pass), Track K (weekly active sellers, monthly impact, 30-day trial plan) to [ANTIGRAVITY_HERMES_PRD_RESEARCH.md](ANTIGRAVITY_HERMES_PRD_RESEARCH.md). Resend: nplusalpha.com now verified; `scripts/enable_digest.sh` sender set to digest@nplusalpha.com. Spec only, no code.
+
+- Nav decision, Nov 10: trial is 14 days, aimed at setup and first usage with recommendations. 30-day lift report moves to day 30 of paid accounts. Track K updated.

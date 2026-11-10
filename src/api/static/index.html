@@ -972,6 +972,7 @@
   <script src="/static/reco-actions.js?v=20261109-reco1" defer></script>
   <script src="/static/account.js?v=20261109-oauth" defer></script>
   <script src="/static/muse-shell.js?v=20261109-hd1" defer></script>
+  <script src="/static/welcome.js?v=20261109a" defer></script>
 </head>
 <body>
   <!-- Top Bar -->
@@ -2431,6 +2432,9 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
       renderDiagnosticsAndAds(ws);
       renderArtworksShowcase(ws);
       renderBidAdvisor(ws.bid_advice_live);
+      if (typeof window !== 'undefined' && typeof window.__museApplySignedInWorkspace === 'function') {
+        window.__museApplySignedInWorkspace();
+      }
     }
 
     // Live API Button: Step 1 Analyze Competitor
@@ -2792,6 +2796,9 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
       renderDiagnosticsAndAds(ws);
       renderArtworksShowcase(ws);
       renderBidAdvisor(ws.bid_advice_live);
+      if (typeof window !== 'undefined' && typeof window.__museApplySignedInWorkspace === 'function') {
+        window.__museApplySignedInWorkspace();
+      }
     }
 
     // Workspace Switcher inside Login Dialog

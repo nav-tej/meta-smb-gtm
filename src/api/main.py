@@ -107,6 +107,12 @@ async def weekly_digest_page() -> FileResponse:
     return FileResponse(STATIC_DIR / "digest.html", headers=PAGE_HEADERS)
 
 
+@app.get("/welcome", include_in_schema=False)
+async def welcome_onboarding_page() -> FileResponse:
+    """Serve the 4-step signed-in shop onboarding flow."""
+    return FileResponse(STATIC_DIR / "welcome.html", headers=PAGE_HEADERS)
+
+
 @app.get("/", include_in_schema=False)
 @app.get("/portal", include_in_schema=False)
 async def customer_portal() -> FileResponse:
