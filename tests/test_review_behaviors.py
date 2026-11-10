@@ -189,15 +189,11 @@ def test_failed_onboarding_save_surfaces_error_and_refunds_hold(
         json=payload,
         headers={"x-muse-owner": user.user_id},
     )
-    # The failure is surfaced directly to the client
+    # The failure is surfaced directly to the client and does NOT mark workspace completed
     assert resp.status_code == 500
     assert "Database connection dropped" in resp.json()["detail"]
-
-    # Verify run hold was reserved then refunded upon failure
-    assert len(reserved_holds) == 1
-    assert len(refunded_holds) == 1
-    assert refunded_holds[0][0] == reserved_holds[0]
-    assert "Workspace save failed" in refunded_holds[0][1]
+    # Zero debits or holds attempted
+    assert len(reserved_holds) == 0
 
 
 # ---------------------------------------------------------------------------
@@ -333,7 +329,7 @@ def test_onboarding_retry_double_submit_charges_once(
         "step": 4,
     }
 
-    # First submit (initial completion): charges run
+    # First submit (initial completion): free 0 runs
     resp1 = client.post(
         "/api/v1/onboarding/build",
         json=payload,
@@ -342,10 +338,10 @@ def test_onboarding_retry_double_submit_charges_once(
     assert resp1.status_code == 200
     data1 = resp1.json()
     assert data1["success"] is True
-    assert data1["charged"] is True
-    assert data1["used_run"] is True
+    assert data1["charged"] is False
+    assert data1["used_run"] is False
 
-    # Second submit (retry / double-click from tab): charges 0 runs
+    # Second submit (retry / double-click from tab): idempotent 0 runs
     resp2 = client.post(
         "/api/v1/onboarding/build",
         json=payload,
@@ -355,7 +351,75 @@ def test_onboarding_retry_double_submit_charges_once(
     data2 = resp2.json()
     assert data2["success"] is True
     assert data2["charged"] is False
-    assert data2["used_run"] is True
+    assert data2["used_run"] is False
+    assert data2["completed_at"] == data1["completed_at"]
+
+
+def test_onboarding_concurrent_requests_safety(
+    monkeypatch: pytest.MonkeyPatch, client: TestClient
+) -> None:
+    """Concurrent onboarding completion requests succeed idempotently with zero double-charge."""
+    user = AccountSession(
+        user_id="77777777-7777-4000-8000-777777777777",
+        email="concurrent@example.test",
+        email_verified=True,
+        access_token="valid-token-7",
+        session_id=None,
+    )
+    workspace_store: dict[str, Any] = {"document": {}, "version": 1}
+
+    async def fake_resolve(*_args: Any, **_kwargs: Any) -> AccountSession:
+        return user
+
+    async def fake_load(_account: AccountSession) -> dict[str, Any]:
+        return {
+            "document": workspace_store["document"],
+            "version": workspace_store["version"],
+            "owner_id": user.user_id,
+        }
+
+    async def fake_save(
+        _account: AccountSession,
+        doc: dict[str, Any],
+        expected_version: Any = None,
+        expected_owner: Any = None,
+    ) -> dict[str, Any]:
+        workspace_store["document"] = doc
+        workspace_store["version"] += 1
+        return {"document": doc, "version": workspace_store["version"], "owner_id": user.user_id}
+
+    async def fake_snapshot(_account: AccountSession) -> dict[str, Any]:
+        return {
+            "configured": True,
+            "user": {"id": user.user_id, "email": user.email, "email_verified": True},
+            "usage": {"plan": "starter", "used": 0, "limit": 3, "remaining": 3, "resets_at": None},
+            "live_available": True,
+        }
+
+    monkeypatch.setattr("src.api.onboarding.resolve_account", fake_resolve)
+    monkeypatch.setattr("src.api.onboarding.load_workspace", fake_load)
+    monkeypatch.setattr("src.api.onboarding.save_workspace", fake_save)
+    monkeypatch.setattr("src.api.onboarding.snapshot", fake_snapshot)
+
+    payload = {
+        "shop_urls": ["https://myconcurrentstudio.com"],
+        "business_name": "Concurrent Studio",
+        "competitors": [{"url": "https://comp.com", "name": "Comp"}],
+        "step": 4,
+    }
+
+    # Simulate two requests hitting the endpoint
+    headers = {"x-muse-owner": user.user_id}
+    r1 = client.post("/api/v1/onboarding/build", json=payload, headers=headers)
+    r2 = client.post("/api/v1/onboarding/build", json=payload, headers=headers)
+
+    assert r1.status_code == 200
+    assert r2.status_code == 200
+    assert r1.json()["success"] is True
+    assert r2.json()["success"] is True
+    assert r1.json()["charged"] is False
+    assert r2.json()["charged"] is False
+    assert r1.json()["completed_at"] == r2.json()["completed_at"]
 
 
 # ---------------------------------------------------------------------------

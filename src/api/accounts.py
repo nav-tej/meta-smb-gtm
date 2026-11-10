@@ -283,4 +283,20 @@ async def update_workspace(
         require_binding=True,
     )
     response.headers["Cache-Control"] = "no-store"
-    return await save_workspace(account, body.document, body.expected_version, body.expected_owner)
+    # Authoritative server-owned onboarding record preservation:
+    # A client PUT cannot wipe or forge an existing completed onboarding state.
+    existing = await load_workspace(account)
+    existing_doc = existing.get("document") or {}
+    next_doc = dict(body.document)
+    if (
+        "onboarding" in existing_doc
+        and isinstance(existing_doc["onboarding"], dict)
+        and existing_doc["onboarding"].get("completed_at")
+    ):
+        if "onboarding" not in next_doc or not isinstance(next_doc.get("onboarding"), dict):
+            next_doc["onboarding"] = existing_doc["onboarding"]
+        else:
+            next_doc["onboarding"]["completed_at"] = existing_doc["onboarding"]["completed_at"]
+            next_doc["onboarding"]["completed"] = True
+            next_doc["onboarding"]["used_run"] = existing_doc["onboarding"].get("used_run", False)
+    return await save_workspace(account, next_doc, body.expected_version, body.expected_owner)

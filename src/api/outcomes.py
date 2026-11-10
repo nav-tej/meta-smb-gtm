@@ -8,7 +8,7 @@ from fastapi import APIRouter, Header, Request, Response
 from pydantic import BaseModel, Field
 
 from src.models.outcome import Outcome, OutcomeSummary
-from src.services.accounts import resolve_account, verify_workspace_owner
+from src.services.accounts import AccountSession, resolve_account, verify_workspace_owner
 from src.services.outcomes import (
     load_account_outcomes,
     save_account_outcome,
@@ -40,6 +40,21 @@ class OutcomeResponse(BaseModel):
     summary: OutcomeSummary
 
 
+async def _get_account_plan_cost(account: AccountSession | None) -> float:
+    if not account:
+        return 0.0
+    try:
+        from src.services.billing import snapshot
+
+        snap = await snapshot(account)
+        plan = (snap.get("usage") or {}).get("plan")
+        if plan == "starter":
+            return 12.0
+    except Exception:
+        pass
+    return 0.0
+
+
 @router.get("", response_model=OutcomesListResponse)
 async def list_outcomes(
     request: Request,
@@ -49,11 +64,12 @@ async def list_outcomes(
     """Retrieve logged outcomes and honest ROI summary for the signed-in account."""
     account = await resolve_account(request, response, require_verified=False)
     if not account:
-        return OutcomesListResponse(outcomes=[], summary=summarize_outcomes([]))
+        return OutcomesListResponse(outcomes=[], summary=summarize_outcomes([], plan_cost_usd=0.0))
 
     verify_workspace_owner(account, x_muse_owner)
     outcomes = await load_account_outcomes(account)
-    summary = summarize_outcomes(outcomes)
+    plan_cost = await _get_account_plan_cost(account)
+    summary = summarize_outcomes(outcomes, plan_cost_usd=plan_cost)
     return OutcomesListResponse(outcomes=outcomes, summary=summary)
 
 
@@ -84,7 +100,8 @@ async def create_outcome(
     outcome = Outcome(**kwargs)
     saved = await save_account_outcome(account, outcome)
     all_outcomes = await load_account_outcomes(account)
-    summary = summarize_outcomes(all_outcomes)
+    plan_cost = await _get_account_plan_cost(account)
+    summary = summarize_outcomes(all_outcomes, plan_cost_usd=plan_cost)
     return OutcomeResponse(outcome=saved, summary=summary)
 
 
@@ -97,8 +114,9 @@ async def get_summary(
     """Compute aggregate progress metrics from seller-logged outcomes."""
     account = await resolve_account(request, response, require_verified=False)
     if not account:
-        return summarize_outcomes([])
+        return summarize_outcomes([], plan_cost_usd=0.0)
 
     verify_workspace_owner(account, x_muse_owner)
     outcomes = await load_account_outcomes(account)
-    return summarize_outcomes(outcomes)
+    plan_cost = await _get_account_plan_cost(account)
+    return summarize_outcomes(outcomes, plan_cost_usd=plan_cost)

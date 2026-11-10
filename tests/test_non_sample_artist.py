@@ -92,6 +92,9 @@ def test_non_sample_artist_onboarding_and_zero_sample_terms(
     monkeypatch.setattr("src.api.accounts.load_workspace", fake_load)
 
     monkeypatch.setattr("src.api.outcomes.resolve_account", fake_resolve)
+    monkeypatch.setattr("src.services.outcomes.load_workspace", fake_load)
+    monkeypatch.setattr("src.services.outcomes.save_workspace", fake_save)
+    monkeypatch.setattr("src.services.accounts.snapshot", fake_snapshot)
 
     # 2. Complete onboarding with real watercolor artist shop data
     build_payload = {

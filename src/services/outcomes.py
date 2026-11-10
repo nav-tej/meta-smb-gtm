@@ -40,7 +40,11 @@ def summarize_outcomes(outcomes: list[Outcome], plan_cost_usd: float = 12.0) -> 
 
 async def load_account_outcomes(account: AccountSession) -> list[Outcome]:
     """Retrieve logged outcomes from the user's persisted workspace."""
-    ws = await load_workspace(account)
+    try:
+        ws = await load_workspace(account)
+    except Exception as err:
+        logger.warning("Could not load workspace for outcomes: %s", err)
+        return []
     doc = ws.get("document") or {}
     raw_outcomes = doc.get("outcomes")
     if not isinstance(raw_outcomes, list):

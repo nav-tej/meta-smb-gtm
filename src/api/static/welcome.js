@@ -317,23 +317,13 @@
       const finishBtn = document.getElementById('wkStep4FinishBtn');
       const skipBtn = document.getElementById('wkStep4SkipBtn');
 
-      if (runsRemaining <= 0) {
-        if (discTitle) discTitle.textContent = 'You have 0 runs left.';
-        if (discDetail) {
-          discDetail.textContent =
-            'You can finish setting up your workspace with your crawled shop data and hand-typed competitors for free (0 runs).';
-        }
-        if (finishBtn) finishBtn.textContent = 'Build workspace with crawl data (0 runs)';
-        if (skipBtn) skipBtn.textContent = 'Skip & build with crawl data (0 runs)';
-      } else {
-        if (discTitle) discTitle.textContent = `Building your workspace uses 1 of your ${runsRemaining} ${runsRemaining === 1 ? 'run' : 'runs'}.`;
-        if (discDetail) {
-          discDetail.textContent =
-            `This uses 1 of your ${runsRemaining} runs. Muse will read your shop and the competitors you picked to build your growth workspace.`;
-        }
-        if (finishBtn) finishBtn.textContent = `Build my workspace · 🪙 1 run (${runsRemaining} left)`;
-        if (skipBtn) skipBtn.textContent = 'Skip & build workspace · 🪙 1 run';
+      if (discTitle) discTitle.textContent = 'Building your workspace is free (0 runs used).';
+      if (discDetail) {
+        discDetail.textContent =
+          `This uses 0 runs. All ${runsRemaining} ${runsRemaining === 1 ? 'run' : 'runs'} are kept for your ad generations and live research.`;
       }
+      if (finishBtn) finishBtn.textContent = 'Build my workspace (free · 0 runs)';
+      if (skipBtn) skipBtn.textContent = 'Skip & build workspace (0 runs) →';
     };
     updateRunsUI();
 
@@ -893,9 +883,8 @@
       }
       const doneSub = document.getElementById('wkDoneSubtitle');
       if (doneSub) {
-        doneSub.textContent = state.used_run
-          ? 'Here is what Muse built from your 1-run setup:'
-          : 'Workspace configured with your shop crawl data and hand-typed competitors (0 runs used):';
+        doneSub.textContent =
+          'Workspace configured with your shop crawl data and competitor watchlist (0 runs used):';
       }
 
       const summaryList = document.getElementById('wkSummaryList');
@@ -907,11 +896,9 @@
         const compNames = selectedCompetitors.map((c) => c.name || c.url).join(', ');
 
         const readItem = `What Muse read: ${pagesCount} pages from ${shopLabel} and ${selectedCompetitors.length} competitors (${compNames || 'none selected'})`;
-        const foundItem = state.used_run
-          ? `What it found: Detected price range ${priceLabel || '$24 to $180'} and 3 initial ranked content moves`
-          : `What it found: Saved your shop crawl (${pagesCount} pages) and ${selectedCompetitors.length} hand-typed competitors. Zero runs spent.`;
+        const foundItem = `What it found: Detected price range ${priceLabel || '$24 to $180'} and saved your shop crawl (${pagesCount} pages) and ${selectedCompetitors.length} competitors. Zero runs spent.`;
         const runDefItem = 'What a run is: A run is one full Muse AI research, competitor crawl, or ad generation cycle.';
-        const runsLeftItem = `Runs remaining: You have ${runsRemaining} ${runsRemaining === 1 ? 'run' : 'runs'} left this month.`;
+        const runsLeftItem = `Runs remaining: You have ${runsRemaining} ${runsRemaining === 1 ? 'run' : 'runs'} left this month for your ad generations and live research.`;
         const cachedItem = 'What is cached: Your shop crawl, competitor watchlist, and setup results are cached so reopening your workspace costs 0 runs.';
         const socialsItem = `Confirmed socials: ${confirmedSocials.length ? confirmedSocials.map((s) => `${s.platform} (${s.handle})`).join(', ') : 'None added yet'}`;
 

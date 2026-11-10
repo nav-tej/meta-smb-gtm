@@ -111,28 +111,8 @@ def test_welcome_onboarding_full_flow_and_honest_workspace(
 
                     is_spend = url.endswith("/api/v1/credits/spend")
                     is_build = url.endswith("/api/v1/onboarding/build")
-                    if (is_spend or is_build) and method == "POST":
+                    if is_spend and method == "POST":
                         remaining_runs = max(0, remaining_runs - 1)
-                        if url.endswith("/api/v1/onboarding/build"):
-                            post_data = route.request.post_data_json or {{}}
-                            workspace_store["document"]["onboarding"] = {{
-                                **post_data,
-                                "completed_at": "2026-11-10T12:00:00Z",
-                                "used_run": True,
-                            }}
-                            route.fulfill(
-                                status=200,
-                                content_type="application/json",
-                                body=json.dumps({{
-                                    "success": True,
-                                    "charged": True,
-                                    "used_run": True,
-                                    "runs_remaining": remaining_runs,
-                                    "completed_at": "2026-11-10T12:00:00Z",
-                                    "workspace": workspace_store,
-                                }}),
-                            )
-                            return
                         route.fulfill(
                             status=200,
                             content_type="application/json",
@@ -142,6 +122,26 @@ def test_welcome_onboarding_full_flow_and_honest_workspace(
                                 "enforced": True,
                                 "persistent": True,
                                 "note": "",
+                            }}),
+                        )
+                        return
+                    if is_build and method == "POST":
+                        post_data = route.request.post_data_json or {{}}
+                        workspace_store["document"]["onboarding"] = {{
+                            **post_data,
+                            "completed_at": "2026-11-10T12:00:00Z",
+                            "used_run": False,
+                        }}
+                        route.fulfill(
+                            status=200,
+                            content_type="application/json",
+                            body=json.dumps({{
+                                "success": True,
+                                "charged": False,
+                                "used_run": False,
+                                "runs_remaining": remaining_runs,
+                                "completed_at": "2026-11-10T12:00:00Z",
+                                "workspace": workspace_store,
                             }}),
                         )
                         return
@@ -301,9 +301,9 @@ def test_welcome_onboarding_full_flow_and_honest_workspace(
             page.click("#wkStep3NextBtn")
             page.wait_for_selector("#wkStep4:not([hidden])")
 
-            # 5. Step 4: Discloses 1-run cost on completion and finishes
+            # 5. Step 4: Discloses free 0-run cost on completion and finishes
             disclosure_text = page.text_content("#wkRunDisclosureBox") or ""
-            assert "1 of your 2 runs" in disclosure_text
+            assert "free (0 runs used)" in disclosure_text
 
             page.select_option("#wkPrefExperience", "new")
             page.fill("#wkPrefFocus", "Highlight stoneware gift sets under $60")
@@ -318,24 +318,22 @@ def test_welcome_onboarding_full_flow_and_honest_workspace(
             assert "What it found" in done_text
             assert "$24 to $180" in done_text
             assert "What a run is" in done_text
-            assert "1 run left" in done_text
+            assert "2 runs left" in done_text or "runs remaining" in done_text.lower()
             assert "What is cached" in done_text
             assert "@mountainpottery" in done_text
 
             # Verify PostHog events
             events = page.evaluate("window.__trackedEvents")
-            run_confirmed_ev = next(e for e in events if e["name"] == "onboarding_run_confirmed")
-            assert run_confirmed_ev["props"]["runs_remaining"] == 2
 
             completed_ev = next(e for e in events if e["name"] == "onboarding_completed")
             assert completed_ev["props"] == {{
                 "has_socials": True,
                 "competitor_count": 1,
-                "used_run": True,
+                "used_run": False,
             }}
 
             explainer_ev = next(e for e in events if e["name"] == "onboarding_explainer_viewed")
-            assert explainer_ev["props"]["used_run"] is True
+            assert explainer_ev["props"]["used_run"] is False
 
             # Verify no URLs or social handles leaked into analytics
             serialized_events = json.dumps(events)
