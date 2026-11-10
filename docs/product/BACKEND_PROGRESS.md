@@ -236,4 +236,16 @@
   - **Full Quality Gate:**
     - `make check` passed cleanly: `523 passed, 2 skipped in 49.91s`. Zero paid model calls, zero live deployments, zero migrations applied.
 
+- [x] **Review 2 Fixes (Step 4b & Digest Isolation Fixes):**
+  - **Directive Suggestions Fallback Fix (`src/api/directives.py`):**
+    - Corrected field lookup from `onboarding.get("shop_name")` to `onboarding.get("business_name") or onboarding.get("shop_name")`.
+    - Defaulted `pricing_text` to `"Look at why competitor entry prices start higher"` for all signed-in accounts without competitors (e.g. when Step 3 is skipped during onboarding), ensuring `"SikhiArt"` is NEVER leaked to a real signed-in account.
+    - Verified extraction of `medium` from `onboarding.preferences.medium` or `workspace.preferences.medium`.
+    - Added `test_non_sample_artist_skipping_competitors_sees_zero_sample_suggestions` in `tests/test_non_sample_artist.py`.
+  - **Home Inline Digest Competitor Isolation (`src/api/static/reco-actions.js`):**
+    - Removed hardcoded `['https://www.sikhiart.com']` from the inline digest subscribe button handler.
+    - Extracts competitors dynamically from `workspace.document.onboarding.competitors` for the signed-in user, and if none are configured, safely redirects to `/digest` to enter competitor shops.
+  - **Verification:**
+    - `make check` is 100% green: `524 passed, 2 skipped in 35.21s`, Ruff clean, 236 files formatted. Zero paid model calls, zero migrations applied.
+
 

@@ -185,8 +185,16 @@ async def list_directive_suggestions(
         doc = ws.get("document") or {}
         onboarding = doc.get("onboarding") or {}
         comps = onboarding.get("competitors") or []
-        shop_name = onboarding.get("shop_name") or ""
-        medium = onboarding.get("medium") or ""
+        shop_name = onboarding.get("business_name") or onboarding.get("shop_name") or ""
+        medium = ""
+        if isinstance(onboarding.get("preferences"), dict):
+            medium = onboarding["preferences"].get("medium") or ""
+        if not medium and isinstance(doc.get("preferences"), dict):
+            medium = doc["preferences"].get("medium") or ""
+        if not medium:
+            medium = onboarding.get("medium") or ""
+
+        pricing_text = "Look at why competitor entry prices start higher"
         if comps and isinstance(comps, list) and comps[0]:
             first_name = comps[0].get("name") or comps[0].get("url") or ""
             if first_name and "sikhiart" not in first_name.lower():

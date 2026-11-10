@@ -175,6 +175,63 @@ def test_non_sample_artist_onboarding_and_zero_sample_terms(
         )
 
 
+def test_non_sample_artist_skipping_competitors_sees_zero_sample_suggestions(
+    monkeypatch: pytest.MonkeyPatch, client: TestClient
+) -> None:
+    """An artist who skips competitors during onboarding sees zero sample terms in suggestions."""
+    user = AccountSession(
+        user_id="88888888-8888-4000-8000-888888888888",
+        email="potter@mountainpottery.test",
+        email_verified=True,
+        access_token="token-potter",
+        session_id=None,
+    )
+    workspace_store: dict[str, Any] = {
+        "document": {
+            "onboarding": {
+                "business_name": "Mountain Pottery Studio",
+                "shop_urls": ["https://mountainpottery.test"],
+                "competitors": [],
+                "completed": True,
+                "completed_at": "2026-11-10T12:00:00Z",
+                "preferences": {"medium": "Ceramics & Stoneware"},
+            }
+        },
+        "version": 1,
+    }
+
+    async def fake_resolve(*_args: Any, **_kwargs: Any) -> AccountSession:
+        return user
+
+    async def fake_load(_account: AccountSession) -> dict[str, Any]:
+        return {
+            "document": workspace_store["document"],
+            "version": workspace_store["version"],
+            "owner_id": user.user_id,
+        }
+
+    monkeypatch.setattr("src.api.directives.resolve_account", fake_resolve)
+    monkeypatch.setattr("src.api.directives.load_workspace", fake_load)
+
+    sug_resp = client.get("/api/v1/directives/suggestions")
+    assert sug_resp.status_code == 200
+    suggestions = sug_resp.json()
+    assert len(suggestions) >= 4
+
+    pricing_sug = suggestions[0]["text"]
+    assert "competitor entry prices start higher" in pricing_sug
+    assert "SikhiArt" not in pricing_sug
+
+    gifting_sug = suggestions[2]["text"]
+    assert "Ceramics & Stoneware" in gifting_sug
+
+    all_sug_text = " ".join(s["text"] for s in suggestions)
+    for term in FORBIDDEN_SAMPLE_TERMS:
+        assert term.lower() not in all_sug_text.lower(), (
+            f"Sample term '{term}' leaked into skipped-competitor suggestions: {all_sug_text}"
+        )
+
+
 @pytest.fixture(scope="module")
 def live_server_url() -> str:
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

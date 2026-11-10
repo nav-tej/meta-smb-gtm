@@ -928,7 +928,23 @@
         msg.hidden = false;
         msg.textContent = 'Subscribing…';
         try {
-          var comps = ['https://www.sikhiart.com'];
+          var comps = [];
+          try {
+            if (window.museAccount && typeof window.museAccount.loadWorkspace === 'function') {
+              var ws = await window.museAccount.loadWorkspace(currentDigestUser.id);
+              var onbComps = ws && ws.document && ws.document.onboarding && ws.document.onboarding.competitors;
+              if (Array.isArray(onbComps)) {
+                comps = onbComps.map(function (c) {
+                  if (typeof c === 'string') return c;
+                  return c && (c.url || c.link);
+                }).filter(Boolean).slice(0, 3);
+              }
+            }
+          } catch (_) {}
+          if (!comps.length) {
+            window.location.href = '/digest';
+            return;
+          }
           var resp = await fetch('/api/v1/digest/subscribe', {
             method: 'POST',
             credentials: 'same-origin',

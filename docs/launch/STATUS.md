@@ -2,6 +2,15 @@
 
 Updated November 10, 2026. Target November 8, America/Los_Angeles.
 
+### November 10 — Gemini BUILD: Review 2 Fixes Complete (Ready for Final Gate 1 Pass)
+
+- **Fixes Completed:**
+  - **Directive Suggestion Leak Resolved (`src/api/directives.py`):** Fixed `business_name` key retrieval; defaulted `pricing_text` to `"Look at why competitor entry prices start higher"` for signed-in accounts without competitors (e.g. when Step 3 is skipped during onboarding), ensuring `"SikhiArt"` is never suggested to a real artist. Added `test_non_sample_artist_skipping_competitors_sees_zero_sample_suggestions` in `tests/test_non_sample_artist.py`.
+  - **Inline Digest Competitor Isolation (`src/api/static/reco-actions.js`):** Removed hardcoded `['https://www.sikhiart.com']` from home inline digest subscription button handler. Competitors are loaded dynamically from `workspace.document.onboarding.competitors` for the signed-in user, and if none are configured, safely redirects to `/digest` to enter competitor shops.
+- **Verification:** Full `make check` passed: **524 passed, 2 skipped in 35.21s**, Ruff check clean, Ruff format clean (236 files). Zero paid model calls, zero migrations applied.
+- **Hermes Gate 2 Status:** Hermes completed Gate 2 browser acceptance with PASS across all 8 items (`docs/launch/hermes-acceptance.md`).
+- **Next:** Ready for final Gate 1 review verification and Nav Gate 3 merge approval.
+
 ### November 10 — Gemini BUILD Gate 1 Fix Round Complete (Ready for Review)
 
 - **Gate 1 Fixes Completed:**
