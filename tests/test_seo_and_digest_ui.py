@@ -268,6 +268,45 @@ def test_digest_and_home_habit_browser_ui(live_server_url: str, viewport_width: 
             modal_text = page.locator("#jrPreviewModal").inner_text()
             assert "digest" in modal_text.lower()
 
+            # -------------------------------------------------------------
+            # 4. Blocker 2: Escape digest email containing markup
+            # -------------------------------------------------------------
+            markup_email = "<b id='injectedMarkup'>maker</b>@example.com"
+            fake_user_markup = {{
+                "configured": True,
+                "user": {{
+                    "id": "usr_xss_test",
+                    "email": markup_email,
+                    "email_verified": True
+                }},
+                "usage": {{"plan": "starter", "remaining": 2, "limit": 20}},
+                "workspace": {{"onboarding": {{"completed_at": "2026-11-09T00:00:00Z"}}}},
+                "live_available": True
+            }}
+            page.route("**/api/v1/account/me", lambda r: r.fulfill(json=fake_user_markup))
+            page.goto(f"{{live_server_url}}/digest", wait_until="domcontentloaded")
+            page.wait_for_selector("#digestAccountInfo:not([hidden])")
+            assert (
+                page.locator("#injectedMarkup").count() == 0
+            ), "Markup in email must not be rendered as HTML"
+            assert markup_email in page.locator("#digestUserEmail").inner_text()
+
+            # Also check home page inline digest prompt with markup email
+            sample_home = f"{{live_server_url}}/?workspace=sample#loop-improve"
+            page.goto(sample_home, wait_until="domcontentloaded")
+            page.wait_for_selector("#jrDigestPrompt")
+            dispatch_ev = (
+                "email => window.dispatchEvent(new CustomEvent('muse:account-change', "
+                "{{ detail: {{ configured: true, user: "
+                "{{ id: 'usr_xss_test', email: email, email_verified: true }}, "
+                "usage: {{ remaining: 2 }} }} }}))"
+            )
+            page.evaluate(dispatch_ev, markup_email)
+            page.wait_for_timeout(200)
+            assert (
+                page.locator("#injectedMarkup").count() == 0
+            ), "Markup in email must not be rendered as HTML on home prompt"
+
             browser.close()
 
         assert not model_called, "Model API must not be called during digest/habit navigation"

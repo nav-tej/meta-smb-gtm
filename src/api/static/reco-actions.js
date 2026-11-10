@@ -903,7 +903,11 @@
           signedInBox.hidden = false;
           var remaining = Number.isFinite(snap && snap.usage && snap.usage.remaining) ? snap.usage.remaining : 3;
           var runsText = remaining <= 0 ? '0 runs left (paused)' : remaining + ' runs remaining';
-          userNote.innerHTML = 'Signed in as <strong>' + (currentDigestUser.email || '') + '</strong> · ' + runsText + ' · 0 runs used for digest';
+          userNote.textContent = 'Signed in as ';
+          var strongEl = document.createElement('strong');
+          strongEl.textContent = currentDigestUser.email || '';
+          userNote.appendChild(strongEl);
+          userNote.appendChild(document.createTextNode(' · ' + runsText + ' · 0 runs used for digest'));
         }
       };
 
