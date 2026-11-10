@@ -55,6 +55,8 @@ class Settings(BaseModel):
     # one-time (no refill).
     accounts_required: bool = False
     trial_runs: int = 3
+    trial_duration_days: int = 14
+    trial_requires_card: bool = False
     supabase_url: str = ""
     supabase_publishable_key: str = ""
     supabase_secret_key: str = ""

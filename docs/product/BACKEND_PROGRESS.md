@@ -3,8 +3,8 @@
 **Branch:** `backend-real` (branched from `prd-research-previews` at `8c3fa0b`)
 **Owner:** Antigravity Session 2 (backend)
 **Baseline:** `make check` passed (441 passed, 2 skipped in 20.76s).
-**Current Suite:** `make check` passed (499 passed, 2 skipped in 34.90s).
-**Status:** Items 1–7 Completed. Starting Item 8 (Trial - Track K).
+**Current Suite:** `make check` passed (504 passed, 2 skipped in 35.60s).
+**Status:** Items 1–8 Completed. Starting Items 10 & 11 from `.tasks/review-fixes.txt`.
 
 ---
 
@@ -153,6 +153,9 @@
   - Added endpoints in `src/api/voice.py` (`GET /api/v1/voice/profile`, `POST /api/v1/voice/tune`), mounted in `src/api/main.py`.
   - Comprehensive test suite in `tests/test_voice_profile.py` (6 tests passing).
 
-- [ ] **Item 8: Trial (Track K):**
-  - 14-day trial entitlement model & spec.
-  - Configurable trial allowances and questions for Nav in STATUS.md.
+- [x] **Item 8: Trial (Track K):**
+  - Implemented 14-day trial entitlement models in `src/models/trial.py` (`TrialEntitlement`, `BaselineMetrics`, `TrialActivity`, `TwoWeekSummary`).
+  - Strict truth rule enforced: day-12 summary carries strictly real counts of seller actions and logged results, never projected or modeled lift.
+  - Configurable trial allowances: added `trial_duration_days = 14` and `trial_requires_card = False` to `src/config.py`.
+  - Comprehensive specification written in `docs/launch/TRIAL_SPEC.md` documenting the 14-day seller lifecycle, Weekly Active Seller (WAS) north-star definition, and open questions for Nav.
+  - Comprehensive unit test suite in `tests/test_trial.py` (5 tests passing).
