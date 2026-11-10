@@ -57,8 +57,8 @@ Every route mounted in `src/api/main.py` and its feature routers (`src/api/*.py`
 
 | Feature / Route | Method & Path | State (`live` / `sample` / `stub`) | Plan Gate | Runs Consumed | Evidence (File & Test) |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Customer Growth Portal** | `GET /`, `GET /portal`, `GET /account` | `live` UI shell + `sample` default fixtures | Demo / Free / Starter | `0` on load `[live]` | `src/api/main.py`, `src/api/static/index.html`, `tests/test_portal_demo.py`, `tests/test_ui_polish.py` |
-| **Daily Growth Desk** | `GET /today`, `GET /api/v1/daily-brief` | `live` route + `sample` default brief (`live` with `?live=true`) | Demo (`sample`) / Free (`3` trial runs) / Starter | `0` in demo; `1` run when `?live=true` `[live]` | `src/api/daily_brief.py`, `src/api/static/today.html`, `tests/test_daily_brief.py` |
+| **Customer Growth Portal** | `GET /`, `GET /portal`, `GET /account` | `live` UI shell + `sample` default fixtures (`data/demo/previews.json`, `presets.json`) | Demo / Free / Starter | `0` on load `[live]` | `src/api/main.py`, `src/api/static/index.html`, `tests/test_portal_demo.py`, `tests/test_ui_polish.py` |
+| **Daily Growth Desk** | `GET /today`, `GET /api/v1/daily-brief` | `live` route + cached/saved brief from monitor snapshots (no model call) | Demo / Free / Starter | `0` runs (cached brief from saved snapshots) `[live]` | `src/api/daily_brief.py`, `src/api/static/today.html`, `tests/test_daily_brief.py` |
 | **Guided Creator Studio** | `GET /create` | `live` 4-step studio UI backed by `/api/v1/generate-ads` | Demo (`sample`) / Free / Starter | `0` in demo; `1` run on live render `[live]` | `src/api/main.py`, `src/api/static/creator.html`, `tests/test_creator_studio.py` |
 | **Weekly Market Digest Page** | `GET /digest`, `GET /api/v1/weekly-digest` | `live` snapshot diff engine over Nov 3 snapshots | Demo / Free / Starter | `0` `[live]` | `src/api/monitor.py`, `src/api/static/digest.html`, `tests/test_monitor_and_digest.py` |
 | **Health & Readiness Checks** | `GET /health`, `GET /readiness`, `GET /api/v1/{health,readiness}` | `live` config introspection (never calls billed APIs) | Public | `0` `[live]` | `src/api/main.py`, `tests/test_readiness_and_budget.py` |
@@ -76,8 +76,8 @@ Every route mounted in `src/api/main.py` and its feature routers (`src/api/*.py`
 | **Digest Email Double Opt-In** | `GET /api/v1/digest/subscription`, `POST /api/v1/digest/subscribe`, `GET /api/v1/digest/confirm`, `GET/POST /api/v1/digest/unsubscribe`, `GET /api/v1/digest/send` | `live` HMAC token + Supabase storage + Resend email delivery | Public / Free / Starter | `0` `[live]` | `src/api/digest_email.py`, `tests/test_digest_email.py` |
 | **Accounts, OAuth & Workspace Sync** | `GET /api/v1/account/me`, `POST /api/v1/account/{signup,signin,signout,session,oauth,recover,password}`, `GET /api/v1/account/oauth/google{/callback}`, `GET/PUT /api/v1/account/workspace` | `live` Supabase Auth + direct Google OAuth (`GOOGLE_CLIENT_ID`) + versioned workspace JSON | Free (`3` trial runs) / Starter | `0` `[live]` | `src/api/accounts.py`, `src/api/static/account.js`, `tests/test_account_ui.py`, `tests/test_accounts.py` |
 | **Durable Media Storage Proxy** | `GET /api/v1/account/media/{asset}` | `live` Supabase Storage bucket proxy (`src/services/media_store.py`) | Free / Starter | `0` `[live]` | `src/api/media.py`, `tests/test_media_persistence.py` |
-| **Run Credits & Usage Meter** | `GET /api/v1/credits`, `POST /api/v1/credits/{spend,add}` | `live` ledger in `src/services/credits.py` & `usage_meter.py` | Free (`3` runs) / Starter (`20`/mo) / Pro (`100`/mo) | Tracks runs `[live]` | `src/api/credits.py`, `tests/test_credits_and_pricing.py` |
-| **Stripe Billing & Customer Portal** | `GET /api/v1/billing/status`, `POST /api/v1/billing/{checkout,portal,webhook}` | `live` Stripe Checkout + webhook signature verification | Starter (`$9/mo` annual, `$12/mo` monthly) / Pro (`$29/mo`) | `0` `[live]` | `src/api/billing.py`, `tests/test_billing.py` |
+| **Run Credits & Usage Meter** | `GET /api/v1/credits`, `POST /api/v1/credits/{spend,add}` | `live` ledger in `src/services/credits.py` & `usage_meter.py` | Free (`3` runs) / Starter (`20`/mo) | Tracks runs `[live]` | `src/api/credits.py`, `tests/test_credits_and_pricing.py` |
+| **Stripe Billing & Customer Portal** | `GET /api/v1/billing/status`, `POST /api/v1/billing/{checkout,portal,webhook}` | `live` Stripe Checkout + webhook signature verification | Starter (`$9/mo` annual, `$12/mo` monthly; Pro planned) | `0` `[live]` | `src/api/billing.py`, `tests/test_billing.py` |
 | **Analytics Config & Legal Pages** | `GET /api/v1/analytics/config`, `GET /static/legal/{terms,privacy,refunds}.html` | `live` PostHog client config + static legal policies | Public | `0` `[live]` | `src/api/analytics.py`, `tests/test_analytics.py`, `tests/test_legal_pages.py` |
 
 ---
@@ -89,7 +89,7 @@ Every control in `src/api/static/index.html`, `src/api/static/muse-shell.js`, an
 | Control / Appendix 1 Item | Selector / Element | Target / Action | Works in Demo? | Works Signed In? | Verification Notes (`[live]` Chromium check) |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Topbar: Weekly digest** | `a.topbar-link[href="/digest"]` | Navigates to `/digest` | **Yes** (`0` runs) | **Yes** | Loads Monday digest page. |
-| **Topbar: Plans & pricing** | `button[data-open-pricing]` | Opens `#musePricingModal` (`muse-shell.js`) | **Yes** (`0` runs) | **Yes** (wires to Stripe Checkout) | Shows Free (`3` runs), Starter (`$9/mo` yr / `$12/mo`), Pro (`$29/mo`). |
+| **Topbar: Plans & pricing** | `button[data-open-pricing]` | Opens `#musePricingModal` (`muse-shell.js`) | **Yes** (`0` runs) | **Yes** (wires to Stripe Checkout) | Shows Free (`3` runs), Starter (`$9/mo` yr / `$12/mo`; Pro planned). |
 | **Topbar: Local tools** | `#openLocalEngineBtn` | Opens `#localEngineDialog.showModal()` | **Yes** (`0` runs) | **Yes** | Explains optional local ComfyUI (`127.0.0.1:8188`). |
 | **Topbar: Shop / Account button** | `#openLoginBtn` + `account.js` | Opens `#loginDialog` / `#museAccountDialog` | **Yes** (`0` runs) | **Yes** | Switches demo shop (`Sample shop`) or opens Google/email sign-in. |
 | **Hero: `Make today's post →`** | `#heroStartFreeBtn` | Navigates to `/today` | **Yes** (`0` runs) | **Yes** | Opens Daily Growth Desk. |
@@ -249,6 +249,8 @@ Free text (capped at 300 characters `[live]`) is parsed by `parse_research_direc
 - `tone_note`: string (max 80 chars `[live]`)
 - `exclude_topics`: list of strings (max 40 chars each `[live]`)
 
+*Implementation Boundary:* Directive parsing is strictly syntax-only pattern extraction. It performs no DNS lookups or network fetches. Any future crawler fetching from candidate URLs must pass them through `src.utils.sitemap.validate_safe_url` at fetch time. Directives confirmed in the UI are currently saved locally on the seller's device (`muse.directive`).
+
 ### 9.3 Prompt Injection Safety Rules (`[live]` enforced)
 1. **No Instruction Concatenation:** Seller free text and crawled page text are never concatenated into instruction text. Raw input is validated and parsed server-side; only typed schema fields reach the pipeline.
 2. **Refusal of Exploits & Sensitive Scrapes:** Requests attempting system prompt overrides (`"ignore previous instructions"`), tool hijacking, credential harvesting, or scraping behind private logins / personal individuals are immediately rejected with an explanatory HTTP 400 response (`[live]`).
@@ -260,23 +262,24 @@ Free text (capped at 300 characters `[live]`) is parsed by `parse_research_direc
 ## 10. Track J: Seller Brand Voice & Blader/Humanizer Pass
 
 ### 10.1 Purpose & Tone Fidelity
-AI-generated copy often defaults to generic corporate buzzwords or inflated, dramatic tropes. Track J enforces that all generated captions, headlines, and digest blurbs mirror the seller's actual voice and undergo a deterministic cleaning pass adhering to the [blader/humanizer](https://github.com/blader/humanizer) guidelines before the seller sees them.
+AI-generated copy often defaults to generic corporate buzzwords or inflated, dramatic tropes. Track J enforces that all generated captions, headlines, and digest blurbs mirror the seller's actual voice and undergo a deterministic lint-and-suggest pass adhering to the [blader/humanizer](https://github.com/blader/humanizer) guidelines before the seller sees them.
 
 ### 10.2 Voice Profile Contract (`VoiceProfile`)
 - Built from the seller's verified content: listing descriptions, captions, and about pages captured during the Track H crawl (`[live]`), plus up to 3 "inspired by" URLs.
 - Extracts stylistic traits: average sentence length, formality, emoji usage, recurring vocabulary, and words to avoid (`[live]`).
 - Plagiarism & Similarity Protection: Inspired-by URLs influence tone only; generated copy is checked against inspiration text to prevent sentence copying (`[live]`).
 
-### 10.3 Deterministic Blader/Humanizer Lint Rules (`src/utils/humanizer.py` `[live]`)
-All copy is passed through `lint_humanizer()` and `clean_humanizer()`:
-1. **Em Dashes Removed:** Em dashes (`—`) and en dashes (`–`) used as conversational crutches are converted to commas, colons, or clean sentence splits.
-2. **Banned AI Vocabulary Stripped:** Instant rejection/replacement of stock AI filler words: *delve, tapestry, embark, elevate, testament, beacon, bespoke, meticulously, quintessential, vibrant, realm, navigate, unlock*.
-3. **No Rule-of-Three Padding:** Catches and collapses synthetic triads ("passion, dedication, and craft").
-4. **No Inflated Numeric Claims:** Ad copy cannot invent awards, years of history, or unverified claims.
-5. **Short, Plain Sentences:** Flags sentences over 28 words; encourages punchy visual copy under 18 words.
+### 10.3 Deterministic Blader/Humanizer Lint-and-Suggest Rules (`src/utils/humanizer.py` `[live]`)
+Copy is evaluated via `lint_humanizer()` with suggestions from `suggest_humanizer_clean()`:
+1. **Non-Destructive Review:** Suggestions are presented for seller review rather than silently mutating text. The seller can accept or reject proposed edits.
+2. **Protected Context:** Quoted titles, artwork titles (e.g. *Revolutionary Light*), product nouns (e.g. *handwoven tapestry*), and paragraph formatting are protected and never mutated.
+3. **Banned AI Vocabulary Flagged:** Recommends alternatives for stock AI filler words: *delve, embark, elevate, testament, beacon, bespoke, meticulously, quintessential, vibrant, realm, navigate, unlock*.
+4. **No Rule-of-Three Padding:** Catches and flags synthetic triads ("passion, dedication, and craft").
+5. **No Inflated Numeric Claims:** Ad copy cannot invent awards, years of history, or unverified claims.
+6. **Short, Plain Sentences:** Flags sentences over 28 words; encourages punchy visual copy under 18 words.
 
 ### 10.4 "Sounds Like You?" Feedback Widget
-On every preview dialog (`/#loop-create`, `/today`, `/create`), sellers can rate copy with 👍 / 👎 and click one-tap adjusters: **"More casual"**, **"More formal"**, or **"Shorter"**. Feedback is recorded locally and sent as `voice_feedback_submitted` PostHog events to refine the account's `VoiceProfile` without spending a model run (`[live]`).
+On preview dialogs (`/#loop-create`, `/today`, `/create`), sellers can rate copy with 👍 / 👎 and click one-tap adjusters: **"More casual"**, **"More formal"**, or **"Shorter"**. Feedback is recorded locally on device and logged via `voice_feedback_submitted` PostHog events to tune voice preferences without spending a model run (`[live]`).
 
 ---
 
@@ -298,6 +301,8 @@ A seller is defined as a **Weekly Active Seller (WAS)** in a 7-day window if and
 | **Habit Retention** | `0%` (no returning cohort yet `[live]`) | `>= 35%` active in 3 of first 4 weeks | WAS cohort tracking |
 | **WAS / WAU Ratio** | `N/A` (`[sample]`) | `>= 50%` of weekly visitors perform an action | PostHog weekly active action filter |
 | **Monthly ROI Lift** | `0` logged outcomes (`[live]`) | `>= 1` logged result / month showing positive ROAS | `/progress` timeline logs |
+
+*Implementation Note:* On `/progress`, outcomes are partitioned by verified account owner on the device (`muse.outcomes.<user_id>`). Revenue is labeled "Logged on this device", plan cost reflects the Starter monthly baseline ($12/mo), and ROI display requires at least 1 logged result (showing `—` instead of an invented negative return when moves = 0).
 
 ### 11.3 14-Day Free Trial Roadmap & 30-Day Lift Measurement
 Per Nav's decision (Nov 10, 2026), the free trial is **14 days**, designed to establish the weekly growth habit and provide immediate value without upfront card requirements:
