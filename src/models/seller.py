@@ -98,6 +98,38 @@ class SellerProfile(BaseModel):
         )
 
 
+class AccessPreferences(BaseModel):
+    channels: list[str] = Field(default_factory=list)
+    can_change_prices: bool = True
+    ads_budget_band: str | None = None
+    minutes_per_week: int | None = Field(default=None, ge=0)
+
+
+class TastePreferences(BaseModel):
+    tone: str | None = None
+    subjects_to_avoid: list[str] = Field(default_factory=list)
+    price_positioning: Literal["budget", "mid", "premium"] | None = None
+
+
+class DismissSignal(BaseModel):
+    id: str = ""
+    title: str = ""
+    channel: str | None = None
+    reason: Literal["not_my_style", "too_advanced", "no_access", "already_tried", ""] = ""
+    at: str | None = None
+
+
+class SellerPreferences(BaseModel):
+    """Seller growth preferences and taste constraints for idea ranking and prompts."""
+
+    experience: Literal["new", "some", "runs_ads"] = "some"
+    access: AccessPreferences = Field(default_factory=AccessPreferences)
+    taste: TastePreferences = Field(default_factory=TastePreferences)
+    research_focus: str | None = Field(default=None, max_length=300)
+    watch: list[str] = Field(default_factory=list)
+    version: int = 1
+
+
 class ScreenshotAnalysis(BaseModel):
     """Multimodal Muse Spark Vision findings from IG, FB, Marketplace, or shop screenshots."""
 

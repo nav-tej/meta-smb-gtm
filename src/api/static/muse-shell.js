@@ -555,6 +555,22 @@
   const writeActions = (v) => store.set(ACTIONS_KEY, JSON.stringify(v));
   const actionId = (text) => { let h = 0; for (const ch of text) h = (h * 31 + ch.charCodeAt(0)) | 0; return `a${(h >>> 0).toString(36)}`; };
   const TRIAGE_SELECTORS = ['.jr-recos > li', '#insightsContainer > .finding-item', '.try-next li', '#msBrief .ms-move', '.ms-digest-recos > li'];
+
+  async function syncSignalsToServer() {
+    try {
+      const snap = window.museAccount?.snapshot;
+      const owner = snap?.user?.id;
+      if (!owner) return;
+      const acts = readActions();
+      const sigs = JSON.parse(localStorage.getItem('muse.dismiss_signals') || '[]');
+      fetch('/api/v1/preferences/signals', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-Muse-Owner': owner },
+        body: JSON.stringify({ actions: acts, dismiss_signals: sigs })
+      }).catch(() => {});
+    } catch (_) {}
+  }
   function itemTitle(item) {
     const head = item.querySelector('strong:not(.ms-match-tag)');
     return (head?.textContent || item.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 120);
@@ -576,6 +592,7 @@
     } else delete all[id];
     writeActions(all);
     actionsChanged();
+    syncSignalsToServer();
     if (status === 'accepted') window.museTrack?.('idea_accepted', { action_id: id, page: location.pathname, has_note: Boolean(note) });
     else if (status === 'dismissed') {
       window.museTrack?.('idea_dismissed', { action_id: id, page: location.pathname, has_note: Boolean(note), reason: reason || 'unspecified' });
