@@ -220,3 +220,38 @@ class CreativeSet(BaseModel):
     creatives: list[Creative]
     mask_path: str | None = None
     positioning_hook: str = ""
+
+
+class PreviewEvidence(BaseModel):
+    """Evidence backing a preview's 'Why this' badge or angle."""
+
+    label: str = Field(min_length=1, max_length=200)
+    url: str | None = Field(default=None, max_length=500)
+    kind: Literal["live", "sample"] = "sample"
+
+
+class CompetitorAdCard(BaseModel):
+    """Competitor pattern card for side-by-side comparison."""
+
+    name: str = Field(min_length=1, max_length=120)
+    format: str = Field(default="Single image ad", max_length=60)
+    primary_text: str = Field(default="", max_length=1000)
+    price_point: str | None = None
+    url: str | None = None
+    note: str = Field(default="", max_length=300)
+
+
+class PreviewSpec(BaseModel):
+    """Track B: 1:1 post preview backing a research insight or ranked move."""
+
+    insight_id: str = Field(min_length=1, max_length=64)
+    source: str = Field(default="ranked_idea", max_length=64)
+    placement: Placement = "instagram_feed"
+    headline: str = Field(min_length=1, max_length=160)
+    caption: str = Field(min_length=1, max_length=2000)
+    cta: str = Field(default="Shop now", max_length=60)
+    image_ref: str = Field(min_length=1, max_length=500)
+    evidence: list[PreviewEvidence] = Field(default_factory=list)
+    why_this: str = Field(default="", max_length=300)
+    checklist: list[str] = Field(default_factory=list)
+    competitor_card: CompetitorAdCard | None = None

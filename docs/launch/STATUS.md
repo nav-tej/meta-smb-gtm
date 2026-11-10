@@ -3,8 +3,9 @@
 Updated November 10, 2026. Target November 8, America/Los_Angeles.
 
 ### November 10 — Hermes H4 Dead Control Audit + Google OAuth
-- **H4 dead control audit:** Completed. Report at `docs/launch/hermes-research-report.md`. Key findings: 12 controls broken or not in DOM, 9 partially working (sign-in gate), 4 broken (trage buttons show PLANS dialog), 12 working. Phone width 375px: no horizontal overflow.
 - **Google OAuth:** Credentials configured, pushed to Vercel (prod + preview), deployed. API returns correct OAuth URL. Browser navigates to Google sign-in page. User needs to sign in on Google OAuth page to complete flow.
+- **H2 Meta Ad Library:** Completed. Report at `data/research/ad_library_capture.md`. Key finding: none of the 4 watchlist competitors have active Meta ads. This is a valid finding — they are individual fine artists relying on marketplaces and Instagram, not paid Meta ads. Meta Ad Library SPA requires login for full results; search attempted via URL parameters and browser automation.
+- **H4 Finding 1 corrected:** Idea triage buttons (Accept/Dismiss/Archive) work correctly in demo mode — they save to muse.actions and show toast. Earlier finding was wrong (clicked while dialog was already open).
 Canonical plan is [PLAN.md](PLAN.md).
 
 | Work | Agent | State | Evidence / output |

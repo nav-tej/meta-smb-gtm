@@ -2,6 +2,8 @@
 
 import base64
 import binascii
+import json
+from pathlib import Path
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
@@ -58,6 +60,21 @@ async def list_creative_models() -> dict[str, Any]:
         "comfyui_workflows": SUPPORTED_COMFY_WORKFLOWS,
         "comfy_cli": discover_comfy_cli(),
     }
+
+
+PREVIEWS_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "demo" / "previews.json"
+
+
+def _read_previews_json() -> dict[str, Any]:
+    if not PREVIEWS_PATH.is_file():
+        return {"previews": []}
+    return dict(json.loads(PREVIEWS_PATH.read_text(encoding="utf-8")))
+
+
+@router.get("/previews")
+async def get_insight_previews() -> dict[str, Any]:
+    """Track B: return 1:1 demo previews for research insights and ranked moves."""
+    return _read_previews_json()
 
 
 @router.post("/transcribe-voice")
