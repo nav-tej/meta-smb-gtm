@@ -3,8 +3,8 @@
 **Branch:** `backend-real` (branched from `prd-research-previews` at `8c3fa0b`)
 **Owner:** Antigravity Session 2 (backend)
 **Baseline:** `make check` passed (441 passed, 2 skipped in 20.76s).
-**Current Suite:** `make check` passed (481 passed, 2 skipped in 34.65s).
-**Status:** Items 1, 2, 3, and 4 Completed. Starting Item 5 (Research directives pipeline).
+**Current Suite:** `make check` passed (487 passed, 2 skipped in 37.98s).
+**Status:** Items 1–5 Completed. Starting Item 6 (Cache layer - Track E).
 
 ---
 
@@ -120,10 +120,17 @@
     - Preserves offline/unauthenticated local storage fallback.
   - Comprehensive unit and API test suite in `tests/test_outcomes_server.py` (7 tests passing).
 
-- [ ] **Item 5: Research directives pipeline (Track I):**
-  - Wire parsed `ResearchDirective` into competitor intel pipeline using typed fields only.
-  - Rate limit directives per account.
-  - Test fixture with competitor page containing `"ignore previous instructions"`.
+- [x] **Item 5: Research directives pipeline (Track I):**
+  - Wired confirmed `ResearchDirective` into `CompetitorIntelRequest` and `build_brief` / `analyze_competitor` as typed fields only (`<research_directive>` JSON block with focus, price_band, channels, timeframe, exclude_topics).
+  - Explicit prompt injection security rule and directive rule enforced in `BRIEF_SYNTHESIS_SYSTEM_PROMPT`.
+  - Quarantined untrusted competitor data: competitor page titles, meta descriptions, and bodies containing `"ignore previous instructions"` are isolated in `<untrusted_competitor_data>` and cannot hijack system instructions.
+  - HTML pre-processing in `src/utils/sitemap.py` strips `<script>` and `<style>` blocks before extracting titles and metadata.
+  - Candidate URLs in `directive.competitors_add` are validated against fetch-time SSRF boundary (`validate_safe_url`), dropping unsafe/internal IPs.
+  - Implemented account-based rate limiter in `src/services/directive_limiter.py` (max 10 directive modifications per hour per account).
+  - Added endpoints in `src/api/directives.py`:
+    - `POST /api/v1/directives/confirm`: rate-limited, owner-bound, persists 1 active directive and history capped at 3 saved directives in workspace document. Logs typed structure (never raw text).
+    - `GET /api/v1/directives/active`: retrieves current active directive and saved count.
+  - Comprehensive test suite in `tests/test_directives_pipeline.py` (6 tests passing).
 
 - [ ] **Item 6: Cache layer (Track E):**
   - Migration file `supabase/migrations/research_cache.sql` (file only, do not apply).

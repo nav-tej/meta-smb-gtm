@@ -1,11 +1,24 @@
-"""Track I: Research Directive Parsing and Suggestion Endpoints."""
+"""Track I: Research Directive Parsing, Confirmation, and Suggestion Endpoints."""
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+import contextlib
+import logging
+from typing import Literal
+
+from fastapi import APIRouter, Header, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
 from src.models.directive import ResearchDirective, parse_research_directive
+from src.services.accounts import (
+    load_workspace,
+    resolve_account,
+    save_workspace,
+    verify_workspace_owner,
+)
+from src.services.directive_limiter import check_directive_rate_limit
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/directives", tags=["directives"])
 
@@ -27,6 +40,22 @@ class SuggestionItem(BaseModel):
     cost: str = "0 runs"
 
 
+class ConfirmDirectiveRequest(BaseModel):
+    directive: ResearchDirective
+
+
+class ConfirmDirectiveResponse(BaseModel):
+    status: Literal["confirmed"] = "confirmed"
+    directive: ResearchDirective
+    summary: str
+    cost: str
+
+
+class ActiveDirectiveResponse(BaseModel):
+    directive: ResearchDirective | None = None
+    saved_count: int = 0
+
+
 @router.post("/parse", response_model=DirectiveResponse)
 async def parse_directive_endpoint(body: ParseRequest) -> DirectiveResponse:
     """Parse seller query into a typed, syntax-only ResearchDirective.
@@ -42,6 +71,98 @@ async def parse_directive_endpoint(body: ParseRequest) -> DirectiveResponse:
 
     cost = "1 run" if directive.competitors_add else "0 runs (re-ranks cached research)"
     return DirectiveResponse(directive=directive, summary=summary, cost=cost)
+
+
+@router.post("/confirm", response_model=ConfirmDirectiveResponse)
+async def confirm_directive_endpoint(
+    body: ConfirmDirectiveRequest,
+    request: Request,
+    response: Response,
+    x_muse_owner: str | None = Header(default=None),
+) -> ConfirmDirectiveResponse:
+    """Confirm and persist an active ResearchDirective to the verified account workspace.
+
+    Enforces sliding-window rate limit (max 10 updates per hour) and logs the parsed
+    directive structure (never raw free-text prompts) for analytics.
+    """
+    account = await resolve_account(request, response, require_verified=True)
+    if not account:
+        raise HTTPException(status_code=401, detail="Create an account and sign in to continue.")
+    verify_workspace_owner(account, x_muse_owner, require_binding=True)
+
+    if not check_directive_rate_limit(account.user_id):
+        raise HTTPException(
+            status_code=429,
+            detail=(
+                "Research directive rate limit exceeded (maximum 10 per hour). "
+                "Please try again later."
+            ),
+        )
+
+    # Log typed directive properties only (never free-text)
+    logger.info(
+        "Confirmed research directive for user %s: focus=%s, timeframe=%d, channels=%s",
+        account.user_id,
+        body.directive.focus,
+        body.directive.timeframe_days,
+        body.directive.channels,
+    )
+
+    ws = await load_workspace(account)
+    doc = dict(ws.get("document") or {})
+
+    serialized = body.directive.model_dump(mode="json")
+    doc["active_directive"] = serialized
+
+    saved = list(doc.get("saved_directives") or [])
+    saved = [d for d in saved if d != serialized]
+    saved.insert(0, serialized)
+    doc["saved_directives"] = saved[:3]
+
+    await save_workspace(
+        account,
+        doc,
+        expected_version=ws.get("version"),
+        expected_owner=account.user_id,
+    )
+
+    cost = "1 run" if body.directive.competitors_add else "0 runs (re-ranks cached research)"
+    summary = (
+        f"Focus: {body.directive.focus.capitalize()} · "
+        f"Window: last {body.directive.timeframe_days} days"
+    )
+    return ConfirmDirectiveResponse(
+        status="confirmed",
+        directive=body.directive,
+        summary=summary,
+        cost=cost,
+    )
+
+
+@router.get("/active", response_model=ActiveDirectiveResponse)
+async def get_active_directive(
+    request: Request,
+    response: Response,
+    x_muse_owner: str | None = Header(default=None),
+) -> ActiveDirectiveResponse:
+    """Retrieve active and saved directive counts for the signed-in account."""
+    account = await resolve_account(request, response, require_verified=False)
+    if not account:
+        return ActiveDirectiveResponse(directive=None, saved_count=0)
+
+    verify_workspace_owner(account, x_muse_owner)
+    ws = await load_workspace(account)
+    doc = ws.get("document") or {}
+    active_raw = doc.get("active_directive")
+    directive = None
+    if isinstance(active_raw, dict):
+        with contextlib.suppress(Exception):
+            directive = ResearchDirective.model_validate(active_raw)
+    saved = doc.get("saved_directives") or []
+    return ActiveDirectiveResponse(
+        directive=directive,
+        saved_count=len(saved) if isinstance(saved, list) else 0,
+    )
 
 
 @router.get("/suggestions", response_model=list[SuggestionItem])

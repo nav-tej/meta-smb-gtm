@@ -7,6 +7,8 @@ from typing import Literal
 
 from pydantic import AliasChoices, BaseModel, Field, model_validator
 
+from src.models.directive import ResearchDirective
+
 UrlBucket = Literal[
     "products",
     "listings",
@@ -228,6 +230,7 @@ class CompetitorIntelRequest(BaseModel):
     max_batches: int = Field(default=5, ge=1, le=20)
     max_urls: int | None = Field(default=None, ge=1, le=10_000)
     fetch_titles: bool = True
+    directive: ResearchDirective | None = None
 
     @model_validator(mode="after")
     def _require_a_source(self) -> CompetitorIntelRequest:
