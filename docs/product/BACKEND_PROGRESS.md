@@ -3,8 +3,8 @@
 **Branch:** `backend-real` (branched from `prd-research-previews` at `8c3fa0b`)
 **Owner:** Antigravity Session 2 (backend)
 **Baseline:** `make check` passed (441 passed, 2 skipped in 20.76s).
-**Current Suite:** `make check` passed (504 passed, 2 skipped in 35.60s).
-**Status:** Items 1–8 Completed. Starting Items 10 & 11 from `.tasks/review-fixes.txt`.
+**Current Suite:** `make check` passed (516 passed, 2 skipped in 43.00s; ruff check clean, ruff format clean across 230 files).
+**Status:** Gate 1 Reached. Items 10, 11, and Step 4b Completed & Verified. Ready for Gemini REVIEW (Gate 1).
 
 ---
 
@@ -159,3 +159,40 @@
   - Configurable trial allowances: added `trial_duration_days = 14` and `trial_requires_card = False` to `src/config.py`.
   - Comprehensive specification written in `docs/launch/TRIAL_SPEC.md` documenting the 14-day seller lifecycle, Weekly Active Seller (WAS) north-star definition, and open questions for Nav.
   - Comprehensive unit test suite in `tests/test_trial.py` (5 tests passing).
+
+- [x] **Item 10: Recommendation to Editor Handoff (`commit 59df473`):**
+  - Fixed preview dialog, ranked list, snapshot move, and digest links to pass `?idea=<insight_id>` instead of rejected `?goal=<insight_id>`.
+  - Added full demo `DEFAULT_PREVIEWS` spec definitions (headline, caption, cta, image_ref, placement, mapped_goal, why_this) in `/create` (`src/api/static/creator.js`) and `/today` (`src/api/static/today.js`).
+  - Implemented `applyIdea(spec)` in both creator and today editors; unknown or missing `?idea` IDs safely fall back to default behavior without error.
+  - Preserved requested idea against asynchronous device drafts in `recoverDevice()`.
+  - Rendered "Why this" evidence dynamically in the editor (`#ideaReason` in creator, `#dailyReason` in today).
+  - Export tracking: on download/export, marks idea `done` in `muse.actions` and reveals `#exportDoneOffer` / `#logResultLink` offering "Log result →" pointing to `/progress`.
+  - Fired telemetry event `post_started { idea_id, source }`.
+  - Zero paid model calls in demo mode.
+  - Comprehensive E2E browser and unit test suite in `tests/test_editor_idea_handoff.py` (5 tests passing across 375px and 1440px viewports).
+
+- [x] **Item 11: Ad Library Signals & Public Links (`commit e85548e`):**
+  - **Meta Ad Library API Documentation Research (Item 11d):**
+    - Official Graph API `/ads_archive` endpoint with `ad_type=ALL` returns ordinary commercial ads *only* when targeted to European Union (EU) member states or the United Kingdom (UK) due to statutory transparency mandates under the EU Digital Services Act (DSA).
+    - For the United States (and other non-EU countries), the official API programmatically filters out commercial product/service ads, returning strictly political and social-issue ads.
+    - Standard commercial ads for US independent artists cannot be retrieved programmatically via Meta's public API for US targeting.
+  - **Implementation (Items 11a, 11b, 11c):**
+    - **(11a) Public Search Link-Out:** Added "See their ads on Meta ↗" external links per competitor in `#sellerList` and dynamic competitor creation pointing to `https://www.facebook.com/ads/library/?active_status=active&AdCandidate=&q=<encoded_name>&search_type=keyword_unordered&media_type=all` with `target="_blank" rel="noopener noreferrer"`.
+    - **(11b) Sample Shop Truth Isolation:** Sample hooks are shown *only* inside the demo shop (`sarabjit_singh` and `etsy_ceramics`), explicitly labeled with `[sample]`. Real accounts see strictly zero fabricated rows.
+    - **(11c) Server API & Cache:** Implemented `GET /api/v1/competitors/ads` with Track E caching (`NAMESPACE_AD_PREVIEWS`).
+      - Without token: returns `status="no_token"`, public search URL, and zero fabricated rows (`ads=[]`).
+      - With token configured: queries `MetaAdLibraryClient`, caches response, and distinguishes API zero (`status="zero"`, `"No ads found via the Meta API."`) from API failure (`status="error"`, graceful failure note).
+      - Live records include `library_url` (`https://www.facebook.com/ads/library/?id=<id>`) and `start_date`.
+  - Comprehensive unit test suite in `tests/test_ad_library_signals.py` (6 tests passing).
+
+- [x] **Step 4b: Non-Sample Artist Workspace Isolation (`commit e85548e`):**
+  - **Nav's Correction (Nov 10):** Persona is any independent or small artist selling on marketplaces and social. Sikh art, Gurpurab occasions, and the four watchlist competitors belong strictly to the sample shop demo.
+  - **PRD Persona Reconciliation:** Updated `docs/product/PRD.md` Section 1.2 to define primary persona as independent/small artists, explicitly framing the Sarabjit Singh shop as a demo showcase.
+  - **General Prompts & Endpoints:**
+    - `src/services/seller_audit.py`: Replaced niche-specific Gurpurab references with general cultural and seasonal moments applicable to any artist.
+    - `src/api/directives.py`: `/suggestions` endpoint dynamically derives pricing suggestions from the signed-in seller's own competitors and medium, falling back to universal artist suggestions.
+  - **Client Workspace Scrubbing (`src/api/static/welcome.js` & `index.html`):**
+    - Dynamic substitution of steer input placeholder, chips, refine buttons, and playbook title (`Actionable Playbook for ${shopName}`) when viewing a signed-in workspace.
+  - **Verification:** Added `tests/test_non_sample_artist.py` verifying that a watercolor studio account ("Elena Vance Watercolor Studio") completes onboarding and has ZERO sample-shop terms leaked into its workspace, suggestions, or outcomes (all passing).
+
+

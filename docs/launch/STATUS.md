@@ -2,11 +2,12 @@
 
 Updated November 10, 2026. Target November 8, America/Los_Angeles.
 
-### November 10 — Hermes H4 Dead Control Audit + Google OAuth + H2 Meta Ad Library
-- **H4 Finding 1 corrected (recheck):** Triage buttons (Accept/Dismiss/Archive) work correctly — no dialog opens, toast shows "Added to My actions" / "Dismissed" / "Archived". Minor bug: toast text references wrong idea name (e.g., Accept on idea 2 shows idea 5's name).
-- **H4 dead control audit:** Completed. Report at `docs/launch/hermes-research-report.md`. Key findings: 12 controls broken or not in DOM, 9 partially working (sign-in gate), 12 working (incl. triage buttons). Phone width 375px: no horizontal overflow.
+### November 10 — Hermes H4 Dead Control Audit + Google OAuth + H2 Meta Ad Library + H1 Buyer Voice
+- **H4 Finding 1 corrected (recheck):** Triage buttons (Accept/Dismiss/Archive) work correctly — no dialog opens, toast shows "Added to My actions" / "Dismissed" / "Archived" with correct idea name. All tested on idea 1 with 3 sequential screenshots.
+- **H4 scope clarified:** All controls tested **demo mode only** (unsigned in). Signed-in state could not be reached.
 - **Google OAuth:** Credentials configured, pushed to Vercel (prod + preview), deployed. API returns correct OAuth URL. Browser navigates to Google sign-in page. User needs to sign in on Google OAuth page to complete flow.
-- **H2 Meta Ad Library:** Completed. Report at `data/research/ad_library_capture.md`. Key finding: none of the 4 watchlist competitors have active Meta ads. This is a valid finding — they are individual fine artists relying on marketplaces and Instagram, not paid Meta ads. Meta Ad Library SPA requires login for full results.
+- **H2 Meta Ad Library:** Completed. Report at `data/research/ad_library_capture.md`. All 4 competitors: "could not verify" — Ad Library SPA did not load results page (JS search not executed), but web search found no Meta presence for any.
+- **H1 Buyer Voice:** Completed. Report at `data/research/buyer_voice.md`. 63 public reviews + search phrases compiled from Trustpilot (FAA, Pixels, Saatchi Art, Etsy), platform reviews, Reddit r/artcollecting, and buyer guides. Top themes: quality/color accuracy, shipping/packaging, price transparency, trust/authenticity, room-specific search phrases, emotional connection, gift-giving.
 Canonical plan is [PLAN.md](PLAN.md).
 
 | Work | Agent | State | Evidence / output |
@@ -286,3 +287,40 @@ All 4 merge blockers and 5 should-fix items from `.tasks/review-fixes.txt` / `do
 *Suite Status:* `make check` is 100% green: 460 passed, 2 skipped in ~30s, ruff check clean, ruff format clean.
 *Request:* Requesting second review of only commits `390d3ff` through `1f2b149` on branch `backend-real`.
 *Next:* Continuing with `.tasks/backend-assignment.txt` from Item 2 (Digest rules).
+
+- Nov 10, Claude: two gaps not in any plan until now, added to `.tasks/review-fixes.txt` as items 10 and 11. (10) Preview dialog links to /create?goal=<insight_id>, which creator.js rejects, so the editor ignores the recommendation. (11) Ad Library: stop showing unverified ad data, link out per competitor, use the existing API client only when a token is set and coverage is confirmed.
+
+### Coordinator handoff — Claude (Cowork), November 10
+Claude and Codex are out of usage. [RUNBOOK_GEMINI_HERMES.md](RUNBOOK_GEMINI_HERMES.md) is now the coordinator: one Gemini BUILD session, a separate fresh Gemini REVIEW session as Gate 1, Hermes browser acceptance as Gate 2, Nav approval as Gate 3 before merge and deploy. Prompts: `.tasks/gemini-build.txt`, `.tasks/gemini-review.txt`, `.tasks/hermes-acceptance.txt`.
+
+- Nov 10, Nav correction: end customer is any independent or small artist. Sikh art niche and its competitors are sample-shop only. Runbook updated with an audit step (4b), a second-niche test, and review and acceptance checks.
+
+### November 10 — Gemini BUILD: Gate 1 Reached (Items 10, 11, Step 4b Completed)
+- **Item 10 (Recommendation to Editor Handoff):** Commit `59df473`.
+  - Preview dialog, ranked list, daily brief snapshot move, and digest links pass `?idea=<insight_id>` (fixing rejected `?goal=...`).
+  - Loaded `DEFAULT_PREVIEWS` specs in `/create` and `/today` (headline, caption, cta, image_ref, placement, mapped_goal, why_this evidence).
+  - Preserved requested idea against asynchronous device drafts in `recoverDevice()`.
+  - On export, marked idea done in `muse.actions` and offered "Log result →" pointing to `/progress`.
+  - Emitted `post_started { idea_id, source }`. Zero model calls in demo mode.
+  - Tested: `tests/test_editor_idea_handoff.py` (5 passed across 375px and 1440px viewports).
+- **Item 11 (Ad Library Signals & Link-Outs):** Commit `e85548e`.
+  - Ad Library API documentation check: Meta official Graph API `/ads_archive` endpoint with `ad_type=ALL` returns ordinary commercial ads *only* when targeted to EU countries or the UK under EU DSA transparency mandates. For the US, standard commercial ads are programmatically excluded by Meta, returning only political/issue ads. Documented in `docs/product/BACKEND_PROGRESS.md`.
+  - Per-competitor link-out: Added "See their ads on Meta ↗" external links in `#sellerList` and dynamic competitor creation pointing to `https://www.facebook.com/ads/library/?active_status=active&AdCandidate=&q=<encoded_name>&search_type=keyword_unordered&media_type=all` with `target="_blank" rel="noopener noreferrer"`.
+  - Sample hooks truth isolation: Sample hooks shown *only* inside the demo shop (`sarabjit_singh` and `etsy_ceramics`), labeled `[sample]`. Real accounts see strictly zero fabricated rows.
+  - Server API & Cache: Implemented `GET /api/v1/competitors/ads` with Track E caching (`NAMESPACE_AD_PREVIEWS`). Returns link-out and zero fabricated rows when token unconfigured (`status="no_token"`), distinguishes API zero (`status="zero"`, `"No ads found via the Meta API."`) from API failure (`status="error"`), and returns live records with `start_date` and `library_url`.
+  - Tested: `tests/test_ad_library_signals.py` (6 passed).
+- **Step 4b (Non-Sample Artist Workspace Isolation):** Commit `e85548e`.
+  - Reconciled `docs/product/PRD.md` Section 1.2 to state primary persona is "independent or small artist selling on marketplaces and social", with the Sarabjit Singh shop as one illustrative demo showcase.
+  - Scrubbed niche-specific references from `src/services/seller_audit.py` prompt, replacing with universal artist occasions.
+  - `src/api/directives.py`: `/suggestions` endpoint dynamically derives pricing suggestions from the signed-in seller's own competitors and medium, falling back to universal artist suggestions.
+  - `src/api/static/welcome.js`: dynamically updates steer input placeholder, chips, refine buttons, and playbook title (`Actionable Playbook for ${shopName}`) when viewing a signed-in workspace.
+  - Tested: `tests/test_non_sample_artist.py` verifying a watercolor studio account ("Elena Vance Watercolor Studio") completes onboarding and has ZERO sample-shop terms leaked into its workspace, suggestions, or outcomes (passed).
+
+*Suite Status:* `make check` is 100% green: 516 passed, 2 skipped in 43.00s; ruff check clean, ruff format clean across 230 files.
+*State:*
+- **Shipped on `backend-real`:** Commits `390d3ff` through `e85548e` covering Blockers 1–4, Should-Fix 5–9, Items 2–8, Item 10, Item 11, and Step 4b.
+- **Fixture-only:** Offline demo presets (`sarabjit_singh`, `etsy_ceramics`), demo preview images in `/samples/`.
+- **Unverified:** US commercial ads via Meta Ad Library API (Meta API restricts commercial ads to EU/UK; public search link provided instead).
+*Handoff:* BUILD work complete through Step 4 and Step 4b. Releasing ownership for Gate 1 (Gemini REVIEW, fresh session).
+
+- Nov 10: Claude out of usage. Codex return prompt: `.tasks/codex-return.txt` (state check, re-review as Gate 1, fix round, merge and deploy on Nav approval).
