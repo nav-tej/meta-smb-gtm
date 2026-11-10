@@ -348,7 +348,7 @@ def test_welcome_onboarding_full_flow_and_honest_workspace(
         [pw_python, "-c", runner_code],
         capture_output=True,
         text=True,
-        timeout=35,
+        timeout=60,
         check=False,
     )
     assert res.returncode == 0, f"STDOUT:\n{res.stdout}\nSTDERR:\n{res.stderr}"

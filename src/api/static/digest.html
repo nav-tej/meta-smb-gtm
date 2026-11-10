@@ -4,7 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#faf8f5">
-  <title>Weekly Market Digest · Muse Growth Studio</title>
+  <title>Weekly competitor digest for small shops | Muse Growth Studio</title>
+  <meta name="description" content="One email every Monday with what your competitors changed and one ready-to-post idea. Free with your Muse account.">
+  <link rel="canonical" href="https://meta-smb-gtm.vercel.app/digest">
+  <meta name="robots" content="index, follow">
   <link rel="stylesheet" href="/static/digest.css?v=20261109-sub">
   <link rel="stylesheet" href="/static/portal-journey.css?v=20261106-ui2">
   <link rel="stylesheet" href="/static/muse-shell.css?v=20261109-ux3">
@@ -57,12 +60,39 @@
     <section class="dg-section dg-subscribe" id="digestSignup" aria-labelledby="dgSubTitle" hidden>
       <h2 id="dgSubTitle">Get your own digest every Monday</h2>
       <p class="dg-sub-lede">Add up to 3 competitor shops (Shopify, Fine Art America or any public shop page). Each Monday we check their public pages and email you new listings, removals and price changes. Free, no runs used, unsubscribe anytime.</p>
-      <form id="digestSignupForm" class="dg-sub-form" novalidate>
-        <label>Your email<input type="email" name="email" required autocomplete="email" maxlength="254"></label>
+      
+      <div id="digestAccountGate" class="dg-account-gate" hidden>
+        <p><strong>A free Muse account is required to subscribe.</strong> Sign in to link your shop watchlist and monitor runs.</p>
+        <button type="button" id="digestSignInBtn" class="primary">Sign in / Create free account</button>
+      </div>
+
+      <div id="digestAccountInfo" class="dg-account-info" hidden>
+        <p>Signed in as <strong id="digestUserEmail"></strong> · <span id="digestRunsNotice">3 runs remaining</span></p>
+      </div>
+
+      <form id="digestSignupForm" class="dg-sub-form" novalidate hidden>
+        <input type="hidden" name="email" id="digestHiddenEmail">
         <label>Competitor shop<input type="text" inputmode="url" name="shop" required maxlength="300" placeholder="https://competitor-shop.com"></label>
         <label>Another shop <span>(optional)</span><input type="text" inputmode="url" name="shop" maxlength="300"></label>
         <label>Another shop <span>(optional)</span><input type="text" inputmode="url" name="shop" maxlength="300"></label>
-        <button type="submit" data-track="digest_subscribe">Email me the digest</button>
+
+        <fieldset class="dg-options-group">
+          <legend>Digest frequency &amp; topics</legend>
+          <label class="dg-select-label">
+            Frequency
+            <select name="frequency" id="digestFrequency">
+              <option value="weekly" selected>Every Monday morning (Recommended)</option>
+              <option value="biweekly">Every two weeks</option>
+            </select>
+          </label>
+          <div class="dg-topics-list">
+            <label class="dg-check-label"><input type="checkbox" name="topic" value="prices" checked> Competitor price changes &amp; discounts</label>
+            <label class="dg-check-label"><input type="checkbox" name="topic" value="listings" checked> New product launches &amp; removals</label>
+            <label class="dg-check-label"><input type="checkbox" name="topic" value="ideas" checked> 1 ready-to-post creative ad idea</label>
+          </div>
+        </fieldset>
+
+        <button type="submit" id="digestSubmitBtn" data-track="digest_subscribe">Email me the digest</button>
         <p class="dg-sub-status" id="digestSignupStatus" role="status" aria-live="polite"></p>
         <p class="dg-sub-fine">We only read public pages and store your email and shop links to send this digest. See our <a href="/static/legal/privacy.html">Privacy Policy</a>.</p>
       </form>

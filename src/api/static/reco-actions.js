@@ -360,6 +360,16 @@
       track('reco_preview_downloaded', { reco_id: currentSpec.insight_id, format: 'txt' });
     });
 
+    var digestBar = el('div', 'jr-preview-digest-bar');
+    digestBar.appendChild(el('span', '', 'Want insights like this emailed every Monday?'));
+    var digestLink = el('a', 'jr-btn-link', 'Get weekly competitor digest →');
+    digestLink.href = '/digest';
+    digestLink.addEventListener('click', function () {
+      track('digest_prompt_shown', { surface: 'preview_dialog' });
+    });
+    digestBar.appendChild(digestLink);
+    dialogEl.appendChild(digestBar);
+
     return dialogEl;
   }
 
@@ -771,6 +781,112 @@
       li.classList.add('has-thumb');
       li.appendChild(btn);
     });
+
+    // Inline Digest Habit Prompt Card (Track G)
+    if (!document.getElementById('jrDigestPrompt')) {
+      var promptCard = el('div', 'jr-digest-prompt');
+      promptCard.id = 'jrDigestPrompt';
+      var promptInner = el('div', 'jr-digest-prompt-inner');
+      var badge = el('span', 'jr-digest-badge', 'Weekly habit · 0 runs');
+      var heading = el('h3', '', 'Get this research in your inbox every Monday');
+      var body = el('p', '', 'We check your watched shops every Monday morning and email you price changes, new listings, and 1 ready-to-post idea. Never miss a move.');
+      var actionsWrap = el('div', 'jr-digest-actions');
+
+      var signedOutBox = el('div', 'jr-digest-signed-out');
+      var signUpBtn = el('button', 'jr-btn-primary', 'Sign up to get weekly digest');
+      signUpBtn.type = 'button';
+      var previewLink1 = el('a', 'jr-digest-preview-link', 'Preview sample digest ↗');
+      previewLink1.href = '/digest';
+      signedOutBox.appendChild(signUpBtn);
+      signedOutBox.appendChild(previewLink1);
+
+      var signedInBox = el('div', 'jr-digest-signed-in');
+      signedInBox.hidden = true;
+      var userNote = el('div', 'jr-digest-user-info');
+      var subBtn = el('button', 'jr-btn-primary', 'Subscribe to weekly digest');
+      subBtn.type = 'button';
+      var previewLink2 = el('a', 'jr-digest-preview-link', 'Manage frequency & topics on /digest ↗');
+      previewLink2.href = '/digest';
+      signedInBox.appendChild(userNote);
+      signedInBox.appendChild(subBtn);
+      signedInBox.appendChild(previewLink2);
+
+      var msg = el('p', 'jr-digest-msg');
+      msg.hidden = true;
+
+      actionsWrap.appendChild(signedOutBox);
+      actionsWrap.appendChild(signedInBox);
+      actionsWrap.appendChild(msg);
+
+      promptInner.appendChild(badge);
+      promptInner.appendChild(heading);
+      promptInner.appendChild(body);
+      promptInner.appendChild(actionsWrap);
+      promptCard.appendChild(promptInner);
+
+      var improveContainer = list.closest('.jr-row') || list.parentNode;
+      if (improveContainer && improveContainer.parentNode) {
+        improveContainer.parentNode.insertBefore(promptCard, improveContainer.nextSibling);
+      } else if (list.nextSibling) {
+        list.parentNode.insertBefore(promptCard, list.nextSibling);
+      } else {
+        list.parentNode.appendChild(promptCard);
+      }
+
+      track('digest_prompt_shown', { surface: 'home_loop' });
+
+      var currentDigestUser = null;
+      var syncDigestAccount = function (snap) {
+        currentDigestUser = snap && snap.user ? snap.user : null;
+        if (!currentDigestUser) {
+          signedOutBox.hidden = false;
+          signedInBox.hidden = true;
+        } else {
+          signedOutBox.hidden = true;
+          signedInBox.hidden = false;
+          var remaining = Number.isFinite(snap && snap.usage && snap.usage.remaining) ? snap.usage.remaining : 3;
+          var runsText = remaining <= 0 ? '0 runs left (paused)' : remaining + ' runs remaining';
+          userNote.innerHTML = 'Signed in as <strong>' + (currentDigestUser.email || '') + '</strong> · ' + runsText + ' · 0 runs used for digest';
+        }
+      };
+
+      signUpBtn.addEventListener('click', function () {
+        try {
+          window.museAccount?.open?.('signup', 'Sign in or create a free account to subscribe to your weekly competitor digest.');
+        } catch (_) {}
+      });
+
+      subBtn.addEventListener('click', async function () {
+        if (!currentDigestUser) return;
+        subBtn.disabled = true;
+        msg.hidden = false;
+        msg.textContent = 'Subscribing…';
+        try {
+          var comps = ['https://www.sikhiart.com'];
+          var resp = await fetch('/api/v1/digest/subscribe', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: currentDigestUser.email, competitors: comps })
+          });
+          var data = await resp.json().catch(function () { return {}; });
+          if (!resp.ok) throw new Error(data.detail || 'Could not subscribe right now.');
+          msg.textContent = data.message || 'Subscribed! Check your inbox to confirm.';
+          track('digest_subscribed', { surface: 'home_inline' });
+        } catch (err) {
+          msg.textContent = err.message;
+          subBtn.disabled = false;
+        }
+      });
+
+      window.addEventListener('account-change', function (e) { syncDigestAccount(e.detail); });
+      window.addEventListener('muse:account-change', function (e) { syncDigestAccount(e.detail); });
+      try {
+        if (window.museAccount && window.museAccount.ready) {
+          window.museAccount.ready().then(syncDigestAccount).catch(function () { syncDigestAccount(null); });
+        }
+      } catch (_) {}
+    }
 
     refreshStrip();
   }

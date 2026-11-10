@@ -575,6 +575,9 @@
     } else delete all[id];
     writeActions(all);
     actionsChanged();
+    if (status === 'accepted') window.museTrack?.('idea_accepted', { action_id: id, page: location.pathname, has_note: Boolean(note) });
+    else if (status === 'dismissed') window.museTrack?.('idea_dismissed', { action_id: id, page: location.pathname, has_note: Boolean(note) });
+    else if (status === 'archived') window.museTrack?.('idea_archived', { action_id: id, page: location.pathname, has_note: Boolean(note) });
     if (!status || silent) return;
     const labels = { accepted: 'Added to My actions', dismissed: 'Dismissed', archived: 'Archived' };
     const undo = status === 'dismissed' || status === 'archived'
@@ -618,6 +621,7 @@
       const note = input.value.trim().replace(/\s+/g, ' ').slice(0, 140);
       if (!note) { input.focus(); return; }
       setStatus(item, 'accepted', { note, silent: true });
+      window.museTrack?.('idea_adjusted', { action_id: item.dataset.actionId, page: location.pathname, has_note: true });
       close();
       toast('Tweak saved · added to My actions');
     });
@@ -692,7 +696,15 @@
     }
     const next = { accepted: ['Mark done', 'done'], done: ['Reopen', 'accepted'], archived: ['Restore', 'accepted'] }[status];
     const move = el('button', { type: 'button', class: 'ms-link' }, next[0]);
-    move.addEventListener('click', () => { const v = readActions(); if (v[id]) v[id] = { ...v[id], status: next[1] }; writeActions(v); actionsChanged(); });
+    move.addEventListener('click', () => {
+      const v = readActions();
+      if (v[id]) {
+        v[id] = { ...v[id], status: next[1] };
+        if (next[1] === 'done') window.museTrack?.('idea_done', { action_id: id });
+      }
+      writeActions(v);
+      actionsChanged();
+    });
     const remove = el('button', { type: 'button', class: 'ms-link ms-remove' }, 'Remove');
     remove.addEventListener('click', () => { const v = readActions(); delete v[id]; writeActions(v); actionsChanged(); });
     row.append(move, remove);

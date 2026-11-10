@@ -481,16 +481,18 @@
       }
       trackEvent('onboarding_step_completed', { step: 1 });
       renderStep2Socials();
-      showStep(2);
+      state.step = 2;
       await saveServerOnboarding(state);
+      showStep(2);
     });
 
     document.getElementById('wkStep1SkipBtn')?.addEventListener('click', async () => {
       if (!state.skipped.includes(1)) state.skipped.push(1);
       trackEvent('onboarding_skipped', { step: 1 });
       renderStep2Socials();
-      showStep(2);
+      state.step = 2;
       await saveServerOnboarding(state);
+      showStep(2);
     });
 
     // =========================================================================
@@ -594,14 +596,16 @@
       if (!state.skipped.includes(2)) state.skipped.push(2);
       trackEvent('onboarding_skipped', { step: 2 });
       renderStep3Competitors();
-      showStep(3);
+      state.step = 3;
       await saveServerOnboarding(state);
+      showStep(3);
     });
     document.getElementById('wkStep2NextBtn')?.addEventListener('click', async () => {
       trackEvent('onboarding_step_completed', { step: 2 });
       renderStep3Competitors();
-      showStep(3);
+      state.step = 3;
       await saveServerOnboarding(state);
+      showStep(3);
     });
 
     // =========================================================================
@@ -751,14 +755,16 @@
       if (!state.skipped.includes(3)) state.skipped.push(3);
       trackEvent('onboarding_skipped', { step: 3 });
       updateRunsUI();
-      showStep(4);
+      state.step = 4;
       await saveServerOnboarding(state);
+      showStep(4);
     });
     document.getElementById('wkStep3NextBtn')?.addEventListener('click', async () => {
       trackEvent('onboarding_step_completed', { step: 3 });
       updateRunsUI();
-      showStep(4);
+      state.step = 4;
       await saveServerOnboarding(state);
+      showStep(4);
     });
 
     // =========================================================================
