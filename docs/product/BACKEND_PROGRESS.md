@@ -3,8 +3,8 @@
 **Branch:** `backend-real` (branched from `prd-research-previews` at `8c3fa0b`)
 **Owner:** Antigravity Session 2 (backend)
 **Baseline:** `make check` passed (441 passed, 2 skipped in 20.76s).
-**Current Suite:** `make check` passed (493 passed, 2 skipped in 35.66s).
-**Status:** Items 1–6 Completed. Starting Item 7 (Voice profile - Track J).
+**Current Suite:** `make check` passed (499 passed, 2 skipped in 34.90s).
+**Status:** Items 1–7 Completed. Starting Item 8 (Trial - Track K).
 
 ---
 
@@ -142,10 +142,16 @@
     - Forced refresh bypasses cache and updates timestamp.
   - Comprehensive unit test suite in `tests/test_research_cache.py` (6 tests passing).
 
-- [ ] **Item 7: Voice profile (Track J):**
-  - `VoiceProfile` built from seller listings/captions.
-  - Similarity check against inspired-by text.
-  - Humanizer pass on all generated captions.
+- [x] **Item 7: Voice profile (Track J):**
+  - Created `VoiceProfile` model in `src/models/voice.py` storing stylistic traits (avg sentence words, formality, emoji usage, hashtags, recurring words, words to avoid, sample lines, adjustments).
+  - Implemented `src/services/voice_profile.py`:
+    - `build_voice_profile`: extracts traits from seller's crawled content. Inspiration sources shape style parameters only and their sentences are never stored.
+    - `check_inspiration_similarity`: sentence-level token overlap guardrail preventing plagiarism of inspired-by texts.
+    - `adjust_voice_profile`: applies seller feedback (`casual`, `formal`, `shorter`).
+    - `humanize_generated_caption`: applies deterministic humanizer cleaning (`clean_text`) to strip em dashes, AI buzzwords, and inflated claims.
+  - Applied humanizer cleaning to generated ad copy in `src/services/ad_creative.py` (`headline` and `primary_text`).
+  - Added endpoints in `src/api/voice.py` (`GET /api/v1/voice/profile`, `POST /api/v1/voice/tune`), mounted in `src/api/main.py`.
+  - Comprehensive test suite in `tests/test_voice_profile.py` (6 tests passing).
 
 - [ ] **Item 8: Trial (Track K):**
   - 14-day trial entitlement model & spec.

@@ -28,6 +28,7 @@ from src.api import (
     preferences,
     product_reference,
     research_targets,
+    voice,
 )
 from src.clients.comfyui import ComfyUIError
 from src.clients.meta import MetaAPIError
@@ -305,6 +306,7 @@ app.include_router(directives.router, prefix=API_PREFIX)
 app.include_router(onboarding.router, prefix=API_PREFIX)
 app.include_router(preferences.router, prefix=API_PREFIX)
 app.include_router(outcomes.router, prefix=API_PREFIX)
+app.include_router(voice.router, prefix=API_PREFIX)
 # Short aliases: /api/credits, /api/monitor, /api/weekly-digest
 app.include_router(credits.router, prefix="/api", include_in_schema=False)
 app.include_router(monitor.router, prefix="/api", include_in_schema=False)
