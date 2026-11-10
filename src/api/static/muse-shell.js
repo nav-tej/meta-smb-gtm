@@ -1001,7 +1001,7 @@
     const moveTitle = el('strong', {}, 'Feature your Empowering Women series');
     const moveReason = el('span', { class: 'ms-note' }, 'SikhiArt keeps adding warrior and guru editions but has no group for women’s stories.');
     moveText.append(moveChip, moveTitle, moveReason);
-    const go = el('a', { class: 'ms-primary ms-small', href: '/create?goal=story' }, 'Make this post →');
+    const go = el('a', { class: 'ms-primary ms-small', href: '/create?idea=idea-1-empowering-women' }, 'Make this post →');
     move.append(moveText, go);
     const safeHref = (href) => (typeof href === 'string' && /^\/(?!\/)/.test(href) ? href : '/create');
     const goLabel = (href) => (href.startsWith('/create') ? 'Make this post →' : 'Open →');
@@ -1387,10 +1387,10 @@
   const PIXELS_SHOP = 'https://sarabjit-singh.pixels.com/';
   const ROUTES = [
     { test: /checkout|contact form|1-click/i, label: 'Get the checkout template →', to: 'tab:tab-export' },
-    { test: /starter|cheap|under \$25|\$1\d/i, label: 'Promote your prints →', to: '/create?goal=visit' },
-    { test: /women|goddess|empower|mai bhago|mata gujri|shop group/i, label: 'Feature it in a post →', to: '/create?goal=story' },
-    { test: /gift|holiday|housewarming|wedding/i, label: 'Make a gift post →', to: '/create?goal=gift' },
-    { test: /story|blog|meaning|village/i, label: 'Make a story post →', to: '/create?goal=story' },
+    { test: /starter|cheap|under \$25|\$1\d/i, label: 'Promote your prints →', to: '/create?idea=idea-2-starter-prints' },
+    { test: /women|goddess|empower|mai bhago|mata gujri|shop group/i, label: 'Feature it in a post →', to: '/create?idea=idea-1-empowering-women' },
+    { test: /gift|holiday|housewarming|wedding/i, label: 'Make a gift post →', to: '/create?idea=idea-3-gift-ready' },
+    { test: /story|blog|meaning|village/i, label: 'Make a story post →', to: '/create?idea=idea-5-painting-story' },
     { test: /home|title|seo|metadata|series tag|omit|listing/i, label: 'Open your Pixels shop ↗', to: PIXELS_SHOP },
   ];
   const CONTAINER_DEFAULTS = {

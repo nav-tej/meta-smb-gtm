@@ -52,6 +52,8 @@
   }
   function recoverDevice() {
     try {
+      const requestedIdea = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('idea') : null;
+      if (requestedIdea) return;
       const raw = localStorage.getItem(deviceKey()) || (!draftOwner ? localStorage.getItem(storageKey) : null);
       if (raw) { installDocument(JSON.parse(raw)); draftStatus('Recovered this device’s draft. Review before sharing.'); }
     } catch { draftStatus('Could not recover device storage. Keep this tab open; download a backup or load your account draft.'); }
@@ -162,7 +164,158 @@
   const mediaAsset = value => typeof value === 'string' && /^\/api\/v1\/account\/media\/[0-9a-f]{32}\.(png|jpg|webp)$/.test(value);
   const imageSource = value => inline(value) || mediaAsset(value) || /^\/samples\/[a-zA-Z0-9_.-]+$/.test(value || '');
   const isOfflineNow = () => Boolean(window.museShell?.isOffline?.() || (typeof navigator !== 'undefined' && navigator.onLine === false));
-  function notice(message, error = false, busy = false) { $('notice').hidden = false; $('notice').textContent = message; $('notice').className = error ? 'error' : (busy ? 'busy' : ''); }
+  const DEFAULT_PREVIEWS = [
+    {
+      insight_id: 'idea-1-empowering-women',
+      source: 'ranked_idea',
+      placement: 'instagram_feed',
+      goal: 'story',
+      headline: 'Sikh Women of Strength — Mai Bhago & Kaur Legacy',
+      caption: 'While mainstream Sikh art galleries feature warrior heroes, our Empowering Women series honors the courage, devotion, and leadership of Sikh women across history. Archival museum-grade prints starting at $18. Tap to discover the full collection on Pixels.',
+      cta: 'Explore series',
+      image_ref: '/samples/naam_japo_restored_gallery_live.webp',
+      why_this: 'SikhiArt has 8 shop collections for warriors and saints, but zero for women. Lead with your unique collection.',
+      product_name: 'Mai Bhago — Empowering Women'
+    },
+    {
+      insight_id: 'idea-2-starter-prints',
+      source: 'ranked_idea',
+      placement: 'instagram_feed',
+      goal: 'visit',
+      headline: 'Timeless Sikh Heritage Art from $14',
+      caption: 'Museum-grade fine art shouldn’t require a $100+ commitment. Start your art wall with authentic archival prints on luster paper, beginning at just $14. Handcrafted with reverence.',
+      cta: 'Shop prints from $14',
+      image_ref: '/samples/ek_onkar_collector_room_live.webp',
+      why_this: '3 of 4 competitors start at $60+. Leading with $14 prints wins gift and first-time buyers.',
+      product_name: 'Ek Onkar luster print ($14)'
+    },
+    {
+      insight_id: 'idea-3-gift-ready',
+      source: 'ranked_idea',
+      placement: 'instagram_feed',
+      goal: 'gift',
+      headline: 'The Thoughtful Spiritual Gift That Lasts a Lifetime',
+      caption: 'Looking for a meaningful housewarming, wedding, or Gurpurab gift? A fine art print of the Golden Temple brings peace and timeless reflection into any home. Custom gift notes available with every order.',
+      cta: 'Send as a gift',
+      image_ref: '/samples/golden_temple_holiday_gift_live.webp',
+      why_this: 'Competitors use gift seasonal wording but charge $60–$129+. You can offer curated $20–$50 gifts.',
+      product_name: 'Harmandir Sahib Golden Temple print'
+    },
+    {
+      insight_id: 'idea-4-home-titles',
+      source: 'ranked_idea',
+      placement: 'facebook_feed',
+      goal: 'visit',
+      headline: 'Listing Optimization: \'For Your Home\' Decor Titles',
+      caption: 'Search visibility update for your shop: Add \'for your home\' to high-intent titles to capture buyers searching for sacred decor rather than generic paintings.',
+      cta: 'Update listings',
+      image_ref: '/samples/kirat_karo_collector_room_live.webp',
+      why_this: 'SikhiArt adds \'for Your Home\' to almost every title to rank in Google & Etsy home decor searches.',
+      product_name: 'Ek Onkar Sacred Sikh Art Print for Your Home'
+    },
+    {
+      insight_id: 'idea-5-painting-story',
+      source: 'ranked_idea',
+      placement: 'instagram_feed',
+      goal: 'story',
+      headline: 'The Story Behind Ek Onkar: One Infinite Creator',
+      caption: 'Behind every brushstroke is a meditation on unity. When I painted this Ek Onkar piece, I wanted the sacred symbol to emerge from quiet gold and deep crimson — a daily reminder that the Divine dwells in all creation. What feeling does it bring to your quiet space?',
+      cta: 'Read the story',
+      image_ref: '/samples/diptych_ek_onkar_kirat_karo_live.webp',
+      why_this: 'Competitors post impersonal product specs. A five-sentence story behind the art builds true emotional connection.',
+      product_name: 'Ek Onkar — One Infinite Creator'
+    }
+  ];
+
+  function findPreviewSpec(id) {
+    if (!id || typeof id !== 'string') return null;
+    return DEFAULT_PREVIEWS.find((p) => p.insight_id === id) || null;
+  }
+
+  function notice(message, error = false, busy = false, actionLink = null) {
+    const el = $('notice');
+    if (!el) return;
+    el.hidden = false;
+    el.className = error ? 'error' : (busy ? 'busy' : '');
+    if (!actionLink) {
+      el.textContent = message;
+      return;
+    }
+    if (typeof el.replaceChildren === 'function' && typeof document.createElement === 'function') {
+      el.replaceChildren();
+      const span = document.createElement('span');
+      span.textContent = message;
+      if (el.append) el.append(span); else if (el.appendChild) el.appendChild(span);
+      const a = document.createElement('a');
+      a.href = actionLink.href;
+      a.textContent = actionLink.text;
+      a.className = 'notice-action';
+      if (a.style) {
+        a.style.marginLeft = '8px';
+        a.style.fontWeight = 'bold';
+        a.style.color = 'inherit';
+        a.style.textDecoration = 'underline';
+      }
+      if (el.append) el.append(a); else if (el.appendChild) el.appendChild(a);
+    } else {
+      el.textContent = message;
+    }
+  }
+
+  function markIdeaExported() {
+    try {
+      const ideaId = state.idea_id || (typeof location !== 'undefined' ? new URLSearchParams(location.search).get('idea') : null);
+      const ACTIONS_KEY = 'muse.actions';
+      const raw = localStorage.getItem(ACTIONS_KEY) || '{}';
+      const all = typeof raw === 'string' && raw ? JSON.parse(raw) : {};
+      const actionKey = ideaId || 'today-post';
+      all[actionKey] = {
+        ...(all[actionKey] || {}),
+        status: 'done',
+        title: state.product.title || 'Daily Desk Post',
+        href: location.pathname + location.search,
+        page: location.pathname,
+        at: new Date().toISOString()
+      };
+      localStorage.setItem(ACTIONS_KEY, JSON.stringify(all));
+      if (typeof window.dispatchEvent === 'function') {
+        window.dispatchEvent(new StorageEvent('storage', { key: ACTIONS_KEY }));
+      }
+      window.museTrack?.('idea_done', { action_id: actionKey, idea_id: ideaId });
+    } catch (_) {}
+    const logLink = $('logResultLink');
+    if (logLink) logLink.hidden = false;
+    notice('Post exported. Paste it into your channel.', false, false, { href: '/progress', text: 'Log result →' });
+  }
+
+  function applyIdea(spec) {
+    if (!spec) return;
+    state.idea = spec;
+    state.idea_id = spec.insight_id;
+    state.why_this = spec.why_this || '';
+    state.product.title = spec.product_name || spec.headline;
+    state.source = 'Recommended research move';
+    if (spec.image_ref && imageSource(spec.image_ref)) {
+      state.original = spec.image_ref;
+      state.image = spec.image_ref;
+      state.imageMode = 'original';
+    }
+    if (spec.placement === 'facebook_feed') {
+      state.channel = 'facebook';
+    } else {
+      state.channel = 'instagram';
+    }
+    document.querySelectorAll?.('[data-channel]').forEach((b) => {
+      b.setAttribute('aria-pressed', String(b.dataset.channel === state.channel));
+    });
+    $('postHook').value = spec.headline;
+    $('postCaption').value = spec.caption;
+    $('itemTitle').textContent = state.product.title;
+    $('dailyReason').textContent = spec.why_this || 'Start with your work. We’ll help with the words.';
+    state.edits[`${state.channel}:0:${state.format}`] = { hook: spec.headline, caption: spec.caption };
+    render();
+    persist();
+  }
   const BUSY_BUTTONS = ['musePlan', 'museImage', 'findItems', 'readListing', 'getPost'];
   let lockedFocus = null;
   function lock(busy, activeId = '') {
@@ -236,7 +389,7 @@
   function render() {
     const plan = currentPlan(); const post = currentPost(); const copy = formatCopy(post);
     $('itemTitle').textContent = state.product.title; $('itemSource').textContent = state.source;
-    $('dailyReason').textContent = `Start with ${state.product.title || 'your item'} on ${names[state.channel]}. Review, take it with you, done.`;
+    $('dailyReason').textContent = state.why_this || `Start with ${state.product.title || 'your item'} on ${names[state.channel]}. Review, take it with you, done.`;
     $('postHook').value = copy.hook || ''; $('postCaption').value = copy.caption || ''; $('copyCount').textContent = `${(copy.caption || '').length} characters`;
     $('format').value = state.format;
     document.querySelectorAll('[data-channel]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.channel === state.channel)));
@@ -340,6 +493,7 @@
       const blob = state.format === 'video' ? await makeClip() : await new Promise(async (resolve, reject) => { try { (await layout(1350)).toBlob(value => value ? resolve(value) : reject(new Error('Could not export the image.')), 'image/png'); } catch (error) { reject(error); } });
       saveBlob(blob, state.format === 'video' ? `clip.${blob.type === 'video/mp4' ? 'mp4' : 'webm'}` : 'feed.png'); const copied = await copyText();
       window.museTrack?.('post_downloaded', { placement: state.format || 'feed', page: '/today' });
+      markIdeaExported();
       notice(`${state.format === 'video' ? 'Clip' : 'Image'} downloaded. ${copied ? 'Caption copied' : 'Caption downloaded'} — open ${names[state.channel]} and add your post.`);
     } catch (error) { notice(error.message, true); } finally { lock(false); }
   }
@@ -472,7 +626,7 @@
   $('format').addEventListener('change', () => { state.format = $('format').value; invalidate(); render(); persist(); });
   $('getPost').addEventListener('click', getPost);
   $('copyOnly').addEventListener('click', async () => { if (state.busy || !reviewed()) return; const copied = await copyText(); notice(copied ? 'Post copied. Paste it into your channel.' : 'Caption downloaded.'); });
-  $('markPosted').addEventListener('click', () => { if (state.busy || !reviewed()) return; state.posted[postIdentity()] = new Date().toISOString(); persist(); render(); notice('Marked posted on this device. You’re done for today. Add results when you have them.'); });
+  $('markPosted').addEventListener('click', () => { if (state.busy || !reviewed()) return; state.posted[postIdentity()] = new Date().toISOString(); persist(); render(); markIdeaExported(); notice('Marked posted on this device. You’re done for today. Add results when you have them.', false, false, { href: '/progress', text: 'Log result →' }); });
   $('downloadPlan').addEventListener('click', () => { const plan = currentPlan(); if (!plan || state.busy) return; const rows = plan.posts.map((post, i) => { const edited = state.edits[`${state.channel}:${i}:${post.format}`]; return `${post.day_offset === 0 ? 'Today' : `In ${post.day_offset} days`} · ${names[post.channel]} · ${post.format}\n${edited?.hook || post.hook}\n${edited?.caption || post.caption}\n${post.visual_direction}\n${post.posting_tip}`; }); saveBlob(new Blob([`${state.product.title}\n${plan.mode === 'muse' ? 'Muse Spark plan' : 'Starter plan'} · manual posting\n\n${rows.join('\n\n')}\n\nDestination: ${safeURL(state.product.destination_url)}\nSuggested days, not scheduled posts. Add only offers you can fulfill.`], { type: 'text/plain' }), 'posting-plan.txt'); });
   $('resultsForm').addEventListener('submit', async event => { event.preventDefault(); if (state.busy) return; const values = {}; for (const key of ['views', 'clicks', 'inquiries', 'sales']) values[key] = Number($(key).value) || 0; if (Object.values(values).some(value => !Number.isSafeInteger(value) || value < 0)) { notice('Use whole, non-negative counts.', true); return; } state.performance = values; state.plans = {}; invalidate(); await buildPlan(false, true); persist(); $('resultsDetails').open = false; });
   $('clearResults').addEventListener('click', async () => { if (state.busy) return; state.performance = null; for (const key of ['views', 'clicks', 'inquiries', 'sales']) $(key).value = ''; state.plans = {}; invalidate(); await buildPlan(false, true); persist(); $('resultsDetails').open = false; });
@@ -480,7 +634,14 @@
   $('musePlan').addEventListener('click', () => buildPlan(true, true)); $('museImage').addEventListener('click', museImage);
   $('useOriginal').addEventListener('click', () => { if (state.busy) return; state.image = state.original; state.imageMode = 'original'; invalidate(); render(); persist(); });
   populateSetup(); render(); initDrafts();
-  window.museTrack?.('post_started', { goal: state.goal || 'daily', source: 'today' });
+  const requestedIdea = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('idea') : null;
+  const ideaSpec = requestedIdea ? findPreviewSpec(requestedIdea) : null;
+  if (ideaSpec) {
+    applyIdea(ideaSpec);
+    window.museTrack?.('post_started', { idea_id: requestedIdea, source: 'today' });
+  } else {
+    window.museTrack?.('post_started', { idea_id: null, goal: state.goal || 'daily', source: 'today' });
+  }
   if (window.museAccount?.ready) window.museAccount.ready().then(() => buildPlan()); else buildPlan();
   fetch('/api/v1/readiness').then(response => response.json()).then(data => { state.readiness = data; syncAccountLive(); $('readinessNote').textContent = data.provider_key_configured ? 'Muse configured, not yet verified here. Starter plans use no credits. Live image uses one Muse Image request; this flow does not run SAM.' : 'No Muse provider key configured. Starter posts and downloads work without it.'; }).catch(() => { $('readinessNote').textContent = 'Could not check server configuration. Your draft is still available.'; });
   window.museDailySnapshot = () => JSON.parse(JSON.stringify({ product: state.product, channel: state.channel, format: state.format, copy: currentCopy(), plan: currentPlan(), performance: state.performance, imageMode: state.imageMode, source: state.source }));

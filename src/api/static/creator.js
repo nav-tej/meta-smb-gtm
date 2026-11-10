@@ -1,10 +1,10 @@
 'use strict';
 (() => {
   const $ = (id) => document.getElementById(id);
-  const state = { accountLive: false, step: 0, presets: null, workspace: 'sarabjit_singh', custom: false, copyEdited: false, sceneEdited: false, goal: 'story', original: '', image: '', imageKind: 'original', sampleImage: '', key: '', live: false, defaultLive: false, readiness: null, busy: false, revision: 0, paint: 0, product: {}, headline: '', caption: '', scene: '', provenance: 'Original-photo layout. No new image generated.' };
+  const state = { accountLive: false, step: 0, presets: null, workspace: 'sarabjit_singh', custom: false, copyEdited: false, sceneEdited: false, goal: 'story', original: '', image: '', imageKind: 'original', sampleImage: '', key: '', live: false, defaultLive: false, readiness: null, busy: false, revision: 0, paint: 0, product: {}, headline: '', caption: '', scene: '', provenance: 'Original-photo layout. No new image generated.', idea_id: null };
 
   const draftNamespace = 'creator';
-  const draftFields = ['workspace', 'custom', 'copyEdited', 'sceneEdited', 'goal', 'original', 'image', 'imageKind', 'sampleImage', 'product', 'headline', 'caption', 'scene', 'provenance', 'artwork'];
+  const draftFields = ['workspace', 'custom', 'copyEdited', 'sceneEdited', 'goal', 'original', 'image', 'imageKind', 'sampleImage', 'product', 'headline', 'caption', 'scene', 'provenance', 'artwork', 'idea_id'];
   function editorDocument() { return { schema: 1, ...Object.fromEntries(draftFields.map(key => [key, state[key]])), offers, channels: postingChannels(), step: state.step }; }
   const isDraftObject = value => !!value && typeof value === 'object' && !Array.isArray(value);
   function applyDocument(data) {
@@ -42,6 +42,8 @@
   }
   function recoverDevice() {
     try {
+      const requestedIdea = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('idea') : null;
+      if (requestedIdea) return;
       const raw = localStorage.getItem(deviceKey());
       if (raw) { installDocument(JSON.parse(raw)); draftStatus('Recovered this device’s draft. Review before sharing.'); }
     } catch { draftStatus('Could not recover device storage. Keep this tab open; download a backup or load your account draft.'); }
@@ -202,7 +204,171 @@
   const mediaAssetPath = (value) => typeof value === 'string' && /^\/api\/v1\/account\/media\/[0-9a-f]{32}\.(png|jpg|webp)$/.test(value) ? value : '';
   const validInline = (value) => typeof value === 'string' && /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(value) && value.length < 4000000;
   const isOfflineNow = () => Boolean(window.museShell?.isOffline?.() || (typeof navigator !== 'undefined' && navigator.onLine === false));
-  function notify(message, kind = '') { $('notice').hidden = false; $('notice').textContent = message; $('notice').className = `notice ${kind}`; }
+  const DEFAULT_PREVIEWS = [
+    {
+      insight_id: 'idea-1-empowering-women',
+      source: 'ranked_idea',
+      placement: 'instagram_feed',
+      goal: 'story',
+      headline: 'Sikh Women of Strength — Mai Bhago & Kaur Legacy',
+      caption: 'While mainstream Sikh art galleries feature warrior heroes, our Empowering Women series honors the courage, devotion, and leadership of Sikh women across history. Archival museum-grade prints starting at $18. Tap to discover the full collection on Pixels.',
+      cta: 'Explore series',
+      image_ref: '/samples/naam_japo_restored_gallery_live.webp',
+      why_this: 'SikhiArt has 8 shop collections for warriors and saints, but zero for women. Lead with your unique collection.',
+      product_name: 'Mai Bhago — Empowering Women'
+    },
+    {
+      insight_id: 'idea-2-starter-prints',
+      source: 'ranked_idea',
+      placement: 'instagram_feed',
+      goal: 'visit',
+      headline: 'Timeless Sikh Heritage Art from $14',
+      caption: 'Museum-grade fine art shouldn’t require a $100+ commitment. Start your art wall with authentic archival prints on luster paper, beginning at just $14. Handcrafted with reverence.',
+      cta: 'Shop prints from $14',
+      image_ref: '/samples/ek_onkar_collector_room_live.webp',
+      why_this: '3 of 4 competitors start at $60+. Leading with $14 prints wins gift and first-time buyers.',
+      product_name: 'Ek Onkar luster print ($14)'
+    },
+    {
+      insight_id: 'idea-3-gift-ready',
+      source: 'ranked_idea',
+      placement: 'instagram_feed',
+      goal: 'gift',
+      headline: 'The Thoughtful Spiritual Gift That Lasts a Lifetime',
+      caption: 'Looking for a meaningful housewarming, wedding, or Gurpurab gift? A fine art print of the Golden Temple brings peace and timeless reflection into any home. Custom gift notes available with every order.',
+      cta: 'Send as a gift',
+      image_ref: '/samples/golden_temple_holiday_gift_live.webp',
+      why_this: 'Competitors use gift seasonal wording but charge $60–$129+. You can offer curated $20–$50 gifts.',
+      product_name: 'Harmandir Sahib Golden Temple print'
+    },
+    {
+      insight_id: 'idea-4-home-titles',
+      source: 'ranked_idea',
+      placement: 'facebook_feed',
+      goal: 'visit',
+      headline: 'Listing Optimization: \'For Your Home\' Decor Titles',
+      caption: 'Search visibility update for your shop: Add \'for your home\' to high-intent titles to capture buyers searching for sacred decor rather than generic paintings.',
+      cta: 'Update listings',
+      image_ref: '/samples/kirat_karo_collector_room_live.webp',
+      why_this: 'SikhiArt adds \'for Your Home\' to almost every title to rank in Google & Etsy home decor searches.',
+      product_name: 'Ek Onkar Sacred Sikh Art Print for Your Home'
+    },
+    {
+      insight_id: 'idea-5-painting-story',
+      source: 'ranked_idea',
+      placement: 'instagram_feed',
+      goal: 'story',
+      headline: 'The Story Behind Ek Onkar: One Infinite Creator',
+      caption: 'Behind every brushstroke is a meditation on unity. When I painted this Ek Onkar piece, I wanted the sacred symbol to emerge from quiet gold and deep crimson — a daily reminder that the Divine dwells in all creation. What feeling does it bring to your quiet space?',
+      cta: 'Read the story',
+      image_ref: '/samples/diptych_ek_onkar_kirat_karo_live.webp',
+      why_this: 'Competitors post impersonal product specs. A five-sentence story behind the art builds true emotional connection.',
+      product_name: 'Ek Onkar — One Infinite Creator'
+    }
+  ];
+
+  function findPreviewSpec(id) {
+    if (!id || typeof id !== 'string') return null;
+    return DEFAULT_PREVIEWS.find((p) => p.insight_id === id) || null;
+  }
+
+  function notify(message, kind = '', actionLink = null) {
+    const noticeEl = $('notice');
+    if (!noticeEl) return;
+    noticeEl.hidden = false;
+    noticeEl.className = `notice ${kind}`;
+    if (!actionLink) {
+      noticeEl.textContent = message;
+      return;
+    }
+    if (typeof noticeEl.replaceChildren === 'function' && typeof document.createElement === 'function') {
+      noticeEl.replaceChildren();
+      const span = document.createElement('span');
+      span.textContent = message;
+      if (noticeEl.append) noticeEl.append(span); else if (noticeEl.appendChild) noticeEl.appendChild(span);
+      const a = document.createElement('a');
+      a.href = actionLink.href;
+      a.textContent = actionLink.text;
+      a.className = 'notice-action';
+      if (a.style) {
+        a.style.marginLeft = '8px';
+        a.style.fontWeight = 'bold';
+        a.style.color = 'inherit';
+        a.style.textDecoration = 'underline';
+      }
+      if (noticeEl.append) noticeEl.append(a); else if (noticeEl.appendChild) noticeEl.appendChild(a);
+    } else {
+      noticeEl.textContent = message;
+    }
+  }
+
+  function markIdeaExported() {
+    try {
+      const ideaId = state.idea_id || (typeof location !== 'undefined' ? new URLSearchParams(location.search).get('idea') : null);
+      const ACTIONS_KEY = 'muse.actions';
+      const raw = localStorage.getItem(ACTIONS_KEY) || '{}';
+      const all = typeof raw === 'string' && raw ? JSON.parse(raw) : {};
+      const actionKey = ideaId || 'custom-post';
+      all[actionKey] = {
+        ...(all[actionKey] || {}),
+        status: 'done',
+        title: state.headline || state.product.name || 'Creator Studio Post',
+        href: location.pathname + location.search,
+        page: location.pathname,
+        at: new Date().toISOString()
+      };
+      localStorage.setItem(ACTIONS_KEY, JSON.stringify(all));
+      if (typeof window.dispatchEvent === 'function') {
+        window.dispatchEvent(new StorageEvent('storage', { key: ACTIONS_KEY }));
+      }
+      window.museTrack?.('idea_done', { action_id: actionKey, idea_id: ideaId });
+    } catch (_) {}
+    const offerEl = $('exportDoneOffer');
+    if (offerEl) offerEl.hidden = false;
+    notify('Post exported using your current headline. Copy the matching caption before posting.', '', { href: '/progress', text: 'Log result →' });
+  }
+
+  function applyIdea(spec) {
+    if (!spec) return;
+    state.idea = spec;
+    state.idea_id = spec.insight_id;
+    state.headline = spec.headline;
+    state.caption = spec.caption;
+    state.copyEdited = true;
+    state.sceneEdited = true;
+    if (spec.product_name) {
+      state.product.name = spec.product_name;
+    }
+    if (spec.image_ref && samplePath(spec.image_ref)) {
+      state.original = samplePath(spec.image_ref);
+      state.image = samplePath(spec.image_ref);
+      state.sampleImage = samplePath(spec.image_ref);
+      state.imageKind = 'original';
+    }
+    const mappedGoal = spec.goal || (spec.insight_id.includes('gift') ? 'gift' : (spec.insight_id.includes('starter') || spec.insight_id.includes('visit') || spec.insight_id.includes('home') ? 'visit' : 'story'));
+    if (Object.hasOwn(goals, mappedGoal)) {
+      state.goal = mappedGoal;
+      document.querySelectorAll?.('.goal').forEach((b) => {
+        const active = b.dataset.goal === mappedGoal;
+        b.classList.toggle('selected', active);
+        b.setAttribute('aria-pressed', String(active));
+      });
+    }
+    if (spec.placement === 'facebook_feed') {
+      $('postFacebook').checked = true;
+    } else {
+      $('postInstagram').checked = true;
+    }
+    state.revision += 1;
+    $('headline').value = state.headline;
+    $('caption').value = state.caption;
+    $('productName').value = state.product.name || '';
+    if ($('ideaTitle')) $('ideaTitle').textContent = spec.headline;
+    if ($('ideaReason')) $('ideaReason').textContent = spec.why_this || '';
+    $('productImageCaption').textContent = `${state.product.name || spec.headline} · loaded from research recommendation.`;
+    refreshPreview();
+    notify(`Loaded recommendation: ${spec.headline}. Evidence: ${spec.why_this || ''}`);
+  }
   function sync() {
     for (const [id, key] of Object.entries(fields)) state.product[key] = $(id).value.trim();
     if (state.product.destination) offers[state.product.destination] = { price: state.product.price, link: state.product.link };
@@ -341,6 +507,8 @@
     if (state.image) { $('sceneCompare').src = state.image; $('sceneCompare').hidden = false; } else { $('sceneCompare').removeAttribute('src'); $('sceneCompare').hidden = true; }
     $('sceneLabel').textContent = state.imageKind === 'original' ? 'Original-photo layout' : state.imageKind === 'saved' ? 'Saved AI scene' : 'New AI scene';
     $('previewShop').textContent = state.product.seller || 'Your shop'; $('previewHeadline').textContent = state.headline; $('previewCaption').textContent = state.caption; $('imageProvenance').textContent = state.provenance; $('shareTitle').textContent = state.product.name || 'Your product'; $('shareProvenance').textContent = state.provenance;
+    if (state.idea?.why_this && $('ideaReason')) $('ideaReason').textContent = state.idea.why_this;
+    if (state.idea?.headline && $('ideaTitle')) $('ideaTitle').textContent = state.idea.headline;
     const link = safeLink(state.product.link); $('listingLink').hidden = !link; if (link) $('listingLink').href = link;
     $('destinationNote').textContent = destinationNote();
     $('productPrice').placeholder = `Optional ${destinations[state.product.destination]} price`;
@@ -483,14 +651,14 @@
     } catch (error) { try { window.museAccount?.refresh?.().catch(() => {}); } catch {} notify(error.message, 'error'); } finally { setBusy(false); }
   }
   function saveBlob(blob, suffix) { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `${(state.product.name || 'promotion').replace(/[^a-z0-9]+/gi, '-').slice(0, 60)}-${suffix}`; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
-  async function download(height) { if (state.busy || !validateProduct()) return; if (!$('reviewed').checked) { notify('Review your image and wording before downloading.', 'error'); go(2); return; } setBusy(true); try { sync(); const canvas = await drawLayout(height); const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png')); if (!blob) throw new Error('Could not create the download.'); saveBlob(blob, height === 1350 ? 'feed.png' : 'story.png'); window.museTrack?.('post_downloaded', { placement: height === 1350 ? 'feed' : 'story', page: '/create' }); notify('Image downloaded using your current headline. Copy the matching caption before posting.'); } catch (e) { notify(e.message, 'error'); } finally { setBusy(false); } }
+  async function download(height) { if (state.busy || !validateProduct()) return; if (!$('reviewed').checked) { notify('Review your image and wording before downloading.', 'error'); go(2); return; } setBusy(true); try { sync(); const canvas = await drawLayout(height); const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png')); if (!blob) throw new Error('Could not create the download.'); saveBlob(blob, height === 1350 ? 'feed.png' : 'story.png'); window.museTrack?.('post_downloaded', { placement: height === 1350 ? 'feed' : 'story', page: '/create' }); notify('Image downloaded using your current headline. Copy the matching caption before posting.'); markIdeaExported(); } catch (e) { notify(e.message, 'error'); } finally { setBusy(false); } }
   function campaignPack() { sync(); return { product: { ...state.product, link: safeLink(state.product.link) }, goal: state.goal, headline: state.headline, caption: state.caption, scene_prompt: state.scene, image_provenance: state.provenance, mode: state.imageKind, posting_channels: postingChannels(), note: 'Download the image separately. This pack does not launch ads or publish posts. Destination details are kept only in this tab; prices are not synced.', posting_checklist: postingChecklist() }; }
   for (const id of [...Object.keys(fields), 'headline', 'caption', 'scene']) $(id).addEventListener('input', changed);
   $('artistExample').addEventListener('click', () => selectExample('sarabjit_singh')); $('ceramicsExample').addEventListener('click', () => selectExample('etsy_ceramics')); $('customProduct').addEventListener('click', newProduct);
   $('importProducts').addEventListener('click', importProducts);
   $('promotionDestination').addEventListener('change', switchDestination);
   for (const id of ['postInstagram', 'postFacebook']) $(id).addEventListener('change', changed);
-  $('downloadInstructions').addEventListener('click', () => { if (state.busy || !$('reviewed').checked || !postingChannels().length) { notify('Review your post and choose a posting channel before downloading instructions.', 'error'); return; } const pack = campaignPack(); saveBlob(new Blob([`${pack.product.name}\n${$('postingSummary').textContent}\n\n${pack.headline}\n\n${pack.caption}\n\n${pack.posting_checklist.map((line, i) => `${i + 1}. ${line}`).join('\n\n')}`], { type: 'text/plain' }), 'posting-instructions.txt'); });
+  $('downloadInstructions').addEventListener('click', () => { if (state.busy || !$('reviewed').checked || !postingChannels().length) { notify('Review your post and choose a posting channel before downloading instructions.', 'error'); return; } const pack = campaignPack(); saveBlob(new Blob([`${pack.product.name}\n${$('postingSummary').textContent}\n\n${pack.headline}\n\n${pack.caption}\n\n${pack.posting_checklist.map((line, i) => `${i + 1}. ${line}`).join('\n\n')}`], { type: 'text/plain' }), 'posting-instructions.txt'); markIdeaExported(); });
   $('productPhoto').addEventListener('change', async (event) => { if (state.busy) return; try { await upload(event.target.files?.[0]); } catch (e) { notify(e.message, 'error'); } });
   const stepButtons = [...document.querySelectorAll('[data-step]')];
   stepButtons.forEach((el, idx) => {
@@ -530,7 +698,7 @@
     });
   });
   $('nextButton').addEventListener('click', () => go(Math.min(3, state.step + 1))); $('backButton').addEventListener('click', () => go(Math.max(0, state.step - 1))); $('originalButton').addEventListener('click', () => { originalLayout(); $('reviewed').checked = false; }); $('draftButton').addEventListener('click', draft); $('generateButton').addEventListener('click', generate);
-  $('downloadFeed').addEventListener('click', () => download(1350)); $('downloadStory').addEventListener('click', () => download(1920)); $('downloadPack').addEventListener('click', () => { if (state.busy) return; if (!$('reviewed').checked) { notify('Review your product details and wording before downloading.', 'error'); return; } saveBlob(new Blob([JSON.stringify(campaignPack(), null, 2)], { type: 'application/json' }), 'campaign.json'); });
+  $('downloadFeed').addEventListener('click', () => download(1350)); $('downloadStory').addEventListener('click', () => download(1920)); $('downloadPack').addEventListener('click', () => { if (state.busy) return; if (!$('reviewed').checked) { notify('Review your product details and wording before downloading.', 'error'); return; } saveBlob(new Blob([JSON.stringify(campaignPack(), null, 2)], { type: 'application/json' }), 'campaign.json'); markIdeaExported(); });
   $('copyCaption').addEventListener('click', async () => { sync(); try { await navigator.clipboard.writeText(`${state.headline}\n\n${state.caption}${safeLink(state.product.link) ? '\n\n' + safeLink(state.product.link) : ''}`); notify('Your current caption and link are copied.'); } catch { notify('Clipboard access is unavailable. Select and copy your caption from the edit screen.', 'error'); } });
   $('unlockKey').addEventListener('input', () => { state.key = $('unlockKey').value.trim(); });
   $('liveMode').addEventListener('change', () => { if ($('liveMode').checked && state.readiness && !state.readiness.provider_key_configured) { $('liveMode').checked = false; notify('The server has no Muse provider key configured. Saved examples still work.', 'error'); } if ($('liveMode').checked && !state.key && !state.defaultLive && !state.accountLive) { $('liveMode').checked = false; notify('Enter the configured demo unlock key first.', 'error'); } state.live = $('liveMode').checked; updateMode(); });
@@ -566,10 +734,17 @@
     $('productImageCaption').textContent = `${name} · original artwork preview. Source: Art of Sarabjit Singh.`;
     notify(`Loaded from the saved Muse ad: ${name}. Choose “Preview a room scene” in step 3 to use its saved Muse image.`);
   }
-  // Ranked ideas on the portal link here with ?goal=story|gift|visit; only known goals are accepted.
-  const requestedGoal = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('goal') : null;
-  if (requestedGoal && Object.hasOwn(goals, requestedGoal)) document.querySelector?.(`[data-goal="${requestedGoal}"]`)?.click();
-  window.museTrack?.('post_started', { goal: requestedGoal || 'default', source: 'creator' });
+  const requestedIdea = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('idea') : null;
+  const ideaSpec = requestedIdea ? findPreviewSpec(requestedIdea) : null;
+  if (ideaSpec) {
+    applyIdea(ideaSpec);
+    window.museTrack?.('post_started', { idea_id: requestedIdea, source: 'creator' });
+  } else {
+    // Ranked ideas on the portal link here with ?goal=story|gift|visit; only known goals are accepted.
+    const requestedGoal = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('goal') : null;
+    if (requestedGoal && Object.hasOwn(goals, requestedGoal)) document.querySelector?.(`[data-goal="${requestedGoal}"]`)?.click();
+    window.museTrack?.('post_started', { idea_id: null, goal: requestedGoal || 'default', source: 'creator' });
+  }
   // Expose a read-only snapshot for focused offline contract checks; never expose the unlock key.
   window.museCreatorSnapshot = () => JSON.parse(JSON.stringify(campaignPack()));
 })();

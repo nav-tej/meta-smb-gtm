@@ -569,7 +569,7 @@
 
     var creatorLink = document.getElementById('jrOpenCreatorLink');
     if (creatorLink) {
-      creatorLink.href = '/create?goal=' + encodeURIComponent(spec.insight_id);
+      creatorLink.href = '/create?idea=' + encodeURIComponent(spec.insight_id);
     }
 
     dialogEl.showModal();
@@ -834,6 +834,11 @@
         event.stopPropagation();
         openPreview(spec, ideaTitle, index + 1);
       });
+
+      var recoActionLink = li.querySelector('a[href^="/create"]');
+      if (recoActionLink) {
+        recoActionLink.href = '/create?idea=' + encodeURIComponent(spec.insight_id);
+      }
 
       li.classList.add('has-thumb');
       li.appendChild(btn);

@@ -131,7 +131,7 @@ def _age(seconds: float) -> str:
 SNAPSHOT_MOVE = DailyMove(
     title="Feature your Empowering Women series",
     reason="SikhiArt keeps adding warrior and guru editions but has no group for women's stories.",
-    href="/create?goal=story",
+    href="/create?idea=idea-1-empowering-women",
     impact="high",
     source="Competitor gap in the saved SikhiArt brief",
 )
@@ -277,7 +277,11 @@ def _trends() -> tuple[list[TrendItem], list[DailyMove], str]:
                 DailyMove(
                     title=f"Refresh the creative on {ad_set.ad_set_name}",
                     reason=f"Click-through rate {fell} as the same people keep seeing it.",
-                    href="/create?goal=gift" if "gift" in ad_set.ad_set_name.lower() else "/create",
+                    href=(
+                        "/create?idea=idea-3-gift-ready"
+                        if "gift" in ad_set.ad_set_name.lower()
+                        else "/create?idea=idea-2-starter-prints"
+                    ),
                     impact="high",
                     source="Campaign trend",
                 )
