@@ -109,7 +109,30 @@ def test_welcome_onboarding_full_flow_and_honest_workspace(
                     method = route.request.method
                     print(f"ROUTE: {{method}} {{url}}", flush=True)
 
-                    if url.endswith("/api/v1/credits/spend") and method == "POST":
+                    is_spend = url.endswith("/api/v1/credits/spend")
+                    is_build = url.endswith("/api/v1/onboarding/build")
+                    if (is_spend or is_build) and method == "POST":
+                        remaining_runs = max(0, remaining_runs - 1)
+                        if url.endswith("/api/v1/onboarding/build"):
+                            post_data = route.request.post_data_json or {{}}
+                            workspace_store["document"]["onboarding"] = {{
+                                **post_data,
+                                "completed_at": "2026-11-10T12:00:00Z",
+                                "used_run": True,
+                            }}
+                            route.fulfill(
+                                status=200,
+                                content_type="application/json",
+                                body=json.dumps({{
+                                    "success": True,
+                                    "charged": True,
+                                    "used_run": True,
+                                    "runs_remaining": remaining_runs,
+                                    "completed_at": "2026-11-10T12:00:00Z",
+                                    "workspace": workspace_store,
+                                }}),
+                            )
+                            return
                         route.fulfill(
                             status=200,
                             content_type="application/json",

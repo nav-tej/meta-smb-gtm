@@ -156,9 +156,14 @@
     };
   }
 
-  function readLocalOnboarding() {
+  function localKeyForUser(user) {
+    return user && user.id ? `muse_onboarding_${user.id}` : 'muse_onboarding_anon';
+  }
+
+  function readLocalOnboarding(user) {
     try {
-      const raw = localStorage.getItem(LOCAL_ONBOARDING_KEY);
+      const key = localKeyForUser(user);
+      const raw = localStorage.getItem(key);
       if (!raw) return null;
       return { ...defaultOnboardingState(), ...JSON.parse(raw) };
     } catch (_) {
@@ -166,9 +171,10 @@
     }
   }
 
-  function writeLocalOnboarding(state) {
+  function writeLocalOnboarding(state, user) {
     try {
-      localStorage.setItem(LOCAL_ONBOARDING_KEY, JSON.stringify(state));
+      const key = localKeyForUser(user);
+      localStorage.setItem(key, JSON.stringify(state));
     } catch (_) {}
   }
 
@@ -178,7 +184,7 @@
         const snap = await window.museAccount.ready();
         if (snap && snap.user && typeof window.museAccount.loadWorkspace === 'function') {
           const ws = await window.museAccount.loadWorkspace(snap.user.id);
-          return { doc: ws.document || {}, user: snap.user, usage: snap.usage };
+          return { doc: ws.document || {}, version: ws.version || 0, user: snap.user, usage: snap.usage };
         }
       }
       const meResp = await fetch('/api/v1/account/me', { credentials: 'same-origin' });
@@ -205,8 +211,9 @@
     return { doc: null, user: null, usage: null };
   }
 
-  async function saveServerOnboarding(onboardingState, preferencesObj) {
-    writeLocalOnboarding(onboardingState);
+  async function saveServerOnboarding(onboardingState, preferencesObj, userObj) {
+    const user = userObj || (window.museAccount?.getSnapshot?.()?.user || null);
+    writeLocalOnboarding(onboardingState, user);
     try {
       if (window.museAccount && typeof window.museAccount.getSnapshot === 'function') {
         const snap = window.museAccount.getSnapshot();
@@ -239,7 +246,7 @@
         onboarding: onboardingState,
         ...(preferencesObj ? { preferences: preferencesObj } : {}),
       };
-      await fetch('/api/v1/account/workspace', {
+      const putResp = await fetch('/api/v1/account/workspace', {
         method: 'PUT',
         credentials: 'same-origin',
         headers: {
@@ -252,9 +259,13 @@
           expected_owner: me.user.id,
         }),
       });
+      if (!putResp.ok) {
+        const errJson = await putResp.json().catch(() => ({}));
+        throw new Error(errJson.detail || errJson.message || 'Failed to save workspace to server.');
+      }
       return true;
-    } catch (_) {
-      return false;
+    } catch (err) {
+      throw err;
     }
   }
 
@@ -265,12 +276,12 @@
     const mainEl = document.getElementById('wkMain');
     if (!mainEl) return;
 
-    let state = readLocalOnboarding() || defaultOnboardingState();
     let currentUser = null;
     let runsRemaining = 3;
 
     const server = await loadServerWorkspaceDoc();
     if (server.user) currentUser = server.user;
+    let state = readLocalOnboarding(currentUser) || defaultOnboardingState();
     if (server.usage && typeof server.usage.remaining === 'number') {
       runsRemaining = Math.max(0, server.usage.remaining);
     } else {
@@ -284,8 +295,8 @@
     }
 
     if (server.doc && server.doc.onboarding && typeof server.doc.onboarding === 'object') {
-      state = { ...defaultOnboardingState(), ...state, ...server.doc.onboarding };
-      writeLocalOnboarding(state);
+      state = { ...defaultOnboardingState(), ...server.doc.onboarding };
+      writeLocalOnboarding(state, currentUser);
     }
 
     const query = new URLSearchParams(window.location.search || '');
@@ -328,7 +339,7 @@
 
     const showStep = (stepNum) => {
       state.step = stepNum;
-      writeLocalOnboarding(state);
+      writeLocalOnboarding(state, currentUser);
       [1, 2, 3, 4].forEach((n) => {
         const sec = document.getElementById(`wkStep${n}`);
         if (sec) sec.hidden = n !== stepNum;
@@ -588,7 +599,7 @@
       });
       if (inp) inp.value = '';
       renderStep2Socials();
-      writeLocalOnboarding(state);
+      writeLocalOnboarding(state, currentUser);
     });
 
     document.getElementById('wkStep2BackBtn')?.addEventListener('click', () => showStep(1));
@@ -627,7 +638,7 @@
         cb.checked = comp.selected !== false;
         cb.addEventListener('change', () => {
           comp.selected = cb.checked;
-          writeLocalOnboarding(state);
+          writeLocalOnboarding(state, currentUser);
         });
 
         const textWrap = document.createElement('div');
@@ -653,7 +664,7 @@
         removeBtn.addEventListener('click', () => {
           state.competitors.splice(idx, 1);
           renderStep3Competitors();
-          writeLocalOnboarding(state);
+          writeLocalOnboarding(state, currentUser);
         });
 
         li.append(label, removeBtn);
@@ -747,7 +758,7 @@
       if (urlInp) urlInp.value = '';
       if (reasonInp) reasonInp.value = '';
       renderStep3Competitors();
-      writeLocalOnboarding(state);
+      writeLocalOnboarding(state, currentUser);
     });
 
     document.getElementById('wkStep3BackBtn')?.addEventListener('click', () => showStep(2));
@@ -801,28 +812,71 @@
         trackEvent('onboarding_step_completed', { step: 4 });
       }
 
-      // Cost rule: Onboarding costs exactly ONE run, charged only on successful completion at final step
+      const finishBtn = document.getElementById('wkStep4FinishBtn');
+      const skipBtn = document.getElementById('wkStep4SkipBtn');
+      const errEl = document.getElementById('wkStep4Error');
+      if (errEl) errEl.hidden = true;
+      if (finishBtn) finishBtn.disabled = true;
+      if (skipBtn) skipBtn.disabled = true;
+
       if (runsRemaining > 0) {
         trackEvent('onboarding_run_confirmed', { runs_remaining: runsRemaining });
-        try {
-          await fetch('/api/v1/credits/spend', {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ label: 'Onboarding workspace build' }),
-          });
-        } catch (_) {}
+      }
+
+      let buildResult = null;
+      try {
+        const payload = {
+          business_name: state.business_name,
+          shop_urls: state.shop_urls,
+          socials: state.socials,
+          competitors: state.competitors,
+          preferences: state.preferences,
+          skipped: state.skipped,
+          crawl_summary: state.crawl_summary,
+          step: 5,
+        };
+
+        const headers = { 'Content-Type': 'application/json' };
+        if (currentUser?.id) {
+          headers['X-Muse-Owner'] = currentUser.id;
+        }
+
+        const resp = await fetch('/api/v1/onboarding/build', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers,
+          body: JSON.stringify(payload),
+        });
+
+        if (!resp.ok) {
+          const errData = await resp.json().catch(() => ({}));
+          throw new Error(errData.detail || errData.message || 'Could not complete onboarding. Please try again.');
+        }
+
+        buildResult = await resp.json();
+      } catch (err) {
+        if (errEl) {
+          errEl.hidden = false;
+          errEl.textContent = err.message || 'Could not complete onboarding.';
+        }
+        if (finishBtn) finishBtn.disabled = false;
+        if (skipBtn) skipBtn.disabled = false;
+        return;
+      }
+
+      state.completed_at = buildResult.completed_at || new Date().toISOString();
+      state.used_run = Boolean(buildResult.used_run);
+      if (typeof buildResult.runs_remaining === 'number') {
+        runsRemaining = buildResult.runs_remaining;
+      } else if (buildResult.charged) {
         runsRemaining = Math.max(0, runsRemaining - 1);
-        state.used_run = true;
-      } else {
-        state.used_run = false;
       }
       updateRunsUI();
 
-      state.completed_at = new Date().toISOString();
       try {
         localStorage.setItem(LOCAL_WORKSPACE_MODE_KEY, 'own');
       } catch (_) {}
+      writeLocalOnboarding(state, currentUser);
 
       const confirmedSocials = (state.socials || []).filter((s) => s.confirmed !== false);
       const selectedCompetitors = (state.competitors || []).filter((c) => c.selected !== false);
@@ -878,8 +932,6 @@
       }
 
       showStep(5);
-      await saveServerOnboarding(state, state.preferences);
-
       trackEvent('onboarding_explainer_viewed', {
         used_run: Boolean(state.used_run),
         runs_left: runsRemaining,
@@ -1362,9 +1414,10 @@
     }
 
     const server = await loadServerWorkspaceDoc();
-    const localOnb = readLocalOnboarding();
-    const onboarding = server.doc?.onboarding || localOnb || null;
     const isSignedIn = Boolean(server.user && server.user.id);
+    // Bind onboarding state to the server document for signed-in accounts.
+    // Unscoped local storage from other accounts on this browser is never trusted.
+    const onboarding = isSignedIn ? (server.doc?.onboarding || null) : readLocalOnboarding(null);
 
     // Post-auth routing rule: if signed-in user has no completed onboarding, redirect to /welcome
     if (isSignedIn && (!onboarding || !onboarding.completed_at)) {
@@ -1392,7 +1445,8 @@
     const query = new URLSearchParams(window.location.search || '');
     if (query.get('workspace') === 'sample') return;
     const server = await loadServerWorkspaceDoc();
-    const onb = server.doc?.onboarding || readLocalOnboarding();
+    // Authoritative check on server document: no cross-account local leak
+    const onb = server.doc?.onboarding || null;
     if (!onb || !onb.completed_at) {
       window.location.assign('/welcome');
     } else {

@@ -168,9 +168,28 @@ async def oauth_google_callback(request: Request) -> RedirectResponse:
         request.query_params.get("state"),
         request.query_params.get("error"),
     )
-    query = urlencode({"oauth_error": error_msg} if error_msg else {"oauth": "google"})
+    if error_msg:
+        query = urlencode({"oauth_error": error_msg})
+        return RedirectResponse(
+            f"{target}?{query}", status_code=302, headers={"Cache-Control": "no-store"}
+        )
+
+    next_dest = "/"
+    if tokens is not None:
+        try:
+            account = await verify_token(tokens.get("access_token", ""))
+            ws = await load_workspace(account)
+            onb = ws.get("document", {}).get("onboarding") if ws.get("document") else None
+            if not onb or not onb.get("completed_at"):
+                next_dest = target if target not in {"/account", "/"} else "/welcome"
+            else:
+                next_dest = target if target != "/account" else "/"
+        except Exception:
+            next_dest = target if target not in {"/account", "/"} else "/welcome"
+
+    query = urlencode({"oauth": "google"})
     redirect = RedirectResponse(
-        f"{target}?{query}", status_code=302, headers={"Cache-Control": "no-store"}
+        f"{next_dest}?{query}", status_code=302, headers={"Cache-Control": "no-store"}
     )
     redirect.delete_cookie("muse_oauth_state", path="/")
     if tokens is not None:
@@ -187,6 +206,12 @@ async def signin(body: SigninRequest, response: Response, _: Mutation) -> dict[s
     result = await snapshot(account)
     set_cookies(response, tokens)
     response.headers["Cache-Control"] = "no-store"
+    try:
+        ws = await load_workspace(account)
+        onb = ws.get("document", {}).get("onboarding") if ws.get("document") else None
+        result["next_path"] = "/" if onb and onb.get("completed_at") else "/welcome"
+    except Exception:
+        result["next_path"] = "/welcome"
     return result
 
 

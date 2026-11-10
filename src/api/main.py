@@ -23,6 +23,7 @@ from src.api import (
     intel,
     media,
     monitor,
+    onboarding,
     product_reference,
     research_targets,
 )
@@ -298,6 +299,7 @@ app.include_router(credits.router, prefix=API_PREFIX)
 app.include_router(monitor.router, prefix=API_PREFIX)
 app.include_router(digest_email.router, prefix=API_PREFIX)
 app.include_router(directives.router, prefix=API_PREFIX)
+app.include_router(onboarding.router, prefix=API_PREFIX)
 # Short aliases: /api/credits, /api/monitor, /api/weekly-digest
 app.include_router(credits.router, prefix="/api", include_in_schema=False)
 app.include_router(monitor.router, prefix="/api", include_in_schema=False)

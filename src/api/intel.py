@@ -27,6 +27,7 @@ from src.services.seller_audit import (
     audit_seller_footprint,
     compute_seller_diagnostics,
 )
+from src.services.social_extract import extract_social_handles
 from src.utils.sitemap import SitemapError
 
 router = APIRouter(tags=["intel"])
@@ -188,6 +189,14 @@ async def ingest_storefront(request: IngestStorefrontRequest) -> dict[str, Any]:
         f"Detected price points: {prices_str}."
     )
 
+    suggested_socials = extract_social_handles(
+        {
+            "social_urls": request.social_urls,
+            "channels": channel_results,
+            "items": discovered_items,
+        }
+    )
+
     return {
         "business_name": request.business_name,
         "total_channels": len(channel_results),
@@ -196,6 +205,7 @@ async def ingest_storefront(request: IngestStorefrontRequest) -> dict[str, Any]:
         "discovered_catalog_items": discovered_items[:24],
         "detected_price_hints": price_hints,
         "seller_context": seller_context,
+        "suggested_socials": suggested_socials,
     }
 
 

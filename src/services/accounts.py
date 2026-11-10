@@ -19,7 +19,7 @@ from fastapi import HTTPException, Request, Response
 from src.clients.supabase import SupabaseError, configured, get_supabase_client
 from src.config import get_settings
 
-SAFE_NEXT_PATHS = {"/", "/account", "/today", "/create", "/digest", "/portal"}
+SAFE_NEXT_PATHS = {"/", "/account", "/today", "/create", "/digest", "/portal", "/welcome"}
 
 
 @dataclass(frozen=True)
