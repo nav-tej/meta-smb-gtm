@@ -3,8 +3,14 @@
 **Branch:** `backend-real` (branched from `prd-research-previews` at `8c3fa0b`)
 **Owner:** Antigravity Session 2 (backend)
 **Baseline:** `make check` passed (441 passed, 2 skipped in 20.76s).
-**Current Suite:** `make check` passed (516 passed, 2 skipped in 43.00s; ruff check clean, ruff format clean across 230 files).
-**Status:** Gate 1 Reached. Items 10, 11, and Step 4b Completed & Verified. Ready for Gemini REVIEW (Gate 1).
+**Current Suite:** `make check` passed (523 passed, 2 skipped in 49.91s; ruff check clean, ruff format clean across 235 files).
+**Status:** Gate 1 Reached. Items 1 to 4, 10, 5–9, 11, and Step 4b Completed & Verified. Ready for Gemini REVIEW (Gate 1).
+
+### Review Blockers Status:
+- **Blocker 1 (Onboarding ownership & debit):** Closed (`commit 390d3ff`, `commit 68103d5`, `commit 954ad12`)
+- **Blocker 2 (Escape digest email in preview UI):** Closed (`commit b2af9e9`)
+- **Blocker 3 (Progress page honest labels, ownership, ROI):** Closed (`commit 5d40d06`, `commit 954ad12`)
+- **Blocker 4 (Remove/reword unkeepable promises):** Closed (`commit aeaa212`, `commit 954ad12`)
 
 ---
 
