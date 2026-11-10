@@ -1,0 +1,29 @@
+# Muse Growth Studio
+> AI marketing copilot and competitive growth studio for makers, fine artists, and small shops.
+
+## Overview
+Muse Growth Studio helps solo artists, craftspeople, and handmade shop owners understand their market and create high-performing marketing assets without spending hours on agency fees or ad buying. Muse combines competitor intelligence, content planning, and creative post generation in a continuous 15-minute daily loop.
+
+## Core Growth Loop
+1. **Research (Competitor Intel):** Crawls public listings and prices across Shopify, Pixels, Fine Art America, and Saatchi Art. Identifies pricing gaps, new product drops, and catalog movements without accessing private accounts or personal data.
+2. **Create (Ad Creative Studio):** Stages artist catalog works in collector room scenes and generates ready-to-post graphics with headlines and captions formatted for Instagram (Feed 4:5, Story 9:16) and Facebook Feed.
+3. **Improve (Ranked Next Moves):** Prioritizes strategic actions based on competitive gaps (e.g., under-cutting high competitor entry prices, launching missing collections). Every insight features a 1:1 preview.
+4. **Iterate (Daily Desk & Outcome Logging):** Track results (reach, clicks, orders, revenue), calculate transparent ROI against plan cost, and adapt recommendations to seller taste and difficulty.
+
+## Key Principles & Guardrails
+- **Truth in Advertising:** Every figure displayed in the UI is explicitly labeled as `[live]`, `[sample]`, or `[estimate]`. Signed-in sellers never see sample data as their own unless explicitly viewing the sample shop.
+- **Account Isolation:** Seller data, competitor watchlists, and generated creative drafts are securely partitioned per user account in cloud storage.
+- **Steerable Research & Prompt Safety:** Seller queries are strictly parsed into structured typed directives (`ResearchDirective`) with a 300-character cap. Raw inputs and crawled page text are never concatenated into executable model instructions.
+- **Seller Voice & Humanizer:** Generated copy is matched to the seller's verified brand voice and passed through a deterministic humanizer lint that strips stock AI cliches ("delve", "tapestry", em dashes, rule-of-three padding).
+- **Quota Transparency:** Onboarding costs exactly 1 run (charged only upon successful workspace build). Weekly digest reading is free (0 runs). Re-ranking cached research costs 0 runs.
+
+## Important URLs & Routes
+- Homepage & Loop: https://meta-smb-gtm.vercel.app/
+- Shop Onboarding: https://meta-smb-gtm.vercel.app/welcome
+- Daily Post Desk: https://meta-smb-gtm.vercel.app/today
+- Ad Creative Studio: https://meta-smb-gtm.vercel.app/create
+- Weekly Market Digest: https://meta-smb-gtm.vercel.app/digest
+- Progress & ROI Tracker: https://meta-smb-gtm.vercel.app/progress
+- Terms of Service: https://meta-smb-gtm.vercel.app/static/legal/terms.html
+- Privacy Policy: https://meta-smb-gtm.vercel.app/static/legal/privacy.html
+- Refund Policy: https://meta-smb-gtm.vercel.app/static/legal/refunds.html

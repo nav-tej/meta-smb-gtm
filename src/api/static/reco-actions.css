@@ -582,3 +582,90 @@
   text-decoration: underline;
 }
 
+/* Track I: Steerable research chips and preview */
+.jr-chip-btn {
+  padding: 0.35rem 0.75rem;
+  border-radius: 20px;
+  border: 1px solid #d5cfc2;
+  background: #fff;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #3d3b36;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.jr-chip-btn:hover {
+  background: #eef7f2;
+  border-color: #2f6f4f;
+  color: #2f6f4f;
+}
+
+/* Track J: Brand voice feedback widget in preview */
+.jr-voice-feedback {
+  margin-top: 0.85rem;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  background: #f7f4ee;
+  border: 1px solid #e6e1d6;
+  display: grid;
+  gap: 0.5rem;
+}
+.jr-voice-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.jr-voice-label {
+  font-weight: 700;
+  font-size: 0.82rem;
+  color: #1e3a29;
+}
+.jr-voice-source {
+  font-size: 0.72rem;
+  color: #7a756b;
+}
+.jr-voice-buttons {
+  display: flex;
+  gap: 0.4rem;
+}
+.jr-voice-thumb {
+  background: #fff;
+  border: 1px solid #d5cfc2;
+  border-radius: 6px;
+  padding: 0.2rem 0.5rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+.jr-voice-thumb:hover {
+  background: #eef7f2;
+  border-color: #2f6f4f;
+}
+.jr-voice-adjustments {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+.jr-voice-chip {
+  padding: 0.25rem 0.55rem;
+  border-radius: 14px;
+  background: #fff;
+  border: 1px solid #d5cfc2;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: #49453e;
+  cursor: pointer;
+}
+.jr-voice-chip:hover {
+  background: #2f6f4f;
+  color: #fff;
+  border-color: #2f6f4f;
+}
+.jr-voice-status {
+  font-size: 0.75rem;
+  color: #2f6f4f;
+  font-weight: 600;
+}
+
+

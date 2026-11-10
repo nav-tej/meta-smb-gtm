@@ -188,7 +188,7 @@ Added Track I (steerable research with injection guardrails and usage suggestion
 
 - Nav decision, Nov 10: trial is 14 days, aimed at setup and first usage with recommendations. 30-day lift report moves to day 30 of paid accounts. Track K updated.
 
-### Gemini Session 1 Takeover Completion & Handback, November 10 ~01:05 PT
+### Gemini Session 1 Takeover Completion & Handback (Revision 5 Complete), November 10 ~01:30 PT
 - **Previous Owner:** Antigravity Session 1 (interrupted by usage limit).
 - **Branch:** `prd-research-previews`
 - **Delivered & Committed:**
@@ -203,13 +203,20 @@ Added Track I (steerable research with injection guardrails and usage suggestion
      - Track G front end: inline digest habit prompt `#jrDigestPrompt` under `#loop-improve` on `/` and within `#jrPreviewModal`; `/digest` frequency selector (`weekly`, `biweekly`), topic checkboxes (`prices`, `listings`, `ideas`), account gate notice `#digestAccountGate` (per Revision 4), removed free-text email input, and `#digestAccountInfo` showing email and runs left (pauses automatically at 0 runs).
      - Hardened onboarding state persistence timing in `welcome.js`.
      - Added `tests/test_seo_and_digest_ui.py` passing at 375px and 1440px with zero model calls.
+  5. **Revision 5 (Track D+I, Track J, Track F+K, and Discovery Files):**
+     - **Discovery Files:** Created `src/api/static/sitemap.xml`, `src/api/static/robots.txt`, and `src/api/static/llms.txt`; mounted routes `GET /robots.txt`, `GET /sitemap.xml`, `GET /llms.txt`, and `GET /progress` in `src/api/main.py`.
+     - **Track I (Steerable Research & Prompt Safety):** Created `src/models/directive.py` with typed `ResearchDirective`, URL normalization, price band parsing, and prompt injection / personal data guardrails. Added `src/api/directives.py` (`POST /api/v1/directives/parse`, `GET /api/v1/directives/suggestions`). Added `#jrSteerResearch` steering card in `src/api/static/index.html` under `#loop-research` with 4 suggestion chips, directive preview, and confirmation flow.
+     - **Track J (Seller Brand Voice & Humanizer):** Created `src/utils/humanizer.py` implementing deterministic linting and cleaning adhering to [blader/humanizer](https://github.com/blader/humanizer) (no em dashes, no stock AI words, no rule-of-three, sentence length checks). Added "Sounds like you?" brand voice feedback widget in `src/api/static/reco-actions.js` emitting `voice_feedback_submitted`.
+     - **Track F+K (Progress Timeline & ROI Tracker):** Created `src/api/static/progress.html` with KPI cards, transparent ROI rule notice, move history timeline, and 30-second "Log result" modal emitting `result_logged`. Updated `docs/product/PRD.md` with Sections 9, 10, and 11 covering Track I directives, Track J voice profiles, and Track K Weekly Active Sellers (WAS), 14-day trial roadmap, and 30-day lift measurement.
+     - **Track D (Dismiss Signals UI):** Added `.ms-dismiss-reasons` in `src/api/static/muse-shell.js` and `muse-shell.css` presenting 4 one-tap reasons (`not_my_style`, `too_advanced`, `no_access`, `already_tried`), persisting signals in `localStorage['muse.dismiss_signals']`, and passing reason to `idea_dismissed` PostHog event.
+     - **Tests & Verification:** Created `tests/test_steer_voice_progress.py` (6 tests passing, including Chromium E2E at 375px and 1440px). Full `make check` passes: **441 passed, 2 skipped in 20.02s**, `ruff check .` clean, `ruff format --check .` clean (197 files).
 - **Verification:**
-  - `make check` is 100% green: `ruff check .` clean, `ruff format --check .` clean (193 files), `pytest` 435 passed, 2 skipped in 14.64s.
+  - `make check` is 100% green: `ruff check .` clean, `ruff format --check .` clean (197 files), `pytest` 441 passed, 2 skipped in 20.02s.
 - **Shipped vs. Fixture-Only vs. Unverified:**
-  - *Shipped (front end):* `/welcome` onboarding, 1:1 insight preview modals/export, SEO head blocks, `og-cover.png`, product analytics events, `/digest` frequency/topic controls and account gating, home page inline digest prompt.
+  - *Shipped (front end):* `/welcome` onboarding, 1:1 insight preview modals/export, SEO head blocks, `og-cover.png`, sitemap.xml, robots.txt, llms.txt, /progress page, steerable research card, brand voice feedback, dismiss reason chips, product analytics events, `/digest` frequency/topic controls and account gating, home page inline digest prompt.
   - *Fixture-only:* `data/demo/previews.json` (5 demo 1:1 creative preview specs); Playwright tests use fixture APIs with zero paid model calls.
   - *Unverified:* Live Resend email sending (digest is disabled in production pending environment settings via `scripts/enable_digest.sh`).
 - **Ownership Release:**
   - Gemini releases ownership of Antigravity Session 1 scope.
-  - No deploy, no push to origin, `DEMO_MODE=true` preserved. Ready for coordinator review and branch integration.
+  - No deploy, no push to origin, `DEMO_MODE=true` strictly preserved. Ready for coordinator review and branch integration.
 

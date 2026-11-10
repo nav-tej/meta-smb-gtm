@@ -19,6 +19,7 @@ from src.api import (
     credits,
     daily_brief,
     digest_email,
+    directives,
     intel,
     media,
     monitor,
@@ -124,6 +125,32 @@ async def customer_portal() -> FileResponse:
 async def account_landing() -> FileResponse:
     """Land email-confirmation links; the account dialog completes sign-in."""
     return FileResponse(STATIC_DIR / "index.html", headers=PAGE_HEADERS)
+
+
+@app.get("/robots.txt", include_in_schema=False)
+async def robots_txt() -> FileResponse:
+    """Serve robots.txt search directives."""
+    return FileResponse(STATIC_DIR / "robots.txt", media_type="text/plain", headers=PAGE_HEADERS)
+
+
+@app.get("/sitemap.xml", include_in_schema=False)
+async def sitemap_xml() -> FileResponse:
+    """Serve sitemap.xml search index."""
+    return FileResponse(
+        STATIC_DIR / "sitemap.xml", media_type="application/xml", headers=PAGE_HEADERS
+    )
+
+
+@app.get("/llms.txt", include_in_schema=False)
+async def llms_txt() -> FileResponse:
+    """Serve llms.txt plain-text documentation for LLMs."""
+    return FileResponse(STATIC_DIR / "llms.txt", media_type="text/plain", headers=PAGE_HEADERS)
+
+
+@app.get("/progress", include_in_schema=False)
+async def progress_page() -> FileResponse:
+    """Serve the Track F/K progress, move tracking, and ROI timeline page."""
+    return FileResponse(STATIC_DIR / "progress.html", headers=PAGE_HEADERS)
 
 
 MUSE_UNAVAILABLE = (
@@ -270,6 +297,7 @@ app.include_router(daily_brief.router, prefix=API_PREFIX)
 app.include_router(credits.router, prefix=API_PREFIX)
 app.include_router(monitor.router, prefix=API_PREFIX)
 app.include_router(digest_email.router, prefix=API_PREFIX)
+app.include_router(directives.router, prefix=API_PREFIX)
 # Short aliases: /api/credits, /api/monitor, /api/weekly-digest
 app.include_router(credits.router, prefix="/api", include_in_schema=False)
 app.include_router(monitor.router, prefix="/api", include_in_schema=False)

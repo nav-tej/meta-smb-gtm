@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /account
+Disallow: /welcome
+Disallow: /portal
+
+Sitemap: https://meta-smb-gtm.vercel.app/sitemap.xml

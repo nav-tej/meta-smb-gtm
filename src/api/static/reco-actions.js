@@ -368,7 +368,64 @@
       track('digest_prompt_shown', { surface: 'preview_dialog' });
     });
     digestBar.appendChild(digestLink);
-    dialogEl.appendChild(digestBar);
+    wrap.appendChild(digestBar);
+
+    // Track J: Brand Voice Feedback Widget
+    var voiceBox = el('div', 'jr-voice-feedback jr-voice-box');
+    var vHead = el('div', 'jr-voice-head');
+    vHead.appendChild(el('span', 'jr-voice-label', 'Sounds like you?'));
+    vHead.appendChild(el('span', 'jr-voice-source', 'Source: [shop bio & catalog]'));
+    var vBtns = el('div', 'jr-voice-buttons');
+    var thumbUp = el('button', 'jr-voice-thumb', '👍');
+    thumbUp.type = 'button';
+    thumbUp.setAttribute('aria-label', 'Sounds like me');
+    var thumbDown = el('button', 'jr-voice-thumb', '👎');
+    thumbDown.type = 'button';
+    thumbDown.setAttribute('aria-label', 'Does not sound like me');
+    vBtns.appendChild(thumbUp);
+    vBtns.appendChild(thumbDown);
+    vHead.appendChild(vBtns);
+
+    var vAdj = el('div', 'jr-voice-adjustments');
+    var chipCasual = el('button', 'jr-voice-chip', 'More casual');
+    chipCasual.type = 'button';
+    var chipFormal = el('button', 'jr-voice-chip', 'More formal');
+    chipFormal.type = 'button';
+    var chipShorter = el('button', 'jr-voice-chip', 'Shorter');
+    chipShorter.type = 'button';
+    vAdj.appendChild(chipCasual);
+    vAdj.appendChild(chipFormal);
+    vAdj.appendChild(chipShorter);
+
+    var vStatus = el('span', 'jr-voice-status');
+    vStatus.hidden = true;
+
+    var handleVoiceFeedback = function (rating, adj) {
+      try {
+        localStorage.setItem('muse.voice_profile', JSON.stringify({ rating: rating, adjustment: adj, updated_at: new Date().toISOString() }));
+      } catch (_) {}
+      vStatus.textContent = adj ? 'Voice tuned: ' + adj : 'Voice feedback saved!';
+      vStatus.hidden = false;
+      track('voice_feedback_submitted', { rating: rating, adjustment: adj, reco_id: currentSpec ? currentSpec.insight_id : null });
+    };
+
+    thumbUp.addEventListener('click', function () { handleVoiceFeedback('thumbs_up', null); });
+    thumbDown.addEventListener('click', function () { handleVoiceFeedback('thumbs_down', null); });
+    chipCasual.addEventListener('click', function () { handleVoiceFeedback('thumbs_up', 'casual'); });
+    chipFormal.addEventListener('click', function () { handleVoiceFeedback('thumbs_up', 'formal'); });
+    chipShorter.addEventListener('click', function () {
+      handleVoiceFeedback('thumbs_up', 'shorter');
+      var postCaption = document.getElementById('jrPostCaption');
+      if (postCaption && currentSpec) {
+        var sentences = currentSpec.caption.split(/(?<=[.!?])\s+/);
+        if (sentences.length > 2) postCaption.textContent = sentences.slice(0, 2).join(' ');
+      }
+    });
+
+    voiceBox.appendChild(vHead);
+    voiceBox.appendChild(vAdj);
+    voiceBox.appendChild(vStatus);
+    wrap.appendChild(voiceBox);
 
     return dialogEl;
   }
@@ -886,6 +943,81 @@
           window.museAccount.ready().then(syncDigestAccount).catch(function () { syncDigestAccount(null); });
         }
       } catch (_) {}
+    }
+
+    // Wire Track I: Steerable Research
+    var steerForm = document.getElementById('jrSteerForm');
+    var steerInput = document.getElementById('jrSteerInput');
+    var directivePreview = document.getElementById('jrDirectivePreview');
+    var directiveSummary = document.getElementById('jrDirectiveSummary');
+    var directiveCost = document.getElementById('jrDirectiveCost');
+    var confirmDirectiveBtn = document.getElementById('jrConfirmDirectiveBtn');
+    var steerStatus = document.getElementById('jrSteerStatus');
+    var steerChips = document.querySelectorAll('.jr-chip-btn');
+
+    if (steerForm && steerInput) {
+      track('directive_suggested_shown', { surface: 'home_research' });
+      var activeDirective = null;
+
+      var parseDirective = async function (text, source) {
+        if (!text) return;
+        if (steerStatus) {
+          steerStatus.hidden = false;
+          steerStatus.textContent = 'Parsing directive safely…';
+        }
+        try {
+          var resp = await fetch('/api/v1/directives/parse', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: text })
+          });
+          var data = await resp.json().catch(function () { return {}; });
+          if (!resp.ok) {
+            throw new Error(data.detail || 'Could not parse directive.');
+          }
+          activeDirective = data.directive;
+          if (directiveSummary) directiveSummary.textContent = data.summary;
+          if (directiveCost) directiveCost.textContent = 'Cost: ' + (data.cost || '0 runs');
+          if (directivePreview) directivePreview.hidden = false;
+          if (steerStatus) steerStatus.hidden = true;
+          track('directive_created', { source: source || 'typed', focus: activeDirective.focus });
+        } catch (err) {
+          if (steerStatus) {
+            steerStatus.hidden = false;
+            steerStatus.textContent = 'Refused: ' + err.message;
+          }
+          track('directive_rejected', { reason: err.message });
+        }
+      };
+
+      steerForm.addEventListener('submit', function (e) {
+        e.preventDefault();
+        parseDirective(steerInput.value.trim(), 'typed');
+      });
+
+      steerChips.forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var promptText = btn.dataset.directive || btn.textContent;
+          steerInput.value = promptText;
+          parseDirective(promptText, 'chip');
+        });
+      });
+
+      if (confirmDirectiveBtn) {
+        confirmDirectiveBtn.addEventListener('click', function () {
+          if (!activeDirective) return;
+          try {
+            localStorage.setItem('muse.active_directive', JSON.stringify(activeDirective));
+          } catch (_) {}
+          if (steerStatus) {
+            steerStatus.hidden = false;
+            steerStatus.textContent = '✓ Research directive confirmed and applied to recommendations from cache.';
+          }
+          if (directivePreview) directivePreview.hidden = true;
+          track('directive_confirmed', { cost: 'free' });
+        });
+      }
     }
 
     refreshStrip();

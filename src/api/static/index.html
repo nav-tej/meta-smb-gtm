@@ -1159,6 +1159,40 @@
             </dl>
             <p class="jr-note">Prices from public listing snapshots (Nov 3): 40 Manjot, 35 Gurinderpreet and 39 SikhiArt prices. Gurdish Pannu sells originals with no USD prices listed.</p>
           </article>
+
+          <article class="jr-card c2 jr-steer-card" id="jrSteerResearch" style="grid-column:1 / -1;margin-top:0.5rem;">
+            <header>
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <h3>Tell Muse what to look into</h3>
+                <span class="jr-badge-sub" style="font-size:0.75rem;padding:2px 8px;border-radius:6px;background:#eef7f2;color:#2f6f4f;font-weight:700;">Track I · Steerable research</span>
+              </div>
+            </header>
+            <p style="margin:0 0 0.75rem;font-size:0.88rem;color:#555047;">Direct research with your own words. Muse parses your question into a safe directive without sending raw text to the model. Re-ranking from cache is free.</p>
+            
+            <form id="jrSteerForm" class="jr-steer-form" novalidate style="display:grid;gap:0.6rem;">
+              <div style="display:flex;gap:0.5rem;align-items:center;">
+                <input id="jrSteerInput" type="text" placeholder="e.g. Look at why SikhiArt dropped prints to $45 or find gift ideas under $50" maxlength="300" style="flex:1;min-height:42px;padding:0.5rem 0.8rem;border:1px solid #d5cfc2;border-radius:10px;font:inherit;">
+                <button type="submit" class="jr-mini primary" id="jrSteerSubmitBtn" style="min-height:42px;padding:0.5rem 1rem;">Parse directive →</button>
+              </div>
+              
+              <div class="jr-steer-chips" id="jrSteerChips" style="display:flex;flex-wrap:wrap;gap:0.4rem;align-items:center;">
+                <span style="font-size:0.75rem;font-weight:700;color:#6b665c;">Suggestions:</span>
+                <button type="button" class="jr-chip-btn" data-directive="Look at why SikhiArt starts at $59.99">Why $59.99 entry</button>
+                <button type="button" class="jr-chip-btn" data-directive="Show me easier moves for solo makers">Easier moves</button>
+                <button type="button" class="jr-chip-btn" data-directive="Gift ideas for upcoming season under $50">Gifts under $50</button>
+                <button type="button" class="jr-chip-btn" data-directive="What should I post on Instagram this week?">Weekly post ideas</button>
+              </div>
+
+              <div id="jrDirectivePreview" class="jr-directive-preview" hidden style="margin-top:0.4rem;padding:0.75rem 1rem;background:#fff;border:1px solid #2f6f4f;border-radius:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
+                <div>
+                  <strong id="jrDirectiveSummary" style="display:block;font-size:0.88rem;color:#1e3a29;"></strong>
+                  <span id="jrDirectiveCost" style="font-size:0.75rem;color:#6b665c;"></span>
+                </div>
+                <button type="button" class="jr-mini primary" id="jrConfirmDirectiveBtn">Confirm &amp; Apply</button>
+              </div>
+              <p id="jrSteerStatus" role="status" aria-live="polite" style="margin:0;font-size:0.82rem;color:#2f6f4f;" hidden></p>
+            </form>
+          </article>
         </div>
       </div>
 

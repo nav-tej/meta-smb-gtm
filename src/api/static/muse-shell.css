@@ -271,6 +271,12 @@
 /* Card layouts (e.g. .jr-recos li { display: grid }) would otherwise override [hidden]. */
 [data-action-id][hidden] { display: none !important; }
 .ms-triage .ms-triage-adjust:hover, .ms-triage .ms-triage-adjust[aria-expanded="true"] { border-color: #b7791f; color: #8a5a12; background: #fbf5e6; }
+.ms-dismiss-reasons { margin-top: 8px; padding: 8px 12px; border-radius: 12px; border: 1px solid #eddcd2; background: #fdf8f5; }
+.ms-dismiss-reasons span { display: block; font-size: 11px; font-weight: 700; margin-bottom: 6px; color: #8a3a1e; }
+.ms-dismiss-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.ms-dismiss-chip { font: inherit; font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 999px; border: 1px solid #e0c5b8; background: #fff; color: #6b2d18; cursor: pointer; }
+.ms-dismiss-chip:hover { background: #8a3a1e; color: #fff; border-color: #8a3a1e; }
+.ms-dismiss-cancel { background: transparent; border: none; font-size: 11px; color: #888; cursor: pointer; text-decoration: underline; margin-left: 4px; }
 .ms-adjust { margin-top: 8px; padding: 10px 12px; border-radius: 12px; border: 1px solid #ead39c; background: #fbf5e6; }
 .ms-adjust label { display: block; font-size: 12px; font-weight: 700; margin-bottom: 6px; color: #5c3d09; }
 .ms-adjust-row { display: flex; flex-wrap: wrap; gap: 6px; }

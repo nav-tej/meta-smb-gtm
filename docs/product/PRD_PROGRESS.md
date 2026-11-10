@@ -35,6 +35,24 @@
   - Added `tests/test_seo_and_digest_ui.py` covering SEO tags, `og-cover.png` specs, digest controls, account gate, and Playwright browser E2E test at 375px and 1440px with zero model calls.
   - Full `make check` passing cleanly (`ruff check .`, `ruff format --check .`, `pytest` — 435 passed, 2 skipped in 14.64s).
 
+- **Revision 5: Track D+I, Track J, Track F+K, and Discovery Files (Finished, Ready to Commit):**
+  - **Discovery Files:** Created `src/api/static/sitemap.xml`, `src/api/static/robots.txt`, and `src/api/static/llms.txt` documenting the project, 4-stage growth loop, truth principles, and route map; mounted `GET /robots.txt`, `GET /sitemap.xml`, `GET /llms.txt`, and `GET /progress` in `src/api/main.py`.
+  - **Track I (Steerable Research & Prompt Safety):**
+    - Created typed `ResearchDirective` model in `src/models/directive.py` with deterministic `parse_research_directive()` enforcing a 300-char limit, URL validation/normalization, price band extraction, and strict refusal of prompt injections and private credential scraping.
+    - Added `POST /api/v1/directives/parse` and `GET /api/v1/directives/suggestions` in `src/api/directives.py`.
+    - Added `#jrSteerResearch` steering card in `src/api/static/index.html` under `#loop-research` with 4 suggestion chips, directive preview, and confirmation flow wired in `reco-actions.js` and `reco-actions.css`.
+  - **Track J (Seller Brand Voice & Humanizer):**
+    - Created `src/utils/humanizer.py` implementing deterministic linting and cleaning adhering to [blader/humanizer](https://github.com/blader/humanizer) (no em dashes, no stock AI buzzwords like delve/tapestry/embark/elevate, no rule-of-three padding, no inflated claims, sentence length enforcement).
+    - Added "Sounds like you?" brand voice feedback widget into `ensureDialog()` in `src/api/static/reco-actions.js` (👍/👎, More casual, More formal, Shorter, source display) emitting `voice_feedback_submitted`.
+  - **Track F+K (Progress, Outcomes & ROI Timeline):**
+    - Created `src/api/static/progress.html` with KPI cards (Moves completed, Logged revenue `[live]`, Plan cost, Net ROI, Hours saved `[estimate]`), transparent ROI notice (no modeled revenue), move history timeline, and 30-second "Log result" modal emitting `result_logged`.
+    - Updated `docs/product/PRD.md` with Sections 9, 10, and 11 covering Track I directives, Track J voice profiles, and Track K Weekly Active Sellers (WAS), 14-day trial roadmap, and 30-day lift measurement.
+  - **Track D (Dismiss Signals UI):**
+    - Added `.ms-dismiss-reasons` in `src/api/static/muse-shell.js` and `muse-shell.css` presenting 4 one-tap reasons (`not_my_style`, `too_advanced`, `no_access`, `already_tried`), persisting signals in `localStorage['muse.dismiss_signals']`, and passing reason to `idea_dismissed` PostHog event.
+  - **Tests & Verification:**
+    - Created `tests/test_steer_voice_progress.py` (6 tests covering discovery routes, directive parsing, injection rejection, humanizer lint/clean, suggestion endpoints, and browser Playwright E2E at 375px and 1440px).
+    - Verified `make check`: **441 passed, 2 skipped in 20.02s**, `ruff check .` clean, `ruff format --check .` clean (197 files).
+
 ---
 
 ### 2. Shipped vs Fixture-Only vs Unverified Summary

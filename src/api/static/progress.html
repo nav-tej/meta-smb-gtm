@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#faf8f5">
+  <title>Progress &amp; ROI Tracker | Muse Growth Studio</title>
+  <meta name="description" content="Track your marketing moves, log real sales results, and measure your return on investment against your plan cost.">
+  <link rel="canonical" href="https://meta-smb-gtm.vercel.app/progress">
+  <meta name="robots" content="index, follow">
+  <link rel="stylesheet" href="/static/digest.css?v=20261109-sub">
+  <link rel="stylesheet" href="/static/muse-shell.css?v=20261109-ux3">
+  <link rel="stylesheet" href="/static/account.css?v=20261109-oauth">
+  <link rel="stylesheet" href="/static/reco-actions.css?v=20261109-reco1">
+  <style>
+    .pg-wrap { max-width: 960px; margin: 2rem auto; padding: 0 1.25rem 4rem; }
+    .pg-head { margin-bottom: 2rem; }
+    .pg-head h1 { font-size: 1.85rem; color: #1e3a29; margin: 0 0 0.5rem; }
+    .pg-head p { font-size: 0.95rem; color: #5a554a; margin: 0; line-height: 1.5; }
+    .pg-kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+    .pg-kpi-card { padding: 1.1rem 1.25rem; border-radius: 14px; background: #fff; border: 1px solid #e5dfd3; display: grid; gap: 0.35rem; }
+    .pg-kpi-label { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #6b665c; }
+    .pg-kpi-val { font-size: 1.75rem; font-weight: 800; color: #1e3a29; font-variant-numeric: tabular-nums; }
+    .pg-kpi-sub { font-size: 0.75rem; color: #888277; }
+    .pg-roi-banner { padding: 0.9rem 1.2rem; border-radius: 12px; background: #eef7f2; border: 1px solid rgba(47, 111, 79, 0.2); font-size: 0.86rem; color: #1e3a29; margin-bottom: 2rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem; }
+    .pg-timeline-sec { margin-top: 2rem; }
+    .pg-timeline-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+    .pg-timeline-head h2 { font-size: 1.25rem; color: #1e3a29; margin: 0; }
+    .pg-timeline-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.85rem; }
+    .pg-timeline-item { padding: 1rem 1.25rem; border-radius: 12px; background: #fff; border: 1px solid #e5dfd3; border-left: 4px solid #2f6f4f; display: grid; gap: 0.4rem; }
+    .pg-item-top { display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; flex-wrap: wrap; }
+    .pg-item-title { font-weight: 700; font-size: 0.98rem; color: #1e3a29; }
+    .pg-item-date { font-size: 0.76rem; color: #888277; }
+    .pg-item-metrics { display: flex; gap: 1rem; font-size: 0.82rem; color: #49453e; font-variant-numeric: tabular-nums; flex-wrap: wrap; }
+    .pg-empty { padding: 2.5rem 1.5rem; text-align: center; border-radius: 16px; background: #fff; border: 1px dashed #cfcabf; color: #6b665c; }
+    .pg-empty strong { display: block; font-size: 1.05rem; margin-bottom: 0.4rem; color: #1e3a29; }
+
+    /* Modal dialog */
+    .pg-dialog { max-width: 480px; width: 92%; border: none; border-radius: 18px; padding: 1.5rem; background: #faf8f5; box-shadow: 0 10px 40px rgba(0,0,0,0.2); }
+    .pg-dialog::backdrop { background: rgba(0,0,0,0.5); backdrop-filter: blur(2px); }
+    .pg-form { display: grid; gap: 0.85rem; margin-top: 1rem; }
+    .pg-form label { display: grid; gap: 0.3rem; font-size: 0.85rem; font-weight: 600; color: #2e2a23; }
+    .pg-form input, .pg-form select { min-height: 42px; padding: 0.5rem 0.75rem; border-radius: 10px; border: 1px solid #cfcabf; background: #fff; font: inherit; }
+    .pg-form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+    .pg-actions { display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 0.5rem; }
+  </style>
+  <script src="/static/analytics.js?v=20261109-ux" defer></script>
+  <script src="/static/account.js?v=20261109-oauth" defer></script>
+  <script src="/static/muse-shell.js?v=20261109-hd1" defer></script>
+</head>
+<body>
+  <header class="topbar ms-topbar">
+    <a class="brand" href="/">
+      <span class="brand-logo" aria-hidden="true">M</span>
+      <span><span class="brand-title">Muse Growth Studio</span><span class="brand-sub">Progress &amp; ROI</span></span>
+    </a>
+    <div class="topbar-right">
+      <a class="topbar-link" href="/">← Home loop</a>
+      <a class="topbar-link" href="/today">Daily desk</a>
+      <a class="topbar-link" href="/digest">Weekly digest</a>
+    </div>
+  </header>
+
+  <main class="pg-wrap">
+    <div class="pg-head">
+      <p class="dg-eyebrow">Outcomes &amp; Lift</p>
+      <h1>Progress &amp; ROI Tracker</h1>
+      <p>Measure your returns over time. Every recommendation you mark done can have a 30-second sales result logged to track real return on investment against your plan cost.</p>
+    </div>
+
+    <div class="pg-roi-banner">
+      <div>
+        <strong>Transparent ROI Rule:</strong> Only seller-logged sales and reach count toward ROI. We never display modeled, hypothetical, or projected revenue.
+      </div>
+      <button type="button" class="jr-btn-primary" id="pgOpenLogBtn">+ Log a result (30s)</button>
+    </div>
+
+    <section class="pg-kpi-grid" aria-label="Monthly performance metrics">
+      <div class="pg-kpi-card">
+        <span class="pg-kpi-label">Moves Completed</span>
+        <span class="pg-kpi-val" id="pgMovesCount">0</span>
+        <span class="pg-kpi-sub">Recommendations marked done</span>
+      </div>
+      <div class="pg-kpi-card">
+        <span class="pg-kpi-label">Logged Revenue</span>
+        <span class="pg-kpi-val" id="pgRevenue">$0</span>
+        <span class="pg-kpi-sub">[live] Attributed to moves</span>
+      </div>
+      <div class="pg-kpi-card">
+        <span class="pg-kpi-label">Plan Cost</span>
+        <span class="pg-kpi-val" id="pgPlanCost">$12</span>
+        <span class="pg-kpi-sub">Starter monthly plan</span>
+      </div>
+      <div class="pg-kpi-card">
+        <span class="pg-kpi-label">Net Return</span>
+        <span class="pg-kpi-val" id="pgNetReturn">-$12</span>
+        <span class="pg-kpi-sub">Revenue minus plan cost</span>
+      </div>
+      <div class="pg-kpi-card">
+        <span class="pg-kpi-label">Hours Saved</span>
+        <span class="pg-kpi-val" id="pgHoursSaved">0h</span>
+        <span class="pg-kpi-sub">[estimate] 1.5h per move done</span>
+      </div>
+    </section>
+
+    <section class="pg-timeline-sec" aria-labelledby="pgTimelineTitle">
+      <div class="pg-timeline-head">
+        <h2 id="pgTimelineTitle">Move History &amp; Results</h2>
+        <span id="pgTimelineCount" style="font-size:0.85rem;color:#888277;"></span>
+      </div>
+
+      <div id="pgEmptyState" class="pg-empty">
+        <strong>Log one result to see your ROI.</strong>
+        <p>You have not logged any post results yet. When you post a recommendation, tap "Log result" to record views, clicks, or sales.</p>
+      </div>
+
+      <ul class="pg-timeline-list" id="pgTimelineList" hidden></ul>
+    </section>
+
+    <!-- Modal for 30s Result Logging -->
+    <dialog class="pg-dialog" id="pgLogModal" aria-labelledby="pgModalTitle">
+      <form id="pgLogForm" class="pg-form" method="dialog">
+        <h3 id="pgModalTitle" style="margin:0 0 0.25rem;color:#1e3a29;">Log Move Result</h3>
+        <p style="margin:0 0 0.5rem;font-size:0.85rem;color:#6b665c;">Record the real outcome of an Instagram post, shop edit, or promotion.</p>
+
+        <label>
+          Move / Idea
+          <input type="text" name="title" id="pgFormTitle" required placeholder="e.g. Mai Bhago Empowering Women post" maxlength="120">
+        </label>
+
+        <div class="pg-form-row">
+          <label>
+            Channel
+            <select name="channel" id="pgFormChannel">
+              <option value="instagram_feed">Instagram Feed</option>
+              <option value="instagram_story">Instagram Story</option>
+              <option value="facebook_feed">Facebook Feed</option>
+              <option value="shop_direct">Shop / Pixels</option>
+            </select>
+          </label>
+          <label>
+            Minutes spent
+            <input type="number" name="minutes" id="pgFormMinutes" min="0" max="600" value="15">
+          </label>
+        </div>
+
+        <div class="pg-form-row">
+          <label>
+            Reach / Views
+            <input type="number" name="reach" id="pgFormReach" min="0" placeholder="0">
+          </label>
+          <label>
+            Clicks / Inquiries
+            <input type="number" name="clicks" id="pgFormClicks" min="0" placeholder="0">
+          </label>
+        </div>
+
+        <div class="pg-form-row">
+          <label>
+            Orders
+            <input type="number" name="orders" id="pgFormOrders" min="0" placeholder="0">
+          </label>
+          <label>
+            Revenue ($)
+            <input type="number" step="0.01" name="revenue" id="pgFormRevenue" min="0" placeholder="0.00">
+          </label>
+        </div>
+
+        <div class="pg-actions">
+          <button type="button" class="jr-btn-secondary" id="pgCancelBtn">Cancel</button>
+          <button type="submit" class="jr-btn-primary" id="pgSubmitBtn">Save Result</button>
+        </div>
+      </form>
+    </dialog>
+  </main>
+
+  <script>
+    (function () {
+      'use strict';
+      const $ = (id) => document.getElementById(id);
+      const OUTCOMES_KEY = 'muse.outcomes';
+
+      function getOutcomes() {
+        try {
+          const raw = localStorage.getItem(OUTCOMES_KEY);
+          return raw ? JSON.parse(raw) : [];
+        } catch (_) { return []; }
+      }
+
+      function saveOutcomes(list) {
+        try {
+          localStorage.setItem(OUTCOMES_KEY, JSON.stringify(list));
+        } catch (_) {}
+      }
+
+      function render() {
+        const outcomes = getOutcomes();
+        const listEl = $('pgTimelineList');
+        const emptyEl = $('pgEmptyState');
+        const movesEl = $('pgMovesCount');
+        const revEl = $('pgRevenue');
+        const netEl = $('pgNetReturn');
+        const hoursEl = $('pgHoursSaved');
+
+        let totalRev = 0;
+        let totalMinutes = 0;
+
+        outcomes.forEach((o) => {
+          totalRev += Number(o.revenue) || 0;
+          totalMinutes += Number(o.minutes) || 0;
+        });
+
+        const count = outcomes.length;
+        movesEl.textContent = count;
+        revEl.textContent = `$${totalRev.toFixed(0)}`;
+        const net = totalRev - 12;
+        netEl.textContent = `${net >= 0 ? '+' : ''}$${net.toFixed(0)}`;
+        netEl.style.color = net >= 0 ? '#2f6f4f' : '#8a5a12';
+        const hoursSaved = (count * 1.5).toFixed(1);
+        hoursEl.textContent = `${hoursSaved}h`;
+
+        if (count === 0) {
+          emptyEl.hidden = false;
+          listEl.hidden = true;
+          listEl.textContent = '';
+        } else {
+          emptyEl.hidden = true;
+          listEl.hidden = false;
+          listEl.textContent = '';
+          outcomes.slice().reverse().forEach((item) => {
+            const li = document.createElement('li');
+            li.className = 'pg-timeline-item';
+            const top = document.createElement('div');
+            top.className = 'pg-item-top';
+            const title = document.createElement('span');
+            title.className = 'pg-item-title';
+            title.textContent = item.title;
+            const date = document.createElement('span');
+            date.className = 'pg-item-date';
+            date.textContent = new Date(item.at || Date.now()).toLocaleDateString();
+            top.appendChild(title);
+            top.appendChild(date);
+
+            const metrics = document.createElement('div');
+            metrics.className = 'pg-item-metrics';
+            metrics.innerHTML = `
+              <span>Channel: <strong>${item.channel}</strong></span>
+              ${item.reach ? `<span>Reach: <strong>${item.reach}</strong></span>` : ''}
+              ${item.clicks ? `<span>Clicks: <strong>${item.clicks}</strong></span>` : ''}
+              ${item.orders ? `<span>Orders: <strong>${item.orders}</strong></span>` : ''}
+              ${item.revenue ? `<span>Revenue: <strong>$${Number(item.revenue).toFixed(2)}</strong></span>` : ''}
+              <span>Time: <strong>${item.minutes || 15}m</strong></span>
+            `;
+
+            li.appendChild(top);
+            li.appendChild(metrics);
+            listEl.appendChild(li);
+          });
+        }
+      }
+
+      const modal = $('pgLogModal');
+      const form = $('pgLogForm');
+      $('pgOpenLogBtn')?.addEventListener('click', () => {
+        if (typeof modal.showModal === 'function') modal.showModal();
+        else modal.hidden = false;
+      });
+      $('pgCancelBtn')?.addEventListener('click', () => {
+        if (typeof modal.close === 'function') modal.close();
+        else modal.hidden = true;
+      });
+
+      form?.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const title = $('pgFormTitle').value.trim();
+        const channel = $('pgFormChannel').value;
+        const minutes = parseInt($('pgFormMinutes').value || '15', 10);
+        const reach = parseInt($('pgFormReach').value || '0', 10);
+        const clicks = parseInt($('pgFormClicks').value || '0', 10);
+        const orders = parseInt($('pgFormOrders').value || '0', 10);
+        const revenue = parseFloat($('pgFormRevenue').value || '0');
+
+        const outcome = {
+          id: 'out_' + Date.now(),
+          title, channel, minutes, reach, clicks, orders, revenue,
+          at: new Date().toISOString()
+        };
+
+        const list = getOutcomes();
+        list.push(outcome);
+        saveOutcomes(list);
+
+        window.museTrack?.('result_logged', {
+          channel,
+          has_revenue: revenue > 0,
+          orders_count: orders,
+          reco_id: outcome.id
+        });
+
+        if (typeof modal.close === 'function') modal.close();
+        else modal.hidden = true;
+        form.reset();
+        render();
+      });
+
+      render();
+    })();
+  </script>
+</body>
+</html>

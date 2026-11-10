@@ -230,3 +230,81 @@ All client events pass through `window.museAnalytics.track(eventName, props)` (`
 1. **Artist Verification of Exhibition & Anniversary Copy:** Can Sarabjit confirm the exact wording and years she prefers for the *Triton Museum*, *Kala Sangam UK*, and *550th Anniversary* references in the default sample shop ads so we can promote them from `[sample — artist to verify]` to `[live]` verified artist bio facts?
 2. **Step 3 Onboarding Run Policy for 0-Run Accounts:** When a signed-in user has `0` runs remaining during `/welcome` Step 3, we allow free manual competitor URL entry; should we also allow `1` complimentary onboarding competitor crawl per new verified domain even if trial runs were spent in `/today`?
 3. **Supabase Migration Application Timing:** Should `supabase/migrations/research_cache.sql` and `supabase/migrations/buyer_polls.sql` be applied before or after merging `prd-research-previews` and `prefs-cache-progress` into `main`?
+
+---
+
+## 9. Track I: Steerable Research & Directive Injection Guardrails
+
+### 9.1 Purpose & User Need
+Sellers need to redirect research in their own words (e.g., *"Look at why SikhiArt dropped prints to $45"*, *"Find gift ideas under $50"* or *"Show me easier moves for solo makers"*) without triggering expensive or risky model calls. Free-text inputs from users or scraped from public competitor websites are untrusted and must never be concatenated into model system instructions.
+
+### 9.2 Data Contract & Schema (`src/models/directive.py`)
+Free text (capped at 300 characters `[live]`) is parsed by `parse_research_directive()` into a typed, deterministic Pydantic model `ResearchDirective` `[live]`:
+- `focus`: Literal (`pricing`, `products`, `posting`, `gifting`, `seo`, `ads`, `audience`)
+- `competitors_add`: list of normalized domain/URLs (at most 6 `[live]`)
+- `competitors_remove`: list of normalized domain/URLs
+- `price_band`: optional `{ min: float, max: float }` (`0 <= min <= max`)
+- `channels`: list of valid channels (`instagram`, `facebook`, `pixels`, `etsy`, `pinterest`, `saatchi`)
+- `timeframe_days`: Literal (`7`, `30`, `90`)
+- `tone_note`: string (max 80 chars `[live]`)
+- `exclude_topics`: list of strings (max 40 chars each `[live]`)
+
+### 9.3 Prompt Injection Safety Rules (`[live]` enforced)
+1. **No Instruction Concatenation:** Seller free text and crawled page text are never concatenated into instruction text. Raw input is validated and parsed server-side; only typed schema fields reach the pipeline.
+2. **Refusal of Exploits & Sensitive Scrapes:** Requests attempting system prompt overrides (`"ignore previous instructions"`), tool hijacking, credential harvesting, or scraping behind private logins / personal individuals are immediately rejected with an explanatory HTTP 400 response (`[live]`).
+3. **Escaped Output & Verified Links:** Any link in output must match crawled competitor URLs or the seller's own registered domain.
+4. **Suggestions Without Model Calls:** 4 state-driven suggestion chips ("Why $59.99 entry", "Easier moves", "Gifts under $50", "Weekly post ideas") are generated deterministically (`0` runs `[live]`). Re-ranking from cache is free (`0` runs).
+
+---
+
+## 10. Track J: Seller Brand Voice & Blader/Humanizer Pass
+
+### 10.1 Purpose & Tone Fidelity
+AI-generated copy often defaults to generic corporate buzzwords or inflated, dramatic tropes. Track J enforces that all generated captions, headlines, and digest blurbs mirror the seller's actual voice and undergo a deterministic cleaning pass adhering to the [blader/humanizer](https://github.com/blader/humanizer) guidelines before the seller sees them.
+
+### 10.2 Voice Profile Contract (`VoiceProfile`)
+- Built from the seller's verified content: listing descriptions, captions, and about pages captured during the Track H crawl (`[live]`), plus up to 3 "inspired by" URLs.
+- Extracts stylistic traits: average sentence length, formality, emoji usage, recurring vocabulary, and words to avoid (`[live]`).
+- Plagiarism & Similarity Protection: Inspired-by URLs influence tone only; generated copy is checked against inspiration text to prevent sentence copying (`[live]`).
+
+### 10.3 Deterministic Blader/Humanizer Lint Rules (`src/utils/humanizer.py` `[live]`)
+All copy is passed through `lint_humanizer()` and `clean_humanizer()`:
+1. **Em Dashes Removed:** Em dashes (`—`) and en dashes (`–`) used as conversational crutches are converted to commas, colons, or clean sentence splits.
+2. **Banned AI Vocabulary Stripped:** Instant rejection/replacement of stock AI filler words: *delve, tapestry, embark, elevate, testament, beacon, bespoke, meticulously, quintessential, vibrant, realm, navigate, unlock*.
+3. **No Rule-of-Three Padding:** Catches and collapses synthetic triads ("passion, dedication, and craft").
+4. **No Inflated Numeric Claims:** Ad copy cannot invent awards, years of history, or unverified claims.
+5. **Short, Plain Sentences:** Flags sentences over 28 words; encourages punchy visual copy under 18 words.
+
+### 10.4 "Sounds Like You?" Feedback Widget
+On every preview dialog (`/#loop-create`, `/today`, `/create`), sellers can rate copy with 👍 / 👎 and click one-tap adjusters: **"More casual"**, **"More formal"**, or **"Shorter"**. Feedback is recorded locally and sent as `voice_feedback_submitted` PostHog events to refine the account's `VoiceProfile` without spending a model run (`[live]`).
+
+---
+
+## 11. Track K: Retention Targets, Weekly Active Sellers & 30-Day Lift
+
+### 11.1 North-Star Metric: Weekly Active Sellers (WAS)
+A seller is defined as a **Weekly Active Seller (WAS)** in a 7-day window if and only if they execute at least one meaningful business action:
+- `Accept` or mark `Done` on a recommendation
+- Download or export a post (`PreviewSpec` canvas PNG)
+- Log a verified business outcome on `/progress`
+- Confirm a steerable research directive
+
+*Note: Merely opening the homepage or viewing the email digest does NOT count toward WAS.*
+
+### 11.2 Baseline Truth vs. Targets (`[live]` vs. `[estimate]`)
+| Metric | Current Baseline (`[live]`) | 90-Day Target (`[estimate]`) | Measurement / Event Source |
+| :--- | :--- | :--- | :--- |
+| **Activation Rate** | `16.6%` (1 signup / 6 visitors `[live]`) | `>= 40%` onboarded + 1st post exported within 24h | `onboarding_completed` + `preview_export_png` |
+| **Habit Retention** | `0%` (no returning cohort yet `[live]`) | `>= 35%` active in 3 of first 4 weeks | WAS cohort tracking |
+| **WAS / WAU Ratio** | `N/A` (`[sample]`) | `>= 50%` of weekly visitors perform an action | PostHog weekly active action filter |
+| **Monthly ROI Lift** | `0` logged outcomes (`[live]`) | `>= 1` logged result / month showing positive ROAS | `/progress` timeline logs |
+
+### 11.3 14-Day Free Trial Roadmap & 30-Day Lift Measurement
+Per Nav's decision (Nov 10, 2026), the free trial is **14 days**, designed to establish the weekly growth habit and provide immediate value without upfront card requirements:
+- **Day 0 (Setup):** 4-step onboarding (`/welcome`), workspace creation (`1` run), baseline capture (optional: followers, monthly orders).
+- **Days 1–3 (First Action):** Top recommendation previewed and exported; day-1 email prompt if no post exported.
+- **Day 7 (Weekly Rhythm):** First Monday digest received with one pre-filled steerable research question; second move completed.
+- **Days 8–12 (Optimization):** Research directive steered from cache (`0` runs); first post outcome logged.
+- **Day 12 (Two-Week Milestone):** In-app "Your First Two Weeks" summary showing moves completed, posts exported, and competitor changes caught.
+- **Day 14 (Trial Expiration):** Paid plan prompt ($9/mo Starter). If not upgraded, workspace remains readable and digest pauses with a one-time notice.
+- **Day 30 (Lift Report):** For paid accounts, "Your First 30 Days" report calculates actual lift against the Day-0 baseline. If no baseline or result was logged, Muse states honestly what is missing—no modeled revenue is ever fabricated.

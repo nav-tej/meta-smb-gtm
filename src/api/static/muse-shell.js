@@ -565,25 +565,35 @@
   }
   // Relative app links and https only; anything else (javascript:, data:, //host) is dropped.
   const safeHref = (href, fallback = '') => (typeof href === 'string' && /^(\/(?!\/)|https:\/\/)/.test(href) ? href : fallback);
-  function setStatus(item, status, { note, silent = false } = {}) {
+  function setStatus(item, status, { note, silent = false, reason = '' } = {}) {
     const id = item.dataset.actionId;
     const all = readActions();
     const previous = all[id] ? { ...all[id] } : null;
     if (status) {
       all[id] = { ...(previous || {}), status, title: itemTitle(item), href: itemLink(item), page: location.pathname, at: new Date().toISOString() };
       if (note !== undefined) all[id].note = note;
+      if (reason) all[id].dismiss_reason = reason;
     } else delete all[id];
     writeActions(all);
     actionsChanged();
     if (status === 'accepted') window.museTrack?.('idea_accepted', { action_id: id, page: location.pathname, has_note: Boolean(note) });
-    else if (status === 'dismissed') window.museTrack?.('idea_dismissed', { action_id: id, page: location.pathname, has_note: Boolean(note) });
+    else if (status === 'dismissed') {
+      window.museTrack?.('idea_dismissed', { action_id: id, page: location.pathname, has_note: Boolean(note), reason: reason || 'unspecified' });
+      if (reason) {
+        try {
+          const signals = JSON.parse(localStorage.getItem('muse.dismiss_signals') || '[]');
+          signals.push({ id, reason, at: new Date().toISOString() });
+          localStorage.setItem('muse.dismiss_signals', JSON.stringify(signals));
+        } catch (_) {}
+      }
+    }
     else if (status === 'archived') window.museTrack?.('idea_archived', { action_id: id, page: location.pathname, has_note: Boolean(note) });
     if (!status || silent) return;
     const labels = { accepted: 'Added to My actions', dismissed: 'Dismissed', archived: 'Archived' };
     const undo = status === 'dismissed' || status === 'archived'
       ? { label: 'Undo', onClick: () => { const v = readActions(); if (previous) v[id] = previous; else delete v[id]; writeActions(v); actionsChanged(); } }
       : null;
-    toast(`${labels[status]} · ${itemTitle(item).slice(0, 48)}`, '', undo);
+    toast(`${labels[status]}${reason ? ` (${reason.replace(/_/g, ' ')})` : ''} · ${itemTitle(item).slice(0, 48)}`, '', undo);
   }
   function applyStatus(item) {
     const entry = readActions()[item.dataset.actionId];
@@ -629,16 +639,56 @@
     button.setAttribute('aria-expanded', 'true');
     input.focus();
   }
+  // Dismiss with reason: one-tap signals (not my style, too advanced, no access, already tried).
+  function toggleDismiss(item, button) {
+    const open = item.querySelector('.ms-dismiss-reasons');
+    if (open) { open.remove(); button.setAttribute('aria-expanded', 'false'); return; }
+    const row = el('div', { class: 'ms-dismiss-reasons' });
+    row.appendChild(el('span', {}, 'Why dismiss? (helps Muse refine recommendations)'));
+    const btns = el('div', { class: 'ms-dismiss-row' });
+    const reasons = [
+      { key: 'not_my_style', label: 'Not my style' },
+      { key: 'too_advanced', label: 'Too advanced' },
+      { key: 'no_access', label: 'No access' },
+      { key: 'already_tried', label: 'Already tried' }
+    ];
+    reasons.forEach(r => {
+      const btn = el('button', { type: 'button', class: 'ms-dismiss-chip', 'data-reason': r.key }, r.label);
+      btn.addEventListener('click', () => {
+        row.remove();
+        button.setAttribute('aria-expanded', 'false');
+        setStatus(item, 'dismissed', { reason: r.key });
+      });
+      btns.appendChild(btn);
+    });
+    const skip = el('button', { type: 'button', class: 'ms-dismiss-chip', style: 'opacity:0.8' }, 'Skip reason');
+    skip.addEventListener('click', () => {
+      row.remove();
+      button.setAttribute('aria-expanded', 'false');
+      setStatus(item, 'dismissed', { reason: '' });
+    });
+    btns.appendChild(skip);
+    const cancel = el('button', { type: 'button', class: 'ms-dismiss-cancel' }, 'Cancel');
+    cancel.addEventListener('click', () => {
+      row.remove();
+      button.setAttribute('aria-expanded', 'false');
+      button.focus();
+    });
+    btns.appendChild(cancel);
+    row.appendChild(btns);
+    item.querySelector('.ms-triage')?.insertAdjacentElement('afterend', row);
+    button.setAttribute('aria-expanded', 'true');
+  }
   function addTriage(item) {
     if (item.querySelector('.ms-triage')) return;
     item.dataset.actionId = actionId(itemTitle(item));
     const bar = el('div', { class: 'ms-triage', role: 'group', 'aria-label': 'Recommendation actions' });
     const accept = el('button', { type: 'button', class: 'ms-triage-accept' }, '✓ Accept');
-    const dismiss = el('button', { type: 'button', class: 'ms-triage-dismiss' }, '✕ Dismiss');
+    const dismiss = el('button', { type: 'button', class: 'ms-triage-dismiss', 'aria-expanded': 'false' }, '✕ Dismiss');
     const archive = el('button', { type: 'button', class: 'ms-triage-archive' }, '⤓ Archive');
     const adjust = el('button', { type: 'button', class: 'ms-triage-adjust', 'aria-expanded': 'false' }, '✎ Adjust');
     accept.addEventListener('click', () => setStatus(item, readActions()[item.dataset.actionId]?.status === 'accepted' ? '' : 'accepted'));
-    dismiss.addEventListener('click', () => setStatus(item, 'dismissed'));
+    dismiss.addEventListener('click', () => toggleDismiss(item, dismiss));
     archive.addEventListener('click', () => setStatus(item, 'archived'));
     adjust.addEventListener('click', () => toggleAdjust(item, adjust));
     bar.append(accept, dismiss, archive, adjust);
