@@ -3,8 +3,8 @@
 **Branch:** `backend-real` (branched from `prd-research-previews` at `8c3fa0b`)
 **Owner:** Antigravity Session 2 (backend)
 **Baseline:** `make check` passed (441 passed, 2 skipped in 20.76s).
-**Current Suite:** `make check` passed (460 passed, 2 skipped in 34.80s).
-**Status:** Review Blockers and Should-Fix Items (1–9) Completed. Continuing with `.tasks/backend-assignment.txt` Item 2.
+**Current Suite:** `make check` passed (481 passed, 2 skipped in 34.65s).
+**Status:** Items 1, 2, 3, and 4 Completed. Starting Item 5 (Research directives pipeline).
 
 ---
 
@@ -77,23 +77,48 @@
 
 ## 2. Backend Assignment Tasks (In Progress)
 
-- [ ] **Item 2: Digest rules (Revision 4):**
-  - Server enforces signed-in account requirement for subscription (`POST /api/v1/digest/subscribe`).
-  - Read entitlement/credits server-side to include runs left in preview.
-  - Handle 0-run paused state: send exactly one pause notification email per zero-run period, pause further sending until runs return.
-  - Unsubscribe always wins.
-  - Tests in `tests/test_digest_rules.py`.
+- [x] **Item 2: Digest rules (Revision 4):** (`commit 9eb6c71`)
+  - Server enforces signed-in account requirement for subscription (`POST /api/v1/digest/subscribe`) returning 401 when unauthenticated.
+  - Subscription is strictly bound to verified account email (`account.email`), ignoring arbitrary client body emails.
+  - Normal weekly digest email includes runs remaining count in HTML and text.
+  - Handled 0-run paused state: sends exactly ONE pause notification email per zero-run period with link to upgrade/reset, and suppresses further emails until runs return.
+  - Resumption: when runs return (>0), digest automatically clears pause state and resumes normal delivery.
+  - Unsubscribe always wins: RFC 8058 `List-Unsubscribe` headers present on all emails; unsubscribing is idempotent and immediately halts delivery.
+  - Added full test suite in `tests/test_digest_rules.py` (5 tests passing).
 
-- [ ] **Item 3: Preferences and signals (Track D):**
-  - `SellerPreferences` on workspace model.
-  - Sync `muse.actions` and `muse.dismiss_signals` to account workspace when signed in.
-  - Deterministic ranking of ideas from preferences + dismiss reasons.
+- [x] **Item 3: Preferences and signals (Track D):** (`commit f3dbc86`)
+  - Added `SellerPreferences`, `AccessPreferences`, `TastePreferences`, and `DismissSignal` models in `src/models/seller.py`.
+  - Implemented deterministic ranking engine `src/services/preference_ranker.py`:
+    - New sellers never see complex ad budget reallocation as top move.
+    - Sellers without price control never see pricing moves as do-it-now.
+    - Dismiss signals with "no_access" dynamically hide that channel from recommendations.
+    - 2+ "too_advanced" dismissals lowers difficulty and deprioritizes advanced moves.
+    - Dismiss signals with "already_tried" filters out or demotes that specific move.
+    - Preserves stable order with deterministic tie-breaking.
+  - Added endpoints in `src/api/preferences.py`:
+    - `GET /api/v1/preferences`: retrieves account preferences or defaults.
+    - `PUT /api/v1/preferences`: persists preferences to verified account workspace.
+    - `POST /api/v1/preferences/signals`: merges `muse.actions` and `muse.dismiss_signals` into account workspace without losing history.
+    - `POST /api/v1/preferences/rank`: deterministically ranks candidate ideas.
+  - Updated `src/api/static/muse-shell.js` to automatically sync `actions` and `dismiss_signals` to server when signed in.
+  - Added comprehensive test suite in `tests/test_seller_preferences.py` (9 tests passing).
 
-- [ ] **Item 4: Outcomes and progress (Track F):**
-  - `Outcome` model stored per account.
-  - `/api/v1/outcomes` read/write endpoints.
-  - `/progress` syncs with server when signed in.
-  - Honest ROI math (only logged revenue counts).
+- [x] **Item 4: Outcomes and progress (Track F):**
+  - Added `Outcome` and `OutcomeSummary` models in `src/models/outcome.py`.
+  - Implemented outcomes persistence and honest ROI calculation in `src/services/outcomes.py`:
+    - Strict truth rule: `net_roi_usd = None` (requires 1 logged result) when `moves_count == 0`; no invented negative or positive modeled revenue.
+    - Honest ROI formula: strictly `total_revenue - plan_cost_usd` ($12 Starter baseline).
+    - Stores outcomes in durable account workspace document.
+  - Added endpoints in `src/api/outcomes.py`:
+    - `GET /api/v1/outcomes`: returns outcomes list and summary (200 with empty outcomes and honest None ROI for unauthenticated callers).
+    - `POST /api/v1/outcomes`: logs seller outcome to verified account workspace, enforcing `x-muse-owner` binding.
+    - `GET /api/v1/outcomes/summary`: returns computed business summary.
+  - Updated `src/api/main.py` to mount `/outcomes` router.
+  - Updated `src/api/static/progress.html`:
+    - `syncAccount()` fetches server outcomes from `/api/v1/outcomes` when signed in.
+    - Form submission sends `POST /api/v1/outcomes` when signed in.
+    - Preserves offline/unauthenticated local storage fallback.
+  - Comprehensive unit and API test suite in `tests/test_outcomes_server.py` (7 tests passing).
 
 - [ ] **Item 5: Research directives pipeline (Track I):**
   - Wire parsed `ResearchDirective` into competitor intel pipeline using typed fields only.

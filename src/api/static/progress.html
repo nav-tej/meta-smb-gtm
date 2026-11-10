@@ -210,6 +210,18 @@
               if (data && data.user) currentUser = data.user;
             }
           }
+          if (currentUser && currentUser.id) {
+            const res = await fetch('/api/v1/outcomes', {
+              credentials: 'same-origin',
+              headers: { 'x-muse-owner': currentUser.id },
+            });
+            if (res.ok) {
+              const data = await res.json();
+              if (Array.isArray(data.outcomes) && data.outcomes.length > 0) {
+                saveOutcomes(data.outcomes);
+              }
+            }
+          }
         } catch (_) {}
         render();
       }
@@ -271,7 +283,7 @@
             title.textContent = item.title;
             const date = document.createElement('span');
             date.className = 'pg-item-date';
-            date.textContent = new Date(item.at || Date.now()).toLocaleDateString();
+            date.textContent = new Date(item.at || item.created_at || Date.now()).toLocaleDateString();
             top.appendChild(title);
             top.appendChild(date);
 
@@ -312,7 +324,7 @@
         else modal.hidden = true;
       });
 
-      form?.addEventListener('submit', (e) => {
+      form?.addEventListener('submit', async (e) => {
         e.preventDefault();
         const title = $('pgFormTitle').value.trim();
         const channel = $('pgFormChannel').value;
@@ -331,6 +343,28 @@
         const list = getOutcomes();
         list.push(outcome);
         saveOutcomes(list);
+
+        if (currentUser && currentUser.id) {
+          try {
+            await fetch('/api/v1/outcomes', {
+              method: 'POST',
+              credentials: 'same-origin',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-muse-owner': currentUser.id,
+              },
+              body: JSON.stringify({
+                title,
+                channel,
+                minutes,
+                reach,
+                clicks,
+                orders,
+                revenue,
+              }),
+            });
+          } catch (_) {}
+        }
 
         window.museTrack?.('result_logged', {
           channel,
