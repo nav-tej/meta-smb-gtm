@@ -48,6 +48,7 @@ API_PREFIX = "/api/v1"
 # Pages must revalidate on every visit; otherwise browsers can keep old HTML that points at
 # old script versions after a deploy. Static assets are versioned with ?v= instead.
 PAGE_HEADERS = {"Cache-Control": "no-cache"}
+NOINDEX_PAGE_HEADERS = {"Cache-Control": "no-cache", "X-Robots-Tag": "noindex, nofollow"}
 REPO_ROOT = Path(__file__).resolve().parents[2]
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 SAMPLES_DIR = REPO_ROOT / "data" / "samples"
@@ -112,7 +113,7 @@ async def weekly_digest_page() -> FileResponse:
 @app.get("/welcome", include_in_schema=False)
 async def welcome_onboarding_page() -> FileResponse:
     """Serve the 4-step signed-in shop onboarding flow."""
-    return FileResponse(STATIC_DIR / "welcome.html", headers=PAGE_HEADERS)
+    return FileResponse(STATIC_DIR / "welcome.html", headers=NOINDEX_PAGE_HEADERS)
 
 
 @app.get("/", include_in_schema=False)
@@ -125,7 +126,7 @@ async def customer_portal() -> FileResponse:
 @app.get("/account", include_in_schema=False)
 async def account_landing() -> FileResponse:
     """Land email-confirmation links; the account dialog completes sign-in."""
-    return FileResponse(STATIC_DIR / "index.html", headers=PAGE_HEADERS)
+    return FileResponse(STATIC_DIR / "index.html", headers=NOINDEX_PAGE_HEADERS)
 
 
 @app.get("/robots.txt", include_in_schema=False)
@@ -151,7 +152,7 @@ async def llms_txt() -> FileResponse:
 @app.get("/progress", include_in_schema=False)
 async def progress_page() -> FileResponse:
     """Serve the Track F/K progress, move tracking, and ROI timeline page."""
-    return FileResponse(STATIC_DIR / "progress.html", headers=PAGE_HEADERS)
+    return FileResponse(STATIC_DIR / "progress.html", headers=NOINDEX_PAGE_HEADERS)
 
 
 MUSE_UNAVAILABLE = (

@@ -11,11 +11,11 @@ Muse Growth Studio helps solo artists, craftspeople, and handmade shop owners un
 4. **Iterate (Daily Desk & Outcome Logging):** Track results (reach, clicks, orders, revenue), calculate transparent ROI against plan cost, and adapt recommendations to seller taste and difficulty.
 
 ## Key Principles & Guardrails
-- **Truth in Advertising:** Every figure displayed in the UI is explicitly labeled as `[live]`, `[sample]`, or `[estimate]`. Signed-in sellers never see sample data as their own unless explicitly viewing the sample shop.
-- **Account Isolation:** Seller data, competitor watchlists, and generated creative drafts are securely partitioned per user account in cloud storage.
-- **Steerable Research & Prompt Safety:** Seller queries are strictly parsed into structured typed directives (`ResearchDirective`) with a 300-character cap. Raw inputs and crawled page text are never concatenated into executable model instructions.
-- **Seller Voice & Humanizer:** Generated copy is matched to the seller's verified brand voice and passed through a deterministic humanizer lint that strips stock AI cliches ("delve", "tapestry", em dashes, rule-of-three padding).
-- **Quota Transparency:** Onboarding costs exactly 1 run (charged only upon successful workspace build). Weekly digest reading is free (0 runs). Re-ranking cached research costs 0 runs.
+- **Truth in Advertising:** Figures displayed in the UI are explicitly labeled as `[live]`, `[sample]`, `[estimate]`, or "logged on this device". Signed-in sellers view sample data clearly distinguished from their own logged outcomes.
+- **Account Isolation & Storage:** Account workspaces and profiles are partitioned per user account when signed in. Drafts and logged outcomes on unauthenticated sessions remain stored locally on the seller's device.
+- **Steerable Research & Prompt Safety:** Seller queries are strictly parsed into structured typed directives (`ResearchDirective`) with a 300-character cap. Raw inputs and crawled page text are never concatenated into executable model instructions. Directive parsing is syntax-only, and any candidate URL is validated with SSRF guards at fetch time.
+- **Seller Voice & Humanizer:** Generated copy is checked against seller voice preferences and passed through a deterministic humanizer lint-and-suggest system that flags stock AI clichés while protecting product names, artwork titles, and formatting.
+- **Quota Transparency:** Onboarding costs 1 run for signed-in accounts upon successful workspace build (or 0 runs if the account has no runs or in demo mode). Weekly digest reading is free (0 runs). Re-ranking cached research costs 0 runs.
 
 ## Important URLs & Routes
 - Homepage & Loop: https://meta-smb-gtm.vercel.app/

@@ -98,6 +98,8 @@ def test_seo_meta_tags_contract() -> None:
     assert 'name="twitter:card" content="summary_large_image"' in home_html
     assert 'href="https://meta-smb-gtm.vercel.app/"' in home_html
     assert '<script type="application/ld+json">' in home_html
+    assert '"name":"Starter, annual"' in home_html
+    assert '"price":"108"' in home_html
 
     # 2. Today page (/today)
     today_resp = client.get("/today")

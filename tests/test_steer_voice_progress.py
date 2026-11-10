@@ -94,7 +94,7 @@ def test_robots_sitemap_llms_and_progress_routes(client: TestClient) -> None:
     assert "<loc>https://meta-smb-gtm.vercel.app/today</loc>" in sitemap_resp.text
     assert "<loc>https://meta-smb-gtm.vercel.app/create</loc>" in sitemap_resp.text
     assert "<loc>https://meta-smb-gtm.vercel.app/digest</loc>" in sitemap_resp.text
-    assert "<loc>https://meta-smb-gtm.vercel.app/progress</loc>" in sitemap_resp.text
+    assert "<loc>https://meta-smb-gtm.vercel.app/progress</loc>" not in sitemap_resp.text
 
     # 3. llms.txt
     llms_resp = client.get("/llms.txt")
@@ -103,15 +103,25 @@ def test_robots_sitemap_llms_and_progress_routes(client: TestClient) -> None:
     assert "Core Growth Loop" in llms_resp.text
     assert "Truth in Advertising" in llms_resp.text
 
-    # 4. /progress
+    # 4. /progress (must have noindex header)
     progress_resp = client.get("/progress")
     assert progress_resp.status_code == 200
+    assert progress_resp.headers.get("x-robots-tag") == "noindex, nofollow"
     assert "<title>Progress &amp; ROI Tracker | Muse Growth Studio</title>" in progress_resp.text
     assert "Progress &amp; ROI Tracker" in progress_resp.text
     assert "Moves Completed" in progress_resp.text
     assert "Logged Revenue" in progress_resp.text
     assert "Transparent ROI Rule" in progress_resp.text
     assert "Log one result to see your ROI" in progress_resp.text
+
+    # 5. /welcome and /account noindex headers
+    welcome_resp = client.get("/welcome")
+    assert welcome_resp.status_code == 200
+    assert welcome_resp.headers.get("x-robots-tag") == "noindex, nofollow"
+
+    account_resp = client.get("/account")
+    assert account_resp.status_code == 200
+    assert account_resp.headers.get("x-robots-tag") == "noindex, nofollow"
 
 
 def test_parse_research_directive_valid() -> None:
