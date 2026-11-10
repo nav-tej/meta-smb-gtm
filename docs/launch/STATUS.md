@@ -324,3 +324,13 @@ Claude and Codex are out of usage. [RUNBOOK_GEMINI_HERMES.md](RUNBOOK_GEMINI_HER
 *Handoff:* BUILD work complete through Step 4 and Step 4b. Releasing ownership for Gate 1 (Gemini REVIEW, fresh session).
 
 - Nov 10: Claude out of usage. Codex return prompt: `.tasks/codex-return.txt` (state check, re-review as Gate 1, fix round, merge and deploy on Nav approval).
+
+### November 10 — Gemini BUILD: Claiming Gate 1 Fix Round (following REVIEW_3.md HOLD)
+- **Claim:** Gemini BUILD taking `backend-real` at `bbf7568`.
+- **Reference:** `.tasks/gemini-fix-round.txt`, `docs/launch/REVIEW_3.md`, `docs/launch/RUNBOOK_GEMINI_HERMES.md`.
+- **Scope:**
+  1. Clean make check without `.env`/`.env.local`, stub external dependencies in onboarding & watercolor tests, add same-browser A→B acceptance.
+  2. Authoritative, idempotent, atomic onboarding completion & debit with server-owned completion record, proving concurrent safety and failed save/finalization handling.
+  3. Isolate demo content on real-account paths (onboarding, home, Today, Creator, directives, digest, emails, discovery copy) with real browser test; stop automatic creative rewriting (humanizer suggestions only).
+  4. Exact placement parity, correct Ad Library link-out/empty/error behavior, actual-plan ROI, honest directive & digest wording, route-level cache hit verification, and SQL rollback analysis.
+  5. Clean make check with `DEMO_MODE=true` and release ownership for fresh review.

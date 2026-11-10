@@ -285,7 +285,10 @@ async def update_workspace(
     response.headers["Cache-Control"] = "no-store"
     # Authoritative server-owned onboarding record preservation:
     # A client PUT cannot wipe or forge an existing completed onboarding state.
-    existing = await load_workspace(account)
+    try:
+        existing = await load_workspace(account)
+    except Exception:
+        existing = {"document": {}}
     existing_doc = existing.get("document") or {}
     next_doc = dict(body.document)
     if (

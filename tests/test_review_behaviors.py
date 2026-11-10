@@ -57,7 +57,11 @@ def test_failed_workspace_put_surfaces_conflict_error(
     ) -> dict[str, Any]:
         raise HTTPException(409, "Your workspace changed. Reload before saving.")
 
+    async def fake_load(_account: AccountSession) -> dict[str, Any]:
+        return {"document": {}, "version": 1, "owner_id": user.user_id}
+
     monkeypatch.setattr("src.api.accounts.resolve_account", fake_resolve)
+    monkeypatch.setattr("src.api.accounts.load_workspace", fake_load)
     monkeypatch.setattr("src.api.accounts.save_workspace", fake_save)
 
     headers = {
