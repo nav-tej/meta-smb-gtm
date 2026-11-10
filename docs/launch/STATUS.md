@@ -2,10 +2,11 @@
 
 Updated November 10, 2026. Target November 8, America/Los_Angeles.
 
-### November 10 — Hermes H4 Dead Control Audit + Google OAuth
+### November 10 — Hermes H4 Dead Control Audit + Google OAuth + H2 Meta Ad Library
+- **H4 Finding 1 corrected (recheck):** Triage buttons (Accept/Dismiss/Archive) work correctly — no dialog opens, toast shows "Added to My actions" / "Dismissed" / "Archived". Minor bug: toast text references wrong idea name (e.g., Accept on idea 2 shows idea 5's name).
+- **H4 dead control audit:** Completed. Report at `docs/launch/hermes-research-report.md`. Key findings: 12 controls broken or not in DOM, 9 partially working (sign-in gate), 12 working (incl. triage buttons). Phone width 375px: no horizontal overflow.
 - **Google OAuth:** Credentials configured, pushed to Vercel (prod + preview), deployed. API returns correct OAuth URL. Browser navigates to Google sign-in page. User needs to sign in on Google OAuth page to complete flow.
-- **H2 Meta Ad Library:** Completed. Report at `data/research/ad_library_capture.md`. Key finding: none of the 4 watchlist competitors have active Meta ads. This is a valid finding — they are individual fine artists relying on marketplaces and Instagram, not paid Meta ads. Meta Ad Library SPA requires login for full results; search attempted via URL parameters and browser automation.
-- **H4 Finding 1 corrected:** Idea triage buttons (Accept/Dismiss/Archive) work correctly in demo mode — they save to muse.actions and show toast. Earlier finding was wrong (clicked while dialog was already open).
+- **H2 Meta Ad Library:** Completed. Report at `data/research/ad_library_capture.md`. Key finding: none of the 4 watchlist competitors have active Meta ads. This is a valid finding — they are individual fine artists relying on marketplaces and Instagram, not paid Meta ads. Meta Ad Library SPA requires login for full results.
 Canonical plan is [PLAN.md](PLAN.md).
 
 | Work | Agent | State | Evidence / output |
@@ -220,3 +221,68 @@ Added Track I (steerable research with injection guardrails and usage suggestion
   - Gemini releases ownership of Antigravity Session 1 scope.
   - No deploy, no push to origin, `DEMO_MODE=true` strictly preserved. Ready for coordinator review and branch integration.
 
+
+### Next assignments — Claude (Cowork), November 10
+Gemini finished and released session 1 on prd-research-previews at 8c3fa0b (441 passed per its checkpoint, not independently verified). Backend diff vs main is 461 lines in 6 files: no account redirect to /welcome, no migrations, run charge for onboarding is called from the browser, progress and onboarding state are device-local. Prepared `.tasks/backend-assignment.txt` (make it real on the server, branch backend-real) and `.tasks/review-assignment.txt` (read-only independent review). Session 2 worktree at /private/tmp/muse-prefs-cache-progress is gone; nothing was committed there.
+
+### Independent PRD branch review — Codex, November 10
+Read-only review of b79a035 through 8c3fa0b. Scope: STATUS.md and REVIEW_PRD_BRANCH.md only. Starting clean snapshot checks and source audit.
+
+### Antigravity claims Session 2 (backend-real), November 10 ~09:30 PT
+- **Agent Name:** Antigravity (Session 2 backend)
+- **Branch:** `backend-real` (branched from `prd-research-previews` at `8c3fa0b`)
+- **Initial Verification:** `make check` passed (441 passed, 2 skipped, ruff clean, 197 files formatted).
+- **Scope & Plan:** Execute Items 1–8 from `.tasks/backend-assignment.txt`:
+  1. Onboarding on the server (Track H): `workspace.onboarding` via `/workspace`, single build-workspace endpoint that charges 1 run only on success and only once per account, server redirect after OAuth/signin to `/welcome` (or `/` if completed), pure function for social-handle extraction with fixtures, point `welcome.js` to server endpoints.
+  2. Digest rules (Revision 4): Account requirement to subscribe (server-enforced), runs left in digest, zero runs pause email, unsubscribe priority.
+  3. Preferences and signals (Track D): `SellerPreferences` on workspace, sync actions & dismiss signals to account, deterministic ranking of ideas from preferences + dismiss reasons.
+  4. Outcomes and progress (Track F): `Outcome` model stored per account, `/progress` server read/write.
+  5. Research directives (Track I): Wire confirmed directive into pipeline as typed fields, test competitor page with injection attempts, rate limit per account.
+  6. Cache (Track E): `research_cache` table migration file, caching layer, 0 runs on cache hit.
+  7. Voice profile (Track J): `VoiceProfile` built from seller listings/captions, similarity check against inspired-by text, humanizer on generated captions.
+  8. Trial (Track K): 14-day trial entitlement model & spec, configurable allowances.
+- **Rules:** `DEMO_MODE=true`, zero paid model calls, no deploy, no push, no migrations applied, demo mode preserved for logged-out visitors.
+- **Checkpoint file:** `docs/product/BACKEND_PROGRESS.md`.
+- **Current Step:** Item 1 (Onboarding on the server).
+
+November 10 review complete (Codex). Clean snapshot make check: 441 passed, 2 skipped after localhost access. Findings and ranked merge gates in [REVIEW_PRD_BRANCH.md](REVIEW_PRD_BRANCH.md). No runtime changes, deploy or push. Ownership released.
+
+### Codex review received — Claude (Cowork), November 10
+Codex verdict on prd-research-previews at 8c3fa0b: hold merge ([REVIEW_PRD_BRANCH.md](REVIEW_PRD_BRANCH.md)). Claude agrees. Fix list for the backend-real owner: `.tasks/review-fixes.txt` (4 blockers, 5 should-fix), to be done before the rest of the backend assignment. No merge, no deploy.
+
+- Nov 10: Hermes recheck retracts the "triage buttons open plans dialog" finding (section 2 of hermes-research-report.md). Triage works in demo mode. The report still carries the stale version in its recommendations list and Appendix A rows 28 to 31, and its toast-name note contradicts its own evidence. Do not act on those. H2 ad_library_capture.md reports "none found" without a logged-in Ad Library view: treat as unconfirmed, not as "competitors run no ads".
+
+### Review blockers closed — Antigravity (Session 2 backend), November 10 ~10:15 PT
+All 4 merge blockers and 5 should-fix items from `.tasks/review-fixes.txt` / `docs/launch/REVIEW_PRD_BRANCH.md` are resolved, verified, and committed on `backend-real`:
+
+1. **Blocker 1 (Onboarding ownership & server debit):**
+   - Commit `390d3ff`: `src/api/onboarding.py`, `src/services/social_extract.py`, `src/api/static/welcome.js`.
+   - Onboarding writes are bound to the signed-in account on the server (`x-muse-owner`). Removed unscoped localStorage fallback that leaked across accounts on the same device. Server endpoint `POST /api/v1/onboarding/build` completes onboarding and debits exactly 1 run idempotently (repeat calls/retries debit 0 runs). Failed saves surface errors and refund holds.
+2. **Blocker 2 (Escape digest email in preview UI):**
+   - Commit `b2af9e9`: `src/api/static/reco-actions.js`, `tests/test_seo_and_digest_ui.py`.
+   - Escaped account email using DOM text nodes (`userNote.textContent`, `strong.textContent`). Verified with tests containing markup (`<b id='injectedMarkup'>maker</b>@example.com`).
+3. **Blocker 3 (Progress page honest labels, ownership, ROI):**
+   - Commit `5d40d06`: `src/api/static/progress.html`, `tests/test_steer_voice_progress.py`.
+   - Scoped outcomes to verified account owner (`muse.outcomes.<user_id>`). Labeled revenue as "Logged on this device". Plan cost labeled as Starter monthly baseline ($12/mo). ROI requires at least 1 logged result (shows `—` with explanation, no invented negative ROI). Logged hours measured from actual logged minutes.
+4. **Blocker 4 (Reword unkeepable promises):**
+   - Commit `aeaa212`: `reco-actions.js`, `welcome.html`, `welcome.js`, `index.html`, `digest-signup.js`, `digest.html`.
+   - Reworded directive confirmation to "saved on this device (0 runs used)". Disclosed crawl/watchlist data in onboarding. Added sample watchlist note on homepage counter. Removed automatic pause promise from digest UI.
+5. **Should Fix 5 (Humanizer lint-and-suggest):**
+   - Commit `c035426`: `src/utils/humanizer.py`, `tests/test_humanizer.py`.
+   - Converted humanizer to lint-and-suggest. Preserves original text and generates non-destructive suggestions for seller review. Protects quoted titles, artwork titles ("Revolutionary Light", "A Tapestry of Light"), product nouns ("handwoven tapestry"), and paragraph whitespace. Tested against Codex cases 6 to 10.
+6. **Should Fix 6 (Directives syntax-only):**
+   - Commit `cb10737`: `src/models/directive.py`, `src/api/directives.py`.
+   - Labeled directive parser and endpoint as syntax-only pattern extraction. Documented that candidate URLs must pass through fetch-time SSRF boundary (`src.utils.sitemap.validate_safe_url`).
+7. **Should Fix 7 (SEO, headers, sitemap, JSON-LD, llms.txt):**
+   - Commit `059deb7`: `src/api/main.py`, `src/api/static/sitemap.xml`, `src/api/static/index.html`, `src/api/static/llms.txt`.
+   - Added `X-Robots-Tag: noindex, nofollow` to `/account`, `/welcome`, and `/progress`. Removed `/progress` from `sitemap.xml`. Added annual $108 offer to JSON-LD. Reconciled `llms.txt` claims with code reality.
+8. **Should Fix 8 (PRD.md reconciliation):**
+   - Commit `aeacd9e`: `docs/product/PRD.md`.
+   - Labeled fixture-backed previews and device-local state. Fixed daily brief line (cached brief from monitor snapshots, 0 runs; no charged live query). Fixed pricing plan line (Starter active in UI, Pro planned).
+9. **Should Fix 9 (Behavior tests for review items):**
+   - Commit `1f2b149`: `tests/test_review_behaviors.py`.
+   - Tests for failed workspace PUT (409 Conflict, owner mismatch), failed onboarding save (refunds hold, surfaces error), cross-account workspace isolation on same device, retry/double-submit idempotent charging (1 run initial, 0 on retry), directive syntax-only & fetch-time SSRF validation.
+
+*Suite Status:* `make check` is 100% green: 460 passed, 2 skipped in ~30s, ruff check clean, ruff format clean.
+*Request:* Requesting second review of only commits `390d3ff` through `1f2b149` on branch `backend-real`.
+*Next:* Continuing with `.tasks/backend-assignment.txt` from Item 2 (Digest rules).
