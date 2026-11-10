@@ -3,8 +3,8 @@
 **Branch:** `backend-real` (branched from `prd-research-previews` at `8c3fa0b`)
 **Owner:** Antigravity Session 2 (backend)
 **Baseline:** `make check` passed (441 passed, 2 skipped in 20.76s).
-**Current Suite:** `make check` passed (487 passed, 2 skipped in 37.98s).
-**Status:** Items 1–5 Completed. Starting Item 6 (Cache layer - Track E).
+**Current Suite:** `make check` passed (493 passed, 2 skipped in 35.66s).
+**Status:** Items 1–6 Completed. Starting Item 7 (Voice profile - Track J).
 
 ---
 
@@ -132,10 +132,15 @@
     - `GET /api/v1/directives/active`: retrieves current active directive and saved count.
   - Comprehensive test suite in `tests/test_directives_pipeline.py` (6 tests passing).
 
-- [ ] **Item 6: Cache layer (Track E):**
-  - Migration file `supabase/migrations/research_cache.sql` (file only, do not apply).
-  - `ResearchCache` service layer with TTLs and hash keys.
-  - 0 runs charged on cache hit.
+- [x] **Item 6: Cache layer (Track E):**
+  - Created migration file `supabase/migrations/research_cache.sql` (file only, unapplied) and rollback `research_cache_rollback.sql`.
+  - Implemented `src/services/research_cache.py`:
+    - Content-addressed SHA-256 keys over `(namespace, account_id, normalized_urls, flow, model_id, prompt_version)`.
+    - Distinct namespace TTLs: competitor crawl (7 days), daily brief (24 hours), ad previews (no expiry).
+    - Cache hits return stored result, charging exactly 0 runs.
+    - Format labels for seller clarity (e.g. `"Last checked Nov 10 · Refresh (1 run)"`).
+    - Forced refresh bypasses cache and updates timestamp.
+  - Comprehensive unit test suite in `tests/test_research_cache.py` (6 tests passing).
 
 - [ ] **Item 7: Voice profile (Track J):**
   - `VoiceProfile` built from seller listings/captions.
