@@ -6,13 +6,14 @@ import hmac
 import logging
 from typing import Annotated
 
-from fastapi import APIRouter, Header, HTTPException, Query, Request
+from fastapi import APIRouter, Header, HTTPException, Query, Request, Response
 from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel, Field
 
 from src.api.demo import _client_ip_hash
 from src.config import get_settings
 from src.services import alerts, digest_email, durable_state
+from src.services.accounts import resolve_account
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/digest", tags=["digest"])
@@ -20,8 +21,10 @@ SENT = "If that address can receive email, a confirmation link is on its way. Ch
 
 
 class SubscribeRequest(BaseModel):
-    email: str = Field(min_length=6, max_length=254)
     competitors: list[str] = Field(min_length=1, max_length=3)
+    frequency: str = "weekly"
+    topics: list[str] = Field(default_factory=list)
+    email: str | None = None
 
 
 @router.get("/subscription")
@@ -31,9 +34,18 @@ async def subscription_status() -> dict[str, bool]:
 
 
 @router.post("/subscribe")
-async def subscribe(body: SubscribeRequest, request: Request) -> dict[str, str]:
+async def subscribe(body: SubscribeRequest, request: Request, response: Response) -> dict[str, str]:
+    """Subscribe to weekly competitor digest (Revision 4: verified account required)."""
+    if not digest_email.available():
+        raise HTTPException(503, "Email digests open soon.")
+    account = await resolve_account(request, response, require_verified=True)
+    if not account or not account.email_verified:
+        raise HTTPException(
+            401, "Sign in with a confirmed email address to subscribe to the competitor digest."
+        )
+    subscriber_email = account.email
     try:
-        await digest_email.subscribe(body.email, body.competitors, _client_ip_hash(request))
+        await digest_email.subscribe(subscriber_email, body.competitors, _client_ip_hash(request))
     except digest_email.DigestError as err:
         raise HTTPException(err.status_code, err.detail) from err
     return {"message": SENT}

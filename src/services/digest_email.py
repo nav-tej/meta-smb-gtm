@@ -330,7 +330,65 @@ LABELS = {
 }
 
 
-def render_digest(reports: list[ShopReport], subscriber_id: str, week: str) -> tuple[str, str, str]:
+def render_paused_email(subscriber_id: str, app_url: str) -> tuple[str, str, str]:
+    """Subject, HTML and text for a single pause notification when runs hit zero."""
+    subject = "Your weekly competitor digest is paused (0 runs remaining)"
+    app = app_url.rstrip("/")
+    leave = unsubscribe_url(subscriber_id)
+    body = (
+        '<p style="margin:0 0 12px;color:#22312b">'
+        "Your weekly competitor digest is paused because your account has "
+        "<strong>0 runs remaining</strong> this month."
+        "</p>"
+        '<p style="margin:16px 0">'
+        f'<a href="{html.escape(app)}/#pricing" style="display:inline-block;background:#1b6e44;'
+        'color:#fff;padding:12px 18px;border-radius:8px;text-decoration:none;font-weight:600">'
+        "Get more runs →</a></p>"
+        '<p style="margin:12px 0 0;color:#536259;font-size:14px">'
+        "Your digest will resume automatically once your monthly runs reset "
+        "or when you upgrade your plan."
+        "</p>"
+    )
+    footer = (
+        "You get this email because you confirmed a competitor digest at Muse Growth Studio. "
+        f'<a href="{html.escape(leave)}" style="color:#6b776f">Unsubscribe</a> · '
+        f"{html.escape(_company_line())}"
+    )
+    text = (
+        f"{subject}\n\n"
+        "Your weekly competitor digest is paused because your account has "
+        "0 runs remaining this month.\n\n"
+        f"Get more runs: {app}/#pricing\n\n"
+        "Your digest will resume automatically once your monthly runs reset "
+        "or when you upgrade your plan.\n\n"
+        f"Unsubscribe: {leave}\n"
+        f"{_company_line()}"
+    )
+    return subject, _wrap("Digest paused", body, footer), text
+
+
+async def get_subscriber_runs(email_address: str) -> int:
+    """Look up runs remaining for a subscriber. Default is 3 (demo/starter trial)."""
+    if not configured():
+        return 3
+    try:
+        res = await get_supabase_client().rpc(
+            "muse_usage_status_for_email",
+            {"p_email": email_address.strip().lower()},
+        )
+        if res.get("allowed") and res.get("remaining") is not None:
+            return int(res["remaining"])
+    except Exception:
+        pass
+    return 3
+
+
+def render_digest(
+    reports: list[ShopReport],
+    subscriber_id: str,
+    week: str,
+    runs_left: int | None = None,
+) -> tuple[str, str, str]:
     """Subject, HTML and text for one subscriber's weekly email."""
     total = sum(sum(r.counts.values()) for r in reports)
     subject = (
@@ -387,6 +445,13 @@ def render_digest(reports: list[ShopReport], subscriber_id: str, week: str) -> t
             body.append("</ul>")
             text.append("")
     app = get_settings().app_url.rstrip("/")
+    if runs_left is not None:
+        body.append(
+            f'<p style="margin:16px 0 6px;font-size:13px;color:#6b776f">'
+            f'Runs remaining this month: <strong style="color:#22312b">{runs_left}</strong>'
+            "</p>"
+        )
+        text.append(f"Runs remaining this month: {runs_left}")
     body.append(
         f'<p style="margin-top:22px"><a href="{html.escape(app)}/create" style="color:#1b6e44;'
         'font-weight:600">Turn this into a post in Muse →</a></p>'
@@ -398,7 +463,7 @@ def render_digest(reports: list[ShopReport], subscriber_id: str, week: str) -> t
         f'<a href="{html.escape(leave)}" style="color:#6b776f">Unsubscribe</a> · '
         f"{html.escape(_company_line())}"
     )
-    text += [f"Make a post: {app}/create", "", f"Unsubscribe: {leave}", _company_line()]
+    text += ["", f"Make a post: {app}/create", "", f"Unsubscribe: {leave}", _company_line()]
     return subject, _wrap(f"Your shops this week ({week})", "".join(body), footer), "\n".join(text)
 
 
@@ -407,9 +472,10 @@ async def run_weekly(
     fetch_entries: FetchEntries | None = None,
     store: SnapshotStore | None = None,
     now: datetime | None = None,
+    runs_lookup: Callable[[str], Awaitable[int]] | None = None,
 ) -> dict[str, int]:
     """Check every watched shop once and email each due subscriber. Safe to repeat."""
-    summary = {"due": 0, "sent": 0, "failed": 0, "shops": 0}
+    summary = {"due": 0, "sent": 0, "paused": 0, "failed": 0, "shops": 0}
     if not available():
         return summary
     now = now or datetime.now(UTC)
@@ -428,14 +494,66 @@ async def run_weekly(
 
     reports = dict(await asyncio.gather(*(checked(url) for url in shops)))
     week = now.strftime("%b %d")
+    app_url = get_settings().app_url.rstrip("/")
+
     for sub in due:
+        sub_id = str(sub["id"])
+        sub_email = sub.get("email", "").strip().lower()
+
+        # Determine subscriber run balance
+        if runs_lookup is not None:
+            runs_left = await runs_lookup(sub_email)
+        else:
+            runs_left = await get_subscriber_runs(sub_email)
+
+        pause_key = f"pause_{sub_id}"
+
+        # Revision 4 rule: Zero runs -> exactly ONE pause notification email, then pause
+        if runs_left <= 0:
+            pause_record = await store.get(pause_key)
+            if pause_record and pause_record.get("paused"):
+                # Already received the single pause notice during this zero-run period
+                continue
+
+            # Send single pause notification
+            subject, body, text = render_paused_email(sub_id, app_url)
+            leave = unsubscribe_url(sub_id)
+            ok = await email.send(
+                sub_email,
+                subject,
+                body,
+                text,
+                headers={
+                    "List-Unsubscribe": f"<{leave}>",
+                    "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+                },
+                idempotency_key=f"digest-pause-{sub_id}",
+            )
+            if ok:
+                summary["paused"] += 1
+                try:
+                    await store.put(pause_key, {"paused": True, "paused_at": now.isoformat()})
+                except Exception as err:
+                    logger.warning("Could not persist pause state for %s: %s", sub_id, err)
+            else:
+                summary["failed"] += 1
+            continue
+
+        # If subscriber had been paused but now has runs > 0, clear pause state
+        pause_record = await store.get(pause_key)
+        if pause_record and pause_record.get("paused"):
+            try:
+                await store.put(pause_key, {"paused": False, "resumed_at": now.isoformat()})
+            except Exception as err:
+                logger.warning("Could not reset pause state for %s: %s", sub_id, err)
+
         mine = [reports[u] for u in sub.get("competitors") or [] if u in reports]
         if not mine:
             continue  # over this run's shop cap: picked up by the next run
-        subject, body, text = render_digest(mine, sub["id"], week)
-        leave = unsubscribe_url(sub["id"])
+        subject, body, text = render_digest(mine, sub_id, week, runs_left=runs_left)
+        leave = unsubscribe_url(sub_id)
         ok = await email.send(
-            sub["email"],
+            sub_email,
             subject,
             body,
             text,
@@ -443,12 +561,12 @@ async def run_weekly(
                 "List-Unsubscribe": f"<{leave}>",
                 "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
             },
-            idempotency_key=f"digest-{sub['id']}-{now:%G-W%V}",
+            idempotency_key=f"digest-{sub_id}-{now:%G-W%V}",
         )
         if ok:
             summary["sent"] += 1
             try:
-                await _rpc("muse_digest_mark_sent", {"p_id": sub["id"]})
+                await _rpc("muse_digest_mark_sent", {"p_id": sub_id})
             except DigestError:
                 logger.warning("Digest sent but not marked; the idempotency key prevents a repeat.")
         else:
