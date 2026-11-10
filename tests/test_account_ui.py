@@ -288,6 +288,8 @@ def test_google_oauth_start_and_callback_mint_verified_session(
     monkeypatch.setenv("ACCOUNTS_REQUIRED", "true")
     monkeypatch.setenv("SUPABASE_URL", "https://example.supabase.co")
     monkeypatch.setenv("SUPABASE_SECRET_KEY", "secret-test-key")
+    monkeypatch.setenv("GOOGLE_CLIENT_ID", "")
+    monkeypatch.setenv("GOOGLE_CLIENT_SECRET", "")
     from src.config import get_settings
 
     get_settings.cache_clear()

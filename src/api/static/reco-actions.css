@@ -1,0 +1,13 @@
+/* Improve list: sample preview thumbnails and the moves-done strip (reco-actions.js). */
+.jr-moves { display: grid; gap: 0.35rem; margin: 0 0 0.7rem; padding: 0.7rem 0.95rem; border-radius: 14px; background: #fff; border: 1px solid var(--border, #e4e0d8); font-size: 0.84rem; }
+.jr-moves-bar { height: 8px; border-radius: 99px; background: #eee9df; overflow: hidden; }
+.jr-moves-bar span { display: block; height: 100%; width: 0; background: var(--c1, #2f6f4f); transition: width 0.25s ease; }
+.jr-moves small { color: var(--text-muted, #6b675f); }
+.jr-recos li.has-thumb { grid-template-columns: minmax(0, 1fr) 84px; column-gap: 0.8rem; }
+.jr-recos li.has-thumb > * { grid-column: 1; }
+.jr-recos li.has-thumb > .ms-triage, .jr-recos li.has-thumb > .ms-adjust, .jr-recos li.has-thumb > .ms-triage-note { grid-column: 1 / -1; }
+.jr-recos li .jr-reco-thumb { grid-column: 2; grid-row: 1 / span 3; align-self: start; padding: 0; border: 1px solid var(--border, #e4e0d8); border-radius: 10px; background: #faf8f3; cursor: pointer; overflow: hidden; display: grid; }
+.jr-reco-thumb img { width: 84px; height: 105px; object-fit: cover; display: block; }
+.jr-reco-thumb span { font-size: 0.66rem; font-weight: 700; padding: 0.2rem 0.3rem; color: #3d3b36; text-align: center; }
+.jr-reco-thumb:focus-visible { outline: 2px solid var(--c1, #2f6f4f); outline-offset: 2px; }
+@media (max-width: 480px) { .jr-recos li.has-thumb { grid-template-columns: minmax(0, 1fr) 64px; } .jr-reco-thumb img { width: 64px; height: 80px; } }
