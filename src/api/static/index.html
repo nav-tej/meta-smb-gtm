@@ -990,9 +990,9 @@
         <button type="button" class="topbar-link topbar-plans" data-open-pricing data-track="nav_plans">Plans &amp; pricing</button>
         <button type="button" class="topbar-link" id="openLocalEngineBtn" title="Optional local ComfyUI tools">Local tools</button>
       </nav>
-      <button type="button" class="workspace-btn" id="openLoginBtn" title="Switch the demo shop shown on this page">
+      <button type="button" class="workspace-btn" id="openLoginBtn" title="Switch between your shop and the sample shop">
         <span class="avatar" id="activeAvatar">SS</span>
-        <span class="workspace-text"><span class="workspace-kicker">Demo shop</span><span id="activeWorkspaceLabel">Art of Sarabjit Singh</span></span>
+        <span class="workspace-text"><span class="workspace-kicker" id="activeWorkspaceKicker">Sample shop</span><span id="activeWorkspaceLabel">Art of Sarabjit Singh</span></span>
         <span class="workspace-caret" aria-hidden="true">▾</span>
       </button>
     </div>
@@ -1008,7 +1008,7 @@
         </span>
         <span class="monitoring-tag">WATCHLIST</span>
         <span class="monitoring-title">
-          <strong>Watching 4 competitors across 6 shop pages</strong>
+          <strong>Watching 4 competitors (6 catalog &amp; shop pages tracked)</strong>
           <span class="monitoring-details">· SikhiArt.com, Fine Art America, Pixels, Saatchi Art</span>
         </span>
       </div>
@@ -1098,7 +1098,7 @@
 
           <article class="jr-card c2">
             <header><h3>Competitor watchlist</h3></header>
-            <p class="jr-watch"><span class="jr-dot" aria-hidden="true"></span>4 competitors · 6 shop pages · last checked Nov 3 <button type="button" class="jr-mini" id="recheckBtn" disabled title="Re-checking needs a live server">Re-check now</button></p>
+            <p class="jr-watch"><span class="jr-dot" aria-hidden="true"></span>4 competitors (6 catalog &amp; shop pages tracked) · last checked Nov 3 <button type="button" class="jr-mini" id="recheckBtn" disabled title="Re-checking needs a live server">Re-check now</button></p>
             <ul class="jr-sellers" id="sellerList">
               <li class="jr-seller has-brief">
                 <div><strong>SikhiArt.com</strong><span>Sikh history paintings &amp; prints · 300 pages</span><span class="jr-new">New: 2 listings in the 30 days before Nov 3</span></div>
@@ -1119,8 +1119,8 @@
             </ul>
             <form class="jr-add" id="addCompetitorForm" novalidate>
               <label for="addCompetitorInput">Add another competitor to analyze</label>
-              <div><input id="addCompetitorInput" type="url" inputmode="url" placeholder="https://their-shop.com" maxlength="300" aria-describedby="addCompetitorCost"><button type="submit" class="jr-mini primary" id="addCompetitorBtn">Add · 🪙 1 run</button></div>
-              <p class="jr-add-cost" id="addCompetitorCost">Analyzing a new shop uses 1 run. In this saved demo the shop is added to your list and no run is used.</p>
+              <div><input id="addCompetitorInput" type="url" inputmode="url" placeholder="https://their-shop.com" maxlength="300" aria-describedby="addCompetitorCost"><button type="submit" class="jr-mini primary" id="addCompetitorBtn">Add · 🪙 1 run (live) / 0 in demo</button></div>
+              <p class="jr-add-cost" id="addCompetitorCost">Live crawl uses 1 run. In this saved demo the shop is added to your list and no run is used.</p>
             </form>
             <p class="jr-note">Public snapshots captured Nov 3, 2026. Only SikhiArt.com has a saved Muse Spark brief; new analyses need a live server.</p>
           </article>
@@ -1128,10 +1128,10 @@
           <article class="jr-card c2">
             <header><h3>What they charge &amp; advertise</h3></header>
             <ul class="jr-prices" aria-label="Print price ranges, log scale">
-              <li class="you"><span class="jr-price-name">You · Pixels prints</span><span class="jr-price-bar"><i style="--l:5.9%;--w:7.9%"></i></span><span class="jr-price-val">$14–$22</span></li>
+              <li class="you"><span class="jr-price-name">You · Pixels POD prints</span><span class="jr-price-bar"><i style="--l:5.9%;--w:7.9%"></i></span><span class="jr-price-val">$14–$22</span></li>
               <li><span class="jr-price-name">Manjot S. Sachdeva</span><span class="jr-price-bar"><i style="--l:6.0%;--w:9.7%"></i></span><span class="jr-price-val">$14–$24</span></li>
               <li><span class="jr-price-name">Gurinderpreet Kaur</span><span class="jr-price-bar"><i style="--l:5.7%;--w:22.4%"></i></span><span class="jr-price-val">$14–$50</span></li>
-              <li><span class="jr-price-name">SikhiArt.com</span><span class="jr-price-bar"><i style="--l:31.4%;--w:65.4%"></i></span><span class="jr-price-val">$60–$2,500</span></li>
+              <li><span class="jr-price-name">SikhiArt.com (competitor range)</span><span class="jr-price-bar"><i style="--l:31.4%;--w:65.4%"></i></span><span class="jr-price-val">$60–$2,500</span></li>
             </ul>
             <p class="jr-scale" aria-hidden="true"><span style="left:0">$10</span><span style="left:40.4%">$100</span><span style="left:80.7%">$1,000</span></p>
             <dl class="jr-facts">
@@ -1258,12 +1258,12 @@
         <div class="kpi-box">
           <div class="kpi-label">Catalog Indexed</div>
           <div class="kpi-val" id="kpiArtworks">72 Works</div>
-          <div class="kpi-sub">9 curated series · Triton Museum & UK exhibited</div>
+          <div class="kpi-sub">9 curated series · exhibition claims need artist verification</div>
         </div>
         <div class="kpi-box">
-          <div class="kpi-label">Pricing Arbitrage Gap</div>
+          <div class="kpi-label">Your POD vs. Direct Signed Range</div>
           <div class="kpi-val" style="color:var(--accent);" id="kpiPriceGap">$14 → $75–$900</div>
-          <div class="kpi-sub">Bridge $14 POD prints to $75 signed 18k-gold editions</div>
+          <div class="kpi-sub">Your $14–$22 POD prints vs. $75–$900 direct signed editions (SikhiArt charges $60–$2,500)</div>
         </div>
         <div class="kpi-box">
           <div class="kpi-label">14-Day Ad ROAS (sample data)</div>
@@ -1490,7 +1490,7 @@
                   <span style="background:rgba(0,0,0,0.55);padding:0.15rem 0.45rem;border-radius:999px;">9:16 Reel</span>
                 </div>
                 <div style="text-align:left;">
-                  <span class="badge gold" style="margin-bottom:0.35rem;">Triton Museum Exhibited</span>
+                  <span class="badge gold" style="margin-bottom:0.35rem;">Sample claim · verify exhibition details</span>
                   <div id="reelHeadline" style="font-weight:700;font-size:0.92rem;line-height:1.25;text-shadow:0 1px 4px rgba(0,0,0,0.8);">
                     Ek Onkar in 18k Gold ✨ Signed Edition of 100
                   </div>
@@ -1538,8 +1538,8 @@
             <label class="field-label" for="briefHeadline">Ad Headline (Editable)</label>
             <input type="text" id="briefHeadline" class="input" style="margin-bottom:0.75rem;" value="Ek Onkar in 18k Gold ✨ Signed Edition of 100" />
 
-            <label class="field-label" for="briefPrimaryText">Primary Ad Copy (Editable)</label>
-            <textarea id="briefPrimaryText" class="textarea" style="margin-bottom:0.75rem;">550 years of Light. One sacred word — Ek Onkar. This 550th Anniversary piece by Bay Area artist Sarabjit Singh is hand-embellished with 18k gold ink, signed & numbered. Exhibited at Triton Museum & Kala Sangam UK. 12x12" $75 / 24x24" $125.</textarea>
+            <label class="field-label" for="briefPrimaryText">Primary Ad Copy (Editable · Verify Exhibition &amp; Anniversary Claims Before Publishing)</label>
+            <textarea id="briefPrimaryText" class="textarea" style="margin-bottom:0.75rem;">One sacred word — Ek Onkar. [Sample copy — artist to verify 550th Anniversary &amp; Triton Museum / Kala Sangam UK exhibition details before publishing.] By Bay Area artist Sarabjit Singh, hand-embellished with 18k gold ink, signed &amp; numbered. 12x12" $75 / 24x24" $125.</textarea>
           </div>
 
           <div>
@@ -1656,10 +1656,10 @@
               📋 Copy Embed HTML for Weebly / Shopify
             </button>
           </div>
-          <pre class="code-box" id="weeblyHtmlCode">&lt;!-- Paste into Weebly / Shopify Embed Code Block on artofsarabjitsingh.com/gurus.html --&gt;
+          <pre class="code-box" id="weeblyHtmlCode">&lt;!-- Paste into Weebly / Shopify Embed Code Block on artofsarabjitsingh.com/gurus.html (Verify exhibition &amp; anniversary claims before publishing) --&gt;
 &lt;div style="max-width:460px;border:1px solid #e6e1d6;border-radius:16px;padding:20px;font-family:sans-serif;background:#fff;box-shadow:0 6px 20px rgba(0,0,0,0.06);"&gt;
-  &lt;span style="background:#fbf5e6;color:#7c5412;font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;"&gt;Triton Museum &amp; Kala Sangam UK Exhibited&lt;/span&gt;
-  &lt;h3 style="margin:10px 0 4px;font-size:20px;"&gt;Ek Onkar — 550th Anniversary 18k Gold Signed Edition&lt;/h3&gt;
+  &lt;span style="background:#fbf5e6;color:#7c5412;font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;"&gt;Sample badge — verify exhibition details before publishing&lt;/span&gt;
+  &lt;h3 style="margin:10px 0 4px;font-size:20px;"&gt;Ek Onkar — 18k Gold Signed Edition (verify anniversary subtitle)&lt;/h3&gt;
   &lt;p style="color:#615e57;font-size:14px;margin:0 0 14px;"&gt;Hand-embellished with 18k gold ink, signed &amp; numbered by Sarabjit Singh (Edition of 100). Ships with Certificate of Authenticity.&lt;/p&gt;
   &lt;div style="display:flex;gap:10px;flex-wrap:wrap;"&gt;
     &lt;a href="#stripe-link-75" style="flex:1;text-align:center;background:#b85d19;color:#fff;padding:10px 14px;border-radius:8px;text-decoration:none;font-weight:700;"&gt;Buy 12x12" Signed Print — $75&lt;/a&gt;
@@ -1679,7 +1679,7 @@
             </button>
           </div>
           <pre class="code-box" id="adsCsvPreview">Campaign Name,Ad Set Name,Daily Budget Change,Placement,Headline,Primary Text,Creative Asset,Cited Finding
-Fall Prints,Retargeting - Site Visitors,+$6.15/day (ROAS 9.3x),instagram_feed,"Ek Onkar in 18k Gold ✨ Signed Edition of 100","550 years of Light. Hand-embellished with 18k gold ink, signed & numbered by Sarabjit Singh. 12x12 $75 / 24x24 $125.",samples/ek_onkar_collector_room_live.webp,F1;F3
+Fall Prints,Retargeting - Site Visitors,+$6.15/day (ROAS 9.3x),instagram_feed,"Ek Onkar in 18k Gold ✨ Signed Edition of 100","[Sample copy — verify anniversary/exhibition claims] Hand-embellished with 18k gold ink, signed & numbered by Sarabjit Singh. 12x12 $75 / 24x24 $125.",samples/ek_onkar_collector_room_live.webp,F1;F3
 Gurpurab Gifts,Golden Temple - Gift Buyers,-$2.25/day (Refresh Creative),instagram_story,"Kirat Karo — Sacred Punjabi Heritage for Your Dining Room","Celebrate the dignity of honest work and Punjabi roots. Signed collector edition by Sarabjit Singh.",samples/kirat_karo_collector_room_live.webp,F1;F2</pre>
         </div>
       </div>
@@ -1743,12 +1743,12 @@ Gurpurab Gifts,Golden Temple - Gift Buyers,-$2.25/day (Refresh Creative),instagr
 
       <button type="button" class="workspace-option selected" data-ws="sarabjit_singh">
         <div>
-          <div style="font-weight:700;font-size:0.95rem;">🎨 Art of Sarabjit Singh (Fine Artist · SF Bay Area)</div>
+          <div style="font-weight:700;font-size:0.95rem;">🎨 Sample shop · Art of Sarabjit Singh (Fine Artist · SF Bay Area)</div>
           <div style="font-size:0.8rem;color:var(--text-muted);margin-top:0.2rem;">
             <code>artofsarabjitsingh.com</code> · Pixels · Fine Art America · Saatchi Art · <code>@artofsarabjitsingh</code>
           </div>
         </div>
-        <span class="badge green">Saved Demo Ready</span>
+        <span class="badge green">Sample shop</span>
       </button>
 
 
