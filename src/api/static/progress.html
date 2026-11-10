@@ -84,22 +84,22 @@
       <div class="pg-kpi-card">
         <span class="pg-kpi-label">Logged Revenue</span>
         <span class="pg-kpi-val" id="pgRevenue">$0</span>
-        <span class="pg-kpi-sub">[live] Attributed to moves</span>
+        <span class="pg-kpi-sub" id="pgRevenueSub">Logged on this device</span>
       </div>
       <div class="pg-kpi-card">
         <span class="pg-kpi-label">Plan Cost</span>
-        <span class="pg-kpi-val" id="pgPlanCost">$12</span>
+        <span class="pg-kpi-val" id="pgPlanCost">$12/mo</span>
         <span class="pg-kpi-sub">Starter monthly plan</span>
       </div>
       <div class="pg-kpi-card">
         <span class="pg-kpi-label">Net Return</span>
-        <span class="pg-kpi-val" id="pgNetReturn">-$12</span>
-        <span class="pg-kpi-sub">Revenue minus plan cost</span>
+        <span class="pg-kpi-val" id="pgNetReturn">—</span>
+        <span class="pg-kpi-sub" id="pgNetReturnSub">Requires 1 logged result</span>
       </div>
       <div class="pg-kpi-card">
-        <span class="pg-kpi-label">Hours Saved</span>
-        <span class="pg-kpi-val" id="pgHoursSaved">0h</span>
-        <span class="pg-kpi-sub">[estimate] 1.5h per move done</span>
+        <span class="pg-kpi-label">Hours Logged</span>
+        <span class="pg-kpi-val" id="pgHoursSaved">0.0h</span>
+        <span class="pg-kpi-sub">Actual time logged across moves</span>
       </div>
     </section>
 
@@ -178,20 +178,46 @@
     (function () {
       'use strict';
       const $ = (id) => document.getElementById(id);
-      const OUTCOMES_KEY = 'muse.outcomes';
+      let currentUser = null;
+
+      function storageKey() {
+        return currentUser && currentUser.id ? 'muse.outcomes.' + currentUser.id : 'muse.outcomes.anon';
+      }
 
       function getOutcomes() {
         try {
-          const raw = localStorage.getItem(OUTCOMES_KEY);
+          const raw = localStorage.getItem(storageKey());
           return raw ? JSON.parse(raw) : [];
         } catch (_) { return []; }
       }
 
       function saveOutcomes(list) {
         try {
-          localStorage.setItem(OUTCOMES_KEY, JSON.stringify(list));
+          localStorage.setItem(storageKey(), JSON.stringify(list));
         } catch (_) {}
       }
+
+      async function syncAccount() {
+        try {
+          if (window.museAccount && typeof window.museAccount.getSnapshot === 'function') {
+            const snap = window.museAccount.getSnapshot();
+            if (snap && snap.user) currentUser = snap.user;
+          }
+          if (!currentUser) {
+            const resp = await fetch('/api/v1/account/me', { credentials: 'same-origin' });
+            if (resp.ok) {
+              const data = await resp.json();
+              if (data && data.user) currentUser = data.user;
+            }
+          }
+        } catch (_) {}
+        render();
+      }
+
+      window.addEventListener('muse:account-change', (ev) => {
+        currentUser = ev?.detail?.user || null;
+        render();
+      });
 
       function render() {
         const outcomes = getOutcomes();
@@ -213,13 +239,13 @@
         const count = outcomes.length;
         movesEl.textContent = count;
         revEl.textContent = `$${totalRev.toFixed(0)}`;
-        const net = totalRev - 12;
-        netEl.textContent = `${net >= 0 ? '+' : ''}$${net.toFixed(0)}`;
-        netEl.style.color = net >= 0 ? '#2f6f4f' : '#8a5a12';
-        const hoursSaved = (count * 1.5).toFixed(1);
-        hoursEl.textContent = `${hoursSaved}h`;
 
         if (count === 0) {
+          netEl.textContent = '—';
+          netEl.style.color = '#888277';
+          const netSub = $('pgNetReturnSub');
+          if (netSub) netSub.textContent = 'Requires 1 logged result';
+          hoursEl.textContent = '0.0h';
           emptyEl.hidden = false;
           listEl.hidden = true;
           listEl.textContent = '';
@@ -227,6 +253,14 @@
           emptyEl.hidden = true;
           listEl.hidden = false;
           listEl.textContent = '';
+          const net = totalRev - 12;
+          netEl.textContent = `${net >= 0 ? '+' : ''}$${net.toFixed(0)}`;
+          netEl.style.color = net >= 0 ? '#2f6f4f' : '#8a5a12';
+          const netSub = $('pgNetReturnSub');
+          if (netSub) netSub.textContent = 'Revenue minus plan cost';
+
+          const hoursLogged = (totalMinutes / 60).toFixed(1);
+          hoursEl.textContent = `${hoursLogged}h`;
           outcomes.slice().reverse().forEach((item) => {
             const li = document.createElement('li');
             li.className = 'pg-timeline-item';
@@ -243,14 +277,22 @@
 
             const metrics = document.createElement('div');
             metrics.className = 'pg-item-metrics';
-            metrics.innerHTML = `
-              <span>Channel: <strong>${item.channel}</strong></span>
-              ${item.reach ? `<span>Reach: <strong>${item.reach}</strong></span>` : ''}
-              ${item.clicks ? `<span>Clicks: <strong>${item.clicks}</strong></span>` : ''}
-              ${item.orders ? `<span>Orders: <strong>${item.orders}</strong></span>` : ''}
-              ${item.revenue ? `<span>Revenue: <strong>$${Number(item.revenue).toFixed(2)}</strong></span>` : ''}
-              <span>Time: <strong>${item.minutes || 15}m</strong></span>
-            `;
+
+            const addMetric = (label, val) => {
+              const span = document.createElement('span');
+              span.textContent = label + ': ';
+              const strong = document.createElement('strong');
+              strong.textContent = String(val);
+              span.appendChild(strong);
+              metrics.appendChild(span);
+            };
+
+            addMetric('Channel', item.channel || 'direct');
+            if (item.reach) addMetric('Reach', item.reach);
+            if (item.clicks) addMetric('Clicks', item.clicks);
+            if (item.orders) addMetric('Orders', item.orders);
+            if (item.revenue) addMetric('Revenue', '$' + Number(item.revenue).toFixed(2));
+            addMetric('Time', (item.minutes || 15) + 'm');
 
             li.appendChild(top);
             li.appendChild(metrics);
@@ -304,6 +346,7 @@
       });
 
       render();
+      syncAccount();
     })();
   </script>
 </body>

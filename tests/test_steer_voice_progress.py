@@ -266,8 +266,7 @@ def test_steer_voice_progress_ui(live_server_url: str) -> None:
                 chip.click()
                 
                 # Verify directive preview appears
-                preview = page.locator("#jrDirectivePreview")
-                preview.wait_for(state="visible", timeout=8000)
+                page.wait_for_selector("#jrDirectiveSummary:has-text('Focus:')", timeout=8000)
                 summary_text = page.locator("#jrDirectiveSummary").inner_text()
                 assert "Focus:" in summary_text, f"Unexpected summary: {{summary_text}}"
                 
@@ -333,13 +332,44 @@ def test_steer_voice_progress_ui(live_server_url: str) -> None:
                 assert "Progress & ROI Tracker" in page.title()
                 kpi_grid = page.locator(".pg-kpi-grid")
                 kpi_grid.wait_for(state="visible", timeout=8000)
-                
-                # Open Log Result modal
+
+                # Verify honest labels: no live tag without server storage,
+                # and no ROI figure without a logged result
+                assert page.locator("#pgRevenueSub").inner_text() == "Logged on this device"
+                assert page.locator("#pgPlanCost").inner_text() == "$12/mo"
+                assert page.locator("#pgNetReturn").inner_text() == "—"
+
+                # Open Log Result modal and log an outcome for Account A
+                page.evaluate(
+                    "window.dispatchEvent(new CustomEvent('muse:account-change', {{"
+                    "  detail: {{ user: {{ id: 'usr_prog_a', email: 'a@prog.test' }} }}"
+                    "}}))"
+                )
+                page.wait_for_timeout(100)
+
                 open_modal_btn = page.locator("#pgOpenLogBtn")
                 open_modal_btn.click()
                 log_modal = page.locator("#pgLogModal")
                 log_modal.wait_for(state="visible", timeout=5000)
-                log_modal.locator("#pgCancelBtn").click()
+
+                page.locator("#pgFormTitle").fill("Featured Spring Floral Vase")
+                page.locator("#pgFormRevenue").fill("50")
+                page.locator("#pgLogForm button[type='submit']").click()
+                page.wait_for_timeout(200)
+
+                # Honest ROI: $50 revenue minus $12 plan cost = +$38
+                assert page.locator("#pgNetReturn").inner_text() == "+$38"
+                assert page.locator("#pgMovesCount").inner_text() == "1"
+
+                # Switch to Account B: must be isolated, no results shown
+                page.evaluate(
+                    "window.dispatchEvent(new CustomEvent('muse:account-change', {{"
+                    "  detail: {{ user: {{ id: 'usr_prog_b', email: 'b@prog.test' }} }}"
+                    "}}))"
+                )
+                page.wait_for_timeout(200)
+                assert page.locator("#pgNetReturn").inner_text() == "—"
+                assert page.locator("#pgMovesCount").inner_text() == "0"
 
                 page.close()
 
