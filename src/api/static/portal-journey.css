@@ -613,3 +613,6 @@
 .jr-seller.ms-paused .ms-watch-state { color: var(--text-muted); }
 .jr-seller.ms-paused .ms-watch-badges { opacity: 0.55; }
 .jr-add-cost { margin: 0.3rem 0 0; font-size: 0.7rem; color: var(--text-muted); }
+.jr-meta-ad-link { display: inline-block; margin-top: 4px; font-size: 0.76rem; font-weight: 600; color: var(--accent, #a35d1e); text-decoration: none; }
+.jr-meta-ad-link:hover { text-decoration: underline; }
+

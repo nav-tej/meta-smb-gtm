@@ -1193,7 +1193,14 @@
           st.textContent = comp.name || comp.url;
           const sp = document.createElement('span');
           sp.textContent = `${comp.url} · ${comp.reason || 'Watched competitor'}`;
-          d.append(st, sp);
+          const adLink = document.createElement('a');
+          adLink.className = 'jr-meta-ad-link';
+          adLink.target = '_blank';
+          adLink.rel = 'noopener noreferrer';
+          const query = comp.name || comp.url;
+          adLink.href = `https://www.facebook.com/ads/library/?active_status=active&AdCandidate=&q=${encodeURIComponent(query)}&search_type=keyword_unordered&media_type=all`;
+          adLink.textContent = 'See their ads on Meta ↗';
+          d.append(st, sp, adLink);
           const btn = document.createElement('button');
           btn.type = 'button';
           btn.className = 'jr-mini primary js-live-brief';
@@ -1289,6 +1296,34 @@
       }
     });
 
+    // Update steer input and chips to derive from user's shop & competitors
+    const steerInput = document.getElementById('jrSteerInput');
+    if (steerInput) {
+      steerInput.placeholder = competitors[0]
+        ? `e.g. Look at why ${competitors[0].name || competitors[0].url} prices start higher`
+        : 'e.g. Look at competitor prices or find gift ideas under $50';
+    }
+    document.querySelectorAll('.jr-chip-btn').forEach((chip) => {
+      if (/SikhiArt/i.test(chip.textContent || '')) {
+        const compName = competitors[0]?.name || competitors[0]?.url || 'competitors';
+        chip.textContent = `Why ${compName} entry`;
+        chip.setAttribute('data-directive', `Look at why ${compName} starts at higher prices`);
+      }
+    });
+    document.querySelectorAll('.ms-refine-chips button').forEach((btn) => {
+      if (/Women/i.test(btn.textContent || '')) {
+        btn.textContent = 'Featured series';
+        btn.setAttribute('data-refine', 'Focus on my featured series');
+      }
+    });
+    const compInput = document.getElementById('compUrlInput');
+    if (compInput) {
+      compInput.value = competitors[0]?.url || '';
+      compInput.placeholder = competitors[0]?.url || 'https://competitor-shop.com';
+    }
+    const playbookTitle = document.getElementById('actionablePlaybookTitle');
+    if (playbookTitle) playbookTitle.textContent = `Actionable Playbook for ${shopName}`;
+
     // 8. Full Workspace Hero & Panels — replace Sarabjit title, KPIs, and findings with user's own shop
     const heroTitle = document.getElementById('heroTitle');
     if (heroTitle) heroTitle.textContent = `${shopName} — Growth Workspace`;
@@ -1345,7 +1380,17 @@
         el.textContent = '';
         const div = document.createElement('div');
         div.className = 'finding-item';
-        div.textContent = `No data yet for ${shopName}. Complete an analysis or log your first campaign to populate this section.`;
+        if (id === 'metaAdsContainer') {
+          const compNames = competitors.map((c) => c.name || c.url);
+          const firstComp = compNames[0] || 'competitors';
+          const pubUrl = `https://www.facebook.com/ads/library/?active_status=active&AdCandidate=&q=${encodeURIComponent(firstComp)}&search_type=keyword_unordered&media_type=all`;
+          div.innerHTML = `
+            <div style="font-size:0.85rem;color:var(--text-muted);">No live ads retrieved from Meta Ad Library API for ${esc(shopName)}.</div>
+            <div style="margin-top:6px;"><a class="jr-meta-ad-link" href="${safeUrl(pubUrl)}" target="_blank" rel="noopener noreferrer">Search public Meta Ad Library for ${esc(firstComp)} ↗</a></div>
+          `;
+        } else {
+          div.textContent = `No data yet for ${shopName}. Complete an analysis or log your first campaign to populate this section.`;
+        }
         el.appendChild(div);
       }
     });

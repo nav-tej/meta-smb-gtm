@@ -16,17 +16,18 @@ Small visual-product sellers—fine artists, printmakers, jewelers, ceramicists,
 
 ### 1.2 Personas & Jobs-to-be-Done (JTBD)
 
-#### Primary Persona: Solo Visual Artist / Multi-Marketplace Maker
-- **Representative Anchor Seller:** **Art of Sarabjit Singh** (`artofsarabjitsingh.com` `[live]`), a San Francisco Bay Area Sikh and Punjabi heritage fine artist.
-- **Active Channels (`[live]` public snapshots captured Nov 3, 2026):**
+#### Primary Persona: Independent or Small Artist Selling on Marketplaces and Social
+- **Target Audience:** Any independent solo painter, printmaker, illustrator, photographer, ceramicist, or handmade maker selling through their own website and online marketplaces (Fine Art America, Pixels, Saatchi Art, Etsy, Shopify) and promoting work on Instagram and Facebook.
+- **Sample Shop Showcase (Demo Example Only):** **Art of Sarabjit Singh** (`artofsarabjitsingh.com` `[sample demo]`), a San Francisco Bay Area fine artist used as the pre-verified offline demo showcase. The Sikh art niche, Gurpurab occasions, and the four watchlist competitors (`SikhiArt.com`, `Gurinderpreet Kaur`, `Manjot Singh Sachdeva`, `Gurdish Pannu`) belong strictly to this sample shop and are never assumed for real accounts.
+- **Sample Shop Active Channels (`[live]` public snapshots captured Nov 3, 2026):**
   - Own website: `https://www.artofsarabjitsingh.com/` (`24` sitemap pages indexed `[live]`).
   - Print-on-demand marketplaces: **Pixels** (`https://sarabjit-singh.pixels.com/`, preferred print storefront `[live]`) and **Fine Art America** (`https://fineartamerica.com/profiles/sarabjit-singh/art/paintings`, `72` paintings indexed across `9` curated series `[live]`, `$14–$22` print range `[live]`).
   - Originals marketplace: **Saatchi Art** (`https://www.saatchiart.com/sarabjitsingh` `[live]`).
   - Social channels: Instagram (`@artofsarabjitsingh` `[live]`) and Facebook (`facebook.com/ArtofSarabjitSingh` `[live]`).
   - Closed channel: **Etsy** (`Etsy · closed` `[live]` — recommendations must never instruct her to list on Etsy).
-- **Direct Edition & Original Pricing:** `$75–$900` signed collector editions (`[sample]`); `$2,000–$4,000` original canvases (`[sample]`).
-- **Core Jobs-to-be-Done:**
-  1. *When I have 15 minutes between studio work and shipping*, help me see what similar artists are listing and charging (`$60–$2,500` at `SikhiArt.com` across `300` URLs `[live]`; `$14–$50` at `Gurinderpreet Kaur` across `70` FAA listings `[live]`; `$14–$24` at `Manjot Singh Sachdeva` across `105` FAA/Pixels listings `[live]`) so I know where my catalog has an opening.
+- **Sample Direct Edition & Original Pricing:** `$75–$900` signed collector editions (`[sample]`); `$2,000–$4,000` original canvases (`[sample]`).
+- **Core Jobs-to-be-Done (Any Artist):**
+  1. *When I have 15 minutes between studio work and shipping*, help me see what similar artists in my medium are listing and charging so I know where my catalog has an opening.
   2. *When Muse suggests a growth move*, show me the exact Instagram/Facebook post it implies—staged with my artwork, my handle, and editable copy—or give me a copy-ready marketplace checklist so I can finish in one sitting.
   3. *When I log views, clicks, or orders*, show me honestly whether my posts and ad budget are paying off without inventing modeled revenue.
 

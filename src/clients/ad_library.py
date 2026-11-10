@@ -44,6 +44,17 @@ def _parse_start_time(raw: str | None) -> datetime | None:
     return dt.replace(tzinfo=UTC) if dt.tzinfo is None else dt.astimezone(UTC)
 
 
+def build_ad_library_search_url(page_or_name: str) -> str:
+    """Public Meta Ad Library search URL for an advertiser / page name."""
+    from urllib.parse import quote_plus
+
+    q = quote_plus(page_or_name.strip())
+    return (
+        f"https://www.facebook.com/ads/library/?active_status=active"
+        f"&AdCandidate=&q={q}&search_type=keyword_unordered&media_type=all"
+    )
+
+
 def summarize_ad_library_records(
     records: list[dict[str, Any]],
     *,
@@ -64,6 +75,8 @@ def summarize_ad_library_records(
             platform_counter[plat] += 1
 
         started = _parse_start_time(item.get("ad_delivery_start_time"))
+        start_date = started.strftime("%Y-%m-%d") if started else None
+        library_url = f"https://www.facebook.com/ads/library/?id={ad_id}" if ad_id else ""
         days_running = max(0, (ref_now - started).days) if started else 0
         if days_running >= 30:
             proven_30d += 1
@@ -81,6 +94,8 @@ def summarize_ad_library_records(
                 days_running=days_running,
                 headline=headline,
                 body_excerpt=body_excerpt,
+                start_date=start_date,
+                library_url=library_url,
             )
         )
 

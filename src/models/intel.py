@@ -41,6 +41,21 @@ class SocialAdSummary(BaseModel):
     days_running: int = Field(default=0, ge=0)
     headline: str = ""
     body_excerpt: str = ""
+    start_date: str | None = None
+    library_url: str = ""
+
+
+class CompetitorAdSignalsResponse(BaseModel):
+    """Server-side response for competitor Meta Ad Library queries."""
+
+    query: str
+    public_library_url: str
+    status: Literal["live", "zero", "no_token", "error"]
+    message: str
+    total_active_ads: int = 0
+    ads: list[SocialAdSummary] = Field(default_factory=list)
+    is_cached: bool = False
+    cache_label: str | None = None
 
 
 class SocialCompetitorSignals(BaseModel):

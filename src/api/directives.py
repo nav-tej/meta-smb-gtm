@@ -166,11 +166,40 @@ async def get_active_directive(
 
 
 @router.get("/suggestions", response_model=list[SuggestionItem])
-async def list_directive_suggestions() -> list[SuggestionItem]:
-    """Return 4 state-derived suggestions that drive usage without model calls."""
+async def list_directive_suggestions(
+    request: Request,
+    response: Response,
+) -> list[SuggestionItem]:
+    """Return 4 state-derived suggestions that drive usage without model calls.
+
+    For signed-in sellers with custom competitors, suggestions derive from their own
+    competitors and preferences. For sample-shop demo sessions, suggestions reference
+    the sample fixture (SikhiArt).
+    """
+    account = await resolve_account(request, response, require_verified=False)
+    pricing_text = "Look at why SikhiArt starts at $59.99"
+    gifting_text = "Gift ideas for upcoming season"
+
+    if account is not None:
+        ws = await load_workspace(account)
+        doc = ws.get("document") or {}
+        onboarding = doc.get("onboarding") or {}
+        comps = onboarding.get("competitors") or []
+        shop_name = onboarding.get("shop_name") or ""
+        medium = onboarding.get("medium") or ""
+        if comps and isinstance(comps, list) and comps[0]:
+            first_name = comps[0].get("name") or comps[0].get("url") or ""
+            if first_name and "sikhiart" not in first_name.lower():
+                pricing_text = f"Look at why {first_name} starts at higher prices"
+        elif shop_name and "sarabjit" not in shop_name.lower():
+            pricing_text = "Look at why competitor entry prices start higher"
+
+        if medium:
+            gifting_text = f"Gift ideas for {medium} collectors"
+
     return [
         SuggestionItem(
-            text="Look at why SikhiArt starts at $59.99",
+            text=pricing_text,
             focus="pricing",
             reason="Competitor price gap analysis",
         ),
@@ -180,7 +209,7 @@ async def list_directive_suggestions() -> list[SuggestionItem]:
             reason="Filter for quick wins under 15 minutes",
         ),
         SuggestionItem(
-            text="Gift ideas for upcoming season",
+            text=gifting_text,
             focus="gifting",
             reason="Seasonal holiday gift positioning",
         ),

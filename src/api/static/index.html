@@ -1120,19 +1120,31 @@
             <p class="jr-watch"><span class="jr-dot" aria-hidden="true"></span>4 competitors (6 catalog &amp; shop pages tracked) · last checked Nov 3 <button type="button" class="jr-mini" id="recheckBtn" disabled title="Re-checking needs a live server">Re-check now</button></p>
             <ul class="jr-sellers" id="sellerList">
               <li class="jr-seller has-brief">
-                <div><strong>SikhiArt.com</strong><span>Sikh history paintings &amp; prints · 300 pages</span><span class="jr-new">New: 2 listings in the 30 days before Nov 3</span></div>
+                <div>
+                  <strong>SikhiArt.com</strong><span>Sikh history paintings &amp; prints · 300 pages</span><span class="jr-new">New: 2 listings in the 30 days before Nov 3</span>
+                  <a class="jr-meta-ad-link" href="https://www.facebook.com/ads/library/?active_status=active&amp;AdCandidate=&amp;q=SikhiArt&amp;search_type=keyword_unordered&amp;media_type=all" target="_blank" rel="noopener noreferrer">See their ads on Meta ↗</a>
+                </div>
                 <button type="button" class="jr-mini primary" id="journeyLoadBrief">Analyze this seller →</button>
               </li>
               <li class="jr-seller">
-                <div><a href="https://fineartamerica.com/profiles/gurinderpreet-kaur/art/paintings" target="_blank" rel="noopener noreferrer">Gurinderpreet Kaur</a><span>Fine Art America · 70 listings</span></div>
+                <div>
+                  <a href="https://fineartamerica.com/profiles/gurinderpreet-kaur/art/paintings" target="_blank" rel="noopener noreferrer">Gurinderpreet Kaur</a><span>Fine Art America · 70 listings</span>
+                  <a class="jr-meta-ad-link" href="https://www.facebook.com/ads/library/?active_status=active&amp;AdCandidate=&amp;q=Gurinderpreet%20Kaur&amp;search_type=keyword_unordered&amp;media_type=all" target="_blank" rel="noopener noreferrer">See their ads on Meta ↗</a>
+                </div>
                 <button type="button" class="jr-mini js-live-brief" disabled title="Live analysis is off in this demo">Request analysis →</button>
               </li>
               <li class="jr-seller">
-                <div><a href="https://fineartamerica.com/profiles/manjot-singh-sachdeva/art/photographs" target="_blank" rel="noopener noreferrer">Manjot Singh Sachdeva</a><span>Golden Temple photos · FAA / Pixels · 105 listings</span></div>
+                <div>
+                  <a href="https://fineartamerica.com/profiles/manjot-singh-sachdeva/art/photographs" target="_blank" rel="noopener noreferrer">Manjot Singh Sachdeva</a><span>Golden Temple photos · FAA / Pixels · 105 listings</span>
+                  <a class="jr-meta-ad-link" href="https://www.facebook.com/ads/library/?active_status=active&amp;AdCandidate=&amp;q=Manjot%20Singh%20Sachdeva&amp;search_type=keyword_unordered&amp;media_type=all" target="_blank" rel="noopener noreferrer">See their ads on Meta ↗</a>
+                </div>
                 <button type="button" class="jr-mini js-live-brief" disabled title="Live analysis is off in this demo">Request analysis →</button>
               </li>
               <li class="jr-seller">
-                <div><a href="https://www.saatchiart.com/gurdishpannu" target="_blank" rel="noopener noreferrer">Gurdish Pannu</a><span>Punjabi folk &amp; Sikh heritage · Saatchi Art</span></div>
+                <div>
+                  <a href="https://www.saatchiart.com/gurdishpannu" target="_blank" rel="noopener noreferrer">Gurdish Pannu</a><span>Punjabi folk &amp; Sikh heritage · Saatchi Art</span>
+                  <a class="jr-meta-ad-link" href="https://www.facebook.com/ads/library/?active_status=active&amp;AdCandidate=&amp;q=Gurdish%20Pannu&amp;search_type=keyword_unordered&amp;media_type=all" target="_blank" rel="noopener noreferrer">See their ads on Meta ↗</a>
+                </div>
                 <button type="button" class="jr-mini js-live-brief" disabled title="Live analysis is off in this demo">Request analysis →</button>
               </li>
             </ul>
@@ -1453,8 +1465,8 @@
           <div class="card">
             <div class="card-header">
               <div>
-                <h2 class="card-title">Illustrative Meta Ad Library Signals</h2>
-                <p class="card-sub">These sample competitor ads illustrate the analysis workflow. Ad longevity alone does not establish profitability.</p>
+                <h2 class="card-title">Meta Ad Library Signals</h2>
+                <p class="card-sub">Sample competitor ads illustrate the analysis workflow for the demo shop. Real accounts show verified live ads or direct public search links.</p>
               </div>
               <span class="badge gold">Instagram + Facebook Feed/Reels</span>
             </div>
@@ -1466,7 +1478,7 @@
           <div class="card">
             <div class="card-header">
               <div>
-                <h2 class="card-title">Actionable Playbook for Sarabjit Singh</h2>
+                <h2 class="card-title" id="actionablePlaybookTitle">Actionable Playbook for Sarabjit Singh</h2>
                 <p class="card-sub">5-to-15 minute high-leverage actions ranked by revenue impact.</p>
               </div>
               <button type="button" class="btn btn-outline" id="runAuditBtn" hidden style="font-size:0.78rem;padding:0.4rem 0.75rem;">
@@ -2071,24 +2083,59 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
 
       const adsEl = document.getElementById('metaAdsContainer');
       adsEl.innerHTML = '';
-      const themes = (ws.meta_ads_signals && ws.meta_ads_signals.longest_running_Declare) || [
-        "Desi Canvas Co (81d active on IG+FB): 'Golden Temple Sunset Framed Canvas - Ready to Hang' ($129+)",
-        "Punjab Heritage Prints (44d active on IG): '3-Piece Sikh History Collector Set - Save 20%' (room mockup hook)",
-        "Modern South Asian Decor (9d active): 'Housewarming & Wedding Art Gifts Under $95'"
-      ];
-      const hooks = (ws.meta_ads_signals && ws.meta_ads_signals.sample_hooks) || themes;
-      hooks.forEach((hook, idx) => {
-        const div = document.createElement('div');
-        div.className = 'finding-item';
-        div.innerHTML = `
-          <div class="finding-head">
-            <span class="badge gold">Sample Ad #${esc(idx + 1)}</span>
-            <span class="badge gold">Illustrative sample hook</span>
-          </div>
-          <div style="font-size:0.84rem;font-weight:600;">${esc(hook)}</div>
-        `;
-        adsEl.appendChild(div);
-      });
+      const isSample = ws.id === 'sarabjit_singh' || ws.id === 'etsy_pottery' || Boolean(ws.meta_ads_signals?.is_sample);
+      if (isSample) {
+        const hooks = (ws.meta_ads_signals && ws.meta_ads_signals.sample_hooks) || [
+          "[sample] Desi Canvas Co (81d active on IG+FB): 'Golden Temple Sunset Framed Canvas — Ready to Hang' ($129+)",
+          "[sample] Punjab Heritage Prints (44d active on IG): '3-Piece Sikh History Collector Set — Save 20%' (room mockup hook)",
+          "[sample] Modern South Asian Decor (9d active on IG): 'Housewarming & Wedding Art Gifts Under $95'"
+        ];
+        hooks.forEach((hook, idx) => {
+          const div = document.createElement('div');
+          div.className = 'finding-item';
+          const competitorName = hook.split('(')[0].replace(/^\[sample\]\s*/i, '').trim();
+          const adUrl = `https://www.facebook.com/ads/library/?active_status=active&AdCandidate=&q=${encodeURIComponent(competitorName)}&search_type=keyword_unordered&media_type=all`;
+          div.innerHTML = `
+            <div class="finding-head">
+              <span class="badge gold">[sample] Sample Ad #${esc(idx + 1)}</span>
+              <span class="badge gold">Sample hook only</span>
+            </div>
+            <div style="font-size:0.84rem;font-weight:600;">${esc(hook)}</div>
+            <div style="margin-top:6px;"><a class="jr-meta-ad-link" href="${safeUrl(adUrl)}" target="_blank" rel="noopener noreferrer">See their ads on Meta ↗</a></div>
+          `;
+          adsEl.appendChild(div);
+        });
+      } else {
+        const sigs = ws.meta_ads_signals || {};
+        if (sigs.ads && sigs.ads.length > 0) {
+          sigs.ads.forEach((ad, idx) => {
+            const div = document.createElement('div');
+            div.className = 'finding-item';
+            div.innerHTML = `
+              <div class="finding-head">
+                <strong>${esc(ad.page_name || 'Competitor Ad')}</strong>
+                <span class="badge green">Live Ad #${esc(idx + 1)}</span>
+              </div>
+              <div style="font-size:0.84rem;font-weight:600;">${esc(ad.headline || ad.body_excerpt)}</div>
+              <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;">
+                Started: ${esc(ad.start_date || 'Unknown')} · ${esc(ad.days_running || 0)} days active
+                <a class="jr-meta-ad-link" href="${safeUrl(ad.library_url)}" target="_blank" rel="noopener noreferrer" style="margin-left:8px;">View ad in library ↗</a>
+              </div>
+            `;
+            adsEl.appendChild(div);
+          });
+        } else {
+          const div = document.createElement('div');
+          div.className = 'finding-item';
+          const msg = sigs.message || (sigs.status === 'zero' ? 'No ads found via the Meta API.' : 'No live ads retrieved from Meta Ad Library API for this shop.');
+          const pubUrl = sigs.public_library_url || 'https://www.facebook.com/ads/library/';
+          div.innerHTML = `
+            <div style="font-size:0.85rem;color:var(--text-muted);">${esc(msg)}</div>
+            <div style="margin-top:6px;"><a class="jr-meta-ad-link" href="${safeUrl(pubUrl)}" target="_blank" rel="noopener noreferrer">Search public Meta Ad Library ↗</a></div>
+          `;
+          adsEl.appendChild(div);
+        }
+      }
     }
 
     function renderArtworksShowcase(ws) {
@@ -2420,6 +2467,13 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
       const meta = document.createElement('span');
       meta.textContent = live ? 'Analyzing now · 1 run' : 'Analysis needs a live server';
       info.appendChild(name); info.appendChild(meta);
+      const adLink = document.createElement('a');
+      adLink.className = 'jr-meta-ad-link';
+      adLink.target = '_blank';
+      adLink.rel = 'noopener noreferrer';
+      adLink.href = `https://www.facebook.com/ads/library/?active_status=active&AdCandidate=&q=${encodeURIComponent(name.textContent)}&search_type=keyword_unordered&media_type=all`;
+      adLink.textContent = 'See their ads on Meta ↗';
+      info.appendChild(adLink);
       const btn = document.createElement('button');
       btn.type = 'button'; btn.className = 'jr-mini js-live-brief'; btn.disabled = true;
       btn.title = 'Live analysis is off in this demo'; btn.textContent = 'Request analysis →';
