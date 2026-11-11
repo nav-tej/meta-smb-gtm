@@ -1,6 +1,24 @@
 # Launch assignments
 
-Updated November 10, 2026. Target November 8, America/Los_Angeles.
+Updated November 11, 2026. Target November 8, America/Los_Angeles.
+
+### November 11 — Gemini BUILD: Released (`0bd8a06`) — Seller Memory Batch 1 (Slices 1 & 2)
+- **Owner / Status:** **Released for Codex review & Hermes acceptance** — isolated `seller-memory` branch off `main` (`0880570`) in `/tmp/muse-seller-memory`, code committed at `0bd8a06` (`0bd8a06f01236a2c7e18e471d21ffe74532de625`). Not pushed, not merged to `main`, not deployed; `/Users/nav/meta-smb-gtm` untouched.
+- **Scope Boundary:** **Batch 1 only** (Scan-to-Recommendation, Reviewable Seller Memory, Competitor Watch Reasons, Feedback Suggestions & Voice Input). **Batch 2 (Digest Delivery)** and **Batch 3 (Gifted Beta Access)** remain queued and unstarted pending review/acceptance.
+- **Implemented Files (`21` files in `0bd8a06`):**
+  - Docs: `docs/product/PRD.md`
+  - Models & Services: `src/models/seller.py`, `src/models/voice.py`, `src/services/seller_memory.py`, `src/services/preference_ranker.py`
+  - API Routes: `src/api/seller_memory.py` (mounted under `API_PREFIX` in `src/api/main.py`), `src/api/preferences.py`, `src/api/onboarding.py`, `src/api/intel.py`, `src/api/creative.py`
+  - Frontend: `src/api/static/seller-memory.js`, `src/api/static/seller-memory.css`, `src/api/static/welcome.html`, `src/api/static/welcome.js`, `src/api/static/index.html`, `src/api/static/today.html`, `src/api/static/creator.html`, `src/api/static/muse-shell.js`
+  - Tests: `tests/test_seller_memory.py`, `tests/test_seller_memory_e2e.py`
+- **Implemented Capabilities:**
+  - **Scan-to-Memory Baseline & Re-scan Diff (`POST /api/v1/seller-memory/scan`, `GET/PUT /api/v1/seller-memory`, `DELETE /api/v1/seller-memory/entries/{entry_id}`):** Extracts `SellerMemoryEntry` proposals distinguishing `observation` vs `interpretation` with source links and scan dates, requires explicit approval on re-scan diffs, and enforces `expected_version` (`409` optimistic locking) plus `verify_workspace_owner` account isolation.
+  - **Competitor Watch Reasons & Zero-Run Ranking (`POST /api/v1/seller-memory/recommend`):** Supports per-competitor watch reasons (`similar_audience`, `price_reference`, `inspiration`, pause/reset) and `This draft` plain-language overrides via `rank_seller_recommendations` (`runs_used: 0`), visibly shifting ranked recommendations and preserving shop context across `/welcome`, `/`, `/today`, and `/create`.
+  - **Typed/Voice Context & Suggestion Learning (`POST /api/v1/seller-memory/interpret`, `GET /api/v1/seller-memory/voice-fixtures`, `POST /api/v1/seller-memory/voice/transcribe`, `POST /api/v1/seller-memory/suggestions/evaluate`, `POST /api/v1/seller-memory/suggestions/{suggestion_id}/respond`):** Converts typed notes and demo voice fixtures into reviewable proposals and surfaces dismiss-signal suggestions for explicit approve/dismiss action.
+  - **Live Voice Transcription Verification Constraint:** Live `POST /api/v1/seller-memory/voice/transcribe` was verified offline via consent and demo-mode gating only (`400` without `consent_confirmed`, `503` in `DEMO_MODE=true`; live external transcription API uncalled per demo constraint).
+- **Verification (Post-Final-Code `0bd8a06`):**
+  - `DEMO_MODE=true META_MODEL_API_KEY= DEMO_KEY= make check` passed: `.venv/bin/ruff check .` clean, `.venv/bin/ruff format --check .` clean (`217` files), `.venv/bin/pytest`: `535 passed, 2 skipped in 42.30s` (existing billing/digest tests skip without `BILLING_PGLITE_DIR`).
+  - Headless Chromium E2E (`tests/test_seller_memory_e2e.py`, `375px` mobile viewport): verified multi-browser `409 Conflict` handling, guest `Reset sample` scoping, `user-a -> user-b` owner isolation with zero cross-account leakage, and `/welcome` -> `/` -> `/today` -> `/create` context continuity with zero horizontal overflow.
 
 ### November 10 — Gemini BUILD: Released (`b3f11c3`) — Production Signup, Privacy & Photo Export Follow-up
 - **Owner / Status:** Released by Gemini BUILD (ready for verification / Nav review) — built on deployed release `632de6e` (`dc4fce0` in `main`), committed locally at `b3f11c3` (`b3f11c3b4e1ff8da52ba79345bbb2ece6e69f7f4`). Not pushed or deployed.
@@ -405,6 +423,6 @@ Claude and Codex are out of usage. [RUNBOOK_GEMINI_HERMES.md](RUNBOOK_GEMINI_HER
   4. Exact placement parity, correct Ad Library link-out/empty/error behavior, actual-plan ROI, honest directive & digest wording, route-level cache hit verification, and SQL rollback analysis.
   5. Clean make check with `DEMO_MODE=true` and release ownership for fresh review.
 
-### November 10 — Next owner for production signup acceptance
+### Signup follow-up deployed to production
 
-Hermes owns the production browser journey. Codex owns evidence review and Git/deployment reconciliation. Gemini BUILD takes confirmed defects, and Nav handles Google/inbox access and product decisions. The prioritized checklist and remaining evidence are in [NEXT.md](NEXT.md#november-10-signup-readiness-handoff). The PRD now reflects free onboarding and distinguishes the current three-run offer from the proposed 14-day lifecycle. Assignment prepared for relay.
+Nav approved deployment in chat. Codex deployed a clean archive of b3f11c3 to Vercel production (dpl_8deG8F3rw1CtKSxU3kBA5Bz3idor, meta-smb-ey7g1mcto-navtejs-6321s-projects.vercel.app). Vercel marked it Ready and assigned meta-smb-gtm.vercel.app. Home, Welcome, Creator, Today, Progress, Digest, robots, sitemap and API health returned 200. Home, Welcome, Creator and Today served HTML referencing the fix1 assets. Remaining browser acceptance covers sign-out privacy, mobile account recovery with inbox delivery, and first export. Previous production rollback target dpl_HXv1ZUnJz6GjN58s1BNcGcvoMGF9 (632de6e).
