@@ -237,12 +237,15 @@
     return DEFAULT_PREVIEWS.find((p) => p.insight_id === id) || null;
   }
 
-  function notice(message, error = false, busy = false, actionLink = null) {
+  function promptPhotoUpload() {
+    $('photo')?.click();
+  }
+  function notice(message, error = false, busy = false, action = null) {
     const el = $('notice');
     if (!el) return;
     el.hidden = false;
     el.className = error ? 'error' : (busy ? 'busy' : '');
-    if (!actionLink) {
+    if (!action) {
       el.textContent = message;
       return;
     }
@@ -251,17 +254,27 @@
       const span = document.createElement('span');
       span.textContent = message;
       if (el.append) el.append(span); else if (el.appendChild) el.appendChild(span);
-      const a = document.createElement('a');
-      a.href = actionLink.href;
-      a.textContent = actionLink.text;
-      a.className = 'notice-action';
-      if (a.style) {
-        a.style.marginLeft = '8px';
-        a.style.fontWeight = 'bold';
-        a.style.color = 'inherit';
-        a.style.textDecoration = 'underline';
+      if (typeof action.onClick === 'function') {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = action.text || 'Continue';
+        btn.className = 'secondary notice-action-btn';
+        btn.addEventListener('click', action.onClick);
+        if (el.append) el.append(btn); else if (el.appendChild) el.appendChild(btn);
+      } else if (action.href) {
+        const a = document.createElement('a');
+        a.href = action.href;
+        a.textContent = action.text;
+        a.className = 'notice-action';
+        if (a.style) {
+          a.style.marginLeft = '8px';
+          a.style.fontWeight = 'bold';
+          a.style.color = 'inherit';
+          a.style.textDecoration = 'underline';
+        }
+        if (el.append) el.append(a); else if (el.appendChild) el.appendChild(a);
       }
-      if (el.append) el.append(a); else if (el.appendChild) el.appendChild(a);
+      if (!el.childNodes?.length) el.textContent = message;
     } else {
       el.textContent = message;
     }
@@ -270,7 +283,8 @@
   function markIdeaExported() {
     try {
       const ideaId = state.idea_id || (typeof location !== 'undefined' ? new URLSearchParams(location.search).get('idea') : null);
-      const ACTIONS_KEY = 'muse.actions';
+      const uid = window.museAccount?.getSnapshot?.()?.user?.id || null;
+      const ACTIONS_KEY = uid ? `muse.actions.${uid}` : 'muse.actions';
       const raw = localStorage.getItem(ACTIONS_KEY) || '{}';
       const all = typeof raw === 'string' && raw ? JSON.parse(raw) : {};
       const actionKey = ideaId || 'today-post';
@@ -415,6 +429,7 @@
     $('deliveryNote').textContent = state.format === 'video' ? 'Makes a silent 6-second artwork clip. Add voice or audio in your app. You post it yourself.' : state.format === 'text' ? 'Copies your post. Instagram and TikTok need a visual; use this text with your image or video.' : 'Downloads the image and copies your text. You post from your account.';
     $('postedStatus').textContent = state.posted[postIdentity()] ? 'Marked posted on this device' : '';
     $('noPhoto').hidden = !!state.image || state.format === 'text';
+    if ($('uploadPhotoText')) $('uploadPhotoText').textContent = state.image ? 'Change photo' : 'Add photo';
     $('planCards').replaceChildren();
     const postsList = plan?.posts || [];
     for (const [i, item] of postsList.entries()) {
@@ -470,10 +485,11 @@
     finally { clearTimeout(timeout); }
   }
   function reviewed() {
+    if (state.format !== 'text' && !state.image) { notice('Add the matching product photo first.', true, false, { text: 'Add photo', onClick: promptPhotoUpload }); return false; }
     if (!$('reviewed').checked) { notice('Check the image, words and destination, then tick the review box.', true); $('reviewed').focus(); return false; }
     if (!currentCopy().hook || !currentCopy().caption) { notice('Add an opening line and caption.', true); return false; }
     if (state.channel === 'x' && captionText().length > 280) { notice('Shorten your X post to 280 characters including the link.', true); return false; }
-    if (state.format !== 'text' && !state.image) { notice('Add the matching product photo first.', true); return false; } return true;
+    return true;
   }
   async function makeClip() {
     if (typeof MediaRecorder === 'undefined' || typeof HTMLCanvasElement.prototype.captureStream !== 'function') throw new Error('Video export is unavailable in this browser. Download a photo or follow the video direction in your plan.');
@@ -574,7 +590,7 @@
   }
   async function museImage() {
     const ownerEpoch = draftEpoch;
-    if (state.busy || !liveReady()) return; if (!state.original) { notice('Add your original photo first.', true); return; }
+    if (state.busy || !liveReady()) return; if (!state.original) { notice('Add your original photo first.', true, false, { text: 'Add photo', onClick: promptPhotoUpload }); return; }
     lock(true, 'museImage'); notice('Muse is creating a new scene. This is a billed image request…', false, true);
     try {
       let data = state.original; if (!inline(data)) { const response = await fetch(data); if (!response.ok) throw new Error('Could not load your source photo.'); data = await new Promise((resolve, reject) => { response.blob().then(blob => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(blob); }).catch(reject); }); }
@@ -608,6 +624,7 @@
   $('manualItem').addEventListener('click', () => { if (state.busy) return; state.product = { title: '', description: '', seller: '', collection: '', price: '', destination_url: '', destination: 'other' }; state.original = ''; state.image = ''; state.imageMode = 'original'; state.plans = {}; state.edits = {}; state.offers = {}; state.performance = null; state.source = 'Your item'; invalidate(); populateSetup(); render(); $('productName').focus(); });
   $('findItems').addEventListener('click', findItems); $('readListing').addEventListener('click', readListing);
   $('photo').addEventListener('change', event => upload(event.target.files?.[0]));
+  if ($('noPhotoAddBtn')) $('noPhotoAddBtn').addEventListener('click', promptPhotoUpload);
   for (const id of ['postHook', 'postCaption']) $(id).addEventListener('input', saveEdit);
   const channelButtons = [...document.querySelectorAll('[data-channel]')];
   channelButtons.forEach((button, idx) => {

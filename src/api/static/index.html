@@ -984,13 +984,13 @@
   <link rel="stylesheet" href="/static/reco-actions.css?v=20261109-reco1">
 
   <link rel="stylesheet" href="/static/pricing-modal.css?v=20261109-ux">
-  <link rel="stylesheet" href="/static/account.css?v=20261109-oauth">
+  <link rel="stylesheet" href="/static/account.css?v=20261110-fix1">
   <link rel="stylesheet" href="/static/muse-shell.css?v=20261109-ux3">
   <script src="/static/analytics.js?v=20261109-ux" defer></script>
-  <script src="/static/reco-actions.js?v=20261109-reco1" defer></script>
-  <script src="/static/account.js?v=20261109-oauth" defer></script>
-  <script src="/static/muse-shell.js?v=20261109-hd1" defer></script>
-  <script src="/static/welcome.js?v=20261109a" defer></script>
+  <script src="/static/reco-actions.js?v=20261110-fix1" defer></script>
+  <script src="/static/account.js?v=20261110-fix1" defer></script>
+  <script src="/static/muse-shell.js?v=20261110-fix1" defer></script>
+  <script src="/static/welcome.js?v=20261110-fix1" defer></script>
 </head>
 <body>
   <!-- Top Bar -->
@@ -2325,18 +2325,31 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
           : (serverOn ? 'Sign in to re-check competitors' : 'Re-check from the saved snapshot · costs 1 run');
       }
     }
+    let briefLoadEpoch = 0;
     async function loadBriefCache() {
+      const epoch = ++briefLoadEpoch;
       Object.keys(briefCache).forEach((k) => delete briefCache[k]);
       const snap = liveSnapshot();
-      if (snap?.configured && snap.user) {
+      const ownerId = snap?.user?.id || null;
+      if (snap?.configured && ownerId) {
         try {
-          const resp = await fetch('/api/v1/account/workspace', { credentials: 'same-origin' });
-          if (resp.ok) Object.assign(briefCache, ((await resp.json()).document || {}).briefs || {});
+          const resp = await fetch('/api/v1/account/workspace', {
+            credentials: 'same-origin',
+            cache: 'no-store',
+            headers: { 'X-Muse-Owner': ownerId },
+          });
+          if (epoch !== briefLoadEpoch) return;
+          if ((liveSnapshot()?.user?.id || null) !== ownerId) return;
+          if (resp.ok) {
+            const payload = await resp.json();
+            if (epoch !== briefLoadEpoch || (liveSnapshot()?.user?.id || null) !== ownerId) return;
+            Object.assign(briefCache, (payload.document || {}).briefs || {});
+          }
         } catch {}
       } else {
         try { Object.assign(briefCache, JSON.parse(localStorage.getItem(DEMO_BRIEFS_KEY) || '{}')); } catch {}
       }
-      refreshSellerButtons();
+      if (epoch === briefLoadEpoch) refreshSellerButtons();
     }
     async function saveBriefCache() {
       try {
@@ -2428,6 +2441,7 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
       requestBrief('https://www.sikhiart.com', event.currentTarget);
     });
     window.addEventListener('muse:account-change', loadBriefCache);
+    window.addEventListener('muse:workspace-reset', loadBriefCache);
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', loadBriefCache);
     else loadBriefCache();
     document.getElementById('journeyBudget').addEventListener('click', async () => {

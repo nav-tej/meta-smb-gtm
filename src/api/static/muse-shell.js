@@ -20,6 +20,8 @@
   // Server accounts (Supabase + runs quota) replace browser-local demo credits when on.
   const serverSnapshot = () => window.museAccount?.getSnapshot?.() || null;
   const serverMode = () => serverSnapshot()?.configured === true;
+  const ownerId = () => serverSnapshot()?.user?.id || null;
+  const ownerKey = (base) => { const uid = ownerId(); return uid ? `${base}.${uid}` : base; };
   function removeGates() {
     document.body.classList.remove('ms-logged-out');
     document.querySelectorAll('.ms-gate').forEach((gate) => gate.remove());
@@ -546,23 +548,38 @@
     if (pill?.parentNode) pill.insertAdjacentElement('afterend', accountSlot); else header.appendChild(accountSlot);
     renderAccount();
     syncServerSession();
-    window.addEventListener('muse:account-change', () => { syncServerSession(); renderAccount(); });
+    const syncAccountUi = () => {
+      syncServerSession();
+      renderAccount();
+      actionsChanged();
+      if (myActionsBox) myActionsBox.open = Object.values(readActions()).some((a) => a.status === 'accepted');
+      renderMemory();
+      if (!ownerId()) {
+        try { if (actionsDialog?.open) actionsDialog.close(); } catch {}
+        toggleNotifications(false);
+        const banner = document.getElementById('focusBanner');
+        if (banner) banner.hidden = true;
+        document.querySelectorAll('.ms-match-tag').forEach((t) => t.remove());
+        document.querySelectorAll('.ms-match').forEach((m) => m.classList.remove('ms-match'));
+      }
+    };
+    window.addEventListener('muse:account-change', syncAccountUi);
+    window.addEventListener('muse:workspace-reset', syncAccountUi);
   }
 
   // ---------- Recommendation triage: accept, dismiss, archive ----------
   const ACTIONS_KEY = 'muse.actions';
-  const readActions = () => { try { const v = JSON.parse(store.get(ACTIONS_KEY) || '{}'); return v && typeof v === 'object' ? v : {}; } catch { return {}; } };
-  const writeActions = (v) => store.set(ACTIONS_KEY, JSON.stringify(v));
+  const readActions = () => { try { const v = JSON.parse(store.get(ownerKey(ACTIONS_KEY)) || '{}'); return v && typeof v === 'object' ? v : {}; } catch { return {}; } };
+  const writeActions = (v) => store.set(ownerKey(ACTIONS_KEY), JSON.stringify(v));
   const actionId = (text) => { let h = 0; for (const ch of text) h = (h * 31 + ch.charCodeAt(0)) | 0; return `a${(h >>> 0).toString(36)}`; };
   const TRIAGE_SELECTORS = ['.jr-recos > li', '#insightsContainer > .finding-item', '.try-next li', '#msBrief .ms-move', '.ms-digest-recos > li'];
 
   async function syncSignalsToServer() {
     try {
-      const snap = window.museAccount?.snapshot;
-      const owner = snap?.user?.id;
+      const owner = ownerId();
       if (!owner) return;
       const acts = readActions();
-      const sigs = JSON.parse(localStorage.getItem('muse.dismiss_signals') || '[]');
+      const sigs = JSON.parse(localStorage.getItem(ownerKey('muse.dismiss_signals')) || '[]');
       fetch('/api/v1/preferences/signals', {
         method: 'POST',
         credentials: 'same-origin',
@@ -598,9 +615,10 @@
       window.museTrack?.('idea_dismissed', { action_id: id, page: location.pathname, has_note: Boolean(note), reason: reason || 'unspecified' });
       if (reason) {
         try {
-          const signals = JSON.parse(localStorage.getItem('muse.dismiss_signals') || '[]');
+          const sigKey = ownerKey('muse.dismiss_signals');
+          const signals = JSON.parse(localStorage.getItem(sigKey) || '[]');
           signals.push({ id, reason, at: new Date().toISOString() });
-          localStorage.setItem('muse.dismiss_signals', JSON.stringify(signals));
+          localStorage.setItem(sigKey, JSON.stringify(signals));
         } catch (_) {}
       }
     }
@@ -1170,8 +1188,8 @@
   // ---------- Portal watchlist: alerts toggle, last checked, change badges ----------
   // Pausing is a per-device alert preference; the scheduled monitor still checks every shop.
   const PAUSE_KEY = 'muse.watchPaused';
-  const readPaused = () => { try { const v = JSON.parse(store.get(PAUSE_KEY) || '{}'); return v && typeof v === 'object' ? v : {}; } catch { return {}; } };
-  function setPaused(name, paused) { const v = readPaused(); if (paused) v[name] = true; else delete v[name]; store.set(PAUSE_KEY, JSON.stringify(v)); }
+  const readPaused = () => { try { const v = JSON.parse(store.get(ownerKey(PAUSE_KEY)) || '{}'); return v && typeof v === 'object' ? v : {}; } catch { return {}; } };
+  function setPaused(name, paused) { const v = readPaused(); if (paused) v[name] = true; else delete v[name]; store.set(ownerKey(PAUSE_KEY), JSON.stringify(v)); }
   const sellerPainters = new Map();
   function decorateSeller(li) {
     if (li.querySelector('.ms-watchmeta')) return;
@@ -1282,14 +1300,14 @@
     document.addEventListener('click', (event) => { if (!header.contains(event.target)) closeMobileNav(); });
     document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && header.classList.contains('ms-nav-open')) { setOpen(false); button.focus(); } });
     // Choosing something in the menu closes it (dialogs and links take over from there).
-    header.addEventListener('click', (event) => { if (event.target.closest('.topbar-link, #openLocalEngineBtn, .workspace-btn, .ma-account-button')) closeMobileNav(); });
+    header.addEventListener('click', (event) => { if (event.target.closest('.topbar-link, #openLocalEngineBtn, .workspace-btn, .ma-account-button, .ma-signup-button, .ma-signout')) closeMobileNav(); });
     window.matchMedia?.('(min-width: 641px)').addEventListener?.('change', (event) => { if (event.matches) closeMobileNav(); });
   }
 
   // ---------- Notifications: competitor changes, new ideas, weekly digest ----------
   const READ_KEY = 'muse.notifRead';
-  const readSeen = () => { try { const v = JSON.parse(store.get(READ_KEY) || '[]'); return new Set(Array.isArray(v) ? v.filter((x) => typeof x === 'string') : []); } catch { return new Set(); } };
-  const writeSeen = (seen) => store.set(READ_KEY, JSON.stringify([...seen].slice(-200)));
+  const readSeen = () => { try { const v = JSON.parse(store.get(ownerKey(READ_KEY)) || '[]'); return new Set(Array.isArray(v) ? v.filter((x) => typeof x === 'string') : []); } catch { return new Set(); } };
+  const writeSeen = (seen) => store.set(ownerKey(READ_KEY), JSON.stringify([...seen].slice(-200)));
   // Monday of the digest's week, so "digest ready" is one notification per week, not per day.
   const weekOf = (isoDate) => {
     const d = new Date(`${String(isoDate).slice(0, 10)}T00:00:00Z`);
@@ -1458,7 +1476,7 @@
     gift: ['gift', 'holiday', 'housewarming', 'wedding'], instagram: ['instagram', 'social', 'post', 'story', 'reel', 'facebook'],
     women: ['women', 'goddess', 'empower', 'mai bhago', 'mata gujri'], story: ['story', 'blog', 'meaning'], home: ['home', 'title'],
   };
-  const readMemory = () => { try { return JSON.parse(store.get(MEMORY_KEY) || '[]').filter((x) => typeof x === 'string').slice(0, 5); } catch { return []; } };
+  const readMemory = () => { try { return JSON.parse(store.get(ownerKey(MEMORY_KEY)) || '[]').filter((x) => typeof x === 'string').slice(0, 5); } catch { return []; } };
   function termsFor(text) {
     const words = text.toLowerCase().match(/[a-z$]+/g) || [];
     const terms = new Set();
@@ -1503,7 +1521,7 @@
     strip.appendChild(el('span', { class: 'ms-memory-badge' }, '🧠 Remembered'));
     for (const item of memory) strip.appendChild(el('span', { class: 'ms-memory-item' }, item));
     const forget = el('button', { type: 'button', class: 'ms-link ms-forget' }, 'Forget');
-    forget.addEventListener('click', () => { store.set(MEMORY_KEY, '[]'); renderMemory(); document.getElementById('focusBanner').hidden = true; document.querySelectorAll('.ms-match-tag').forEach((t) => t.remove()); document.querySelectorAll('.ms-match').forEach((m) => m.classList.remove('ms-match')); toast('Preferences forgotten.'); });
+    forget.addEventListener('click', () => { store.set(ownerKey(MEMORY_KEY), '[]'); renderMemory(); document.getElementById('focusBanner').hidden = true; document.querySelectorAll('.ms-match-tag').forEach((t) => t.remove()); document.querySelectorAll('.ms-match').forEach((m) => m.classList.remove('ms-match')); toast('Preferences forgotten.'); });
     strip.appendChild(forget);
   }
   function mountRefine() {
@@ -1518,7 +1536,7 @@
       if (!requireRun('Refined analysis')) return;
       await progress('Refining your seller audit', ['Saving your preference to memory', 'Re-ranking the saved findings', 'Highlighting what matches']);
       const memory = [text, ...readMemory().filter((m) => m.toLowerCase() !== text.toLowerCase())].slice(0, 5);
-      store.set(MEMORY_KEY, JSON.stringify(memory));
+      store.set(ownerKey(MEMORY_KEY), JSON.stringify(memory));
       renderMemory();
       applyFocus(text);
       toast('Your preferences saved');

@@ -11,6 +11,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from src.api.main import app
+from src.clients.supabase import SupabaseError
 from src.services import accounts as accounts_service
 from src.services.accounts import AccountSession
 
@@ -366,3 +367,160 @@ def test_google_oauth_start_and_callback_mint_verified_session(
         assert "muse_access=" in cb.headers.get("set-cookie", "")
     finally:
         get_settings.cache_clear()
+
+
+def test_duplicate_signup_returns_409_and_never_signs_in(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Duplicate signup rejects both wrong and matching passwords identically with 409."""
+    auth_calls: list[str] = []
+
+    class FakeSupabase:
+        async def auth(
+            self,
+            path: str,
+            method: str = "GET",
+            body: dict[str, Any] | None = None,
+            access_token: str | None = None,
+            secret: bool = False,
+        ) -> dict[str, Any]:
+            auth_calls.append(path)
+            if path == "admin/users":
+                raise SupabaseError(401, "User already registered")
+            raise AssertionError(f"Unexpected downstream auth call on duplicate signup: {path}")
+
+    monkeypatch.setattr("src.api.accounts.get_supabase_client", lambda: FakeSupabase())
+    monkeypatch.setattr(accounts_service, "get_supabase_client", lambda: FakeSupabase())
+    monkeypatch.setattr(accounts_service, "configured", lambda: True)
+    monkeypatch.setenv("ACCOUNTS_REQUIRED", "true")
+    from src.config import get_settings
+
+    get_settings.cache_clear()
+    try:
+        client = TestClient(app)
+        headers = {"Origin": "http://localhost:8000"}
+        res_same = client.post(
+            "/api/v1/account/signup",
+            headers=headers,
+            json={"email": "existing@example.test", "password": "matching-secret-password"},
+        )
+        res_diff = client.post(
+            "/api/v1/account/signup",
+            headers=headers,
+            json={"email": "existing@example.test", "password": "different-secret-password"},
+        )
+    finally:
+        get_settings.cache_clear()
+
+    assert res_same.status_code == 409
+    assert res_diff.status_code == 409
+    assert res_same.json()["detail"] == res_diff.json()["detail"]
+    assert "already exists" not in res_same.json()["detail"].lower()
+    assert "Forgot password?" in res_same.json()["detail"]
+    assert "muse_access" not in res_same.cookies
+    assert "muse_access" not in res_diff.cookies
+    assert auth_calls == ["admin/users", "admin/users"]
+
+
+def test_recover_and_password_reset_flow(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Password recovery returns a non-leaking response and /password updates credentials."""
+    user = AccountSession(
+        user_id="00000000-0000-4000-8000-000000000077",
+        email="reset@example.test",
+        email_verified=True,
+        access_token="recovery-access-tok",
+        session_id=None,
+    )
+    auth_calls: list[tuple[str, str, dict[str, Any] | None, str | None]] = []
+
+    class FakeSupabase:
+        async def auth(
+            self,
+            path: str,
+            method: str = "GET",
+            body: dict[str, Any] | None = None,
+            access_token: str | None = None,
+            secret: bool = False,
+        ) -> dict[str, Any]:
+            auth_calls.append((path, method, body, access_token))
+            if path.startswith("recover"):
+                if body and body.get("email") == "missing@example.test":
+                    raise SupabaseError(401, "No user")
+                return {}
+            if path == "user" and method == "PUT":
+                return {"id": user.user_id, "email": user.email}
+            raise AssertionError(f"Unexpected call: {method} {path}")
+
+        async def rpc(self, name: str, params: dict[str, Any]) -> dict[str, Any]:
+            return {
+                "allowed": True,
+                "plan": "trial",
+                "used": 0,
+                "limit": 3,
+                "remaining": 3,
+                "resets_at": None,
+                "live_available": True,
+            }
+
+    async def fake_verify(token: str) -> AccountSession:
+        assert token == "recovery-access-tok"
+        return user
+
+    monkeypatch.setattr("src.api.accounts.get_supabase_client", lambda: FakeSupabase())
+    monkeypatch.setattr(accounts_service, "get_supabase_client", lambda: FakeSupabase())
+    monkeypatch.setattr(accounts_service, "configured", lambda: True)
+    monkeypatch.setattr("src.api.accounts.verify_token", fake_verify)
+    monkeypatch.setattr(accounts_service, "verify_token", fake_verify)
+    monkeypatch.setattr(
+        "src.api.accounts.resolve_account",
+        lambda req, res, require_verified=True: _return_async(user),
+    )
+
+    from src.config import get_settings
+
+    get_settings.cache_clear()
+    try:
+        client = TestClient(app)
+        headers = {"Origin": "http://localhost:8000"}
+        rec_real = client.post(
+            "/api/v1/account/recover",
+            headers=headers,
+            json={"email": "reset@example.test"},
+        )
+        rec_missing = client.post(
+            "/api/v1/account/recover",
+            headers=headers,
+            json={"email": "missing@example.test"},
+        )
+        sess = client.post(
+            "/api/v1/account/session",
+            headers=headers,
+            json={
+                "access_token": "recovery-access-tok",
+                "refresh_token": "recovery-refresh-tok",
+            },
+        )
+        pwd = client.post(
+            "/api/v1/account/password",
+            headers=headers,
+            json={"password": "new-long-secret-password-123"},
+        )
+    finally:
+        get_settings.cache_clear()
+
+    assert rec_real.status_code == 200
+    assert rec_missing.status_code == 200
+    assert rec_real.json() == rec_missing.json()
+    assert sess.status_code == 200
+    assert "muse_access" in sess.cookies
+    assert pwd.status_code == 200
+    assert auth_calls[-1] == (
+        "user",
+        "PUT",
+        {"password": "new-long-secret-password-123"},
+        "recovery-access-tok",
+    )
+
+
+async def _return_async(val: AccountSession) -> AccountSession:
+    return val

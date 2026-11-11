@@ -101,7 +101,6 @@ async def me(request: Request, response: Response) -> dict[str, Any]:
 async def signup(body: SignupRequest, response: Response, _: Mutation) -> dict[str, Any]:
     response.headers["Cache-Control"] = "no-store"
     payload = body.model_dump()
-    already_exists = False
     try:
         await get_supabase_client().auth(
             "admin/users",
@@ -111,23 +110,19 @@ async def signup(body: SignupRequest, response: Response, _: Mutation) -> dict[s
         )
     except SupabaseError as err:
         if err.status_code == 401:
-            already_exists = True
-        else:
-            await get_supabase_client().auth("signup?" + callback_query(), "POST", payload)
-            return {
-                "message": "Check your email to confirm your account, then sign in.",
-                "authenticated": False,
-            }
-
-    try:
-        tokens = await get_supabase_client().auth("token?grant_type=password", "POST", payload)
-    except SupabaseError as err:
-        if already_exists and err.status_code == 401:
+            # Never auto-sign-in existing accounts via /signup or reveal email existence.
             raise HTTPException(
                 409,
-                "An account with this email already exists. Sign in or reset your password.",
+                "Could not create a new account with those details. "
+                "If you already registered, sign in or use Forgot password? below.",
             ) from err
-        raise
+        await get_supabase_client().auth("signup?" + callback_query(), "POST", payload)
+        return {
+            "message": "Check your email to confirm your account, then sign in.",
+            "authenticated": False,
+        }
+
+    tokens = await get_supabase_client().auth("token?grant_type=password", "POST", payload)
     account = await verify_token(tokens.get("access_token", ""))
     result = await snapshot(account)
     set_cookies(response, tokens)

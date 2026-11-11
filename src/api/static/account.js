@@ -9,6 +9,7 @@
   let workspaceOwner = null;
   let mode = 'signin';
   let busy = false;
+  let retryCount = 0;
   let dialog;
   let form;
   let title;
@@ -20,9 +21,13 @@
   let submit;
   let message;
   let tabs;
+  let signinTab;
+  let signupTab;
   let googleButton;
   let divider;
   let recover;
+  let refreshButton;
+  let accountSignoutButton;
   let accountButton;
   let signupButton;
   let signoutButton;
@@ -45,7 +50,7 @@
     const timer = setTimeout(() => controller.abort(), 15000);
     try {
       const response = await fetch(root + path, {
-        method, credentials: 'same-origin', headers: { 'Content-Type': 'application/json', ...extraHeaders },
+        method, credentials: 'same-origin', cache: 'no-store', headers: { 'Content-Type': 'application/json', ...extraHeaders },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }), signal: controller.signal
       });
       let data = {};
@@ -106,8 +111,10 @@
     if (googleButton) { googleButton.disabled = value; googleButton.setAttribute('aria-busy', String(value)); }
     if (signoutButton) signoutButton.disabled = value;
   }
-  function setMode(next, text = '') {
+  function setMode(next, text = '', isError = false, options = {}) {
+    const previousMode = mode;
     mode = ['signin', 'signup', 'recover', 'password', 'account'].includes(next) ? next : 'signin';
+    if (!options.keepRetry && previousMode !== mode) retryCount = 0;
     const signedIn = mode === 'account';
     const passwordOnly = mode === 'password';
     const showGoogle = !signedIn && !passwordOnly && mode !== 'recover';
@@ -118,6 +125,7 @@
     emailLabel.hidden = passwordOnly || signedIn;
     email.hidden = passwordOnly || signedIn;
     email.required = !passwordOnly && !signedIn;
+    if (!options.preserveEmail && signedIn) email.value = '';
     passwordLabel.hidden = mode === 'recover' || signedIn;
     password.hidden = mode === 'recover' || signedIn;
     password.required = mode !== 'recover' && !signedIn;
@@ -127,16 +135,45 @@
     submit.hidden = signedIn;
     submit.textContent = { signin: 'Sign in', signup: 'Create account', recover: 'Send reset link', password: 'Update password' }[mode] || 'Continue';
     tabs.hidden = signedIn || passwordOnly;
-    recover.hidden = mode !== 'signin';
-    say(text || (signedIn ? quotaLabel.textContent : 'Saved examples remain available without an account.'));
+    if (signinTab) {
+      const signinActive = mode === 'signin' || mode === 'recover';
+      if (signinTab.classList?.toggle) signinTab.classList.toggle('ma-tab-active', signinActive);
+      else signinTab.className = signinActive ? 'ma-tab-active' : '';
+      signinTab.setAttribute('aria-pressed', String(signinActive));
+    }
+    if (signupTab) {
+      const signupActive = mode === 'signup';
+      if (signupTab.classList?.toggle) signupTab.classList.toggle('ma-tab-active', signupActive);
+      else signupTab.className = signupActive ? 'ma-tab-active' : '';
+      signupTab.setAttribute('aria-pressed', String(signupActive));
+    }
+    recover.textContent = 'Forgot password?';
+    recover.hidden = !['signin', 'signup'].includes(mode);
+    if (accountSignoutButton) accountSignoutButton.hidden = !signedIn;
+    say(text || (signedIn ? quotaLabel.textContent : 'Saved examples remain available without an account.'), isError);
   }
   const track = (name, props) => { try { window.museTrack?.(name, props); } catch {} };
+  function focusInitialField() {
+    try {
+      if (email && !email.hidden && !email.value.trim()) email.focus();
+      else if (password && !password.hidden) password.focus();
+      else if (accountSignoutButton && !accountSignoutButton.hidden) accountSignoutButton.focus();
+      else if (refreshButton && !refreshButton.hidden) refreshButton.focus();
+    } catch {}
+  }
   function open(next = 'signin', text = '') {
     if (!dialog) mount();
     if (busy || !dialog) return;
-    track('auth_dialog_opened', { mode: snapshot.user && next === 'signin' ? 'account' : next });
-    setMode(snapshot.user && next === 'signin' ? 'account' : next, text);
+    retryCount = 0;
+    const alreadySignedIn = Boolean(snapshot.user);
+    const targetMode = alreadySignedIn && ['signin', 'signup'].includes(next) ? 'account' : next;
+    const resolvedText = alreadySignedIn && next === 'signup' && !text
+      ? `You are already signed in as ${snapshot.user.email}. Sign out first to create or switch accounts.`
+      : text;
+    track('auth_dialog_opened', { mode: targetMode });
+    setMode(targetMode, resolvedText);
     if (!dialog.open) dialog.showModal();
+    focusInitialField();
     if (!snapshot.configured) say('Account setup is unavailable on this server. Your saved demo and draft still work.', true);
   }
   function liveReady() {
@@ -158,33 +195,69 @@
     const selectedMode = mode;
     const emailValue = email.value.trim();
     const passwordValue = password.value;
-    if (selectedMode !== 'password' && !emailValue) { email.focus(); return; }
-    if (['signup', 'password'].includes(selectedMode) && passwordValue.length < 12) { say('Use a password with at least 12 characters.', true); password.focus(); return; }
+    if (selectedMode !== 'password' && (!emailValue || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(emailValue))) {
+      retryCount += 1;
+      say(emailValue ? 'Enter a valid email address (for example, name@shop.com).' : 'Enter your email address first.', true);
+      email.focus();
+      return;
+    }
+    if (selectedMode === 'signin' && !passwordValue) {
+      retryCount += 1;
+      say('Enter your password to sign in, or choose Forgot password? below.', true);
+      password.focus();
+      return;
+    }
+    if (['signup', 'password'].includes(selectedMode) && passwordValue.length < 12) {
+      retryCount += 1;
+      say(`Use a password with at least 12 characters (${passwordValue.length}/12 entered). Your email stayed filled in.`, true);
+      password.focus();
+      return;
+    }
     setBusy(true); say('One moment…');
     try {
       if (selectedMode === 'signin') {
         update(await request('/signin', 'POST', { email: emailValue, password: passwordValue }));
+        retryCount = 0;
         track('signed_in');
         password.value = ''; dialog.close();
       } else if (selectedMode === 'signup') {
         const result = await request('/signup', 'POST', { email: emailValue, password: passwordValue });
+        retryCount = 0;
         track('signup_submitted');
         if (result?.user) {
           update(result);
           track('signed_in');
           password.value = ''; dialog.close();
         } else {
-          setMode('signin', result.message || 'Check your inbox to confirm your email, then sign in.');
+          setMode('signin', result.message || 'Check your inbox to confirm your email, then sign in.', false, { preserveEmail: true });
         }
       } else if (selectedMode === 'recover') {
         const result = await request('/recover', 'POST', { email: emailValue });
+        retryCount = 0;
         track('password_reset_requested');
-        setMode('signin', result.message || 'If an account exists, a reset link is on its way.');
+        setMode('signin', result.message || 'If an account exists, a reset link is on its way.', false, { preserveEmail: true });
       } else if (selectedMode === 'password') {
         await request('/password', 'POST', { password: passwordValue });
+        retryCount = 0;
         password.value = ''; await refresh(); setMode('account', 'Password updated. Your current draft is unchanged.');
       }
-    } catch (error) { track('auth_failed', { mode: selectedMode, status: error.status || 0 }); say(error.message, true); }
+    } catch (error) {
+      retryCount += 1;
+      track('auth_failed', { mode: selectedMode, status: error.status || 0, attempt: retryCount });
+      const rawMsg = error.message || 'Could not complete that request.';
+      if (selectedMode === 'signup' && error.status === 409) {
+        const retryHint = retryCount > 1
+          ? ` (Attempt ${retryCount}: enter your password above to sign in, or click Forgot password? below.)`
+          : '';
+        setMode('signin', `${rawMsg}${retryHint}`, true, { preserveEmail: true, keepRetry: true });
+        if (password && !password.hidden) password.focus();
+      } else {
+        const retryNote = retryCount > 1 && ['signin', 'signup'].includes(selectedMode)
+          ? ` (Attempt ${retryCount} — check your details${selectedMode === 'signin' ? ' or choose Forgot password? below' : ''}.)`
+          : '';
+        say(`${rawMsg}${retryNote}`, true);
+      }
+    }
     finally { password.value = ''; setBusy(false); }
   }
   async function onGoogle() {
@@ -308,22 +381,26 @@
     title = node('h2', { id: 'ma-title' }, 'Welcome back.');
     description = node('p', { class: 'ma-description' });
     tabs = node('div', { class: 'ma-tabs' });
-    const signinTab = node('button', { type: 'button' }, 'Sign in');
-    const signupTab = node('button', { type: 'button' }, 'Create account');
-    signinTab.addEventListener('click', () => { if (!busy) setMode('signin'); }); signupTab.addEventListener('click', () => { if (!busy) setMode('signup'); }); tabs.append(signinTab, signupTab);
+    signinTab = node('button', { type: 'button' }, 'Sign in');
+    signupTab = node('button', { type: 'button' }, 'Create account');
+    signinTab.addEventListener('click', () => { if (!busy) { setMode('signin', '', false, { preserveEmail: true }); focusInitialField(); } });
+    signupTab.addEventListener('click', () => { if (!busy) { setMode('signup', '', false, { preserveEmail: true }); focusInitialField(); } });
+    tabs.append(signinTab, signupTab);
     googleButton = node('button', { type: 'button', class: 'ma-google' }, 'Continue with Google');
     googleButton.addEventListener('click', onGoogle);
     divider = node('p', { class: 'ma-divider' }, 'or use email');
-    form = node('form');
+    form = node('form', { novalidate: '' });
     emailLabel = node('label', { for: 'ma-email' }, 'Email'); email = node('input', { id: 'ma-email', type: 'email', autocomplete: 'email', maxlength: '254', required: '' });
     passwordLabel = node('label', { for: 'ma-password' }, 'Password'); password = node('input', { id: 'ma-password', type: 'password', autocomplete: 'current-password', maxlength: '128', required: '' });
     submit = node('button', { type: 'submit', class: 'ma-primary' }, 'Sign in');
     message = node('p', { class: 'ma-message', role: 'status', 'aria-live': 'polite' });
-    recover = node('button', { type: 'button', class: 'ma-recover' }, 'Forgot password?'); recover.addEventListener('click', () => { if (!busy) setMode('recover'); });
+    recover = node('button', { type: 'button', class: 'ma-recover' }, 'Forgot password?'); recover.addEventListener('click', () => { if (!busy) { setMode('recover', '', false, { preserveEmail: true }); focusInitialField(); } });
     form.append(emailLabel, email, passwordLabel, password, submit); form.addEventListener('submit', onSubmit);
-    const refreshButton = node('button', { type: 'button', class: 'ma-refresh' }, 'Refresh account');
+    accountSignoutButton = node('button', { type: 'button', class: 'ma-secondary ma-dialog-signout', hidden: '' }, 'Sign out');
+    accountSignoutButton.addEventListener('click', signout);
+    refreshButton = node('button', { type: 'button', class: 'ma-refresh' }, 'Refresh account');
     refreshButton.addEventListener('click', async () => { if (busy) return; setBusy(true); try { await refresh(); setMode(snapshot.user ? 'account' : 'signin', 'Account refreshed.'); } catch (error) { say(error.message, true); } finally { setBusy(false); } });
-    dialog.append(close, title, description, tabs, googleButton, divider, form, recover, message, refreshButton);
+    dialog.append(close, title, description, tabs, googleButton, divider, form, recover, message, accountSignoutButton, refreshButton);
     dialog.addEventListener('keydown', event => {
       if (event.key !== 'Tab') return;
       const focusables = [...dialog.querySelectorAll('button:not([hidden]):not([disabled]), input:not([hidden]):not([disabled]), [tabindex]:not([tabindex="-1"])')].filter(el => !el.closest('[hidden]'));

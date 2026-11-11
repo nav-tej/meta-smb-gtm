@@ -7,6 +7,9 @@
 (function () {
   const LOCAL_ONBOARDING_KEY = 'muse.onboarding.v1';
   const LOCAL_WORKSPACE_MODE_KEY = 'muse.workspace_mode.v1'; // 'own' | 'sample'
+  let homeSyncEpoch = 0;
+  let lastRenderedUserId = null;
+  let cleanHomeState = null;
 
   function trackEvent(eventName, props = {}) {
     try {
@@ -181,18 +184,28 @@
   async function loadServerWorkspaceDoc() {
     try {
       if (window.museAccount && typeof window.museAccount.ready === 'function') {
-        const snap = await window.museAccount.ready();
+        await window.museAccount.ready();
+        const snap = typeof window.museAccount.getSnapshot === 'function'
+          ? window.museAccount.getSnapshot()
+          : null;
+        if (snap && !snap.user) {
+          return { doc: null, version: 0, user: null, usage: snap.usage || null };
+        }
         if (snap && snap.user && typeof window.museAccount.loadWorkspace === 'function') {
           const ws = await window.museAccount.loadWorkspace(snap.user.id);
           return { doc: ws.document || {}, version: ws.version || 0, user: snap.user, usage: snap.usage };
         }
       }
-      const meResp = await fetch('/api/v1/account/me', { credentials: 'same-origin' });
+      const meResp = await fetch('/api/v1/account/me', {
+        credentials: 'same-origin',
+        cache: 'no-store',
+      });
       if (meResp.ok) {
         const me = await meResp.json();
         if (me && me.user && me.user.id) {
           const wsResp = await fetch('/api/v1/account/workspace', {
             credentials: 'same-origin',
+            cache: 'no-store',
             headers: { 'X-Muse-Owner': me.user.id },
           });
           if (wsResp.ok) {
@@ -969,8 +982,106 @@
   // =========================================================================
   // 2. HOME PAGE (/) SIGNED-IN WORKSPACE & HONEST EMPTY STATES
   // =========================================================================
+  function captureCleanHomeState() {
+    if (cleanHomeState || !document.getElementById('journey')) return;
+    const textTargets = [];
+    [
+      '#activeWorkspaceKicker', '.workspace-kicker', '#activeWorkspaceLabel', '#activeAvatar',
+      '.jr-eyebrow', '#actionablePlaybookTitle', '#heroTitle', '#heroCategory', '#heroDesc',
+      '#kpiArtworks', '#kpiPriceGap', '#kpiRoas', '#compDomainBadge', '#compSummaryText',
+    ].forEach((sel) => {
+      const el = document.querySelector(sel);
+      if (el) textTargets.push([el, el.textContent]);
+    });
+    const hiddenTargets = ['#loggedOutHero', '.hero-bridge', '.ra-moves-strip']
+      .map((sel) => document.querySelector(sel))
+      .filter(Boolean)
+      .map((el) => [el, Boolean(el.hidden)]);
+    const childTargets = [];
+    [
+      '.monitoring-title', '.monitoring-right', '#loop-research .jr-card.c1',
+      '#loop-research .jr-watch', '#sellerList', '#adGallery',
+      '#loop-improve ol.jr-recos', '#channelStrip',
+    ].forEach((sel) => {
+      const el = document.querySelector(sel);
+      if (el) childTargets.push([el, Array.from(el.childNodes)]);
+    });
+    document.querySelectorAll('.jr-stats > div, #loop-research .jr-card.c2').forEach((el) => {
+      childTargets.push([el, Array.from(el.childNodes)]);
+    });
+    ['findingsContainer', 'insightsContainer', 'diagnosticsContainer', 'metaAdsContainer', 'reallocationsContainer', 'audiencesContainer'].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) childTargets.push([el, Array.from(el.childNodes)]);
+    });
+    const steerInput = document.getElementById('jrSteerInput');
+    const compInput = document.getElementById('compUrlInput');
+    cleanHomeState = {
+      textTargets,
+      hiddenTargets,
+      childTargets,
+      jrNotes: Array.from(document.querySelectorAll('#journey .jr-note')).map((el) => [el, el.textContent]),
+      nextSpans: Array.from(document.querySelectorAll('#loop-iterate .jr-next-card span')).map((el) => [el, el.textContent]),
+      steerPlaceholder: steerInput ? [steerInput, steerInput.placeholder] : null,
+      compInput: compInput ? [compInput, compInput.value, compInput.placeholder] : null,
+      chips: Array.from(document.querySelectorAll('.jr-chip-btn')).map((el) => [el, el.textContent, el.getAttribute('data-directive')]),
+      refineChips: Array.from(document.querySelectorAll('.ms-refine-chips button')).map((el) => [el, el.textContent, el.getAttribute('data-refine')]),
+    };
+  }
+
+  function resetSignedOutHomeWorkspace({ preserveMode = false } = {}) {
+    document.getElementById('ownWorkspaceOptionBtn')?.remove();
+    window.__museApplySignedInWorkspace = null;
+    lastRenderedUserId = null;
+    if (!preserveMode) {
+      try {
+        if (localStorage.getItem(LOCAL_WORKSPACE_MODE_KEY) === 'own') {
+          localStorage.removeItem(LOCAL_WORKSPACE_MODE_KEY);
+        }
+      } catch (_) {}
+    }
+    if (cleanHomeState) {
+      cleanHomeState.textTargets.forEach(([el, text]) => { if (el) el.textContent = text; });
+      cleanHomeState.hiddenTargets.forEach(([el, hidden]) => { if (el) el.hidden = hidden; });
+      cleanHomeState.childTargets.forEach(([el, nodes]) => { if (el) el.replaceChildren(...nodes); });
+      cleanHomeState.jrNotes.forEach(([el, text]) => { if (el) el.textContent = text; });
+      cleanHomeState.nextSpans.forEach(([el, text]) => { if (el) el.textContent = text; });
+      if (cleanHomeState.steerPlaceholder) {
+        const [el, placeholder] = cleanHomeState.steerPlaceholder;
+        if (el) el.placeholder = placeholder;
+      }
+      if (cleanHomeState.compInput) {
+        const [el, value, placeholder] = cleanHomeState.compInput;
+        if (el) { el.value = value; el.placeholder = placeholder; }
+      }
+      cleanHomeState.chips.forEach(([el, text, directive]) => {
+        if (!el) return;
+        el.textContent = text;
+        if (directive === null) el.removeAttribute('data-directive');
+        else el.setAttribute('data-directive', directive);
+      });
+      cleanHomeState.refineChips.forEach(([el, text, refine]) => {
+        if (!el) return;
+        el.textContent = text;
+        if (refine === null) el.removeAttribute('data-refine');
+        else el.setAttribute('data-refine', refine);
+      });
+    } else if (document.getElementById('journey')) {
+      const loggedOutHero = document.getElementById('loggedOutHero');
+      if (loggedOutHero) loggedOutHero.hidden = false;
+      const heroBridge = document.querySelector('.hero-bridge');
+      if (heroBridge) heroBridge.hidden = false;
+      const movesStrip = document.querySelector('.ra-moves-strip');
+      if (movesStrip) movesStrip.hidden = false;
+    }
+    try {
+      window.dispatchEvent(new CustomEvent('muse:workspace-reset'));
+    } catch (_) {}
+  }
+
   function renderSignedInHomeWorkspace(onboarding, user) {
     if (!document.getElementById('journey')) return;
+    captureCleanHomeState();
+    lastRenderedUserId = user?.id || null;
 
     const shopName = onboarding?.business_name || (user?.email ? `${user.email.split('@')[0]}’s Shop` : 'Your Shop');
     const summary = onboarding?.crawl_summary || null;
@@ -1387,7 +1498,8 @@
     const loginDialog = document.getElementById('loginDialog');
     if (!loginDialog) return;
     const inner = loginDialog.querySelector('.dialog-inner');
-    if (!inner || document.getElementById('ownWorkspaceOptionBtn')) return;
+    if (!inner) return;
+    document.getElementById('ownWorkspaceOptionBtn')?.remove();
 
     const sampleOpt = inner.querySelector('[data-ws="sarabjit_singh"]');
     if (!sampleOpt) return;
@@ -1421,15 +1533,20 @@
 
     sampleOpt.parentNode.insertBefore(ownBtn, sampleOpt);
 
-    sampleOpt.addEventListener('click', () => {
-      try {
-        localStorage.setItem(LOCAL_WORKSPACE_MODE_KEY, 'sample');
-      } catch (_) {}
-    });
+    if (!sampleOpt.dataset.wsBound) {
+      sampleOpt.dataset.wsBound = '1';
+      sampleOpt.addEventListener('click', () => {
+        try {
+          localStorage.setItem(LOCAL_WORKSPACE_MODE_KEY, 'sample');
+        } catch (_) {}
+      });
+    }
   }
 
   async function initHomePageOnboardingSync() {
     if (window.location.pathname === '/welcome') return;
+    if (!document.getElementById('journey')) return;
+    const seq = ++homeSyncEpoch;
 
     const query = new URLSearchParams(window.location.search || '');
     const explicitMode = query.get('workspace'); // 'sample' | 'own'
@@ -1437,6 +1554,9 @@
       try {
         localStorage.setItem(LOCAL_WORKSPACE_MODE_KEY, 'sample');
       } catch (_) {}
+      if (lastRenderedUserId || document.getElementById('ownWorkspaceOptionBtn')) {
+        resetSignedOutHomeWorkspace({ preserveMode: true });
+      }
       return;
     }
     if (explicitMode === 'own') {
@@ -1446,6 +1566,10 @@
     }
 
     const server = await loadServerWorkspaceDoc();
+    if (seq !== homeSyncEpoch) return;
+    const snap = window.museAccount?.getSnapshot?.();
+    if (snap && (snap.user?.id || null) !== (server.user?.id || null)) return;
+
     const isSignedIn = Boolean(server.user && server.user.id);
     // Bind onboarding state to the server document for signed-in accounts.
     // Unscoped local storage from other accounts on this browser is never trusted.
@@ -1465,24 +1589,47 @@
       const applyFn = () => renderSignedInHomeWorkspace(onboarding || defaultOnboardingState(), server.user);
       window.__museApplySignedInWorkspace = applyFn;
       applyFn();
-    } else if (onboarding?.completed_at) {
+    } else if (isSignedIn && onboarding?.completed_at) {
       injectLoginDialogSwitcher(onboarding, server.user);
+    } else if (!isSignedIn && (lastRenderedUserId || document.getElementById('ownWorkspaceOptionBtn'))) {
+      resetSignedOutHomeWorkspace();
     }
   }
 
-  // Listen for sign-in events from account.js so signing in immediately routes new accounts to /welcome
+  // Listen for sign-in / sign-out events from account.js so signed-out views reset immediately
   window.addEventListener('muse:account-change', async (ev) => {
-    const user = ev?.detail?.user;
-    if (!user || window.location.pathname === '/welcome') return;
+    if (window.location.pathname === '/welcome') return;
+    const seq = ++homeSyncEpoch;
+    const user = ev?.detail?.user || null;
+    if (!user) {
+      resetSignedOutHomeWorkspace();
+      return;
+    }
     const query = new URLSearchParams(window.location.search || '');
     if (query.get('workspace') === 'sample') return;
     const server = await loadServerWorkspaceDoc();
+    if (seq !== homeSyncEpoch) return;
+    const snap = window.museAccount?.getSnapshot?.();
+    if (snap && snap.user?.id !== user.id) return;
     // Authoritative check on server document: no cross-account local leak
     const onb = server.doc?.onboarding || null;
     if (!onb || !onb.completed_at) {
       window.location.assign('/welcome');
     } else {
+      injectLoginDialogSwitcher(onb, user);
       renderSignedInHomeWorkspace(onb, user);
+    }
+  });
+
+  window.addEventListener('pageshow', (event) => {
+    if (window.location.pathname === '/welcome') return;
+    if (!document.getElementById('journey')) return;
+    if (event.persisted) {
+      if (lastRenderedUserId || document.getElementById('ownWorkspaceOptionBtn')) {
+        resetSignedOutHomeWorkspace({ preserveMode: true });
+      }
+      window.museAccount?.refresh?.();
+      initHomePageOnboardingSync();
     }
   });
 

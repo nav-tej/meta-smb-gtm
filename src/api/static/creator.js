@@ -282,12 +282,18 @@
     return DEFAULT_PREVIEWS.find((p) => p.insight_id === id) || null;
   }
 
-  function notify(message, kind = '', actionLink = null) {
+  function promptPhotoUpload() {
+    const input = $('productPhoto');
+    if (!input) return;
+    try { if ($('moreDetails')) $('moreDetails').open = true; } catch {}
+    input.click();
+  }
+  function notify(message, kind = '', action = null) {
     const noticeEl = $('notice');
     if (!noticeEl) return;
     noticeEl.hidden = false;
     noticeEl.className = `notice ${kind}`;
-    if (!actionLink) {
+    if (!action) {
       noticeEl.textContent = message;
       return;
     }
@@ -296,17 +302,27 @@
       const span = document.createElement('span');
       span.textContent = message;
       if (noticeEl.append) noticeEl.append(span); else if (noticeEl.appendChild) noticeEl.appendChild(span);
-      const a = document.createElement('a');
-      a.href = actionLink.href;
-      a.textContent = actionLink.text;
-      a.className = 'notice-action';
-      if (a.style) {
-        a.style.marginLeft = '8px';
-        a.style.fontWeight = 'bold';
-        a.style.color = 'inherit';
-        a.style.textDecoration = 'underline';
+      if (typeof action.onClick === 'function') {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = action.text || 'Continue';
+        btn.className = 'secondary notice-action-btn';
+        btn.addEventListener('click', action.onClick);
+        if (noticeEl.append) noticeEl.append(btn); else if (noticeEl.appendChild) noticeEl.appendChild(btn);
+      } else if (action.href) {
+        const a = document.createElement('a');
+        a.href = action.href;
+        a.textContent = action.text;
+        a.className = 'notice-action';
+        if (a.style) {
+          a.style.marginLeft = '8px';
+          a.style.fontWeight = 'bold';
+          a.style.color = 'inherit';
+          a.style.textDecoration = 'underline';
+        }
+        if (noticeEl.append) noticeEl.append(a); else if (noticeEl.appendChild) noticeEl.appendChild(a);
       }
-      if (noticeEl.append) noticeEl.append(a); else if (noticeEl.appendChild) noticeEl.appendChild(a);
+      if (!noticeEl.childNodes?.length) noticeEl.textContent = message;
     } else {
       noticeEl.textContent = message;
     }
@@ -315,7 +331,8 @@
   function markIdeaExported() {
     try {
       const ideaId = state.idea_id || (typeof location !== 'undefined' ? new URLSearchParams(location.search).get('idea') : null);
-      const ACTIONS_KEY = 'muse.actions';
+      const uid = window.museAccount?.getSnapshot?.()?.user?.id || null;
+      const ACTIONS_KEY = uid ? `muse.actions.${uid}` : 'muse.actions';
       const raw = localStorage.getItem(ACTIONS_KEY) || '{}';
       const all = typeof raw === 'string' && raw ? JSON.parse(raw) : {};
       const actionKey = ideaId || 'custom-post';
@@ -515,7 +532,7 @@
     }
     finally { clearTimeout(timer); setBusy(false); }
   }
-  function validateProduct() { sync(); if (!state.product.name) { notify('Give your product a name first.', 'error'); $('productName').focus(); return false; } if (!state.original) { $('moreDetails').open = true; notify('Add a product photo first. Open “More details” to upload it.', 'error'); return false; } if (state.product.link && !safeLink(state.product.link)) { $('moreDetails').open = true; notify('Use a complete http:// or https:// product link, or leave it empty.', 'error'); $('productLink').focus(); return false; } return true; }
+  function validateProduct() { sync(); if (!state.product.name) { notify('Give your product a name first.', 'error'); $('productName').focus(); return false; } if (!state.original) { if ($('moreDetails')) $('moreDetails').open = true; notify('Add a product photo first to preview or export your image.', 'error', { text: 'Add photo', onClick: promptPhotoUpload }); return false; } if (state.product.link && !safeLink(state.product.link)) { $('moreDetails').open = true; notify('Use a complete http:// or https:// product link, or leave it empty.', 'error'); $('productLink').focus(); return false; } return true; }
   function go(step) {
     if (state.busy || (step > 0 && !validateProduct())) return;
     if (step === 3 && !postingChannels().length) { notify('Choose Instagram or Facebook for this post before sharing.', 'error'); go(0); return; }
@@ -529,6 +546,8 @@
   function refreshPreview() {
     persistDraft();
     for (const id of ['productImage', 'originalCompare']) { if (state.original) { $(id).src = state.original; $(id).hidden = false; } else { $(id).removeAttribute('src'); $(id).hidden = true; } }
+    if ($('directPhotoUpload')) $('directPhotoUpload').textContent = state.original ? 'Change photo' : 'Add photo';
+    if ($('shareMissingPhoto')) $('shareMissingPhoto').hidden = !!state.original;
     if (state.image) { $('sceneCompare').src = state.image; $('sceneCompare').hidden = false; } else { $('sceneCompare').removeAttribute('src'); $('sceneCompare').hidden = true; }
     $('sceneLabel').textContent = state.imageKind === 'original' ? 'Original-photo layout' : state.imageKind === 'saved' ? 'Saved AI scene' : 'New AI scene';
     $('previewShop').textContent = state.product.seller || 'Your shop'; $('previewHeadline').textContent = state.headline; $('previewCaption').textContent = state.caption; $('imageProvenance').textContent = state.provenance; $('shareTitle').textContent = state.product.name || 'Your product'; $('shareProvenance').textContent = state.provenance;
@@ -723,6 +742,7 @@
   for (const id of ['postInstagram', 'postFacebook']) $(id).addEventListener('change', changed);
   $('downloadInstructions').addEventListener('click', () => { if (state.busy || !$('reviewed').checked || !postingChannels().length) { notify('Review your post and choose a posting channel before downloading instructions.', 'error'); return; } const pack = campaignPack(); saveBlob(new Blob([`${pack.product.name}\n${$('postingSummary').textContent}\n\n${pack.headline}\n\n${pack.caption}\n\n${pack.posting_checklist.map((line, i) => `${i + 1}. ${line}`).join('\n\n')}`], { type: 'text/plain' }), 'posting-instructions.txt'); markIdeaExported(); });
   $('productPhoto').addEventListener('change', async (event) => { if (state.busy) return; try { await upload(event.target.files?.[0]); } catch (e) { notify(e.message, 'error'); } });
+  if ($('shareAddPhotoBtn')) $('shareAddPhotoBtn').addEventListener('click', promptPhotoUpload);
   const stepButtons = [...document.querySelectorAll('[data-step]')];
   stepButtons.forEach((el, idx) => {
     el.addEventListener('click', () => go(Number(el.dataset.step)));

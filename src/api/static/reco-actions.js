@@ -4,6 +4,18 @@
 (function () {
   'use strict';
   var ACTIONS_KEY = 'muse.actions';
+  function currentUserId() {
+    return window.museAccount && typeof window.museAccount.getSnapshot === 'function'
+      ? (window.museAccount.getSnapshot()?.user?.id || null)
+      : null;
+  }
+  function scopedKey(base) {
+    var uid = currentUserId();
+    return uid ? base + '.' + uid : base;
+  }
+  function actionsKey() {
+    return scopedKey(ACTIONS_KEY);
+  }
 
   var DEFAULT_PREVIEWS = [
     {
@@ -143,7 +155,7 @@
 
   function readActions() {
     try {
-      var v = JSON.parse(localStorage.getItem(ACTIONS_KEY) || '{}');
+      var v = JSON.parse(localStorage.getItem(actionsKey()) || '{}');
       return v && typeof v === 'object' ? v : {};
     } catch (_) {
       return {};
@@ -402,7 +414,7 @@
 
     var handleVoiceFeedback = function (rating, adj) {
       try {
-        localStorage.setItem('muse.voice_profile', JSON.stringify({ rating: rating, adjustment: adj, updated_at: new Date().toISOString() }));
+        localStorage.setItem(scopedKey('muse.voice_profile'), JSON.stringify({ rating: rating, adjustment: adj, updated_at: new Date().toISOString() }));
       } catch (_) {}
       vStatus.textContent = adj ? 'Voice tuned: ' + adj : 'Voice feedback saved!';
       vStatus.hidden = false;
@@ -781,8 +793,13 @@
         setTimeout(refreshStrip, 60);
       }
     });
-    window.addEventListener('storage', function (event) { if (event.key === ACTIONS_KEY) refreshStrip(); });
+    window.addEventListener('storage', function (event) {
+      if (!event.key || event.key === actionsKey() || event.key === ACTIONS_KEY) refreshStrip();
+    });
     window.addEventListener('focus', refreshStrip);
+    window.addEventListener('muse:account-change', refreshStrip);
+    window.addEventListener('account-change', refreshStrip);
+    window.addEventListener('muse:workspace-reset', refreshStrip);
 
     // Load 1:1 previews (from /api/v1/previews with DEFAULT_PREVIEWS fallback)
     var previews = DEFAULT_PREVIEWS;
@@ -1033,7 +1050,7 @@
         confirmDirectiveBtn.addEventListener('click', function () {
           if (!activeDirective) return;
           try {
-            localStorage.setItem('muse.active_directive', JSON.stringify(activeDirective));
+            localStorage.setItem(scopedKey('muse.active_directive'), JSON.stringify(activeDirective));
           } catch (_) {}
           if (steerStatus) {
             steerStatus.hidden = false;

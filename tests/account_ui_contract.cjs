@@ -21,7 +21,7 @@ function harness(hash = '') {
   const header = new Element('header'), body = new Element('body');
   const anonymous = () => ({ configured: true, user: null, usage: null, live_available: false });
   const signed = id => ({ configured: true, user: { id, email: `${id}@example.test`, email_verified: true }, usage: { plan: 'trial', used: 0, limit: 3, remaining: 3, resets_at: null }, live_available: true });
-  let account = anonymous(), version = 7, workspace = { caption: 'Previous saved draft' }, failSignin = false, deferLoad = null;
+  let account = anonymous(), version = 7, workspace = { caption: 'Previous saved draft' }, failSignin = false, failSignup = false, deferLoad = null;
   const response = (data, status = 200) => ({ ok: status >= 200 && status < 300, status, json: async () => data });
   const context = {
     console, URLSearchParams, AbortController, setTimeout: () => 1, clearTimeout() {},
@@ -33,7 +33,7 @@ function harness(hash = '') {
       order.push(url); calls.push({ url, options, payload: options.body ? JSON.parse(options.body) : null });
       const suffix = url.replace('/api/v1/account', '');
       if (suffix === '/me') return response(account);
-      if (suffix === '/signup') return response({ message: 'Check your email to confirm your account.', authenticated: false });
+      if (suffix === '/signup') { if (failSignup) return response({ detail: 'Could not create a new account with those details.' }, 409); return response({ message: 'Check your email to confirm your account.', authenticated: false }); }
       if (suffix === '/oauth') return response({ provider: 'google', url: 'https://auth.example.test/oauth/google' });
       if (suffix === '/signin') { if (failSignin) return response({ detail: 'Invalid credentials.' }, 401); account = signed('user-a'); return response(account); }
       if (suffix === '/signout') { account = anonymous(); return response({ message: 'Signed out.' }); }
@@ -58,7 +58,7 @@ function harness(hash = '') {
   return { context, calls, events, order, nodes, ids, button, fire, api: context.window.museAccount,
     form: () => nodes.find(element => element.tagName === 'form'), dialog: () => nodes.find(element => element.tagName === 'dialog'),
     setAccount: value => { account = value; }, signed, response,
-    failSignin: value => { failSignin = value; }, deferLoad: fn => { deferLoad = fn; } };
+    failSignin: value => { failSignin = value; }, failSignup: value => { failSignup = value; }, deferLoad: fn => { deferLoad = fn; } };
 }
 
 (async () => {
@@ -148,5 +148,38 @@ function harness(hash = '') {
   assert.equal(googleCb.order[0], 'clear-hash');
   assert.equal(googleCb.calls[0].url, '/api/v1/account/session');
   assert(googleCb.nodes.some(element => element.textContent.includes('Signed in with Google')));
+
+  // Signup validation, 409 conflict auto-switch to sign-in + Forgot password?, and retry feedback.
+  const retry = harness(); await retry.api.ready();
+  retry.api.open('signup');
+  assert.equal(retry.button('Forgot password?').hidden, false);
+  retry.ids.get('ma-email').value = 'repeat@example.test';
+  retry.ids.get('ma-password').value = 'short';
+  await retry.fire(retry.form(), 'submit');
+  assert(retry.nodes.some(element => element.textContent.includes('at least 12 characters')));
+  assert.equal(retry.ids.get('ma-email').value, 'repeat@example.test');
+
+  retry.failSignup(true);
+  retry.ids.get('ma-password').value = 'valid-long-passphrase-12';
+  await retry.fire(retry.form(), 'submit');
+  assert.equal(retry.ids.get('ma-title').textContent, 'Welcome back.');
+  assert.equal(retry.ids.get('ma-email').value, 'repeat@example.test');
+  assert.equal(retry.button('Forgot password?').hidden, false);
+  assert(retry.nodes.some(element => element.className === 'ma-message ma-error'));
+  assert(retry.nodes.some(element => element.textContent.includes('Attempt 2')));
+
+  retry.failSignin(true);
+  retry.ids.get('ma-password').value = 'another-wrong-passphrase';
+  await retry.fire(retry.form(), 'submit');
+  assert(retry.nodes.some(element => element.textContent.includes('Attempt 3')));
+
+  // Already signed-in open('signup') opens account mode instead of duplicate signup form.
+  retry.failSignin(false);
+  retry.ids.get('ma-password').value = 'correct-passphrase-12';
+  await retry.fire(retry.form(), 'submit');
+  assert(retry.api.getSnapshot().user);
+  retry.api.open('signup');
+  assert.equal(retry.ids.get('ma-title').textContent, 'Your Muse account');
+  assert(retry.button('Sign out') && !retry.button('Sign out').hidden);
   console.log('ACCOUNT UI CONTRACT PASSED');
 })().catch(error => { console.error(error); process.exitCode = 1; });
