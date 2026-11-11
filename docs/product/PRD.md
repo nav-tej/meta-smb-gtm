@@ -306,11 +306,76 @@ A seller is defined as a **Weekly Active Seller (WAS)** in a 7-day window if and
 *Implementation Note:* On `/progress`, outcomes are partitioned by verified account owner on the device (`muse.outcomes.<user_id>`). Revenue is labeled "Logged on this device", plan cost reflects the Starter monthly baseline ($12/mo), and ROI display requires at least 1 logged result (showing `—` instead of an invented negative return when moves = 0).
 
 ### 11.3 14-Day Free Trial Roadmap & 30-Day Lift Measurement
-Per Nav's decision (Nov 10, 2026), the free trial is **14 days**, designed to establish the weekly growth habit and provide immediate value without upfront card requirements:
-- **Day 0 (Setup):** 4-step onboarding (`/welcome`), workspace creation (`1` run), baseline capture (optional: followers, monthly orders).
+The proposed **14-day, no-card trial** is a roadmap. The current signup offer is three free runs. Time-based eligibility, reminders, and the reports below need separate release evidence.
+- **Day 0 (Setup):** 4-step onboarding (`/welcome`), workspace creation (0 runs), baseline capture (optional: followers, monthly orders).
 - **Days 1–3 (First Action):** Top recommendation previewed and exported; day-1 email prompt if no post exported.
 - **Day 7 (Weekly Rhythm):** First Monday digest received with one pre-filled steerable research question; second move completed.
 - **Days 8–12 (Optimization):** Research directive steered from cache (`0` runs); first post outcome logged.
 - **Day 12 (Two-Week Milestone):** In-app "Your First Two Weeks" summary showing moves completed, posts exported, and competitor changes caught.
 - **Day 14 (Trial Expiration):** Paid plan prompt ($9/mo Starter). If not upgraded, workspace remains readable and digest pauses with a one-time notice.
 - **Day 30 (Lift Report):** For paid accounts, "Your First 30 Days" report calculates actual lift against the Day-0 baseline. If no baseline or result was logged, Muse states honestly what is missing—no modeled revenue is ever fabricated.
+
+## 12. Personalization from shop context to finished creative
+
+**Proposed.** Onboarding preferences, research directives and voice feedback already cover parts of this workflow. The missing product contract is how sellers inspect and revise the context those features use, and how a change produces a visible result.
+
+### P0. Edit the context used for the current output
+
+- Add a compact **Your context** panel beside recommendations and in the editor. Show the selected product, destination, goal, audience, occasion, available channels, time and budget. Prefill known values and let sellers correct them or leave them blank. Keep price, availability and other factual claims tied to the selected product and destination.
+- Offer a plain-language field such as “Anything else Muse should know?” with examples like “I only have 15 minutes,” “Use my original artwork,” or “Invite commissions without quoting a price.” Show which constraints were understood, what needs clarification, and where they apply. Let sellers edit the interpreted values before applying. Treat free text as user context with bounded scope.
+- Default changes to **this draft**. Offer an explicit **Save as shop default** for reusable preferences. Explain which values came from the seller, a storefront import, a saved default, or a sample. For account users preserve owner isolation. For visitors keep changes in the demo draft and offer Reset sample.
+- Give each recommendation **Why this fits** with the product facts, constraints and evidence it used. Re-rank available moves for free. When none fits, show what information is missing or offer a manual next step. Keep a separate explicit action for fresh model generation and show its cost before submission.
+
+### P0. Make adjustments visible and reversible
+
+- Edit headline, caption and CTA independently. Provide controls for source photo, placement and basic layout. Preview Feed and Story at their export proportions. Show the actual caption separately and warn if visible copy clips.
+- Offer **Keep my photo**, **Change the call to action**, and **Shorten this caption** as direct edits. Preserve the current version until the seller applies a proposed change. Provide Undo and reset just the edited area. Preserve user-edited text when changing placement.
+- For the demo, use the seller's original photo and deterministic layouts. Offer saved scenes for matching sample products with a source label. Show a before/after comparison and download the composition displayed. Complete the entire demo with zero model calls.
+
+### P1. Carry context across a seller's workflow
+
+- Reuse shop defaults and per-product facts across research, Today, Creator and Digest. Let a draft override a default without changing other drafts. Keep voice examples and phrases to avoid editable. Preserve product names and claims during any suggested rewrite.
+- Make dismiss reasons actionable. For example, “I don’t sell on Instagram” should prompt the seller to remove it from their allowed channels and show which ideas changed. Let sellers undo the preference update. Treat logged outcomes as observations and avoid inferring sales lift from a single result.
+- Add a research-to-creative handoff that preserves evidence, editable assumptions and the chosen placement. A recommendation should still make sense after the seller changes product or goal. Flag stale evidence and ask the seller to review affected claims.
+
+### Acceptance
+
+1. A sample-shop visitor changes the goal and available channel, sees a different or re-ranked next move with an explanation, edits the resulting creative, undoes a change and exports the selected size with zero runs.
+2. A watercolor seller supplies a product, audience and constraint in their own words. The app shows the interpreted context, uses their own photo, and explains how the output reflects the constraint. Reload restores the draft. A second account sees its own context.
+3. Switching from a draft-only instruction to a saved shop default requires a deliberate action. Removing the instruction restores the default behavior. Empty or unsupported context never becomes an invented fact.
+4. Measure context applied, preview opened, edit accepted or undone, and first export. Compare the default and personalized paths by completion and time to first export. Exclude raw context, product text and captions from analytics.
+
+### P1. Seller memory that improves with use
+
+**Proposed.** Add **What Muse remembers** to the seller profile and link it from Your context. A seller can start from optional onboarding questions, a typed description, or a voice note. They can skip setup and add context after seeing their first useful output.
+
+- Ask four optional questions about what they sell and who buys it, their current goal, the channels and time they can use, and how they want to sound. Allow the seller to answer any subset or describe their situation in their own words. Prefill from existing onboarding answers and let them correct imported details.
+- Turn a description or transcript into a reviewable list of proposed facts and preferences. Distinguish facts such as a shop URL from preferences such as “use short captions” and temporary goals such as “promote commissions this month.” Show the scope, source and any uncertainty. The seller can edit, approve or dismiss each item before it becomes a default.
+- For voice, offer record or upload with a typed fallback and explicit consent before sending audio for transcription. Display any run cost before processing. Let the seller edit the transcript, preview the proposed entries and choose what to save. Keep audio and unapproved transcripts out of durable memory and analytics. The saved demo uses a clearly labeled sample transcript with zero model calls.
+- Reuse the owner-bound, versioned workspace, SellerPreferences and VoiceProfile. Support shop defaults, per-product details and temporary campaign context. Current draft choices override applicable campaign and product defaults, then shop defaults. An explicit exclusion such as an unavailable channel stays in effect until the seller changes it. If a preference conflicts with a product fact, ask the seller to resolve it. Preserve existing documents and unknown fields on save.
+- Make each saved entry editable and removable. Show which entries shaped a recommendation or draft, and offer to ignore an entry for this draft. Deleting an entry stops future use while preserving previously exported or saved creative. Guest demo memory is device-local with a reset control. Account memory is owner-bound and available across browsers.
+- Suggest updates from repeated adjustments, dismiss reasons and explicit feedback. For example, after several “too much time” dismissals, propose “Prefer moves under 15 minutes.” Explain the signal and ask the seller to approve it. Keep suggestions separate from accepted memory. Do not infer factual claims, demographics or causal sales lift from clicks or outcomes.
+- Keep setup and saved preference changes free. Track only event names, counts and input method for measurement. Evaluate time to first useful export, how often sellers apply or undo a proposed memory change, and whether returning sellers reuse their preferences.
+
+**Acceptance.** A watercolor seller can describe their context or answer questions, review and save the proposed entries, and see them change recommendation ranking and editor defaults. A draft override leaves the saved profile intact. A second browser restores the same account defaults. A second account and a signed-out visitor cannot see them. Conflicting saves preserve both users’ edits for resolution. A fixture voice transcript takes the same review path. Repeated feedback proposes a change without applying it, and forgetting an entry removes it from subsequent results.
+
+### P0. Start memory with a reviewable shop scan
+
+- Reuse the shop scan for seller-supplied storefront, product, portfolio and About URLs. Show a short “What Muse found” draft even when the seller skips the questionnaire. Use public content with the existing crawler's fetch-time safeguards. Show partial results and manual entry when a page cannot be read.
+- For each proposed entry show an editable value, source link and scan date. Separate observed facts (a listed print price) from interpretations (likely gift audience) and seller goals (sell more commissions). Ask only about missing details that would change the next move. Never assume stock, buyer demographics or pricing across destinations.
+- Keep competitor observations separate from the seller profile. In the existing add/suggest flow, let sellers mark each competitor “similar audience,” “price reference,” or “inspiration,” and say why a suggested competitor is relevant. Removing a competitor excludes it from future recommendations and digest checks. Re-scans propose changes with a before/after view and preserve seller corrections until explicitly accepted.
+- Demo acceptance: load a saved shop snapshot, correct one observation, add or replace a competitor, and see one recommendation and its rationale change without a paid call. A real seller can complete the same flow using their own shop.
+
+### P1. A digest worth opening
+
+- Let sellers preview a digest and set Weekly, Every two weeks, Monthly or Paused, with topic choices for listing changes, pricing and suggested moves. Show the next send date and timezone. Persist choices server-side and use them at delivery. Define monthly behavior for shorter months, prevent duplicates on retries, and let unsubscribe override the schedule.
+- Lead with one move the seller can do now and why it fits their goal, product, time and available channels. Follow with up to three meaningful changes since the previous successful send. Include source links, check dates, and what remains uncertain. Use a short plain-text version alongside mobile-friendly HTML. Link each actionable item to its preview or editor and include manage preferences and unsubscribe links.
+- Preview the actual email layout in the app. Label sample previews and distinguish a successful check with no changes from a failed or missing check. Use confirmed memory, approved watchlist entries and saved evidence for a zero-run preview. Keep live delivery behind opt-in and the existing delivery configuration.
+- Acceptance: simulate weekly, biweekly, monthly and paused subscribers using a fake clock and sender. Assert correct windows, topics, retries and unsubscribe. A preview for a seller with limited time should show a materially different move from a generic digest.
+
+### P1. Gift access for feedback testers
+
+- Give the operator an invite flow that grants access to an individual account. Support an existing account such as Nav's test account and a new recipient who signs in to redeem an email-bound, expiring, single-use invite. Each tester uses their own login and workspace.
+- Start with a complimentary beta pass with an explicit run allowance and expiry. Show gifted access, remaining runs and expiry in the account UI. The operator can list and revoke grants. Keep an audit record and enforce the existing global spend guard. Keep gifts separate from Stripe subscriptions and preserve any paid plan when the gift ends.
+- Add an optional “Send feedback” link for testers after onboarding or export. Capture the step, what they tried, what went wrong and optional contact permission. Exclude draft text, audio and other personal material by default. Feedback is voluntary and access stays usable without it.
+- Acceptance: redeem once across repeated attempts, reject a different account, revoke and expire access, preserve a paid entitlement, and verify the recipient has an isolated workspace. Test with fixture accounts and no outbound email or model calls.

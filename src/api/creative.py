@@ -25,6 +25,7 @@ class VoiceNoteRequest(BaseModel):
         min_length=4, description="Base64-encoded WAV/MP3/WebM audio bytes from seller voice note."
     )
     filename: str = Field(default="voice_note.wav", max_length=120)
+    consent_confirmed: bool | None = None
 
 
 def get_ad_creative_service() -> AdCreativeService:
@@ -80,6 +81,11 @@ async def get_insight_previews() -> dict[str, Any]:
 @router.post("/transcribe-voice")
 async def transcribe_voice(request: VoiceNoteRequest, live: LiveMode) -> dict[str, str]:
     """Transcribe a seller's spoken voice note into text via `muse-voice-transcribe-1.0`."""
+    if request.consent_confirmed is False:
+        raise HTTPException(
+            400,
+            "Explicit consent is required before sending your voice recording for transcription.",
+        )
     if not live:
         raise demo_unavailable("Voice transcription")
     raw = request.audio_base64.strip()

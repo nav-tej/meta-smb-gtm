@@ -4,6 +4,7 @@ import base64
 import binascii
 import json
 import logging
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, Any
 from urllib.parse import urlparse
@@ -196,11 +197,12 @@ async def ingest_storefront(request: IngestStorefrontRequest) -> dict[str, Any]:
     sample_titles = [item["title"] for item in discovered_items[:10] if item.get("title")]
     channels_str = ", ".join(f"{c['host']} ({c['status']})" for c in channel_results)
     prices_str = (
-        ", ".join(price_hints[:6]) if price_hints else "$14-$22 POD prints; $75-$900 direct"
+        ", ".join(price_hints[:6]) if price_hints else "No public prices detected on crawled pages"
     )
+    scan_date = datetime.now(UTC).date().isoformat()
     seller_context = (
         f"{request.business_name}. Connected channels: {channels_str}. "
-        f"Sample catalog pages/products: {'; '.join(sample_titles[:8])}. "
+        f"Sample catalog pages/products: {'; '.join(sample_titles[:8]) or 'None indexed yet'}. "
         f"Detected price points: {prices_str}."
     )
 
@@ -214,6 +216,7 @@ async def ingest_storefront(request: IngestStorefrontRequest) -> dict[str, Any]:
 
     return {
         "business_name": request.business_name,
+        "scan_date": scan_date,
         "total_channels": len(channel_results),
         "total_pages_crawled": sum(int(c["pages_found"]) for c in channel_results),
         "channels": channel_results,

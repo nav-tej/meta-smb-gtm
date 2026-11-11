@@ -465,6 +465,13 @@
         }
         renderCrawlProof(summary);
         await saveServerOnboarding(state);
+        if (typeof window.dispatchEvent === 'function' && typeof CustomEvent === 'function') {
+          window.dispatchEvent(
+            new CustomEvent('muse:scan-complete', {
+              detail: { summary, data, businessName: summary.business_name, primaryUrl, extraUrls },
+            })
+          );
+        }
         return true;
       } catch (err) {
         if (step1Err) {
@@ -628,13 +635,25 @@
     const compListEl = document.getElementById('wkCompList');
     const step3Err = document.getElementById('wkStep3Error');
 
+    const compRoleOptions = [
+      { value: 'similar_audience', label: 'Similar audience' },
+      { value: 'price_reference', label: 'Price reference' },
+      { value: 'inspiration', label: 'Creative inspiration' },
+    ];
+
     function renderStep3Competitors() {
       updateRunsUI();
       if (!compListEl) return;
       compListEl.textContent = '';
       (state.competitors || []).forEach((comp, idx) => {
+        if (!comp.role || !compRoleOptions.some((o) => o.value === comp.role)) {
+          comp.role = 'similar_audience';
+        }
+        if (typeof comp.rationale !== 'string') {
+          comp.rationale = comp.reason || '';
+        }
         const li = document.createElement('li');
-        li.className = 'wk-comp-item';
+        li.className = 'wk-comp-item sm-wk-comp-item';
         const label = document.createElement('label');
         const cb = document.createElement('input');
         cb.type = 'checkbox';
@@ -645,6 +664,8 @@
         });
 
         const textWrap = document.createElement('div');
+        textWrap.style.flex = '1';
+        textWrap.style.minWidth = '0';
         const nameEl = document.createElement('strong');
         nameEl.textContent = comp.name || comp.url;
         const urlEl = document.createElement('div');
@@ -655,7 +676,45 @@
         reasonEl.style.fontSize = '0.82rem';
         reasonEl.style.marginTop = '2px';
         reasonEl.textContent = comp.reason || 'Watched competitor store';
-        textWrap.append(nameEl, urlEl, reasonEl);
+
+        const metaRow = document.createElement('div');
+        metaRow.className = 'sm-comp-role-wrap';
+
+        const roleLabel = document.createElement('label');
+        roleLabel.className = 'sm-field-inline';
+        roleLabel.textContent = 'Why watch: ';
+        const roleSelect = document.createElement('select');
+        roleSelect.className = 'wk-select sm-comp-role';
+        roleSelect.setAttribute('aria-label', `Role for ${comp.name || comp.url}`);
+        compRoleOptions.forEach((opt) => {
+          const o = document.createElement('option');
+          o.value = opt.value;
+          o.textContent = opt.label;
+          if (opt.value === comp.role) o.selected = true;
+          roleSelect.appendChild(o);
+        });
+        roleSelect.addEventListener('change', () => {
+          comp.role = roleSelect.value;
+          writeLocalOnboarding(state, currentUser);
+        });
+        roleLabel.appendChild(roleSelect);
+
+        const rationaleInput = document.createElement('input');
+        rationaleInput.type = 'text';
+        rationaleInput.className = 'wk-input sm-comp-rationale';
+        rationaleInput.placeholder = 'Note why (e.g. gift packaging, $35 entry print)';
+        rationaleInput.maxLength = 200;
+        rationaleInput.value = comp.rationale || comp.reason || '';
+        rationaleInput.setAttribute('aria-label', `Rationale for ${comp.name || comp.url}`);
+        rationaleInput.addEventListener('change', () => {
+          comp.rationale = rationaleInput.value.trim();
+          comp.reason = comp.rationale || comp.reason || '';
+          reasonEl.textContent = comp.reason || 'Watched competitor store';
+          writeLocalOnboarding(state, currentUser);
+        });
+
+        metaRow.append(roleLabel, rationaleInput);
+        textWrap.append(nameEl, urlEl, reasonEl, metaRow);
 
         label.append(cb, textWrap);
 
@@ -696,16 +755,19 @@
             {
               name: 'Desert Ceramics Studio',
               url: 'https://desertceramics.com',
+              role: 'similar_audience',
               reason: 'Handmade ceramic & stoneware collection',
             },
             {
               name: 'Earth & Clay Art',
               url: 'https://earthandclay.com',
+              role: 'price_reference',
               reason: 'Functional pottery & bespoke vase sets',
             },
             {
               name: 'Artisan Kilnworks',
               url: 'https://artisankiln.com',
+              role: 'inspiration',
               reason: 'Handmade mugs and gift items under $60',
             },
           ];
@@ -717,6 +779,8 @@
             state.competitors.push({
               name: s.name || deriveBusinessName(url),
               url,
+              role: s.role || 'similar_audience',
+              rationale: s.reason || 'Suggested similar storefront',
               reason: s.reason || 'Suggested similar storefront',
               selected: true,
             });
@@ -741,6 +805,7 @@
     document.getElementById('wkAddCompBtn')?.addEventListener('click', () => {
       const urlInp = document.getElementById('wkManualCompUrl');
       const reasonInp = document.getElementById('wkManualCompReason');
+      const roleInp = document.getElementById('wkManualCompRole');
       const url = normalizeShopUrl(urlInp?.value);
       if (!url) {
         if (step3Err) {
@@ -750,11 +815,14 @@
         return;
       }
       if (step3Err) step3Err.hidden = true;
+      const reasonText = String(reasonInp?.value || '').trim() || 'Added by you to watch prices & listings';
       if (!state.competitors.some((c) => c.url === url)) {
         state.competitors.push({
           name: deriveBusinessName(url),
           url,
-          reason: String(reasonInp?.value || '').trim() || 'Added by you to watch prices & listings',
+          role: roleInp?.value || 'similar_audience',
+          rationale: reasonText,
+          reason: reasonText,
           selected: true,
         });
       }
@@ -909,7 +977,10 @@
         const compNames = selectedCompetitors.map((c) => c.name || c.url).join(', ');
 
         const readItem = `What Muse read: ${pagesCount} pages from ${shopLabel} and ${selectedCompetitors.length} competitors (${compNames || 'none selected'})`;
-        const foundItem = `What it found: Detected price range ${priceLabel || '$24 to $180'} and saved your shop crawl (${pagesCount} pages) and ${selectedCompetitors.length} competitors. Zero runs spent.`;
+        const extraMem = typeof window.museSellerMemory?.getOnboardingMemoryEntries === 'function'
+          ? window.museSellerMemory.getOnboardingMemoryEntries()
+          : [];
+        const foundItem = `What it found: ${priceLabel ? `Detected price range ${priceLabel}` : 'No public prices detected yet'} and saved your shop crawl (${pagesCount} pages), ${selectedCompetitors.length} competitors, and ${extraMem.length} profile item(s). Zero runs spent.`;
         const runDefItem = 'What a run is: A run is one full Muse AI research, competitor crawl, or ad generation cycle.';
         const runsLeftItem = `Runs remaining: You have ${runsRemaining} ${runsRemaining === 1 ? 'run' : 'runs'} left this month for your ad generations and live research.`;
         const cachedItem = 'What is cached: Your shop crawl, competitor watchlist, and setup results are cached so reopening your workspace costs 0 runs.';

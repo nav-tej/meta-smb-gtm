@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 
 FormalityLevel = Literal["casual", "neutral", "formal"]
 VoiceAdjustment = Literal["casual", "formal", "shorter"]
+CaptionLengthPref = Literal["short", "medium", "detailed"]
 
 
 class VoiceProfile(BaseModel):
@@ -25,6 +26,9 @@ class VoiceProfile(BaseModel):
     common_hashtags: list[str] = Field(default_factory=list, max_length=10)
     recurring_words: list[str] = Field(default_factory=list, max_length=20)
     words_to_avoid: list[str] = Field(default_factory=list, max_length=30)
+    phrases_to_avoid: list[str] = Field(default_factory=list, max_length=30)
+    preferred_cta_style: str | None = Field(default=None, max_length=120)
+    caption_length: CaptionLengthPref | None = None
     sample_lines: list[str] = Field(default_factory=list, max_length=8)
     sources: list[str] = Field(default_factory=list, max_length=5)
     adjustments: list[VoiceAdjustment] = Field(default_factory=list, max_length=10)

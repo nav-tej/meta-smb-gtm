@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from src.models.intel import ActionableInsight
 from src.models.seller import DismissSignal, SellerPreferences
+from src.models.voice import VoiceProfile
 from src.services.accounts import (
     load_workspace,
     resolve_account,
@@ -16,6 +17,7 @@ from src.services.accounts import (
     verify_workspace_owner,
 )
 from src.services.preference_ranker import rank_ideas_deterministically
+from src.services.seller_memory import suggest_memory_updates
 
 router = APIRouter(prefix="/preferences", tags=["preferences"])
 
@@ -112,16 +114,39 @@ async def sync_signals(
             seen.add(key)
     doc["dismiss_signals"] = existing_signals
 
+    # Evaluate pending feedback suggestions without auto-applying
+    raw_pref = doc.get("preferences")
+    cur_pref = (
+        SellerPreferences.model_validate(raw_pref)
+        if isinstance(raw_pref, dict)
+        else SellerPreferences()
+    )
+    raw_voice = doc.get("voice_profile")
+    cur_voice = (
+        VoiceProfile.model_validate(raw_voice) if isinstance(raw_voice, dict) else VoiceProfile()
+    )
+    parsed_signals = [
+        DismissSignal.model_validate(s) for s in existing_signals if isinstance(s, dict)
+    ]
+    suggestions = suggest_memory_updates(
+        preferences=cur_pref, voice_profile=cur_voice, dismiss_signals=parsed_signals
+    )
+    cur_pref.suggested_updates = suggestions
+    doc["preferences"] = cur_pref.model_dump(mode="json")
+
     saved = await save_workspace(
         account,
         doc,
         expected_version=ws.get("version"),
         expected_owner=account.user_id,
     )
+    pending = [s.model_dump(mode="json") for s in suggestions if s.status == "pending"]
     return {
         "success": True,
         "actions_count": len(existing_actions),
         "signals_count": len(existing_signals),
+        "pending_suggestions_count": len(pending),
+        "suggested_updates": pending,
         "version": saved.get("version"),
     }
 

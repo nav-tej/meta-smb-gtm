@@ -609,7 +609,17 @@
     } else delete all[id];
     writeActions(all);
     actionsChanged();
-    syncSignalsToServer();
+    const emitSignalsUpdated = () => {
+      if (
+        typeof window !== 'undefined' &&
+        typeof window.dispatchEvent === 'function' &&
+        typeof CustomEvent === 'function'
+      ) {
+        window.dispatchEvent(
+          new CustomEvent('muse:signals-updated', { detail: { id, reason: reason || '', status } })
+        );
+      }
+    };
     if (status === 'accepted') window.museTrack?.('idea_accepted', { action_id: id, page: location.pathname, has_note: Boolean(note) });
     else if (status === 'dismissed') {
       window.museTrack?.('idea_dismissed', { action_id: id, page: location.pathname, has_note: Boolean(note), reason: reason || 'unspecified' });
@@ -623,6 +633,7 @@
       }
     }
     else if (status === 'archived') window.museTrack?.('idea_archived', { action_id: id, page: location.pathname, has_note: Boolean(note) });
+    Promise.resolve(syncSignalsToServer()).then(emitSignalsUpdated).catch(emitSignalsUpdated);
     if (!status || silent) return;
     const labels = { accepted: 'Added to My actions', dismissed: 'Dismissed', archived: 'Archived' };
     const undo = status === 'dismissed' || status === 'archived'
@@ -683,8 +694,10 @@
     const btns = el('div', { class: 'ms-dismiss-row' });
     const reasons = [
       { key: 'not_my_style', label: 'Not my style' },
+      { key: 'too_much_time', label: 'Too much time' },
       { key: 'too_advanced', label: 'Too advanced' },
       { key: 'no_access', label: 'No access' },
+      { key: 'wrong_channel', label: 'Wrong channel' },
       { key: 'already_tried', label: 'Already tried' }
     ];
     reasons.forEach(r => {
@@ -1696,6 +1709,6 @@
     mountTriage();
   }
 
-  window.museShell = { spend, spendLive, canRun, requireRun, syncCredits, fetch: museFetch, errorMessage, friendlyError, isOffline, setOfflineState, hasAccount: hasSession, progress, toast, openGift, openPricing, openSignup, openActions, openTour, showStage, watchlist: WATCH, signals: loadSignals, competitorStatus, changeBadges, notificationItems, pausedCompetitors: readPaused, toggleNotifications, markRead };
+  window.museShell = { spend, spendLive, canRun, requireRun, syncCredits, fetch: museFetch, errorMessage, friendlyError, isOffline, setOfflineState, hasAccount: hasSession, progress, toast, openGift, openPricing, openSignup, openActions, openTour, showStage, refreshTriage, actionsChanged, watchlist: WATCH, signals: loadSignals, competitorStatus, changeBadges, notificationItems, pausedCompetitors: readPaused, toggleNotifications, markRead };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();

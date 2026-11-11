@@ -33,6 +33,7 @@ class OnboardingBuildRequest(BaseModel):
     socials: list[dict[str, Any]] = Field(default_factory=list)
     competitors: list[dict[str, Any]] = Field(default_factory=list)
     preferences: dict[str, Any] | None = None
+    memory_entries: list[dict[str, Any]] = Field(default_factory=list)
     skipped: list[int] = Field(default_factory=list)
     crawl_summary: dict[str, Any] | None = None
     step: int = 5
@@ -139,8 +140,29 @@ async def complete_onboarding(
 
         next_doc = dict(doc)
         next_doc["onboarding"] = onboarding_data
-        if body.preferences:
-            next_doc["preferences"] = body.preferences
+        if body.preferences or body.memory_entries or body.competitors:
+            merged_pref = dict(body.preferences or next_doc.get("preferences") or {})
+            if body.memory_entries:
+                merged_pref["memory_entries"] = body.memory_entries
+            if body.competitors:
+                merged_pref["competitor_entries"] = [
+                    {
+                        "name": str(c.get("name") or "")[:140],
+                        "url": str(c.get("url") or "")[:500],
+                        "role": (
+                            c.get("role")
+                            if c.get("role")
+                            in {"similar_audience", "price_reference", "inspiration"}
+                            else "similar_audience"
+                        ),
+                        "rationale": str(c.get("rationale") or c.get("reason") or "")[:280],
+                        "reason": str(c.get("reason") or c.get("rationale") or "")[:280],
+                        "selected": c.get("selected", True) is not False,
+                    }
+                    for c in body.competitors
+                    if isinstance(c, dict) and c.get("url")
+                ]
+            next_doc["preferences"] = merged_pref
 
         try:
             saved_ws = await save_workspace(

@@ -93,13 +93,20 @@ def rank_ideas_deterministically(
             elif isinstance(s, dict):
                 signals.append(DismissSignal.model_validate(s))
 
-    # 1. Discover hidden channels from "no_access" signals and access preferences
+    # 1. Discover hidden channels from "no_access" / "wrong_channel" signals and access preferences
     hidden_channels: set[str] = set()
     for sig in signals:
-        if sig.reason == "no_access":
+        if sig.reason in {"no_access", "wrong_channel"}:
             detected = sig.channel or _detect_channel(f"{sig.title} {sig.id}")
             if detected:
                 hidden_channels.add(detected)
+
+    # Also honor explicit channel exclusions saved in seller memory
+    for entry in pref.memory_entries:
+        if entry.status == "accepted" and entry.key == "excluded_channels":
+            for ch in CHANNEL_KEYWORDS:
+                if ch in entry.value.lower():
+                    hidden_channels.add(ch)
 
     # If seller specified explicit accessible channels, any other channel is hidden
     if pref.access.channels:
@@ -109,9 +116,13 @@ def rank_ideas_deterministically(
             if ch not in allowed and not any(a in ch for a in allowed):
                 hidden_channels.add(ch)
 
-    # 2. Count "too_advanced" signals
+    # 2. Count "too_advanced" and "too_much_time" signals
     too_advanced_count = sum(1 for s in signals if s.reason == "too_advanced")
+    too_much_time_count = sum(1 for s in signals if s.reason == "too_much_time")
     is_low_experience = pref.experience == "new" or too_advanced_count >= 2
+    prefers_quick_moves = (
+        pref.access.minutes_per_week is not None and pref.access.minutes_per_week <= 15
+    ) or too_much_time_count >= 2
 
     # 3. Collect already_tried idea identifiers or titles
     already_tried_titles = {
@@ -167,12 +178,23 @@ def rank_ideas_deterministically(
             if any(bad.lower() in combined for bad in pref.taste.subjects_to_avoid):
                 score -= 100.0
 
-        # Check research focus keyword match
-        if pref.research_focus:
-            focus_words = [w.lower() for w in re.findall(r"\w+", pref.research_focus) if len(w) > 3]
+        # Check research focus and goal keyword match
+        focus_parts = [p for p in (pref.research_focus, pref.goal) if p]
+        if focus_parts:
+            focus_words = [
+                w.lower() for w in re.findall(r"\w+", " ".join(focus_parts)) if len(w) > 3
+            ]
             combined = f"{idea.title} {idea.action} {idea.why}".lower()
             if any(w in combined for w in focus_words):
                 score += 30.0
+
+        # Prefer quick wins if weekly time limit is tight
+        if prefers_quick_moves:
+            combined = f"{idea.title} {idea.action}".lower()
+            if any(k in combined for k in ("series", "holiday gift sets", "audit", "campaign")):
+                score -= 35.0
+            elif any(k in combined for k in ("quick", "short", "story", "15", "one")):
+                score += 25.0
 
         scored.append((score, idx, idea))
 
