@@ -8,6 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from src.api.main import app
+from src.config import get_settings
 from src.models.intel import SitemapEntry
 from src.models.seller import (
     AccessPreferences,
@@ -210,25 +211,124 @@ def test_rescan_diff_preserves_seller_edited_observation(client: TestClient) -> 
 def test_voice_fixture_consent_gate_and_conflict_detection(
     monkeypatch: pytest.MonkeyPatch, client: TestClient
 ) -> None:
-    """Voice fixture parses cleanly at 0 runs; live transcription enforces consent & demo gate."""
+    """Voice fixture parses cleanly at 0 runs; live enforces consent & demo gate before billing."""
+    from src.api import demo as demo_api
+    from src.services import usage_meter
+
     fixtures_resp = client.get("/api/v1/seller-memory/voice-fixtures")
     assert fixtures_resp.status_code == 200
     fixtures = fixtures_resp.json()["fixtures"]
     assert any(f["id"] == "watercolor_studio" for f in fixtures)
 
-    # Reject live voice transcription if explicit consent is missing/false
-    bad_consent = client.post(
-        "/api/v1/seller-memory/voice/transcribe",
-        json={"audio_base64": "dGVzdA==", "filename": "note.webm", "consent_confirmed": False},
-    )
-    assert bad_consent.status_code == 400
+    provider_calls: list[dict[str, Any]] = []
+    billing_calls: list[str] = []
 
-    # In demo mode without live API key, even consented live transcription fails cleanly with 503
-    no_live = client.post(
-        "/api/v1/seller-memory/voice/transcribe",
-        json={"audio_base64": "dGVzdA==", "filename": "note.webm", "consent_confirmed": True},
-    )
-    assert no_live.status_code == 503
+    class FakeMetaClient:
+        async def transcribe_audio(
+            self, audio_bytes: bytes, *, filename: str = "voice.webm", mime_type: str = "audio/webm"
+        ) -> str:
+            provider_calls.append(
+                {"size": len(audio_bytes), "filename": filename, "mime_type": mime_type}
+            )
+            return "I have 20 minutes a week and my linen prints are EUR 40."
+
+    async def spy_authorize(
+        user_id: str, ip_hash: str, op_id: str, session_id: str | None = None
+    ) -> str:
+        billing_calls.append(f"authorize:{user_id}")
+        return "op-voice-1"
+
+    async def spy_finish(outcome: str, operation_id: str = "") -> None:
+        billing_calls.append(f"finish:{outcome}:{operation_id}")
+
+    async def spy_spend(*args: Any, **kwargs: Any):
+        billing_calls.append("spend_credit")
+        yield True
+
+    monkeypatch.setattr("src.api.seller_memory.get_meta_client", lambda: FakeMetaClient())
+    monkeypatch.setattr(usage_meter, "authorize_operation", spy_authorize)
+    monkeypatch.setattr(usage_meter, "finish_operation", spy_finish)
+    monkeypatch.setattr(demo_api, "_spend_credit", spy_spend)
+    monkeypatch.setenv("DEMO_MODE", "true")
+    monkeypatch.setenv("DEMO_KEY", "unit-demo-key")
+    monkeypatch.setenv("ACCOUNTS_REQUIRED", "false")
+    get_settings.cache_clear()
+
+    try:
+        # 1. Missing consent fails with 400 BEFORE demo/billing/provider even with ?live=true
+        bad_consent = client.post(
+            "/api/v1/seller-memory/voice/transcribe?live=true",
+            headers={"X-Demo-Key": "unit-demo-key"},
+            json={"audio_base64": "dGVzdA==", "filename": "note.webm", "consent_confirmed": False},
+        )
+        assert bad_consent.status_code == 400
+        assert provider_calls == []
+        assert billing_calls == []
+
+        # 2. In explicit DEMO_MODE=true without live=true, consented call returns 403
+        no_live = client.post(
+            "/api/v1/seller-memory/voice/transcribe",
+            json={"audio_base64": "dGVzdA==", "filename": "note.webm", "consent_confirmed": True},
+        )
+        assert no_live.status_code == 403
+        assert provider_calls == []
+        assert billing_calls == []
+
+        # 3. With ?live=true but invalid X-Demo-Key in demo mode -> 403 (0 provider/billing calls)
+        bad_key = client.post(
+            "/api/v1/seller-memory/voice/transcribe?live=true",
+            headers={"X-Demo-Key": "wrong-key"},
+            json={"audio_base64": "dGVzdA==", "filename": "note.webm", "consent_confirmed": True},
+        )
+        assert bad_key.status_code == 403
+        assert provider_calls == []
+        assert billing_calls == []
+
+        # 4. Eligible mocked live request with consent + valid key invokes provider
+        ok_live = client.post(
+            "/api/v1/seller-memory/voice/transcribe?live=true",
+            headers={"X-Demo-Key": "unit-demo-key"},
+            json={"audio_base64": "dGVzdA==", "filename": "note.webm", "consent_confirmed": True},
+        )
+        assert ok_live.status_code == 200
+        assert "EUR 40" in ok_live.json()["transcript"]
+        assert len(provider_calls) == 1
+
+        # 5. Accounts-required eligible live rejects without consent BEFORE billing
+        provider_calls.clear()
+        billing_calls.clear()
+        monkeypatch.setenv("ACCOUNTS_REQUIRED", "true")
+        get_settings.cache_clear()
+        _, accounts = _install_multi_account_workspace(monkeypatch)
+
+        async def _fake_acct_resolve(
+            request: Any, _response: Any = None, require_verified: bool = False
+        ):
+            uid = request.headers.get("x-test-user")
+            return accounts[uid] if uid else None
+
+        monkeypatch.setattr("src.services.accounts.resolve_account", _fake_acct_resolve)
+
+        no_consent_acct = client.post(
+            "/api/v1/seller-memory/voice/transcribe?live=true",
+            headers={"X-Test-User": "user-a"},
+            json={"audio_base64": "dGVzdA==", "filename": "note.webm", "consent_confirmed": False},
+        )
+        assert no_consent_acct.status_code == 400
+        assert provider_calls == []
+        assert billing_calls == []
+
+        ok_acct = client.post(
+            "/api/v1/seller-memory/voice/transcribe?live=true",
+            headers={"X-Test-User": "user-a"},
+            json={"audio_base64": "dGVzdA==", "filename": "note.webm", "consent_confirmed": True},
+        )
+        assert ok_acct.status_code == 200
+        assert len(provider_calls) == 1
+        assert billing_calls == ["authorize:user-a", "finish:completed:op-voice-1"]
+    finally:
+        monkeypatch.undo()
+        get_settings.cache_clear()
 
     # Demo voice fixture parses cleanly at 0 runs and flags conflicts without auto-saving
     existing = SellerMemoryEntry(
@@ -476,3 +576,345 @@ def test_conflict_409_forget_entry_feedback_suggestions_and_owner_isolation(
         e["key"] == "minutes_per_week" and "15" in e["value"]
         for e in app_resp.json()["memory_entries"]
     )
+
+
+def test_put_requires_explicit_expected_version_and_preserves_unknown_extras(
+    monkeypatch: pytest.MonkeyPatch, client: TestClient
+) -> None:
+    """PUT requires expected_version (409 when omitted) and preserves unknown extras."""
+    stores, _ = _install_multi_account_workspace(monkeypatch)
+    stores["user-a"]["version"] = 3
+    stores["user-a"]["document"] = {
+        "onboarding": {"business_name": "Studio North"},
+        "preferences": {
+            "goal": "Promote studio prints",
+            "future_pref_flag": "keep-me",
+            "access": {
+                "minutes_per_week": 30,
+                "channels": ["instagram"],
+                "future_access_slot": "weekends",
+            },
+            "taste": {"tone": "warm", "future_taste_palette": "ochre"},
+            "memory_entries": [
+                {
+                    "id": "obs-p1",
+                    "key": "price_range",
+                    "label": "Price range",
+                    "value": "Prints start at EUR 45",
+                    "kind": "observation",
+                    "scope": "product",
+                    "source": "shop_scan",
+                    "status": "accepted",
+                    "custom_entry_meta": "keep-entry",
+                },
+                {
+                    "id": "pref-avoid",
+                    "key": "subjects_to_avoid",
+                    "label": "Avoid",
+                    "value": "flashy",
+                    "kind": "preference",
+                    "scope": "shop_default",
+                    "source": "user_input",
+                    "status": "accepted",
+                },
+            ],
+            "competitor_entries": [
+                {
+                    "name": "Peer One",
+                    "url": "https://peer.example.test",
+                    "role": "similar_audience",
+                    "selected": True,
+                    "custom_comp_flag": 42,
+                }
+            ],
+        },
+        "voice_profile": {"formality": "casual", "future_voice_marker": "poetic"},
+        "dismiss_signals": [
+            {"id": "d1", "title": "Long post", "reason": "too_much_time"},
+            {"id": "d2", "title": "Complex shoot", "reason": "too_much_time"},
+        ],
+    }
+
+    # 1. Missing expected_version returns 409 conflict with snapshots
+    no_ver = client.put(
+        "/api/v1/seller-memory",
+        headers={"X-Test-User": "user-a", "X-Muse-Owner": "user-a"},
+        json={"preferences": {"goal": "Stale client overwrite"}},
+    )
+    assert no_ver.status_code == 409
+    assert no_ver.json()["server_version"] == 3
+    assert stores["user-a"]["document"]["preferences"]["goal"] == "Promote studio prints"
+
+    # 2. Explicit matching PUT preserves unknown fields at root & nested models
+    ok_put = client.put(
+        "/api/v1/seller-memory",
+        headers={"X-Test-User": "user-a", "X-Muse-Owner": "user-a"},
+        json={
+            "expected_version": 3,
+            "expected_owner": "user-a",
+            "preferences": {
+                "goal": "Sell winter gift prints",
+                "access": {"minutes_per_week": 20, "channels": ["instagram"]},
+                "taste": {"tone": "personal"},
+            },
+            "voice_profile": {"formality": "formal"},
+            "memory_entries": stores["user-a"]["document"]["preferences"]["memory_entries"],
+            "competitor_entries": stores["user-a"]["document"]["preferences"]["competitor_entries"],
+        },
+    )
+    assert ok_put.status_code == 200
+    put_body = ok_put.json()
+    assert put_body["preferences"]["future_pref_flag"] == "keep-me"
+    assert put_body["preferences"]["access"]["future_access_slot"] == "weekends"
+    assert put_body["preferences"]["taste"]["future_taste_palette"] == "ochre"
+    assert put_body["voice_profile"]["future_voice_marker"] == "poetic"
+    assert put_body["memory_entries"][0]["custom_entry_meta"] == "keep-entry"
+    assert put_body["competitor_entries"][0]["custom_comp_flag"] == 42
+
+    # 3. DELETE entry preserves all unknown fields
+    del_resp = client.delete(
+        "/api/v1/seller-memory/entries/pref-avoid",
+        headers={"X-Test-User": "user-a", "X-Muse-Owner": "user-a"},
+    )
+    assert del_resp.status_code == 200
+    del_body = del_resp.json()
+    assert del_body["preferences"]["future_pref_flag"] == "keep-me"
+    assert del_body["preferences"]["access"]["future_access_slot"] == "weekends"
+    assert del_body["preferences"]["taste"]["future_taste_palette"] == "ochre"
+    assert del_body["voice_profile"]["future_voice_marker"] == "poetic"
+
+    # 4. Suggestions evaluate & respond preserve all unknown fields
+    eval_resp = client.post(
+        "/api/v1/seller-memory/suggestions/evaluate",
+        headers={"X-Test-User": "user-a", "X-Muse-Owner": "user-a"},
+    )
+    assert eval_resp.status_code == 200
+    assert stores["user-a"]["document"]["preferences"]["future_pref_flag"] == "keep-me"
+
+    app_resp = client.post(
+        "/api/v1/seller-memory/suggestions/suggest-prefer-15min/respond",
+        headers={"X-Test-User": "user-a", "X-Muse-Owner": "user-a"},
+        json={"decision": "approve", "expected_owner": "user-a"},
+    )
+    assert app_resp.status_code == 200
+    app_body = app_resp.json()
+    assert app_body["preferences"]["access"]["minutes_per_week"] == 15
+    assert app_body["preferences"]["future_pref_flag"] == "keep-me"
+    assert app_body["preferences"]["access"]["future_access_slot"] == "weekends"
+    assert app_body["preferences"]["taste"]["future_taste_palette"] == "ochre"
+    assert app_body["voice_profile"]["future_voice_marker"] == "poetic"
+
+
+def test_context_truth_currency_product_destination_ignore_and_all_channels_excluded(
+    monkeypatch: pytest.MonkeyPatch, client: TestClient
+) -> None:
+    """Currency, product/destination scope, ignore keys, and channel exclusions hold."""
+
+    async def fake_collect(*args: Any, **kwargs: Any) -> tuple[list[SitemapEntry], list[str]]:
+        return (
+            [
+                SitemapEntry(
+                    loc="https://euroatelier.example/prints/alpine-STUDY",
+                    title="Alpine Study 8x10 Print — EUR 45",
+                    bucket="products",
+                    price_hint="EUR 45",
+                )
+            ],
+            ["https://euroatelier.example/sitemap.xml"],
+        )
+
+    monkeypatch.setattr("src.api.seller_memory.collect_entries", fake_collect)
+    scan_resp = client.post(
+        "/api/v1/seller-memory/scan",
+        json={
+            "website_url": "https://euroatelier.example",
+            "business_name": "Euro Atelier",
+            "product_key": "Alpine Study",
+            "destination": "website",
+        },
+    )
+    assert scan_resp.status_code == 200
+    price_obs = next(e for e in scan_resp.json()["proposed_entries"] if e["key"] == "price_range")
+    assert "EUR 45" in price_obs["value"]
+    assert "$" not in price_obs["value"]
+    assert price_obs["source_url"] == "https://euroatelier.example/prints/alpine-STUDY"
+    assert price_obs["product_key"] == "Alpine Study"
+    assert price_obs["destination"] == "website"
+
+    # Two-product, two-destination, and ignore_entry_ids vs ignored_entry_ids before defaults
+    entries = [
+        SellerMemoryEntry(
+            id="obs-euro-website",
+            key="price_range",
+            label="Website price",
+            value="Prints start at EUR 45",
+            kind="observation",
+            scope="product",
+            product_key="Alpine Study",
+            destination="website",
+            source="shop_scan",
+            status="accepted",
+        ),
+        SellerMemoryEntry(
+            id="obs-usd-etsy",
+            key="price_range",
+            label="Etsy price",
+            value="Prints start at $28",
+            kind="observation",
+            scope="product",
+            product_key="Meadow Mug",
+            destination="etsy",
+            source="shop_scan",
+            status="accepted",
+        ),
+        SellerMemoryEntry(
+            id="obs-alpine-etsy",
+            key="price_range",
+            label="Alpine Study Etsy price",
+            value="Prints start at $39",
+            kind="observation",
+            scope="product",
+            product_key="Alpine Study",
+            destination="etsy",
+            source="shop_scan",
+            status="accepted",
+        ),
+        SellerMemoryEntry(
+            id="pref-goal",
+            key="goal",
+            label="Goal",
+            value="more studio visits",
+            kind="goal",
+            scope="shop_default",
+            source="user_input",
+            status="accepted",
+        ),
+        SellerMemoryEntry(
+            id="pref-min",
+            key="minutes_per_week",
+            label="Weekly time budget",
+            value="60 minutes / week",
+            kind="preference",
+            scope="shop_default",
+            source="user_input",
+            status="accepted",
+        ),
+        SellerMemoryEntry(
+            id="pref-avoid",
+            key="subjects_to_avoid",
+            label="Avoid",
+            value="flashy, urgent",
+            kind="preference",
+            scope="shop_default",
+            source="user_input",
+            status="accepted",
+        ),
+    ]
+    pref = SellerPreferences(
+        goal="default shop goal",
+        access=AccessPreferences(minutes_per_week=30, channels=["instagram", "facebook"]),
+        memory_entries=entries,
+    )
+
+    # Scoped to Alpine Study on website -> EUR 45 (never USD or Meadow Mug's $28)
+    rec_eur = client.post(
+        "/api/v1/seller-memory/recommend",
+        json={
+            "business_name": "Euro Atelier",
+            "product_name": "Alpine Study",
+            "preferences": pref.model_dump(mode="json"),
+            "draft_override": {
+                "active": True,
+                "product_name": "Alpine Study",
+                "destination": "website",
+            },
+            "competitor_entries": [
+                CompetitorEntry(
+                    name="Price Peer",
+                    url="https://pricepeer.example",
+                    role="price_reference",
+                    selected=True,
+                ).model_dump(mode="json")
+            ],
+        },
+    ).json()
+    assert rec_eur["editor_defaults"]["price_claim"] == "EUR 45"
+    assert "EUR 45" in rec_eur["recommendations"][0]["title"]
+    # Non-top recommendation carries its own distinct editor_defaults
+    rec0_def = rec_eur["recommendations"][0]["editor_defaults"]
+    rec1_def = rec_eur["recommendations"][1]["editor_defaults"]
+    assert rec0_def["recommendation_id"] != rec1_def["recommendation_id"]
+    assert rec0_def["recommendation_title"] != rec1_def["recommendation_title"]
+
+    # Scoped to Meadow Mug on etsy -> $28 (never EUR 45)
+    rec_usd = client.post(
+        "/api/v1/seller-memory/recommend",
+        json={
+            "business_name": "Euro Atelier",
+            "product_name": "Meadow Mug",
+            "preferences": pref.model_dump(mode="json"),
+            "draft_override": {"active": True, "product_name": "Meadow Mug", "destination": "etsy"},
+        },
+    ).json()
+    assert rec_usd["editor_defaults"]["price_claim"] == "$28"
+
+    # Unscoped query when 2 distinct product/destination facts exist must NOT guess either one!
+    rec_unscoped = client.post(
+        "/api/v1/seller-memory/recommend",
+        json={
+            "business_name": "Euro Atelier",
+            "preferences": pref.model_dump(mode="json"),
+        },
+    ).json()
+    assert rec_unscoped["editor_defaults"]["price_claim"] == ""
+
+    # Same product (Alpine Study) WITHOUT destination when 2 destinations exist stays unknown!
+    rec_ambig_dest = client.post(
+        "/api/v1/seller-memory/recommend",
+        json={
+            "business_name": "Euro Atelier",
+            "product_name": "Alpine Study",
+            "preferences": pref.model_dump(mode="json"),
+        },
+    ).json()
+    assert rec_ambig_dest["editor_defaults"]["price_claim"] == ""
+
+    # Both ignore_entry_ids AND ignored_entry_ids exclude entries BEFORE deriving defaults
+    for key_name in ("ignore_entry_ids", "ignored_entry_ids"):
+        rec_ignored = client.post(
+            "/api/v1/seller-memory/recommend",
+            json={
+                "business_name": "Euro Atelier",
+                "product_name": "Alpine Study",
+                "preferences": pref.model_dump(mode="json"),
+                "draft_override": {
+                    "active": True,
+                    "product_name": "Alpine Study",
+                    "destination": "website",
+                    key_name: ["pref-min", "pref-goal", "obs-euro-website", "pref-avoid"],
+                },
+            },
+        ).json()
+        assert rec_ignored["editor_defaults"]["minutes_per_week"] == 30
+        assert rec_ignored["editor_defaults"]["context_summary"] == ""
+        assert rec_ignored["editor_defaults"]["price_claim"] == ""
+        assert rec_ignored["editor_defaults"]["words_to_avoid"] == []
+        used_ids = {u["id"] for r in rec_ignored["recommendations"] for u in r["used_entries"]}
+        assert not (used_ids & {"pref-min", "pref-goal", "obs-euro-website", "pref-avoid"})
+
+    # All channels excluded must NEVER reintroduce "website" -> empty moves + missing_info_prompt
+    rec_no_ch = client.post(
+        "/api/v1/seller-memory/recommend",
+        json={
+            "business_name": "Euro Atelier",
+            "preferences": pref.model_dump(mode="json"),
+            "draft_override": {
+                "active": True,
+                "excluded_channels": ["instagram", "facebook"],
+            },
+        },
+    ).json()
+    assert rec_no_ch["all_channels_excluded"] is True
+    assert rec_no_ch["recommendations"] == []
+    assert rec_no_ch["editor_defaults"]["channel"] is None
+    assert "excluded" in rec_no_ch["missing_info_prompt"].lower()

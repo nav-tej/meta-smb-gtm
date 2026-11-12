@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from src.models.intel import ActionableInsight
 
@@ -99,6 +99,8 @@ class SellerProfile(BaseModel):
 
 
 class AccessPreferences(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     channels: list[str] = Field(default_factory=list)
     can_change_prices: bool = True
     ads_budget_band: str | None = None
@@ -106,6 +108,8 @@ class AccessPreferences(BaseModel):
 
 
 class TastePreferences(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     tone: str | None = None
     subjects_to_avoid: list[str] = Field(default_factory=list)
     price_positioning: Literal["budget", "mid", "premium"] | None = None
@@ -136,6 +140,8 @@ MemorySource = Literal[
 
 class SellerMemoryEntry(BaseModel):
     """Single inspectable, editable, and removable seller memory item."""
+
+    model_config = ConfigDict(extra="allow")
 
     id: str = Field(min_length=1, max_length=100)
     key: str = Field(min_length=1, max_length=80)
@@ -173,6 +179,8 @@ class SellerMemoryDiffItem(BaseModel):
 class CompetitorEntry(BaseModel):
     """Watched competitor with editable role and rationale separate from seller profile."""
 
+    model_config = ConfigDict(extra="allow")
+
     name: str = Field(default="", max_length=140)
     url: str = Field(min_length=1, max_length=500)
     role: CompetitorRole = "similar_audience"
@@ -183,6 +191,8 @@ class CompetitorEntry(BaseModel):
 
 class SuggestedMemoryUpdate(BaseModel):
     """Pending feedback-derived update requiring explicit seller approval."""
+
+    model_config = ConfigDict(extra="allow")
 
     id: str = Field(min_length=1, max_length=100)
     key: str = Field(min_length=1, max_length=80)
@@ -198,6 +208,8 @@ class SuggestedMemoryUpdate(BaseModel):
 
 
 class DismissSignal(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     id: str = ""
     title: str = ""
     channel: str | None = None
@@ -215,6 +227,8 @@ class DismissSignal(BaseModel):
 
 class SellerPreferences(BaseModel):
     """Seller growth preferences and taste constraints for idea ranking and prompts."""
+
+    model_config = ConfigDict(extra="allow")
 
     experience: Literal["new", "some", "runs_ads"] = "some"
     access: AccessPreferences = Field(default_factory=AccessPreferences)

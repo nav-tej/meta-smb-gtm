@@ -4,21 +4,25 @@ from __future__ import annotations
 
 import base64
 import binascii
+import contextlib
 from datetime import UTC, datetime
 from typing import Annotated, Any, Literal
 from urllib.parse import urlparse
 
-from fastapi import APIRouter, Header, HTTPException, Request, Response
+from fastapi import APIRouter, Header, HTTPException, Query, Request, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from src.api.demo import LiveMode, demo_unavailable
+from src.api import demo as demo_api
+from src.api.demo import demo_unavailable
 from src.clients.meta import MetaAPIError, get_meta_client
 from src.models.seller import (
+    AccessPreferences,
     CompetitorEntry,
     DismissSignal,
     SellerMemoryEntry,
     SellerPreferences,
+    TastePreferences,
 )
 from src.models.voice import VoiceProfile
 from src.services.accounts import (
@@ -53,6 +57,8 @@ class ScanShopRequest(BaseModel):
     max_urls_per_source: int = Field(default=25, ge=5, le=100)
     existing_entries: list[SellerMemoryEntry] = Field(default_factory=list)
     snapshot_items: list[dict[str, Any]] = Field(default_factory=list, max_length=30)
+    product_key: str | None = Field(default=None, max_length=120)
+    destination: str | None = Field(default=None, max_length=80)
 
 
 class InterpretContextRequest(BaseModel):
@@ -142,6 +148,56 @@ def _extract_profile_parts(
     return pref, voice, comps, signals
 
 
+_PREF_KNOWN_KEYS = set(SellerPreferences.model_fields.keys())
+_ACCESS_KNOWN_KEYS = set(AccessPreferences.model_fields.keys())
+_TASTE_KNOWN_KEYS = set(TastePreferences.model_fields.keys())
+_VOICE_KNOWN_KEYS = set(VoiceProfile.model_fields.keys())
+
+
+def _merge_preserving_unknown_extras(
+    existing_raw: Any,
+    updated_raw: dict[str, Any],
+    known_keys: set[str],
+    nested_keys: dict[str, set[str]] | None = None,
+) -> dict[str, Any]:
+    """Preserve unknown custom keys from stored objects without reviving deleted known values."""
+    merged = dict(updated_raw)
+    if isinstance(existing_raw, dict):
+        for key, value in existing_raw.items():
+            if key not in known_keys and key not in merged:
+                merged[key] = value
+        for nested_key, sub_known in (nested_keys or {}).items():
+            if isinstance(existing_raw.get(nested_key), dict) and isinstance(
+                merged.get(nested_key), dict
+            ):
+                merged[nested_key] = _merge_preserving_unknown_extras(
+                    existing_raw[nested_key],
+                    merged[nested_key],
+                    sub_known,
+                )
+    return merged
+
+
+def _dump_preserving_workspace_extras(
+    ws: dict[str, Any],
+    next_pref: SellerPreferences,
+    next_voice: VoiceProfile,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    raw_doc = ws.get("document") if isinstance(ws.get("document"), dict) else {}
+    merged_pref = _merge_preserving_unknown_extras(
+        raw_doc.get("preferences"),
+        next_pref.model_dump(mode="json"),
+        _PREF_KNOWN_KEYS,
+        {"access": _ACCESS_KNOWN_KEYS, "taste": _TASTE_KNOWN_KEYS},
+    )
+    merged_voice = _merge_preserving_unknown_extras(
+        raw_doc.get("voice_profile"),
+        next_voice.model_dump(mode="json"),
+        _VOICE_KNOWN_KEYS,
+    )
+    return merged_pref, merged_voice
+
+
 async def _load_account_state(
     account: AccountSession,
 ) -> tuple[
@@ -223,13 +279,13 @@ async def save_seller_memory(
     ws, cur_pref, cur_voice, cur_comps, signals = await _load_account_state(account)
     ws_version = int(ws.get("version") or 0)
 
-    if body.expected_version is not None and body.expected_version != ws_version:
+    if body.expected_version is None or body.expected_version != ws_version:
         return JSONResponse(
             status_code=409,
             content={
                 "detail": (
-                    "Your seller memory was updated in another browser or tab. "
-                    "Review both versions before saving."
+                    "Your seller memory changed in another tab or requires an explicit version "
+                    "before replacing saved settings."
                 ),
                 "server_version": ws_version,
                 "server_preferences": cur_pref.model_dump(mode="json"),
@@ -257,9 +313,10 @@ async def save_seller_memory(
     elif not next_pref.competitor_entries and cur_comps:
         next_pref.competitor_entries = cur_comps
 
+    merged_pref, merged_voice = _dump_preserving_workspace_extras(ws, next_pref, next_voice)
     doc = dict(ws.get("document") or {})
-    doc["preferences"] = next_pref.model_dump(mode="json")
-    doc["voice_profile"] = next_voice.model_dump(mode="json")
+    doc["preferences"] = merged_pref
+    doc["voice_profile"] = merged_voice
 
     if isinstance(doc.get("onboarding"), dict) and body.competitor_entries is not None:
         onb_copy = dict(doc["onboarding"])
@@ -272,18 +329,20 @@ async def save_seller_memory(
         expected_version=ws.get("version"),
         expected_owner=account.user_id,
     )
+    saved_pref = SellerPreferences.model_validate(merged_pref)
+    saved_voice = VoiceProfile.model_validate(merged_voice)
     return {
         "success": True,
         "owner_id": account.user_id,
         "version": int(saved.get("version") or ws_version + 1),
-        "preferences": next_pref.model_dump(mode="json"),
-        "voice_profile": next_voice.model_dump(mode="json"),
-        "memory_entries": [e.model_dump(mode="json") for e in next_pref.memory_entries],
-        "competitor_entries": [c.model_dump(mode="json") for c in next_pref.competitor_entries],
+        "preferences": merged_pref,
+        "voice_profile": merged_voice,
+        "memory_entries": [e.model_dump(mode="json") for e in saved_pref.memory_entries],
+        "competitor_entries": [c.model_dump(mode="json") for c in saved_pref.competitor_entries],
         "suggested_updates": [
             s.model_dump(mode="json")
             for s in suggest_memory_updates(
-                preferences=next_pref, voice_profile=next_voice, dismiss_signals=signals
+                preferences=saved_pref, voice_profile=saved_voice, dismiss_signals=signals
             )
             if s.status == "pending"
         ],
@@ -308,9 +367,10 @@ async def delete_memory_entry(
     if not removed:
         raise HTTPException(404, f"Memory entry '{entry_id}' was not found.")
 
+    merged_pref, merged_voice = _dump_preserving_workspace_extras(ws, next_pref, next_voice)
     doc = dict(ws.get("document") or {})
-    doc["preferences"] = next_pref.model_dump(mode="json")
-    doc["voice_profile"] = next_voice.model_dump(mode="json")
+    doc["preferences"] = merged_pref
+    doc["voice_profile"] = merged_voice
 
     saved = await save_workspace(
         account,
@@ -322,8 +382,8 @@ async def delete_memory_entry(
         "success": True,
         "deleted_entry_id": entry_id,
         "version": int(saved.get("version") or 0),
-        "preferences": next_pref.model_dump(mode="json"),
-        "voice_profile": next_voice.model_dump(mode="json"),
+        "preferences": merged_pref,
+        "voice_profile": merged_voice,
         "memory_entries": [e.model_dump(mode="json") for e in next_pref.memory_entries],
         "competitor_entries": [c.model_dump(mode="json") for c in cur_comps],
     }
@@ -450,6 +510,8 @@ async def scan_shop_baseline(
         discovered_items=discovered_items,
         detected_price_hints=price_hints,
         suggested_socials=suggested_socials,
+        product_key=body.product_key,
+        destination=body.destination,
     )
 
     existing_entries = list(body.existing_entries)
@@ -493,7 +555,11 @@ async def list_voice_fixtures() -> dict[str, Any]:
 
 @router.post("/voice/transcribe")
 async def transcribe_consented_voice(
-    body: VoiceTranscribeRequest, live: LiveMode
+    body: VoiceTranscribeRequest,
+    request: Request,
+    response: Response,
+    live: Annotated[bool, Query(description="Make a real (billed) Muse call.")] = False,
+    x_demo_key: Annotated[str | None, Header()] = None,
 ) -> dict[str, str]:
     """Consent-gated voice transcription returning an unapproved transcript for review only."""
     if not body.consent_confirmed:
@@ -501,8 +567,6 @@ async def transcribe_consented_voice(
             400,
             "Explicit consent is required before sending your voice recording for transcription.",
         )
-    if not live:
-        raise demo_unavailable("Live voice transcription")
     raw = body.audio_base64.strip()
     if "," in raw and raw.startswith("data:"):
         raw = raw.split(",", 1)[1]
@@ -510,12 +574,21 @@ async def transcribe_consented_voice(
         audio_bytes = base64.b64decode(raw, validate=True)
     except binascii.Error as err:
         raise MetaAPIError("Upload the voice note again: the audio data was not valid.") from err
-    transcript = await get_meta_client().transcribe_audio(audio_bytes, filename=body.filename)
-    return {
-        "transcript": transcript,
-        "model": "muse-voice-transcribe-1.0",
-        "saved_to_memory": "false",
-    }
+
+    async with contextlib.asynccontextmanager(demo_api.live_mode)(
+        request=request,
+        response=response,
+        live=live,
+        x_demo_key=x_demo_key,
+    ) as is_live:
+        if not is_live:
+            raise demo_unavailable("Live voice transcription")
+        transcript = await get_meta_client().transcribe_audio(audio_bytes, filename=body.filename)
+        return {
+            "transcript": transcript,
+            "model": "muse-voice-transcribe-1.0",
+            "saved_to_memory": "false",
+        }
 
 
 @router.post("/interpret")
@@ -580,8 +653,10 @@ async def evaluate_suggestions(
         s.model_dump(mode="json") for s in pref.suggested_updates
     ]:
         pref.suggested_updates = suggestions
+        merged_pref, merged_voice = _dump_preserving_workspace_extras(ws, pref, voice)
         doc = dict(ws.get("document") or {})
-        doc["preferences"] = pref.model_dump(mode="json")
+        doc["preferences"] = merged_pref
+        doc["voice_profile"] = merged_voice
         await save_workspace(
             account,
             doc,
@@ -619,9 +694,10 @@ async def respond_suggestion(
     if handled is None:
         raise HTTPException(404, f"Suggested update '{suggestion_id}' was not found.")
 
+    merged_pref, merged_voice = _dump_preserving_workspace_extras(ws, next_pref, next_voice)
     doc = dict(ws.get("document") or {})
-    doc["preferences"] = next_pref.model_dump(mode="json")
-    doc["voice_profile"] = next_voice.model_dump(mode="json")
+    doc["preferences"] = merged_pref
+    doc["voice_profile"] = merged_voice
     saved = await save_workspace(
         account,
         doc,
@@ -633,8 +709,8 @@ async def respond_suggestion(
         "decision": body.decision,
         "suggestion": handled.model_dump(mode="json"),
         "version": int(saved.get("version") or 0),
-        "preferences": next_pref.model_dump(mode="json"),
-        "voice_profile": next_voice.model_dump(mode="json"),
+        "preferences": merged_pref,
+        "voice_profile": merged_voice,
         "memory_entries": [e.model_dump(mode="json") for e in next_pref.memory_entries],
         "competitor_entries": [c.model_dump(mode="json") for c in cur_comps],
         "suggested_updates": [

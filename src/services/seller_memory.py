@@ -68,21 +68,87 @@ def _today_iso() -> str:
     return datetime.now(UTC).date().isoformat()
 
 
-def _parse_numeric_prices(price_hints: list[str]) -> list[float]:
-    values: list[float] = []
+_PRICE_TOKEN_RE = re.compile(
+    r"\b(EUR|GBP|USD|CAD|AUD|CHF|JPY|INR)\s*([0-9]{1,5}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?)"
+    r"|([$€£¥₹])\s*([0-9]{1,5}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?)",
+    re.IGNORECASE,
+)
+
+
+def _norm_scope_token(value: str | None) -> str:
+    return re.sub(r"\s+", " ", str(value or "").strip().lower())
+
+
+def _format_currency_amount(prefix: str, amount: float, *, spaced: bool = False) -> str:
+    num_str = f"{int(amount)}" if amount.is_integer() else f"{amount:,.2f}"
+    return f"{prefix} {num_str}" if spaced else f"{prefix}{num_str}"
+
+
+def _extract_price_tokens(price_hints: list[str]) -> list[tuple[str, float, str]]:
+    """Extract (currency_key, numeric_value, display_str) preserving original currencies."""
+    tokens: list[tuple[str, float, str]] = []
+    seen_display: set[str] = set()
     for hint in price_hints:
-        for match in re.findall(r"(\d{1,5}(?:,\d{3})*(?:\.\d{2})?)", str(hint)):
+        text = str(hint or "").strip()
+        if not text:
+            continue
+        matched_any = False
+        for m in _PRICE_TOKEN_RE.finditer(text):
+            matched_any = True
+            if m.group(1):
+                code = m.group(1).upper()
+                raw_num = m.group(2)
+                spaced = True
+                curr = code
+            else:
+                curr = m.group(3)
+                raw_num = m.group(4)
+                spaced = False
             try:
-                num = float(match.replace(",", ""))
-                if num > 0:
-                    values.append(num)
+                num = float(raw_num.replace(",", ""))
             except ValueError:
                 continue
-    return sorted(values)
+            if num <= 0:
+                continue
+            display = _format_currency_amount(curr, num, spaced=spaced)
+            if display not in seen_display:
+                seen_display.add(display)
+                tokens.append((curr, num, display))
+        if not matched_any:
+            # Bare numeric hints without currency must never be forced into USD "$".
+            for m in re.finditer(r"(\d{1,5}(?:,\d{3})*(?:\.\d{1,2})?)", text):
+                try:
+                    num = float(m.group(1).replace(",", ""))
+                except ValueError:
+                    continue
+                if num <= 0:
+                    continue
+                display = _format_currency_amount("", num, spaced=False)
+                if display not in seen_display:
+                    seen_display.add(display)
+                    tokens.append(("", num, display))
+    return sorted(tokens, key=lambda item: (item[0], item[1]))
 
 
-def _format_price(amount: float) -> str:
-    return f"${int(amount)}" if amount.is_integer() else f"${amount:,.2f}"
+def _extract_explicit_currency_prices(text: str) -> list[str]:
+    found: list[str] = []
+    seen: set[str] = set()
+    for m in _PRICE_TOKEN_RE.finditer(str(text or "")):
+        item = f"{m.group(1).upper()} {m.group(2)}" if m.group(1) else f"{m.group(3)}{m.group(4)}"
+        if item not in seen:
+            seen.add(item)
+            found.append(item)
+    return found
+
+
+def _extract_short_price(price_claim: str) -> str:
+    text = str(price_claim or "").strip()
+    if not text:
+        return ""
+    explicit = _extract_explicit_currency_prices(text)
+    if explicit:
+        return explicit[0]
+    return text[:40]
 
 
 def extract_scan_proposals(
@@ -94,6 +160,8 @@ def extract_scan_proposals(
     detected_price_hints: list[str],
     suggested_socials: list[dict[str, Any]] | None = None,
     scan_date: str | None = None,
+    product_key: str | None = None,
+    destination: str | None = None,
 ) -> dict[str, Any]:
     """Turn a shop scan into separate observed facts, interpretations, and missing questions."""
     when = scan_date or _today_iso()
@@ -160,15 +228,27 @@ def extract_scan_proposals(
             "You can type a short description below."
         )
 
-    numeric_prices = _parse_numeric_prices(detected_price_hints)
-    if numeric_prices:
-        low = _format_price(numeric_prices[0])
-        high = _format_price(numeric_prices[-1])
-        price_val = (
-            f"Listed prices start at {low} (range {low}–{high})"
-            if low != high
-            else f"Listed item price: {low}"
-        )
+    price_tokens = _extract_price_tokens(detected_price_hints)
+    lowest_price_display = ""
+    price_source_url = source_url
+    for item in discovered_items:
+        if isinstance(item, dict) and item.get("price_hint") and item.get("url"):
+            price_source_url = str(item.get("url"))
+            break
+    if price_tokens:
+        currencies = list(dict.fromkeys(tok[0] for tok in price_tokens))
+        if len(currencies) == 1:
+            low = price_tokens[0][2]
+            high = price_tokens[-1][2]
+            lowest_price_display = low
+            price_val = (
+                f"Listed prices start at {low} (range {low}–{high})"
+                if low != high
+                else f"Listed item price: {low}"
+            )
+        else:
+            lowest_price_display = price_tokens[0][2]
+            price_val = f"Observed prices: {', '.join(tok[2] for tok in price_tokens[:4])}"
         proposals.append(
             SellerMemoryEntry(
                 id="obs-price-range",
@@ -177,8 +257,10 @@ def extract_scan_proposals(
                 value=price_val,
                 kind="observation",
                 scope="product",
+                product_key=product_key,
+                destination=destination,
                 source="shop_scan",
-                source_url=source_url,
+                source_url=price_source_url,
                 scan_date=when,
                 confidence="observed",
                 uncertainty=(
@@ -221,10 +303,9 @@ def extract_scan_proposals(
                 label="Possible audience angle (interpretation)",
                 value=(
                     "Work on these pages may appeal to gift and home-decor buyers"
-                    if not numeric_prices
+                    if not lowest_price_display
                     else (
-                        f"Pieces starting around {_format_price(numeric_prices[0])} "
-                        "may appeal to gift buyers"
+                        f"Pieces starting around {lowest_price_display} may appeal to gift buyers"
                     )
                 ),
                 kind="interpretation",
@@ -293,16 +374,30 @@ def compute_rescan_diff(
     scanned_entries: list[SellerMemoryEntry],
 ) -> dict[str, Any]:
     """Compare existing saved memory against a new scan without overwriting seller edits."""
-    by_key: dict[tuple[str, str], SellerMemoryEntry] = {}
+    by_key: dict[tuple[str, str, str, str], SellerMemoryEntry] = {}
     for entry in existing_entries:
         if entry.status == "accepted":
-            by_key[(entry.key, entry.scope)] = entry
+            by_key[
+                (
+                    entry.key,
+                    entry.scope,
+                    _norm_scope_token(entry.product_key),
+                    _norm_scope_token(entry.destination),
+                )
+            ] = entry
 
     diff_items: list[SellerMemoryDiffItem] = []
     preserved_count = 0
 
     for candidate in scanned_entries:
-        prior = by_key.get((candidate.key, candidate.scope))
+        prior = by_key.get(
+            (
+                candidate.key,
+                candidate.scope,
+                _norm_scope_token(candidate.product_key),
+                _norm_scope_token(candidate.destination),
+            )
+        )
         if prior is None:
             diff_items.append(
                 SellerMemoryDiffItem(
@@ -394,10 +489,9 @@ def parse_context_to_proposals(
             )
         )
 
-    # 2. Explicit price facts (tied to product/destination scope)
-    price_matches = re.findall(r"\$\d{1,5}(?:,\d{3})*(?:\.\d{2})?", transcript_text)
-    if price_matches:
-        unique_prices = list(dict.fromkeys(price_matches))
+    # 2. Explicit price facts (tied to product/destination scope & preserving currency)
+    unique_prices = _extract_explicit_currency_prices(transcript_text)
+    if unique_prices:
         proposals.append(
             SellerMemoryEntry(
                 id="obs-stated-prices",
@@ -415,14 +509,20 @@ def parse_context_to_proposals(
                 status="proposed",
             )
         )
-        # Check price conflict against existing accepted price_range entry
+        # Check price conflict ONLY within matching product/destination scope
         if existing_entries:
+            norm_req_prod = _norm_scope_token(product_key)
+            norm_req_dest = _norm_scope_token(destination)
             for existing in existing_entries:
-                if (
-                    existing.status == "accepted"
-                    and existing.key == "price_range"
-                    and unique_prices[0] not in existing.value
-                ):
+                if existing.status != "accepted" or existing.key != "price_range":
+                    continue
+                norm_ex_prod = _norm_scope_token(existing.product_key)
+                norm_ex_dest = _norm_scope_token(existing.destination)
+                if norm_req_prod and norm_ex_prod and norm_req_prod != norm_ex_prod:
+                    continue
+                if norm_req_dest and norm_ex_dest and norm_req_dest != norm_ex_dest:
+                    continue
+                if unique_prices[0] not in existing.value:
                     conflicts.append(
                         {
                             "entry_id": existing.id,
@@ -942,6 +1042,130 @@ def _competitor_display(comp: CompetitorEntry) -> str:
     return comp.name.strip() or re.sub(r"^https?://(www\.)?", "", comp.url).split("/")[0]
 
 
+_SCOPE_PRIORITY = {"draft": 4, "campaign": 3, "product": 2, "shop_default": 1}
+
+
+def _select_scoped_entries(
+    entries: list[SellerMemoryEntry],
+    *,
+    effective_product: str,
+    effective_destination: str,
+) -> list[SellerMemoryEntry]:
+    """Keep only entries matching product_key, destination, and applicable scope (never bleed)."""
+    norm_req_prod = _norm_scope_token(effective_product)
+    norm_req_dest = _norm_scope_token(effective_destination)
+
+    # Group by entry.key so multi-product/destination ambiguities stay isolated per fact key.
+    by_key: dict[str, list[SellerMemoryEntry]] = {}
+    for entry in entries:
+        by_key.setdefault(entry.key, []).append(entry)
+
+    result: list[SellerMemoryEntry] = []
+    for _key, items in by_key.items():
+        # Step 1: filter by product_key
+        prod_candidates: list[SellerMemoryEntry] = []
+        distinct_prods = {
+            _norm_scope_token(e.product_key) for e in items if _norm_scope_token(e.product_key)
+        }
+        has_exact_prod = bool(norm_req_prod) and norm_req_prod in distinct_prods
+        for e in items:
+            ep = _norm_scope_token(e.product_key)
+            if norm_req_prod:
+                if ep and ep != norm_req_prod:
+                    continue
+                if has_exact_prod and not ep and e.scope in {"product", "campaign", "draft"}:
+                    continue
+            else:
+                if ep and len(distinct_prods) > 1:
+                    continue
+            prod_candidates.append(e)
+
+        # Step 2: filter survivors by destination
+        distinct_dests = {
+            _norm_scope_token(e.destination)
+            for e in prod_candidates
+            if _norm_scope_token(e.destination)
+        }
+        has_exact_dest = bool(norm_req_dest) and norm_req_dest in distinct_dests
+        for e in prod_candidates:
+            ed = _norm_scope_token(e.destination)
+            if norm_req_dest:
+                if ed and ed != norm_req_dest:
+                    continue
+                if has_exact_dest and not ed and e.scope in {"product", "campaign", "draft"}:
+                    continue
+            else:
+                if ed and len(distinct_dests) > 1:
+                    continue
+            result.append(e)
+
+    result.sort(
+        key=lambda e: (
+            1 if (_norm_scope_token(e.product_key) == norm_req_prod and norm_req_prod) else 0,
+            1 if (_norm_scope_token(e.destination) == norm_req_dest and norm_req_dest) else 0,
+            _SCOPE_PRIORITY.get(e.scope, 0),
+        ),
+        reverse=True,
+    )
+    return result
+
+
+def _parse_excluded_channels_from_text(text: str) -> set[str]:
+    lower = str(text or "").lower()
+    return {ch for ch in _KNOWN_CHANNELS if re.search(rf"\b{re.escape(ch)}\b", lower)}
+
+
+def _build_editor_defaults_for_move(
+    *,
+    move: dict[str, Any] | None,
+    business_name: str,
+    effective_product: str,
+    effective_destination: str,
+    effective_goal: str,
+    effective_context_note: str,
+    effective_minutes: int,
+    primary_channel: str | None,
+    caption_length: str,
+    tone: str,
+    avoid_list: list[str],
+    short_price: str,
+    is_draft_override: bool,
+) -> dict[str, Any]:
+    mapped_goal = "story"
+    if move is not None:
+        raw_goal = str(move.get("goal") or "").lower()
+        if raw_goal == "gift":
+            mapped_goal = "gift"
+        elif raw_goal in {"visits", "visit"}:
+            mapped_goal = "visit"
+        else:
+            mapped_goal = "story"
+    elif "gift" in effective_goal.lower():
+        mapped_goal = "gift"
+
+    raw_price = move.get("price_claim") if move else None
+    move_price = str(raw_price if raw_price is not None else short_price)
+    return {
+        "recommendation_id": move["id"] if move else None,
+        "recommendation_title": move["title"] if move else "",
+        "recommendation_action": move["action"] if move else "",
+        "business_name": business_name,
+        "product_name": effective_product or business_name,
+        "destination": effective_destination or "website",
+        "channel": move["channel"] if move else primary_channel,
+        "goal": mapped_goal,
+        "cta": move["cta"] if move else "Visit shop",
+        "caption_length": caption_length,
+        "tone": tone,
+        "words_to_avoid": avoid_list,
+        "price_claim": move_price,
+        "minutes_per_week": effective_minutes,
+        "context_summary": effective_context_note or effective_goal,
+        "why_this_fits": move["why_this_fits"] if move else "",
+        "is_draft_override": is_draft_override,
+    }
+
+
 def rank_seller_recommendations(
     *,
     business_name: str = "Your Studio",
@@ -959,44 +1183,103 @@ def rank_seller_recommendations(
     override = draft_override or {}
     signals = dismiss_signals or []
 
-    # Layer precedence: draft_override > saved campaign/product/shop_default
-    effective_minutes = override.get("minutes_per_week")
-    if effective_minutes is None:
-        effective_minutes = pref.access.minutes_per_week or 30
-    else:
-        effective_minutes = int(effective_minutes)
-
-    effective_goal = str(override.get("goal") or pref.goal or "").strip()
+    # Step 1: Resolve draft_override identity scope & ignored entries BEFORE deriving defaults.
     effective_product = str(override.get("product_name") or product_name or "").strip()
     effective_destination = str(override.get("destination") or "").strip()
-    effective_context_note = str(override.get("context_note") or pref.context_note or "").strip()
-    effective_channels = (
-        [str(c).lower() for c in override["channels"] if str(c).strip()]
-        if isinstance(override.get("channels"), list) and override.get("channels")
-        else [c.lower() for c in pref.access.channels]
-    )
-    ignored_entry_ids = set(override.get("ignore_entry_ids") or [])
-    active_entries = [
-        e for e in pref.memory_entries if e.status == "accepted" and e.id not in ignored_entry_ids
-    ]
 
-    # Collect price fact strictly from active accepted entries or override (never invent!)
-    price_entry = next((e for e in active_entries if e.key == "price_range"), None)
+    raw_ignored = (
+        override.get("ignore_entry_ids")
+        if override.get("ignore_entry_ids") is not None
+        else override.get("ignored_entry_ids")
+    )
+    ignored_entry_ids = {str(x).strip() for x in (raw_ignored or []) if str(x).strip()}
+
+    accepted_entries = [e for e in pref.memory_entries if e.status == "accepted"]
+    ignored_entries = [e for e in accepted_entries if e.id in ignored_entry_ids]
+    ignored_keys = {e.key for e in ignored_entries}
+    unignored_entries = [e for e in accepted_entries if e.id not in ignored_entry_ids]
+
+    # Step 2: Filter surviving accepted entries by product_key, destination, and scope.
+    active_entries = _select_scoped_entries(
+        unignored_entries,
+        effective_product=effective_product,
+        effective_destination=effective_destination,
+    )
+
+    def _first_entry(key: str) -> SellerMemoryEntry | None:
+        return next((e for e in active_entries if e.key == key), None)
+
+    # Step 3: Derive effective constraints after applying ignore_entry_ids & scope filters.
+    if override.get("minutes_per_week") is not None:
+        effective_minutes = int(override["minutes_per_week"])
+    else:
+        min_entry = _first_entry("minutes_per_week")
+        if min_entry is not None:
+            nums = re.findall(r"\d+", min_entry.value)
+            effective_minutes = max(5, min(240, int(nums[0]))) if nums else 30
+        elif "minutes_per_week" in ignored_keys:
+            effective_minutes = 30
+        else:
+            effective_minutes = pref.access.minutes_per_week or 30
+
+    goal_override = str(override.get("goal") or "").strip()
+    if goal_override:
+        effective_goal = goal_override
+    else:
+        goal_entry = _first_entry("goal")
+        if goal_entry is not None:
+            effective_goal = goal_entry.value.strip()
+        elif "goal" in ignored_keys:
+            effective_goal = ""
+        else:
+            effective_goal = str(pref.goal or "").strip()
+
+    note_override = str(override.get("context_note") or "").strip()
+    if note_override:
+        effective_context_note = note_override
+    else:
+        note_entry = _first_entry("context_note")
+        if note_entry is not None:
+            effective_context_note = note_entry.value.strip()
+        elif "context_note" in ignored_keys:
+            effective_context_note = ""
+        else:
+            effective_context_note = str(pref.context_note or "").strip()
+
+    if "channels" in override and isinstance(override["channels"], list):
+        effective_channels = [
+            str(c).strip().lower() for c in override["channels"] if str(c).strip()
+        ]
+        channels_explicit = True
+    else:
+        channels_explicit = False
+        ch_entry = _first_entry("channels")
+        if ch_entry is not None:
+            effective_channels = [
+                ch.strip().lower() for ch in ch_entry.value.split(",") if ch.strip()
+            ]
+        elif "channels" in ignored_keys:
+            effective_channels = []
+        else:
+            effective_channels = [c.lower() for c in pref.access.channels]
+
+    # Collect price fact strictly from active scoped entries or override (preserve currency!)
+    price_entry = _first_entry("price_range")
+    if price_entry and not effective_destination and _norm_scope_token(price_entry.destination):
+        effective_destination = str(price_entry.destination).strip()
     price_claim = str(
         override.get("price_claim") or (price_entry.value if price_entry else "")
     ).strip()
-    short_price = ""
-    if price_claim:
-        m = re.search(r"\$\d{1,5}(?:,\d{3})*(?:\.\d{2})?", price_claim)
-        short_price = m.group(0) if m else price_claim[:40]
+    short_price = _extract_short_price(price_claim)
 
-    # Gather excluded channels from accepted entries + dismiss signals
+    # Gather excluded channels from active unignored entries, override, and dismiss signals.
     excluded_channels: set[str] = set()
+    for ch in override.get("excluded_channels") or []:
+        if str(ch).strip():
+            excluded_channels.add(str(ch).strip().lower())
     for e in active_entries:
         if e.key == "excluded_channels":
-            for ch in _KNOWN_CHANNELS:
-                if ch in e.value.lower():
-                    excluded_channels.add(ch)
+            excluded_channels |= _parse_excluded_channels_from_text(e.value)
     for sig in signals:
         if sig.reason in {"no_access", "wrong_channel"}:
             detected_ch = (sig.channel or "").lower() or next(
@@ -1005,16 +1288,15 @@ def rank_seller_recommendations(
             if detected_ch:
                 excluded_channels.add(detected_ch)
 
-    if not effective_channels:
+    if channels_explicit or effective_channels:
+        allowed_channels = [ch for ch in effective_channels if ch not in excluded_channels]
+    else:
         allowed_channels = [
             ch for ch in ("instagram", "facebook", "website") if ch not in excluded_channels
         ]
-    else:
-        allowed_channels = [ch for ch in effective_channels if ch not in excluded_channels]
-    if not allowed_channels:
-        allowed_channels = ["website"]
 
-    primary_channel = allowed_channels[0]
+    all_channels_excluded = len(allowed_channels) == 0
+    primary_channel: str | None = allowed_channels[0] if allowed_channels else None
     active_comps = [c for c in (competitor_entries or pref.competitor_entries) if c.selected]
 
     comp_by_role: dict[CompetitorRole, CompetitorEntry] = {}
@@ -1028,137 +1310,142 @@ def rank_seller_recommendations(
 
     subject_label = effective_product or f"{business_name} featured work"
 
-    # Build role-differentiated candidate moves using seller's actual context (zero sample leaks)
+    # Build role-differentiated candidate moves only when at least one allowed channel remains.
     candidates: list[dict[str, Any]] = []
+    if primary_channel is not None:
+        channel_title = primary_channel.title()
 
-    # Move A: Price positioning / Entry offer (rises when competitor role == "price_reference")
-    comp_a = price_comp or any_comp
-    comp_a_name = _competitor_display(comp_a) if comp_a else "watched shops"
-    comp_a_why = (comp_a.rationale or comp_a.reason).strip() if comp_a else ""
-    price_lead_headline = (
-        f"Lead with your {short_price} entry work against {comp_a_name}"
-        if short_price
-        else f"Clarify your entry price tier against {comp_a_name}"
-    )
-    candidates.append(
-        {
-            "id": "move-price-positioning",
-            "category": "price_reference",
-            "title": price_lead_headline,
-            "action": (
-                f"Publish one {primary_channel.title()} post pairing {subject_label} with "
-                f"{short_price or 'a clear starting price'} and link straight to your listing."
-            ),
-            "channel": primary_channel,
-            "goal": "visits",
-            "estimated_minutes": 12,
-            "base_score": 58.0,
-            "competitor_used": comp_a_name if comp_a else None,
-            "competitor_role": comp_a.role if comp_a else None,
-            "competitor_rationale": comp_a_why,
-            "price_claim": short_price,
-            "cta": f"Shop {short_price}" if short_price else "See listing",
-        }
-    )
+        # Move A: Price positioning / Entry offer (rises when competitor role == "price_reference")
+        comp_a = price_comp or any_comp
+        comp_a_name = _competitor_display(comp_a) if comp_a else "watched shops"
+        comp_a_why = (comp_a.rationale or comp_a.reason).strip() if comp_a else ""
+        price_lead_headline = (
+            f"Lead with your {short_price} entry work against {comp_a_name}"
+            if short_price
+            else f"Clarify your entry price tier against {comp_a_name}"
+        )
+        candidates.append(
+            {
+                "id": "move-price-positioning",
+                "category": "price_reference",
+                "title": price_lead_headline,
+                "action": (
+                    f"Publish one {channel_title} post pairing {subject_label} with "
+                    f"{short_price or 'a clear starting price'} and link straight to your listing."
+                ),
+                "channel": primary_channel,
+                "goal": "visits",
+                "estimated_minutes": 12,
+                "base_score": 58.0,
+                "competitor_used": comp_a_name if comp_a else None,
+                "competitor_role": comp_a.role if comp_a else None,
+                "competitor_rationale": comp_a_why,
+                "price_claim": short_price,
+                "cta": f"Shop {short_price}" if short_price else "See listing",
+            }
+        )
 
-    # Move B: Audience & Gift Angle (rises on similar_audience or gift goal)
-    comp_b = audience_comp or any_comp
-    comp_b_name = _competitor_display(comp_b) if comp_b else "similar sellers"
-    comp_b_why = (comp_b.rationale or comp_b.reason).strip() if comp_b else ""
-    candidates.append(
-        {
-            "id": "move-similar-audience",
-            "category": "similar_audience",
-            "title": f"Reach {business_name}'s buyer audience with a ready-to-gift angle",
-            "action": (
-                f"Share {subject_label} on {primary_channel.title()} showing how buyers place or "
-                f"gift it in a real home setting."
-            ),
-            "channel": primary_channel,
-            "goal": "gift",
-            "estimated_minutes": 15,
-            "base_score": 56.0,
-            "competitor_used": comp_b_name if comp_b else None,
-            "competitor_role": comp_b.role if comp_b else None,
-            "competitor_rationale": comp_b_why,
-            "price_claim": short_price,
-            "cta": "Explore gift option",
-        }
-    )
+        # Move B: Audience & Gift Angle (rises on similar_audience or gift goal)
+        comp_b = audience_comp or any_comp
+        comp_b_name = _competitor_display(comp_b) if comp_b else "similar sellers"
+        comp_b_why = (comp_b.rationale or comp_b.reason).strip() if comp_b else ""
+        candidates.append(
+            {
+                "id": "move-similar-audience",
+                "category": "similar_audience",
+                "title": f"Reach {business_name}'s buyer audience with a ready-to-gift angle",
+                "action": (
+                    f"Share {subject_label} on {channel_title} showing how buyers place or "
+                    f"gift it in a real home setting."
+                ),
+                "channel": primary_channel,
+                "goal": "gift",
+                "estimated_minutes": 15,
+                "base_score": 56.0,
+                "competitor_used": comp_b_name if comp_b else None,
+                "competitor_role": comp_b.role if comp_b else None,
+                "competitor_rationale": comp_b_why,
+                "price_claim": short_price,
+                "cta": "Explore gift option",
+            }
+        )
 
-    # Move C: Creative / Process Inspiration (rises on inspiration or story goal)
-    comp_c = insp_comp or any_comp
-    comp_c_name = _competitor_display(comp_c) if comp_c else "inspiring studios"
-    comp_c_why = (comp_c.rationale or comp_c.reason).strip() if comp_c else ""
-    candidates.append(
-        {
-            "id": "move-inspiration-story",
-            "category": "inspiration",
-            "title": f"Share your studio story behind {subject_label}",
-            "action": (
-                f"Post your original photo of {subject_label} with 2–3 sentences about your "
-                f"process and materials (adapted in style from {comp_c_name}, in your own voice)."
-            ),
-            "channel": primary_channel,
-            "goal": "story",
-            "estimated_minutes": 10,
-            "base_score": 55.0,
-            "competitor_used": comp_c_name if comp_c else None,
-            "competitor_role": comp_c.role if comp_c else None,
-            "competitor_rationale": comp_c_why,
-            "price_claim": "",
-            "cta": "Read studio story",
-        }
-    )
+        # Move C: Creative / Process Inspiration (rises on inspiration or story goal)
+        comp_c = insp_comp or any_comp
+        comp_c_name = _competitor_display(comp_c) if comp_c else "inspiring studios"
+        comp_c_why = (comp_c.rationale or comp_c.reason).strip() if comp_c else ""
+        candidates.append(
+            {
+                "id": "move-inspiration-story",
+                "category": "inspiration",
+                "title": f"Share your studio story behind {subject_label}",
+                "action": (
+                    f"Post your original photo of {subject_label} with 2–3 sentences about your "
+                    f"process and materials (adapted in style from {comp_c_name}, "
+                    "in your own voice)."
+                ),
+                "channel": primary_channel,
+                "goal": "story",
+                "estimated_minutes": 10,
+                "base_score": 55.0,
+                "competitor_used": comp_c_name if comp_c else None,
+                "competitor_role": comp_c.role if comp_c else None,
+                "competitor_rationale": comp_c_why,
+                "price_claim": "",
+                "cta": "Read studio story",
+            }
+        )
 
-    # Move D: Commission / Custom inquiry post (rises on commission/inquiry goal)
-    candidates.append(
-        {
-            "id": "move-commission-invite",
-            "category": "commission",
-            "title": f"Invite custom commissions for {business_name}",
-            "action": (
-                f"Show {subject_label} on {primary_channel.title()} and invite "
-                "buyers to message for custom sizes without quoting an upfront commission price."
-            ),
-            "channel": primary_channel,
-            "goal": "story",
-            "estimated_minutes": 10,
-            "base_score": 48.0,
-            "competitor_used": _competitor_display(any_comp) if any_comp else None,
-            "competitor_role": any_comp.role if any_comp else None,
-            "competitor_rationale": (
-                (any_comp.rationale or any_comp.reason).strip() if any_comp else ""
-            ),
-            "price_claim": "",
-            "cta": "Message for a custom piece",
-        }
-    )
+        # Move D: Commission / Custom inquiry post (rises on commission/inquiry goal)
+        candidates.append(
+            {
+                "id": "move-commission-invite",
+                "category": "commission",
+                "title": f"Invite custom commissions for {business_name}",
+                "action": (
+                    f"Show {subject_label} on {channel_title} and invite buyers to message "
+                    "for custom sizes without quoting an upfront commission price."
+                ),
+                "channel": primary_channel,
+                "goal": "story",
+                "estimated_minutes": 10,
+                "base_score": 48.0,
+                "competitor_used": _competitor_display(any_comp) if any_comp else None,
+                "competitor_role": any_comp.role if any_comp else None,
+                "competitor_rationale": (
+                    (any_comp.rationale or any_comp.reason).strip() if any_comp else ""
+                ),
+                "price_claim": "",
+                "cta": "Message for a custom piece",
+            }
+        )
 
-    # Move E: Multi-listing catalog / time-heavy update (gets penalized when time <= 15 mins)
-    candidates.append(
-        {
-            "id": "move-catalog-refresh",
-            "category": "catalog",
-            "title": (
-                "Refresh titles & descriptions across 5 listings on "
-                f"{effective_destination or 'your shop'}"
-            ),
-            "action": (
-                "Update 5 shop titles with room-specific search terms and verify cross-channel "
-                "links (requires ~40 minutes)."
-            ),
-            "channel": "website" if "website" not in excluded_channels else primary_channel,
-            "goal": "visits",
-            "estimated_minutes": 40,
-            "base_score": 52.0,
-            "competitor_used": None,
-            "competitor_role": None,
-            "competitor_rationale": "",
-            "price_claim": "",
-            "cta": "Update shop titles",
-        }
-    )
+        # Move E: Multi-listing catalog / time-heavy update (gets penalized when time <= 15 mins)
+        if "website" in allowed_channels or primary_channel:
+            refresh_channel = "website" if "website" in allowed_channels else primary_channel
+            candidates.append(
+                {
+                    "id": "move-catalog-refresh",
+                    "category": "catalog",
+                    "title": (
+                        "Refresh titles & descriptions across 5 listings on "
+                        f"{effective_destination or 'your shop'}"
+                    ),
+                    "action": (
+                        "Update 5 shop titles with room-specific search terms and verify "
+                        "cross-channel links (requires ~40 minutes)."
+                    ),
+                    "channel": refresh_channel,
+                    "goal": "visits",
+                    "estimated_minutes": 40,
+                    "base_score": 52.0,
+                    "competitor_used": None,
+                    "competitor_role": None,
+                    "competitor_rationale": "",
+                    "price_claim": "",
+                    "cta": "Update shop titles",
+                }
+            )
 
     already_tried = {
         s.title.lower().strip() for s in signals if s.reason == "already_tried" and s.title
@@ -1280,7 +1567,11 @@ def rank_seller_recommendations(
         why_this_fits = (
             "; ".join(reasons)
             if reasons
-            else (f"Matches {business_name}'s available {primary_channel.title()} channel.")
+            else (
+                f"Matches {business_name}'s available {str(move['channel']).title()} channel."
+                if move.get("channel")
+                else f"Prepared for {business_name}."
+            )
         )
         ranked.append(
             {
@@ -1293,6 +1584,57 @@ def rank_seller_recommendations(
         )
 
     ranked.sort(key=lambda item: (-item["score"], item["estimated_minutes"]))
+
+    ignored_avoid = {
+        t.strip().lower()
+        for e in ignored_entries
+        if e.key == "subjects_to_avoid"
+        for t in e.value.split(",")
+        if t.strip()
+    }
+    active_avoid_terms = [
+        t.strip()
+        for e in active_entries
+        if e.key == "subjects_to_avoid"
+        for t in e.value.split(",")
+        if t.strip()
+    ]
+    base_avoid = [
+        t
+        for t in [*pref.taste.subjects_to_avoid, *voice.words_to_avoid]
+        if t.strip().lower() not in ignored_avoid
+    ]
+    avoid_list = list(dict.fromkeys([*base_avoid, *active_avoid_terms]))
+
+    caption_entry = _first_entry("caption_length")
+    if override.get("caption_length"):
+        eff_caption_len = str(override["caption_length"])
+    elif caption_entry is not None and "short" in caption_entry.value.lower():
+        eff_caption_len = "short"
+    elif "caption_length" in ignored_keys:
+        eff_caption_len = "medium"
+    else:
+        eff_caption_len = voice.caption_length or (
+            "short" if "shorter" in voice.adjustments else "medium"
+        )
+    eff_tone = str(override.get("tone") or pref.taste.tone or voice.formality or "neutral")
+
+    for item in ranked:
+        item["editor_defaults"] = _build_editor_defaults_for_move(
+            move=item,
+            business_name=business_name,
+            effective_product=effective_product,
+            effective_destination=effective_destination,
+            effective_goal=effective_goal,
+            effective_context_note=effective_context_note,
+            effective_minutes=effective_minutes,
+            primary_channel=primary_channel,
+            caption_length=eff_caption_len,
+            tone=eff_tone,
+            avoid_list=avoid_list,
+            short_price=short_price,
+            is_draft_override=bool(override),
+        )
 
     top = ranked[0] if ranked else None
     what_changed: str | None = None
@@ -1309,37 +1651,45 @@ def rank_seller_recommendations(
             "Ranked using temporary draft-only context (your saved shop defaults were not altered)."
         )
 
-    avoid_list = list(dict.fromkeys([*pref.taste.subjects_to_avoid, *voice.words_to_avoid]))
-    editor_defaults = {
-        "business_name": business_name,
-        "product_name": effective_product or business_name,
-        "destination": effective_destination or "website",
-        "channel": primary_channel,
-        "goal": (
-            "gift"
-            if (top and top["goal"] == "gift") or "gift" in effective_goal.lower()
-            else ("visit" if top and top["goal"] == "visits" else "story")
-        ),
-        "cta": top["cta"] if top else "Visit shop",
-        "caption_length": voice.caption_length
-        or ("short" if "shorter" in voice.adjustments else "medium"),
-        "tone": pref.taste.tone or voice.formality,
-        "words_to_avoid": avoid_list,
-        "price_claim": short_price,
-        "minutes_per_week": effective_minutes,
-        "context_summary": effective_context_note or effective_goal,
-        "why_this_fits": top["why_this_fits"] if top else "",
-        "is_draft_override": bool(override),
-    }
+    editor_defaults = (
+        dict(top["editor_defaults"])
+        if top is not None
+        else _build_editor_defaults_for_move(
+            move=None,
+            business_name=business_name,
+            effective_product=effective_product,
+            effective_destination=effective_destination,
+            effective_goal=effective_goal,
+            effective_context_note=effective_context_note,
+            effective_minutes=effective_minutes,
+            primary_channel=primary_channel,
+            caption_length=eff_caption_len,
+            tone=eff_tone,
+            avoid_list=avoid_list,
+            short_price=short_price,
+            is_draft_override=bool(override),
+        )
+    )
+
+    if all_channels_excluded:
+        excl_names = ", ".join(c.title() for c in sorted(excluded_channels))
+        missing_prompt = (
+            f"All available channels are excluded ({excl_names}). "
+            "Restore a posting channel in Your context or clear channel exclusions "
+            "to generate moves."
+        )
+    elif not active_comps:
+        missing_prompt = (
+            "Add your primary channel or one watched competitor to sharper rank your next moves."
+        )
+    else:
+        missing_prompt = ""
 
     return {
         "recommendations": ranked,
         "what_changed": what_changed,
         "editor_defaults": editor_defaults,
         "excluded_channels": sorted(excluded_channels),
-        "missing_info_prompt": (
-            "Add your primary channel or one watched competitor to sharper rank your next moves."
-            if not active_comps
-            else ""
-        ),
+        "all_channels_excluded": all_channels_excluded,
+        "missing_info_prompt": missing_prompt,
     }

@@ -9,18 +9,32 @@
       return typeof location !== 'undefined' && new URLSearchParams(location.search).get('workspace') === 'sample';
     } catch (_) { return false; }
   };
+  function readRecommendationHandoff(uid = window.museAccount?.getSnapshot?.()?.user?.id || window.museAccount?.current?.()?.id || null) {
+    try {
+      const hid = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('sm_handoff') : null;
+      if (!hid) return null;
+      const ns = uid ? String(uid) : 'guest';
+      const mode = isSampleMode() ? 'sample' : 'own';
+      const raw = localStorage.getItem(`muse.sm.handoff.${encodeURIComponent(ns)}.${encodeURIComponent(hid)}`);
+      const payload = raw ? JSON.parse(raw) : null;
+      if (!payload || payload.owner_id !== ns || payload.workspace_mode !== mode) return null;
+      return payload;
+    } catch (_) {
+      return null;
+    }
+  }
   const originalSample = '/samples/ek_onkar_original.jpg';
   const initialProduct = (shopName) => (shopName && !isSampleMode() ? { title: 'Featured Artwork', description: `Artwork collection by ${shopName}.`, seller: shopName, collection: '', price: '', destination_url: '', destination: 'website' } : { title: 'Ek Onkar', description: 'An artwork by Sarabjit Singh exploring connection and equality through color and form.', seller: 'Art of Sarabjit Singh', collection: '', price: '', destination_url: 'https://sarabjit-singh.pixels.com/', destination: 'pixels' });
-  const state = { product: initialProduct(), original: originalSample, image: originalSample, imageMode: 'original', source: 'Suggested from the artist example', channel: 'instagram', format: 'image', goal: 'visits', salesGoal: null, performance: null, plans: {}, edits: {}, selected: 0, posted: {}, offers: {}, busy: false, revision: 0, paint: 0, live: false, key: '', readiness: null };
+  const state = { product: initialProduct(), original: originalSample, image: originalSample, imageMode: 'original', source: 'Suggested from the artist example', channel: 'instagram', format: 'image', goal: 'visits', salesGoal: null, performance: null, plans: {}, edits: {}, selected: 0, posted: {}, offers: {}, busy: false, revision: 0, paint: 0, live: false, key: '', readiness: null, cta: '', why_this: '', idea_id: null };
 
   const draftNamespace = 'daily';
-  function editorDocument() { return { schema: 1, ...Object.fromEntries(['product', 'original', 'image', 'imageMode', 'source', 'channel', 'selected', 'format', 'goal', 'salesGoal', 'performance', 'plans', 'edits', 'posted', 'offers'].map(key => [key, state[key]])) }; }
+  function editorDocument() { return { schema: 1, ...Object.fromEntries(['product', 'original', 'image', 'imageMode', 'source', 'channel', 'selected', 'format', 'goal', 'salesGoal', 'performance', 'plans', 'edits', 'posted', 'offers', 'cta', 'why_this', 'idea_id'].map(key => [key, state[key]])) }; }
   const isDraftObject = value => !!value && typeof value === 'object' && !Array.isArray(value);
   function applyDocument(data) {
     if (!data || (data.schema !== undefined && data.schema !== 1) || typeof data.product?.title !== 'string' || (data.original !== '' && !imageSource(data.original))) throw new Error('Unsupported daily draft.');
     for (const key of ['plans', 'edits', 'posted', 'offers']) if (data[key] !== undefined && !isDraftObject(data[key])) throw new Error('Invalid daily draft fields.');
-    state.plans = {}; state.edits = {}; state.posted = {}; state.offers = {}; state.performance = null; state.salesGoal = null;
-      for (const key of ['product', 'original', 'source', 'salesGoal', 'performance', 'posted', 'offers']) if (data[key] !== undefined) state[key] = data[key];
+    state.plans = {}; state.edits = {}; state.posted = {}; state.offers = {}; state.performance = null; state.salesGoal = null; state.cta = ''; state.why_this = ''; state.idea_id = null;
+      for (const key of ['product', 'original', 'source', 'salesGoal', 'performance', 'posted', 'offers', 'cta', 'why_this', 'idea_id']) if (data[key] !== undefined) state[key] = data[key];
       state.channel = Object.hasOwn(names, data.channel) ? data.channel : 'instagram';
       state.format = ['image', 'video', 'text'].includes(data.format) ? data.format : 'image';
       state.goal = ['visits', 'inquiries', 'sales'].includes(data.goal) ? data.goal : 'visits';
@@ -58,7 +72,7 @@
   function recoverDevice() {
     try {
       const requestedIdea = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('idea') : null;
-      if (requestedIdea) return;
+      if (requestedIdea && findPreviewSpec(requestedIdea)) return;
       const raw = localStorage.getItem(deviceKey()) || (!draftOwner ? localStorage.getItem(storageKey) : null);
       if (raw) { installDocument(JSON.parse(raw)); draftStatus('Recovered this device’s draft. Review before sharing.'); }
     } catch { draftStatus('Could not recover device storage. Keep this tab open; download a backup or load your account draft.'); }
@@ -331,7 +345,50 @@
     $('postCaption').value = spec.caption;
     $('itemTitle').textContent = state.product.title;
     $('dailyReason').textContent = spec.why_this || 'Start with your work. We’ll help with the words.';
+    state.cta = spec.cta || '';
     state.edits[`${state.channel}:0:${state.format}`] = { hook: spec.headline, caption: spec.caption };
+    render();
+    persist();
+  }
+  function applyRecommendationHandoff(handoff) {
+    if (!handoff) return;
+    if (!isSampleMode() && (state.original === originalSample || state.product.title === 'Ek Onkar')) {
+      state.original = '';
+      state.image = '';
+      state.imageMode = 'original';
+      if (state.product.title === 'Ek Onkar') state.product.title = 'Featured Artwork';
+      if (state.product.seller === 'Art of Sarabjit Singh') state.product.seller = '';
+    }
+    const existingTitle = String(state.product.title || '').trim();
+    const isGenericTitle = !existingTitle || existingTitle === 'Ek Onkar' || existingTitle === 'Featured Artwork';
+    if (handoff.business_name) state.product.seller = handoff.business_name;
+    if (handoff.product_name && (handoff.product_name !== handoff.business_name || isGenericTitle)) {
+      state.product.title = handoff.product_name;
+    }
+    if (handoff.price_claim !== undefined && handoff.price_claim !== '') {
+      state.product.price = handoff.price_claim;
+    }
+    if (handoff.destination) {
+      state.product.destination = Object.hasOwn(shops, handoff.destination) ? handoff.destination : 'other';
+    }
+    if (handoff.channel && Object.hasOwn(names, String(handoff.channel).toLowerCase())) {
+      state.channel = String(handoff.channel).toLowerCase();
+      state.format = state.channel === 'tiktok' ? 'video' : (state.channel === 'x' ? 'text' : 'image');
+    }
+    state.goal = handoff.goal === 'gift' ? 'inquiries' : 'visits';
+    state.selected = 0;
+    state.idea_id = handoff.recommendation_id || handoff.id || null;
+    state.why_this = handoff.why_this_fits || '';
+    state.cta = handoff.cta || '';
+    state.source = 'Selected recommendation';
+    const hook = handoff.title || state.product.title || 'Featured Artwork';
+    const caption = handoff.action || state.product.description || 'Share your work directly with buyers.';
+    ['image', 'video', 'text'].forEach((fmt) => {
+      state.edits[`${state.channel}:0:${fmt}`] = { hook, caption };
+    });
+    state.plans = {};
+    state.revision += 1;
+    populateSetup();
     render();
     persist();
   }
@@ -471,11 +528,11 @@
     ctx.fillStyle = '#f6f3eb'; ctx.fillRect(0, 0, 1080, height); ctx.fillStyle = '#253d34'; ctx.font = '25px sans-serif'; ctx.fillText((state.product.seller || 'Made with care').slice(0, 50), 80, 95);
     if (src) { const image = await loadImage(src); const area = { x: 80, y: 150, w: 920, h: height - 520 }; const scale = Math.min(area.w / image.width, area.h / image.height); const w = image.width * scale; const h = image.height * scale; ctx.drawImage(image, area.x + (area.w - w) / 2, area.y + (area.h - h) / 2, w, h); }
     ctx.fillStyle = '#253d34'; fitText(ctx, copy.hook || state.product.title, 80, height - 280, 880, 46, 3);
-    ctx.font = '24px sans-serif'; ctx.fillText((currentPost()?.cta || 'Explore the work').slice(0, 55), 80, height - 95); return canvas;
+    ctx.font = '24px sans-serif'; ctx.fillText((state.cta || currentPost()?.cta || 'Explore the work').slice(0, 55), 80, height - 95); return canvas;
   }
   function paint() { const token = ++state.paint; const height = state.format === 'video' ? 1920 : 1350; layout(height).then(canvas => { if (token !== state.paint) return; const preview = $('postCanvas'); preview.width = canvas.width; preview.height = canvas.height; preview.getContext('2d').drawImage(canvas, 0, 0); }).catch(error => notice(error.message, true)); }
   function saveBlob(blob, suffix) { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `${state.product.title.replace(/[^a-z0-9]+/gi, '-').slice(0, 45)}-${state.channel}-${suffix}`; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000); }
-  function captionText() { const copy = currentCopy(); const url = safeURL(state.product.destination_url); let text = `${copy.hook}\n\n${copy.caption}`; const cta = currentPost()?.cta; if (cta && !text.includes(cta)) text += `\n\n${cta}`; if (url && ['facebook', 'x'].includes(state.channel) && !text.includes(url)) text += `\n\n${url}`; if (url && ['instagram', 'tiktok'].includes(state.channel) && !/profile link|link in my profile/i.test(text)) text += '\n\nExplore the work through the link in my profile.'; return text; }
+  function captionText() { const copy = currentCopy(); const url = safeURL(state.product.destination_url); let text = `${copy.hook}\n\n${copy.caption}`; const cta = state.cta || currentPost()?.cta; if (cta && !text.includes(cta)) text += `\n\n${cta}`; if (url && ['facebook', 'x'].includes(state.channel) && !text.includes(url)) text += `\n\n${url}`; if (url && ['instagram', 'tiktok'].includes(state.channel) && !/profile link|link in my profile/i.test(text)) text += '\n\nExplore the work through the link in my profile.'; return text; }
   async function copyText() {
     const text = captionText(); let timeout;
     try {
@@ -657,22 +714,32 @@
   $('useOriginal').addEventListener('click', () => { if (state.busy) return; state.image = state.original; state.imageMode = 'original'; invalidate(); render(); persist(); });
   populateSetup(); render(); initDrafts();
   const requestedIdea = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('idea') : null;
+  const requestedHandoffId = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('sm_handoff') : null;
   const ideaSpec = requestedIdea ? findPreviewSpec(requestedIdea) : null;
-  if (ideaSpec && (!window.museAccount?.current?.() || isSampleMode())) {
+  if (ideaSpec && !requestedHandoffId && (!window.museAccount?.current?.() || isSampleMode())) {
     applyIdea(ideaSpec);
     window.museTrack?.('post_started', { idea_id: requestedIdea, source: 'today' });
   } else {
-    window.museTrack?.('post_started', { idea_id: null, goal: state.goal || 'daily', source: 'today' });
+    window.museTrack?.('post_started', { idea_id: requestedHandoffId || null, goal: state.goal || 'daily', source: 'today' });
   }
   if (window.museAccount?.ready) {
     window.museAccount.ready().then(async (snap) => {
       const acc = snap?.user || window.museAccount.getSnapshot()?.user || window.museAccount.current?.();
+      const handoff = readRecommendationHandoff(acc?.id || null);
       if (acc && !isSampleMode()) {
-        if (state.product.title === 'Ek Onkar') {
-          state.product.title = 'Featured Artwork';
-          state.product.description = 'Fine art collection.';
-          state.original = '';
-          state.image = '';
+        if (/sarabjit|artofsarabjitsingh/i.test(state.product.destination_url || '')) {
+          state.product.destination_url = '';
+        }
+        if (state.product.title === 'Ek Onkar' || state.original === originalSample) {
+          if (state.product.title === 'Ek Onkar') state.product.title = 'Featured Artwork';
+          if (state.product.seller === 'Art of Sarabjit Singh') state.product.seller = '';
+          if (!state.product.description || state.product.description.includes('Sarabjit Singh')) {
+            state.product.description = 'Fine art collection.';
+          }
+          if (state.original === originalSample) {
+            state.original = '';
+            state.image = '';
+          }
           state.source = 'Featured artwork';
           populateSetup();
           render();
@@ -683,20 +750,29 @@
             const wsData = await wsRes.json();
             const shopName = wsData?.document?.onboarding?.business_name;
             if (shopName) {
-              state.product.seller = shopName;
-              state.product.description = `Fine art collection from ${shopName}.`;
-              state.source = `Featured from ${shopName}`;
+              if (!state.product.seller || state.product.seller === 'Art of Sarabjit Singh') state.product.seller = shopName;
+              if (!state.product.description || state.product.description === 'Fine art collection.') {
+                state.product.description = `Fine art collection from ${shopName}.`;
+              }
+              if (state.source === 'Featured artwork' || state.source === 'Suggested from the artist example') {
+                state.source = `Featured from ${shopName}`;
+              }
               populateSetup();
               render();
             }
           }
         } catch (_) {}
       }
+      if (handoff) {
+        applyRecommendationHandoff(handoff);
+      }
       buildPlan();
     });
   } else {
+    const handoff = readRecommendationHandoff(null);
+    if (handoff) applyRecommendationHandoff(handoff);
     buildPlan();
   }
   fetch('/api/v1/readiness').then(response => response.json()).then(data => { state.readiness = data; syncAccountLive(); $('readinessNote').textContent = data.provider_key_configured ? 'Muse configured, not yet verified here. Starter plans use no credits. Live image uses one Muse Image request; this flow does not run SAM.' : 'No Muse provider key configured. Starter posts and downloads work without it.'; }).catch(() => { $('readinessNote').textContent = 'Could not check server configuration. Your draft is still available.'; });
-  window.museDailySnapshot = () => JSON.parse(JSON.stringify({ product: state.product, channel: state.channel, format: state.format, copy: currentCopy(), plan: currentPlan(), performance: state.performance, imageMode: state.imageMode, source: state.source }));
+  window.museDailySnapshot = () => JSON.parse(JSON.stringify({ product: state.product, channel: state.channel, format: state.format, copy: currentCopy(), cta: state.cta || currentPost()?.cta || '', why_this: state.why_this, idea_id: state.idea_id, plan: currentPlan(), performance: state.performance, imageMode: state.imageMode, source: state.source }));
 })();

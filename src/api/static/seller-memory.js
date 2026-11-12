@@ -44,6 +44,7 @@
     dismissSignals: [],
     draftOverride: null,
     scope: 'draft', // 'draft' | 'shop_default'
+    draftId: 'default',
     recommendResult: null,
     previousTopId: null,
     onboardingEntries: [],
@@ -52,8 +53,38 @@
     onboardingScanUrl: '',
     onboardingScanDate: '',
     conflictPending: null,
+    serverBaseline: null,
     loadedForOwner: '__init__',
+    activeGeneration: 0,
+    recSeq: 0,
+    scanSeq: 0,
+    interpretSeq: 0,
   };
+
+  function cloneDeep(val, fallback = null) {
+    try {
+      return val === undefined ? fallback : JSON.parse(JSON.stringify(val));
+    } catch (_) {
+      return fallback;
+    }
+  }
+
+  function safeHttpUrl(raw) {
+    if (!raw || typeof raw !== 'string') return '';
+    const trimmed = raw.trim();
+    if (!trimmed) return '';
+    try {
+      const parsed = new URL(trimmed);
+      if (
+        (parsed.protocol === 'http:' || parsed.protocol === 'https:') &&
+        !parsed.username &&
+        !parsed.password
+      ) {
+        return parsed.href;
+      }
+    } catch (_) {}
+    return '';
+  }
 
   // --- Safe DOM & Storage Helpers ---
   function el(tag, attrs = {}, ...children) {
@@ -92,20 +123,56 @@
     return uid ? String(uid) : null;
   }
 
-  function ownerNamespace() {
-    return currentOwnerId() || 'guest';
+  function ownerNamespace(owner = currentOwnerId()) {
+    return owner || 'guest';
   }
 
-  function draftStorageKey(ns = ownerNamespace()) {
-    return `muse.sm.draft.${ns}`;
+  function currentWorkspaceMode() {
+    return isSampleMode() ? 'sample' : 'own';
+  }
+
+  function urlDraftParam() {
+    try {
+      const fromUrl = new URLSearchParams(location.search).get('draft');
+      if (fromUrl && fromUrl.trim()) return fromUrl.trim().slice(0, 64);
+    } catch (_) {}
+    return '';
+  }
+
+  function currentDraftId() {
+    return state.draftId || urlDraftParam() || 'default';
+  }
+
+  function draftStorageKey(
+    ns = ownerNamespace(),
+    mode = currentWorkspaceMode(),
+    draftId = currentDraftId()
+  ) {
+    return `muse.sm.draft.${encodeURIComponent(ns)}.${mode}.${encodeURIComponent(draftId)}`;
+  }
+
+  function handoffStorageKey(handoffId, ns = ownerNamespace()) {
+    return `muse.sm.handoff.${encodeURIComponent(ns)}.${encodeURIComponent(handoffId)}`;
   }
 
   function pendingOnboardingKey(ns = ownerNamespace()) {
-    return `muse.sm.pending_onb.${ns}`;
+    return `muse.sm.pending_onb.${encodeURIComponent(ns)}`;
   }
 
   function guestSampleKey() {
     return 'muse.sm.guest_sample.v1';
+  }
+
+  function isCurrentRequestContext(gen, expectedUid, expectedSample) {
+    return (
+      gen === state.activeGeneration &&
+      currentOwnerId() === expectedUid &&
+      isSampleMode() === expectedSample
+    );
+  }
+
+  function stateTagForCurrent() {
+    return `${currentOwnerId() || 'guest'}:${isSampleMode() ? 'sample' : 'own'}`;
   }
 
   function isSampleMode() {
@@ -130,8 +197,8 @@
   async function apiJson(url, options = {}) {
     const resp = await fetch(url, {
       credentials: 'same-origin',
-      headers: { ...authHeaders(), ...(options.headers || {}) },
       ...options,
+      headers: { ...authHeaders(), ...(options.headers || {}) },
     });
     const text = await resp.text();
     let data = {};
@@ -144,6 +211,10 @@
   }
 
   function resetInMemoryState() {
+    state.activeGeneration += 1;
+    state.recSeq += 1;
+    state.scanSeq += 1;
+    state.interpretSeq += 1;
     state.version = 0;
     state.businessName = '';
     state.preferences = {};
@@ -156,6 +227,47 @@
     state.recommendResult = null;
     state.previousTopId = null;
     state.conflictPending = null;
+    state.serverBaseline = null;
+  }
+
+  function clearPrivateMemoryUI() {
+    resetInMemoryState();
+    state.onboardingEntries = [];
+    state.onboardingScanDiff = [];
+    state.onboardingScanWarnings = [];
+    state.onboardingScanUrl = '';
+    state.onboardingScanDate = '';
+    const memBackdrop = document.getElementById('smMemoryModalBackdrop');
+    if (memBackdrop) {
+      memBackdrop.hidden = true;
+      const body = document.getElementById('smMemoryModalBody');
+      if (body) body.textContent = '';
+    }
+    const conflictBackdrop = document.getElementById('smConflictModalBackdrop');
+    if (conflictBackdrop) {
+      conflictBackdrop.hidden = true;
+      conflictBackdrop.textContent = '';
+    }
+    [
+      'smContextPanel',
+      'smWhatChangedBanner',
+      'smMissingInfoBanner',
+      'smTopMovePreview',
+      'smStudioContextBar',
+      'smOnboardingScanReview',
+    ].forEach((id) => {
+      const node = document.getElementById(id);
+      if (node) {
+        node.textContent = '';
+        node.hidden = true;
+      }
+    });
+    document.querySelectorAll('#loop-improve ol.jr-recos li[data-sm-reco-id]').forEach((li) => {
+      li.remove();
+    });
+    document.querySelectorAll('#sellerList .sm-comp-role-wrap').forEach((wrap) => {
+      wrap.remove();
+    });
   }
 
   function loadDraftOverride() {
@@ -170,10 +282,11 @@
   function saveDraftOverride(override) {
     state.draftOverride = override;
     try {
+      const key = draftStorageKey();
       if (override) {
-        localStorage.setItem(draftStorageKey(), JSON.stringify(override));
+        localStorage.setItem(key, JSON.stringify(override));
       } else {
-        localStorage.removeItem(draftStorageKey());
+        localStorage.removeItem(key);
       }
     } catch (_) {}
   }
@@ -250,30 +363,40 @@
   // --- Server Load / Save / Sync ---
   async function loadServerMemory(force = false) {
     const uid = currentOwnerId();
-    if (!force && state.loadedForOwner === (uid || 'guest')) return;
-    if (state.loadedForOwner !== '__init__' && state.loadedForOwner !== (uid || 'guest')) {
-      resetInMemoryState();
+    const expectedSample = isSampleMode();
+    const stateTag = `${uid || 'guest'}:${expectedSample ? 'sample' : 'own'}`;
+    if (!force && state.loadedForOwner === stateTag) return;
+    if (state.loadedForOwner !== '__init__' && state.loadedForOwner !== stateTag) {
+      clearPrivateMemoryUI();
     }
+    const gen = ++state.activeGeneration;
     state.ownerId = uid;
-    state.loadedForOwner = uid || 'guest';
+    state.loadedForOwner = stateTag;
+    const initialDraft = urlDraftParam();
+    if (initialDraft) state.draftId = initialDraft;
     loadDraftOverride();
 
     if (!uid) {
       state.authenticated = false;
-      if (isSampleMode()) {
+      if (expectedSample) {
         const sample = loadGuestSampleState();
         state.businessName = sample.businessName;
         state.preferences = sample.preferences;
         state.memoryEntries = sample.memoryEntries;
         state.competitorEntries = sample.competitorEntries;
       }
+      if (!isCurrentRequestContext(gen, uid, expectedSample)) return;
       renderHomeUI();
       renderStudioBar();
       return;
     }
 
     const res = await apiJson('/api/v1/seller-memory', { method: 'GET' });
+    if (!isCurrentRequestContext(gen, uid, expectedSample)) return;
+
     if (res.ok && res.data) {
+      const serverOwner = res.data.owner_id ?? uid;
+      if (res.data.authenticated && serverOwner !== uid) return;
       state.authenticated = Boolean(res.data.authenticated);
       state.version = Number(res.data.version || 0);
       state.businessName = res.data.business_name || '';
@@ -283,23 +406,32 @@
       state.competitorEntries = res.data.competitor_entries || [];
       state.suggestedUpdates = res.data.suggested_updates || [];
       state.dismissSignals = res.data.dismiss_signals || [];
+      state.serverBaseline = cloneDeep({
+        preferences: state.preferences,
+        voiceProfile: state.voiceProfile,
+        memoryEntries: state.memoryEntries,
+        competitorEntries: state.competitorEntries,
+      });
     }
 
     // Flush any pending onboarding edits created right before navigation
     const pending = loadPendingOnboarding(uid);
     if (pending && Array.isArray(pending.memory_entries) && pending.memory_entries.length) {
-      await syncPendingOnboardingToServer(pending, uid);
+      await syncPendingOnboardingToServer(pending, uid, gen);
+      if (!isCurrentRequestContext(gen, uid, expectedSample)) return;
     }
 
     const onStudio = location.pathname.startsWith('/today') || location.pathname.startsWith('/create');
     if (document.getElementById('loop-improve') || onStudio) {
-      await fetchRecommendations(false);
+      await fetchRecommendations(false, { gen, expectedOwner: uid, expectedSample });
+      if (!isCurrentRequestContext(gen, uid, expectedSample)) return;
     }
     renderHomeUI();
     renderStudioBar();
   }
 
-  async function syncPendingOnboardingToServer(pending, uid) {
+  async function syncPendingOnboardingToServer(pending, uid, gen = state.activeGeneration) {
+    if (!uid || currentOwnerId() !== uid || gen !== state.activeGeneration) return;
     const mergedEntries = mergeEntriesList(state.memoryEntries, pending.memory_entries || []);
     const nextComps =
       Array.isArray(state.competitorEntries) && state.competitorEntries.length
@@ -310,29 +442,133 @@
       ...(pending.preferences || {}),
       competitor_entries: nextComps,
     };
+    const expectedVersion = Number.isInteger(state.version) ? state.version : 0;
     const saveRes = await apiJson('/api/v1/seller-memory', {
       method: 'PUT',
       body: JSON.stringify({
         expected_owner: uid,
-        expected_version: state.version || null,
+        expected_version: expectedVersion,
         preferences: nextPrefs,
         memory_entries: mergedEntries,
         competitor_entries: nextComps,
       }),
     });
+    if (gen !== state.activeGeneration || currentOwnerId() !== uid) return;
     if (saveRes.ok && saveRes.data) {
       state.version = Number(saveRes.data.version || state.version);
       state.preferences = saveRes.data.preferences || nextPrefs;
       state.memoryEntries = saveRes.data.memory_entries || mergedEntries;
       state.competitorEntries = saveRes.data.competitor_entries || nextComps;
+      state.serverBaseline = cloneDeep({
+        preferences: state.preferences,
+        voiceProfile: state.voiceProfile,
+        memoryEntries: state.memoryEntries,
+        competitorEntries: state.competitorEntries,
+      });
       savePendingOnboarding(null, uid);
     }
+  }
+
+  function isPlainObject(val) {
+    return Boolean(val && typeof val === 'object' && !Array.isArray(val));
+  }
+
+  function valuesEqual(a, b) {
+    try {
+      return JSON.stringify(a) === JSON.stringify(b);
+    } catch (_) {
+      return a === b;
+    }
+  }
+
+  function threeWayMerge(base, server, local) {
+    if (!isPlainObject(server) && !isPlainObject(local)) {
+      if (valuesEqual(local, base)) return cloneDeep(server);
+      return cloneDeep(local !== undefined ? local : server);
+    }
+    const baseObj = isPlainObject(base) ? base : {};
+    const srvObj = isPlainObject(server) ? server : {};
+    const locObj = isPlainObject(local) ? local : {};
+    const out = cloneDeep(srvObj, {});
+    const keys = new Set([...Object.keys(baseObj), ...Object.keys(srvObj), ...Object.keys(locObj)]);
+    keys.forEach((k) => {
+      const bVal = baseObj[k];
+      const sVal = srvObj[k];
+      const lVal = locObj[k];
+      const inSrv = Object.prototype.hasOwnProperty.call(srvObj, k);
+      const inLoc = Object.prototype.hasOwnProperty.call(locObj, k);
+      const inBase = Object.prototype.hasOwnProperty.call(baseObj, k);
+      if (isPlainObject(sVal) && isPlainObject(lVal)) {
+        out[k] = threeWayMerge(bVal, sVal, lVal);
+      } else if (!inLoc) {
+        if (inBase && !valuesEqual(sVal, bVal)) {
+          out[k] = cloneDeep(sVal);
+        } else if (!inBase && inSrv) {
+          out[k] = cloneDeep(sVal);
+        } else {
+          delete out[k];
+        }
+      } else if (!inSrv) {
+        if (!inBase || !valuesEqual(lVal, bVal)) {
+          out[k] = cloneDeep(lVal);
+        }
+      } else if (valuesEqual(lVal, bVal)) {
+        out[k] = cloneDeep(sVal);
+      } else {
+        out[k] = cloneDeep(lVal);
+      }
+    });
+    return out;
+  }
+
+  function threeWayMergeEntries(baseList, serverList, localList) {
+    const baseMap = new Map((baseList || []).filter((e) => e && e.id).map((e) => [e.id, e]));
+    const srvMap = new Map((serverList || []).filter((e) => e && e.id).map((e) => [e.id, cloneDeep(e)]));
+    const out = new Map(srvMap);
+    (localList || []).forEach((loc) => {
+      if (!loc || !loc.id) return;
+      const base = baseMap.get(loc.id);
+      const srv = srvMap.get(loc.id);
+      if (!srv) {
+        if (!base || !valuesEqual(loc, base)) out.set(loc.id, cloneDeep(loc));
+        return;
+      }
+      if (base && valuesEqual(loc, base)) {
+        out.set(loc.id, cloneDeep(srv));
+      } else if (srv.seller_edited && !loc.seller_edited) {
+        out.set(loc.id, cloneDeep(srv));
+      } else {
+        out.set(loc.id, threeWayMerge(base || {}, srv, loc));
+      }
+    });
+    return Array.from(out.values());
+  }
+
+  function mergeCompetitorEntries(baseComps, serverComps, localComps) {
+    const compKey = (c) => (c?.url || c?.name || '').toLowerCase();
+    const baseMap = new Map((baseComps || []).filter((c) => compKey(c)).map((c) => [compKey(c), c]));
+    const srvMap = new Map((serverComps || []).filter((c) => compKey(c)).map((c) => [compKey(c), cloneDeep(c)]));
+    const out = new Map(srvMap);
+    (localComps || []).forEach((loc) => {
+      const k = compKey(loc);
+      if (!k) return;
+      const base = baseMap.get(k);
+      const srv = srvMap.get(k);
+      if (!srv) {
+        out.set(k, cloneDeep(loc));
+      } else if (base && valuesEqual(loc, base)) {
+        out.set(k, cloneDeep(srv));
+      } else {
+        out.set(k, threeWayMerge(base || {}, srv, loc));
+      }
+    });
+    return Array.from(out.values());
   }
 
   function mergeEntriesList(base, incoming) {
     const byId = new Map();
     (base || []).forEach((e) => {
-      if (e && e.id) byId.set(e.id, e);
+      if (e && e.id) byId.set(e.id, cloneDeep(e));
     });
     (incoming || []).forEach((e) => {
       if (!e || !e.id) return;
@@ -340,7 +576,7 @@
       if (prev && prev.seller_edited && !e.seller_edited) {
         return; // Preserve seller edits unless newer entry was also seller-edited
       }
-      byId.set(e.id, e);
+      byId.set(e.id, prev ? { ...prev, ...cloneDeep(e) } : cloneDeep(e));
     });
     return Array.from(byId.values());
   }
@@ -348,22 +584,43 @@
   let persistQueue = Promise.resolve();
 
   function persistToServer(opts = {}) {
-    const run = persistQueue.then(() => _persistToServerOnce(opts), () => _persistToServerOnce(opts));
+    const boundOwner = currentOwnerId();
+    const boundGen = state.activeGeneration;
+    const boundSample = isSampleMode();
+    const snapshot = {
+      preferences: cloneDeep(opts.preferences !== undefined ? opts.preferences : state.preferences, {}),
+      voiceProfile: cloneDeep(opts.voiceProfile !== undefined ? opts.voiceProfile : state.voiceProfile, {}),
+      memoryEntries: cloneDeep(opts.memoryEntries !== undefined ? opts.memoryEntries : state.memoryEntries, []),
+      competitorEntries: cloneDeep(opts.competitorEntries !== undefined ? opts.competitorEntries : state.competitorEntries, []),
+      forceVersion: opts.forceVersion !== undefined ? opts.forceVersion : null,
+      boundOwner,
+      boundGen,
+      boundSample,
+    };
+    const run = persistQueue.then(
+      () => _persistToServerOnce(snapshot),
+      () => _persistToServerOnce(snapshot)
+    );
     persistQueue = run.catch(() => {});
     return run;
   }
 
   async function _persistToServerOnce({
-    preferences = state.preferences,
-    voiceProfile = state.voiceProfile,
-    memoryEntries = state.memoryEntries,
-    competitorEntries = state.competitorEntries,
+    preferences,
+    voiceProfile,
+    memoryEntries,
+    competitorEntries,
     forceVersion = null,
-  } = {}) {
-    const uid = currentOwnerId();
-    if (!uid) {
-      // Guest demo device-local persistence only
-      if (isSampleMode()) {
+    boundOwner,
+    boundGen,
+    boundSample,
+  }) {
+    if (!isCurrentRequestContext(boundGen, boundOwner, boundSample)) {
+      return { ok: false, stale: true };
+    }
+    if (!boundOwner) {
+      // Guest demo device-local persistence only for matching guest session
+      if (boundSample) {
         localStorage.setItem(
           guestSampleKey(),
           JSON.stringify({
@@ -380,11 +637,16 @@
       return { ok: true, guest: true };
     }
 
+    const expectedVersion = forceVersion !== null
+      ? forceVersion
+      : (Number.isInteger(state.version) ? state.version : 0);
+
     const res = await apiJson('/api/v1/seller-memory', {
       method: 'PUT',
+      headers: { 'X-Muse-Owner': boundOwner },
       body: JSON.stringify({
-        expected_version: forceVersion !== null ? forceVersion : state.version,
-        expected_owner: uid,
+        expected_version: expectedVersion,
+        expected_owner: boundOwner,
         preferences,
         voice_profile: voiceProfile,
         memory_entries: memoryEntries,
@@ -392,8 +654,20 @@
       }),
     });
 
+    if (!isCurrentRequestContext(boundGen, boundOwner, boundSample)) {
+      return { ok: false, stale: true };
+    }
+
     if (res.status === 409 && res.data && res.data.server_version !== undefined) {
       state.conflictPending = {
+        ownerId: boundOwner,
+        gen: boundGen,
+        base: cloneDeep(state.serverBaseline, {
+          preferences: {},
+          voiceProfile: {},
+          memoryEntries: [],
+          competitorEntries: [],
+        }),
         local: {
           preferences,
           voiceProfile,
@@ -419,19 +693,31 @@
       state.memoryEntries = res.data.memory_entries || memoryEntries;
       state.competitorEntries = res.data.competitor_entries || competitorEntries;
       state.suggestedUpdates = res.data.suggested_updates || state.suggestedUpdates;
+      state.serverBaseline = cloneDeep({
+        preferences: state.preferences,
+        voiceProfile: state.voiceProfile,
+        memoryEntries: state.memoryEntries,
+        competitorEntries: state.competitorEntries,
+      });
       return { ok: true };
     }
     toast(res.data?.detail || `Could not save memory (HTTP ${res.status})`);
     return { ok: false };
   }
 
-  async function fetchRecommendations(showSpinner = true) {
+  async function fetchRecommendations(showSpinner = true, ctx = null) {
+    const gen = ctx?.gen ?? state.activeGeneration;
+    const expectedOwner = ctx && 'expectedOwner' in ctx ? ctx.expectedOwner : currentOwnerId();
+    const expectedSample = ctx && 'expectedSample' in ctx ? ctx.expectedSample : isSampleMode();
+    const seq = ++state.recSeq;
+
     const activePref = {
       ...(state.preferences || {}),
       memory_entries: state.memoryEntries || [],
     };
     const res = await apiJson('/api/v1/seller-memory/recommend', {
       method: 'POST',
+      headers: expectedOwner ? { 'X-Muse-Owner': expectedOwner } : {},
       body: JSON.stringify({
         business_name: state.businessName || deriveSignedInBusinessName() || 'Your Studio',
         product_name: state.draftOverride?.product_name || null,
@@ -443,6 +729,9 @@
         previous_top_id: state.previousTopId || null,
       }),
     });
+    if (!isCurrentRequestContext(gen, expectedOwner, expectedSample) || seq !== state.recSeq) {
+      return null;
+    }
     if (res.ok && res.data) {
       state.recommendResult = res.data;
       const top = res.data.recommendations?.[0];
@@ -493,8 +782,11 @@
 
       const meta = el('div', { class: 'sm-memory-meta' });
       if (entry.source_url) {
+        const validatedUrl = safeHttpUrl(entry.source_url);
         meta.appendChild(
-          el('span', {}, 'Source: ', el('a', { href: entry.source_url, target: '_blank', rel: 'noopener' }, entry.source_url))
+          validatedUrl
+            ? el('span', {}, 'Source: ', el('a', { href: validatedUrl, target: '_blank', rel: 'noopener noreferrer' }, validatedUrl))
+            : el('span', {}, `Source: ${String(entry.source_url)}`)
         );
       }
       if (entry.scan_date) {
@@ -646,9 +938,14 @@
     }
 
     async function runInterpret({ text, sourceType, fixtureId }) {
+      const boundGen = state.activeGeneration;
+      const boundOwner = currentOwnerId();
+      const boundSample = isSampleMode();
+      const seq = ++state.interpretSeq;
       voiceStatus.textContent = '';
       const res = await apiJson('/api/v1/seller-memory/interpret', {
         method: 'POST',
+        headers: boundOwner ? { 'X-Muse-Owner': boundOwner } : {},
         body: JSON.stringify({
           text: text || '',
           source_type: sourceType,
@@ -656,6 +953,9 @@
           existing_entries: existingEntriesFn ? existingEntriesFn() : state.memoryEntries,
         }),
       });
+      if (!isCurrentRequestContext(boundGen, boundOwner, boundSample) || seq !== state.interpretSeq) {
+        return;
+      }
       if (!res.ok) {
         voiceStatus.textContent = res.data?.detail || 'Could not interpret note.';
         return;
@@ -881,6 +1181,13 @@
 
     window.addEventListener('muse:scan-complete', async (ev) => {
       const detail = ev.detail || {};
+      if (window.museAccount?.ready) {
+        try { await window.museAccount.ready(); } catch (_) {}
+      }
+      const boundGen = state.activeGeneration;
+      const boundOwner = currentOwnerId();
+      const boundSample = isSampleMode();
+      const seq = ++state.scanSeq;
       const items = (detail.data?.discovered_catalog_items || []).slice(0, 20);
       const priceHints = detail.data?.detected_price_hints || [];
       const snapshotItems = items.map((item, idx) => ({
@@ -893,6 +1200,7 @@
 
       const scanRes = await apiJson('/api/v1/seller-memory/scan', {
         method: 'POST',
+        headers: boundOwner ? { 'X-Muse-Owner': boundOwner } : {},
         body: JSON.stringify({
           business_name: detail.businessName || 'Your Shop',
           website_url: detail.primaryUrl || '',
@@ -901,6 +1209,9 @@
           snapshot_items: snapshotItems,
         }),
       });
+      if (!isCurrentRequestContext(boundGen, boundOwner, boundSample) || seq !== state.scanSeq) {
+        return;
+      }
       if (!scanRes.ok || !scanRes.data) return;
 
       const blockedNotes = (detail.data?.channels || [])
@@ -1010,18 +1321,25 @@
       const obs = new MutationObserver(async () => {
         if (stepDone.hidden) return;
         const uid = currentOwnerId();
+        const boundGen = state.activeGeneration;
+        const boundSample = isSampleMode();
         if (!uid) return;
         const pending = loadPendingOnboarding(uid);
         if (!pending) return;
         // Fetch current server version post-/onboarding/build, then save cleanly
-        const cur = await apiJson('/api/v1/seller-memory', { method: 'GET' });
+        const cur = await apiJson('/api/v1/seller-memory', {
+          method: 'GET',
+          headers: { 'X-Muse-Owner': uid },
+        });
+        if (!isCurrentRequestContext(boundGen, uid, boundSample)) return;
         if (cur.ok && cur.data) {
           state.version = Number(cur.data.version || 0);
           state.preferences = cur.data.preferences || {};
           state.memoryEntries = cur.data.memory_entries || [];
           state.competitorEntries = cur.data.competitor_entries || [];
         }
-        await syncPendingOnboardingToServer(pending, uid);
+        await syncPendingOnboardingToServer(pending, uid, boundGen);
+        if (!isCurrentRequestContext(boundGen, uid, boundSample)) return;
         stepDone.dataset.smSynced = 'true';
       });
       obs.observe(stepDone, { attributes: true, attributeFilter: ['hidden'] });
@@ -1045,10 +1363,17 @@
         else improveSec.prepend(panel);
       }
     }
+    panel.hidden = false;
 
     const pref = state.preferences || {};
     const draft = state.draftOverride || {};
-    const isDraftActive = Boolean(draft && (draft.active || draft.goal || draft.minutes_per_week || draft.context_note || (draft.ignored_entry_ids || []).length));
+    const draftIgnoredIds = Array.isArray(draft.ignore_entry_ids)
+      ? draft.ignore_entry_ids
+      : (Array.isArray(draft.ignored_entry_ids) ? draft.ignored_entry_ids : []);
+    const isDraftActive = Boolean(
+      draft &&
+      (draft.active || draft.goal || draft.minutes_per_week || draft.context_note || draft.product_name || draft.destination || draftIgnoredIds.length)
+    );
     const guestDemo = isSampleMode();
 
     panel.textContent = '';
@@ -1106,7 +1431,7 @@
       panel.appendChild(sugWrap);
     }
 
-    // Scope switcher: This draft vs Save as shop default
+    // Scope switcher: This draft vs Save as shop default + active draft slot
     const scopeBar = el('div', { class: 'sm-badge-row', style: 'justify-content:space-between;' });
     const scopeToggle = el('div', { class: 'sm-scope-toggle', role: 'group', 'aria-label': 'Context scope' });
     const draftBtn = el('button', {
@@ -1129,6 +1454,34 @@
     });
     scopeToggle.append(draftBtn, defaultBtn);
     scopeBar.appendChild(scopeToggle);
+
+    const activeDraftId = currentDraftId();
+    const draftSelect = el('select', {
+      id: 'smDraftSlotSelect',
+      class: 'sm-select',
+      'aria-label': 'Active draft slot',
+      style: 'max-width:170px;',
+    });
+    const draftSlots = ['default', 'draft-2'];
+    if (!draftSlots.includes(activeDraftId)) draftSlots.push(activeDraftId);
+    draftSlots.forEach((slotId) => {
+      const label = slotId === 'default' ? 'Draft 1 (main)' : (slotId === 'draft-2' ? 'Draft 2 (alt)' : `Draft: ${slotId}`);
+      const opt = el('option', { value: slotId }, label);
+      if (slotId === activeDraftId) opt.selected = true;
+      draftSelect.appendChild(opt);
+    });
+    draftSelect.addEventListener('change', async () => {
+      const boundGen = state.activeGeneration;
+      const boundOwner = currentOwnerId();
+      const boundSample = isSampleMode();
+      state.draftId = draftSelect.value || 'default';
+      loadDraftOverride();
+      await fetchRecommendations(true, { gen: boundGen, expectedOwner: boundOwner, expectedSample: boundSample });
+      if (!isCurrentRequestContext(boundGen, boundOwner, boundSample)) return;
+      renderHomeUI();
+    });
+    scopeBar.appendChild(draftSelect);
+
     if (isDraftActive) {
       scopeBar.appendChild(el('span', { class: 'sm-badge sm-badge-draft' }, 'Draft override active'));
     }
@@ -1141,6 +1494,15 @@
       : (pref.access?.minutes_per_week ?? 30);
     const audienceVal = showingDraft ? (draft.audience ?? pref.audience ?? '') : (pref.audience ?? '');
     const productVal = showingDraft ? (draft.product_name ?? '') : '';
+    const destinationVal = showingDraft ? (draft.destination ?? '') : '';
+
+    const destDatalist = el('datalist', { id: 'smDestDatalist' },
+      el('option', { value: 'website' }),
+      el('option', { value: 'etsy' }),
+      el('option', { value: 'instagram' }),
+      el('option', { value: 'fineartamerica' }),
+      el('option', { value: 'saatchi' })
+    );
 
     const grid = el('div', { class: 'sm-grid-2' },
       el('div', { class: 'sm-field' },
@@ -1183,6 +1545,18 @@
           value: productVal,
           placeholder: 'e.g. Meadow Mist 8x10 Print',
         })
+      ),
+      el('div', { class: 'sm-field' },
+        el('label', { for: 'smCtxDestination' }, 'Destination / channel (optional)'),
+        el('input', {
+          type: 'text',
+          id: 'smCtxDestination',
+          class: 'sm-input',
+          list: 'smDestDatalist',
+          value: destinationVal,
+          placeholder: 'e.g. website, etsy, instagram',
+        }),
+        destDatalist
       )
     );
     panel.appendChild(grid);
@@ -1207,8 +1581,12 @@
         class: 'sm-btn sm-btn-ghost',
       }, 'Clear draft override');
       clearDraftBtn.addEventListener('click', async () => {
+        const boundGen = state.activeGeneration;
+        const boundOwner = currentOwnerId();
+        const boundSample = isSampleMode();
         saveDraftOverride(null);
-        await fetchRecommendations(true);
+        await fetchRecommendations(true, { gen: boundGen, expectedOwner: boundOwner, expectedSample: boundSample });
+        if (!isCurrentRequestContext(boundGen, boundOwner, boundSample)) return;
         renderHomeUI();
       });
       actions.appendChild(clearDraftBtn);
@@ -1230,6 +1608,9 @@
     }
 
     applyDraftBtn.addEventListener('click', async () => {
+      const boundGen = state.activeGeneration;
+      const boundOwner = currentOwnerId();
+      const boundSample = isSampleMode();
       const nextDraft = {
         ...(state.draftOverride || {}),
         active: true,
@@ -1237,17 +1618,25 @@
         minutes_per_week: Number(document.getElementById('smCtxMinutes')?.value || 30),
         audience: document.getElementById('smCtxAudience')?.value?.trim() || '',
         product_name: document.getElementById('smCtxProduct')?.value?.trim() || '',
+        destination: document.getElementById('smCtxDestination')?.value?.trim() || '',
       };
       saveDraftOverride(nextDraft);
-      await fetchRecommendations(true);
+      await fetchRecommendations(true, { gen: boundGen, expectedOwner: boundOwner, expectedSample: boundSample });
+      if (!isCurrentRequestContext(boundGen, boundOwner, boundSample)) return;
       renderHomeUI();
       toast('Applied to this draft only — saved shop defaults unchanged.');
     });
 
     saveDefaultBtn.addEventListener('click', async () => {
+      const boundGen = state.activeGeneration;
+      const boundOwner = currentOwnerId();
+      const boundSample = isSampleMode();
       const nextGoal = document.getElementById('smCtxGoal')?.value?.trim() || '';
       const nextMinutes = Number(document.getElementById('smCtxMinutes')?.value || 30);
       const nextAudience = document.getElementById('smCtxAudience')?.value?.trim() || '';
+      const prevGoal = state.preferences?.goal || '';
+      const prevMinutes = Number(state.preferences?.access?.minutes_per_week || 30);
+      const prevAudience = state.preferences?.audience || '';
       const nextPrefs = {
         ...(state.preferences || {}),
         goal: nextGoal,
@@ -1255,7 +1644,7 @@
         access: { ...(state.preferences?.access || {}), minutes_per_week: nextMinutes },
       };
       const updates = [];
-      if (nextGoal) {
+      if (nextGoal && nextGoal !== prevGoal) {
         updates.push({
           id: 'pref-goal',
           key: 'goal',
@@ -1269,19 +1658,21 @@
           seller_edited: true,
         });
       }
-      updates.push({
-        id: 'pref-minutes',
-        key: 'minutes_per_week',
-        label: 'Weekly time budget',
-        value: `${nextMinutes} minutes / week`,
-        kind: 'preference',
-        scope: 'shop_default',
-        source: 'user_input',
-        confidence: 'confirmed',
-        status: 'accepted',
-        seller_edited: true,
-      });
-      if (nextAudience) {
+      if (nextMinutes !== prevMinutes) {
+        updates.push({
+          id: 'pref-minutes',
+          key: 'minutes_per_week',
+          label: 'Weekly time budget',
+          value: `${nextMinutes} minutes / week`,
+          kind: 'preference',
+          scope: 'shop_default',
+          source: 'user_input',
+          confidence: 'confirmed',
+          status: 'accepted',
+          seller_edited: true,
+        });
+      }
+      if (nextAudience && nextAudience !== prevAudience) {
         updates.push({
           id: 'pref-audience',
           key: 'audience',
@@ -1298,8 +1689,10 @@
       const nextEntries = mergeEntriesList(state.memoryEntries, updates);
       saveDraftOverride(null);
       const saved = await persistToServer({ preferences: nextPrefs, memoryEntries: nextEntries });
+      if (!isCurrentRequestContext(boundGen, boundOwner, boundSample)) return;
       if (saved.ok) {
-        await fetchRecommendations(true);
+        await fetchRecommendations(true, { gen: boundGen, expectedOwner: boundOwner, expectedSample: boundSample });
+        if (!isCurrentRequestContext(boundGen, boundOwner, boundSample)) return;
         renderHomeUI();
         toast('Saved as your shop default.');
       }
@@ -1353,7 +1746,11 @@
         const compUrl = comp.url || '';
         const compName = comp.name || '';
         const compIdx = idx;
+        const boundGen = state.activeGeneration;
+        const boundOwner = currentOwnerId();
+        const boundSample = isSampleMode();
         const runUpdate = async () => {
+          if (!isCurrentRequestContext(boundGen, boundOwner, boundSample)) return;
           const nextEntries = Array.isArray(state.competitorEntries) ? [...state.competitorEntries] : [];
           let targetIdx = nextEntries.findIndex(
             (c) => (compUrl && c.url === compUrl) || (compName && c.name === compName)
@@ -1370,10 +1767,16 @@
             reason: nextRationale || liveComp.reason || '',
           };
           state.competitorEntries = nextEntries;
-          await fetchRecommendations(true);
-          if (currentOwnerId()) {
+          await fetchRecommendations(true, {
+            gen: boundGen,
+            expectedOwner: boundOwner,
+            expectedSample: boundSample,
+          });
+          if (!isCurrentRequestContext(boundGen, boundOwner, boundSample)) return;
+          if (boundOwner) {
             await persistToServer({ competitorEntries: state.competitorEntries });
           }
+          if (!isCurrentRequestContext(boundGen, boundOwner, boundSample)) return;
           toast(`Updated watch reason to ${ROLE_LABELS[nextRole]}.`);
         };
         const queued = (state.compUpdateQueue || Promise.resolve()).then(runUpdate, runUpdate);
@@ -1388,11 +1791,69 @@
     });
   }
 
+  function createStudioHandoff(rec, fallbackDef = {}) {
+    const moveDef = rec?.editor_defaults || fallbackDef || {};
+    const ns = ownerNamespace();
+    const draftId = currentDraftId();
+    const id = `sm_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+    const payload = {
+      id,
+      owner_id: ns,
+      workspace_mode: currentWorkspaceMode(),
+      draft_id: draftId,
+      created_at: new Date().toISOString(),
+      recommendation_id: rec?.id || moveDef.recommendation_id || '',
+      title: rec?.title || moveDef.recommendation_title || '',
+      action: rec?.action || moveDef.recommendation_action || '',
+      why_this_fits: rec?.why_this_fits || moveDef.why_this_fits || '',
+      channel: rec?.channel || moveDef.channel || '',
+      goal: moveDef.goal || rec?.goal || 'story',
+      cta: moveDef.cta || rec?.cta || '',
+      business_name: moveDef.business_name || state.businessName || '',
+      product_name: moveDef.product_name || '',
+      destination: moveDef.destination || state.draftOverride?.destination || '',
+      price_claim: moveDef.price_claim || rec?.price_claim || '',
+      caption_length: moveDef.caption_length || 'medium',
+      tone: moveDef.tone || 'neutral',
+      words_to_avoid: Array.isArray(moveDef.words_to_avoid) ? moveDef.words_to_avoid : [],
+      minutes_per_week: moveDef.minutes_per_week || null,
+      context_summary: moveDef.context_summary || '',
+    };
+    try {
+      const prefix = `muse.sm.handoff.${encodeURIComponent(ns)}.`;
+      const existing = [];
+      for (let i = 0; i < localStorage.length; i += 1) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith(prefix)) existing.push(k);
+      }
+      if (existing.length > 24) {
+        existing.slice(0, existing.length - 20).forEach((k) => localStorage.removeItem(k));
+      }
+      localStorage.setItem(handoffStorageKey(id, ns), JSON.stringify(payload));
+    } catch (_) {}
+    return id;
+  }
+
+  function readActiveStudioHandoff() {
+    try {
+      const hid = new URLSearchParams(location.search).get('sm_handoff');
+      if (!hid) return null;
+      const ns = ownerNamespace();
+      const raw = localStorage.getItem(handoffStorageKey(hid, ns));
+      const payload = safeParse(raw, null);
+      if (!payload || payload.owner_id !== ns || payload.workspace_mode !== currentWorkspaceMode()) {
+        return null;
+      }
+      return payload;
+    } catch (_) {
+      return null;
+    }
+  }
+
   function renderHomeRecommendations() {
     const improveSec = document.getElementById('loop-improve');
     if (!improveSec || isSampleMode() || !state.recommendResult) return;
     const recos = state.recommendResult.recommendations || [];
-    if (!recos.length) return;
 
     let banner = document.getElementById('smWhatChangedBanner');
     if (!banner) {
@@ -1400,19 +1861,48 @@
       const panel = document.getElementById('smContextPanel');
       if (panel) panel.insertAdjacentElement('afterend', banner);
     }
-    if (state.recommendResult.what_changed) {
+    if (state.recommendResult.what_changed && recos.length) {
       banner.textContent = state.recommendResult.what_changed;
       banner.hidden = false;
     } else {
+      banner.textContent = '';
       banner.hidden = true;
     }
 
-    const top = recos[0];
+    let missingBanner = document.getElementById('smMissingInfoBanner');
+    if (!missingBanner) {
+      missingBanner = el('div', { id: 'smMissingInfoBanner', class: 'sm-what-changed', hidden: true, role: 'status' });
+      if (banner) banner.insertAdjacentElement('afterend', missingBanner);
+    }
+    const missingPrompt = state.recommendResult.missing_info_prompt || '';
+    if (missingPrompt && (!recos.length || state.recommendResult.all_channels_excluded)) {
+      missingBanner.textContent = missingPrompt;
+      missingBanner.hidden = false;
+    } else {
+      missingBanner.textContent = '';
+      missingBanner.hidden = true;
+    }
+
     let topCard = document.getElementById('smTopMovePreview');
     if (!topCard) {
       topCard = el('div', { id: 'smTopMovePreview', class: 'sm-card' });
-      banner.insertAdjacentElement('afterend', topCard);
+      (missingBanner || banner).insertAdjacentElement('afterend', topCard);
     }
+
+    const listEl = improveSec.querySelector('ol.jr-recos');
+    if (!recos.length) {
+      topCard.textContent = '';
+      topCard.hidden = true;
+      topCard.dataset.smTopId = '';
+      if (listEl) listEl.textContent = '';
+      if (typeof window.museShell?.refreshTriage === 'function') {
+        window.museShell.refreshTriage();
+      }
+      return;
+    }
+
+    const top = recos[0];
+    topCard.hidden = false;
     topCard.dataset.smTopId = top.id || '';
     topCard.textContent = '';
     const openImproveBtn = el('button', {
@@ -1439,18 +1929,16 @@
       el('div', { class: 'sm-why-line' }, `Why this fits: ${top.why_this_fits || ''}`)
     );
 
-    const listEl = improveSec.querySelector('ol.jr-recos');
     if (!listEl) return;
     listEl.textContent = '';
 
     const def = state.recommendResult.editor_defaults || {};
+    const draftId = currentDraftId();
     recos.slice(0, 5).forEach((rec) => {
+      const handoffId = createStudioHandoff(rec, def);
       const qs = new URLSearchParams();
-      qs.set('idea', rec.title || '');
-      qs.set('from_memory', '1');
-      if (def.goal) qs.set('goal', def.goal);
-      if (def.business_name) qs.set('seller_name', def.business_name);
-      if (def.product_name) qs.set('product_name', def.product_name);
+      qs.set('sm_handoff', handoffId);
+      qs.set('draft', draftId);
 
       const usedChips = el('div', { class: 'sm-used-chips' }, el('span', { style: 'font-weight:600;' }, 'Used from memory:'));
       if (rec.used_entries && rec.used_entries.length) {
@@ -1464,14 +1952,24 @@
             }, 'Ignore for draft')
           );
           chip.querySelector('button')?.addEventListener('click', async () => {
-            const curIgnored = new Set(state.draftOverride?.ignored_entry_ids || []);
+            const boundGen = state.activeGeneration;
+            const boundOwner = currentOwnerId();
+            const boundSample = isSampleMode();
+            const prevDraft = state.draftOverride || {};
+            const existingIgnored = Array.isArray(prevDraft.ignore_entry_ids)
+              ? prevDraft.ignore_entry_ids
+              : (Array.isArray(prevDraft.ignored_entry_ids) ? prevDraft.ignored_entry_ids : []);
+            const curIgnored = new Set(existingIgnored);
             curIgnored.add(u.id);
-            saveDraftOverride({
-              ...(state.draftOverride || {}),
-              active: true,
-              ignored_entry_ids: Array.from(curIgnored),
+            const nextDraft = { ...prevDraft, active: true, ignore_entry_ids: Array.from(curIgnored) };
+            delete nextDraft.ignored_entry_ids;
+            saveDraftOverride(nextDraft);
+            await fetchRecommendations(true, {
+              gen: boundGen,
+              expectedOwner: boundOwner,
+              expectedSample: boundSample,
             });
-            await fetchRecommendations(true);
+            if (!isCurrentRequestContext(boundGen, boundOwner, boundSample)) return;
             renderHomeUI();
             toast(`Ignored "${u.label}" for this draft only.`);
           });
@@ -1486,13 +1984,29 @@
         usedChips
       );
 
+      const makeAdLink = el('a', {
+        href: `/create?${qs.toString()}`,
+        class: 'sm-btn sm-btn-primary',
+        style: 'text-decoration:none;',
+      }, 'Make ad');
+      const draftPostLink = el('a', {
+        href: `/today?${qs.toString()}`,
+        class: 'sm-btn',
+        style: 'text-decoration:none;',
+      }, 'Draft daily post');
+      const refreshHandoffHref = () => {
+        const freshId = createStudioHandoff(rec, def);
+        const nextQs = new URLSearchParams({ sm_handoff: freshId, draft: currentDraftId() }).toString();
+        makeAdLink.href = `/create?${nextQs}`;
+        draftPostLink.href = `/today?${nextQs}`;
+      };
+      makeAdLink.addEventListener('click', refreshHandoffHref);
+      draftPostLink.addEventListener('click', refreshHandoffHref);
+
       const li = el('li', { 'data-sm-reco-id': rec.id },
         el('div', { style: 'font-weight:700;' }, `${rec.title} · ~${rec.estimated_minutes || 15} min`),
         el('div', { style: 'margin-top:4px;font-size:0.9rem;' }, rec.action || ''),
-        el('div', { class: 'sm-btn-row', style: 'margin-top:6px;' },
-          el('a', { href: `/create?${qs.toString()}`, class: 'sm-btn sm-btn-primary', style: 'text-decoration:none;' }, 'Make ad'),
-          el('a', { href: `/today?${qs.toString()}`, class: 'sm-btn', style: 'text-decoration:none;' }, 'Draft daily post')
-        ),
+        el('div', { class: 'sm-btn-row', style: 'margin-top:6px;' }, makeAdLink, draftPostLink),
         metaBox
       );
       listEl.appendChild(li);
@@ -1505,18 +2019,23 @@
 
   async function handleSuggestionDecision(suggestionId, decision) {
     const uid = currentOwnerId();
+    const boundGen = state.activeGeneration;
+    const boundSample = isSampleMode();
     if (!uid) return;
     const res = await apiJson(`/api/v1/seller-memory/suggestions/${encodeURIComponent(suggestionId)}/respond`, {
       method: 'POST',
+      headers: { 'X-Muse-Owner': uid },
       body: JSON.stringify({ decision, expected_owner: uid }),
     });
+    if (!isCurrentRequestContext(boundGen, uid, boundSample)) return;
     if (res.ok && res.data) {
       state.version = Number(res.data.version || state.version);
       state.preferences = res.data.preferences || state.preferences;
       state.voiceProfile = res.data.voice_profile || state.voiceProfile;
       state.memoryEntries = res.data.memory_entries || state.memoryEntries;
       state.suggestedUpdates = res.data.suggested_updates || [];
-      await fetchRecommendations(true);
+      await fetchRecommendations(true, { gen: boundGen, expectedOwner: uid, expectedSample: boundSample });
+      if (!isCurrentRequestContext(boundGen, uid, boundSample)) return;
       renderHomeUI();
       if (document.getElementById('smMemoryModalBackdrop')?.hidden === false) {
         renderMemoryModalBody();
@@ -1589,19 +2108,35 @@
         const inp = el('input', { type: 'text', class: 'sm-memory-input', value: entry.value || '', 'aria-label': `Edit ${entry.label || entry.key}` });
         const meta = el('div', { class: 'sm-memory-meta' });
         if (entry.source) meta.appendChild(el('span', {}, SOURCE_LABELS[entry.source] || entry.source));
-        if (entry.source_url) meta.appendChild(el('a', { href: entry.source_url, target: '_blank', rel: 'noopener' }, entry.source_url));
+        if (entry.source_url) {
+          const validatedUrl = safeHttpUrl(entry.source_url);
+          meta.appendChild(
+            validatedUrl
+              ? el('a', { href: validatedUrl, target: '_blank', rel: 'noopener noreferrer' }, validatedUrl)
+              : el('span', {}, `Source: ${String(entry.source_url)}`)
+          );
+        }
         if (entry.scan_date) meta.appendChild(el('span', {}, `Scan date: ${entry.scan_date}`));
         if (entry.uncertainty) meta.appendChild(el('span', {}, entry.uncertainty));
 
         const saveBtn = el('button', { type: 'button', class: 'sm-btn sm-btn-primary' }, 'Save edit');
         saveBtn.addEventListener('click', async () => {
+          const boundGen = state.activeGeneration;
+          const boundOwner = currentOwnerId();
+          const boundSample = isSampleMode();
           entry.value = inp.value.trim();
           entry.seller_edited = true;
           entry.confidence = 'confirmed';
           entry.status = 'accepted';
           const ok = await persistToServer({ memoryEntries: state.memoryEntries });
+          if (!isCurrentRequestContext(boundGen, boundOwner, boundSample)) return;
           if (ok.ok) {
-            await fetchRecommendations(true);
+            await fetchRecommendations(true, {
+              gen: boundGen,
+              expectedOwner: boundOwner,
+              expectedSample: boundSample,
+            });
+            if (!isCurrentRequestContext(boundGen, boundOwner, boundSample)) return;
             renderHomeUI();
             renderMemoryModalBody();
             toast('Updated saved memory.');
@@ -1614,11 +2149,15 @@
           'data-forget-entry': entry.id,
         }, 'Forget');
         forgetBtn.addEventListener('click', async () => {
+          const boundGen = state.activeGeneration;
           const uid = currentOwnerId();
+          const boundSample = isSampleMode();
           if (uid) {
             const delRes = await apiJson(`/api/v1/seller-memory/entries/${encodeURIComponent(entry.id)}`, {
               method: 'DELETE',
+              headers: { 'X-Muse-Owner': uid },
             });
+            if (!isCurrentRequestContext(boundGen, uid, boundSample)) return;
             if (delRes.ok && delRes.data) {
               state.version = Number(delRes.data.version || state.version);
               state.preferences = delRes.data.preferences || state.preferences;
@@ -1632,7 +2171,9 @@
           } else {
             state.memoryEntries = state.memoryEntries.filter((x) => x.id !== entry.id);
           }
-          await fetchRecommendations(true);
+          if (!isCurrentRequestContext(boundGen, uid, boundSample)) return;
+          await fetchRecommendations(true, { gen: boundGen, expectedOwner: uid, expectedSample: boundSample });
+          if (!isCurrentRequestContext(boundGen, uid, boundSample)) return;
           renderHomeUI();
           renderMemoryModalBody();
           toast(`Forgot "${entry.label || entry.key}".`);
@@ -1648,10 +2189,19 @@
     const addWidget = buildVoiceAndNoteWidget({
       existingEntriesFn: () => state.memoryEntries,
       onAcceptEntries: async (accepted) => {
+        const boundGen = state.activeGeneration;
+        const boundOwner = currentOwnerId();
+        const boundSample = isSampleMode();
         const nextEntries = mergeEntriesList(state.memoryEntries, accepted);
         const ok = await persistToServer({ memoryEntries: nextEntries });
+        if (!isCurrentRequestContext(boundGen, boundOwner, boundSample)) return;
         if (ok.ok) {
-          await fetchRecommendations(true);
+          await fetchRecommendations(true, {
+            gen: boundGen,
+            expectedOwner: boundOwner,
+            expectedSample: boundSample,
+          });
+          if (!isCurrentRequestContext(boundGen, boundOwner, boundSample)) return;
           renderHomeUI();
           renderMemoryModalBody();
           toast(`Added ${accepted.length} item(s) to saved memory.`);
@@ -1693,6 +2243,11 @@
     const mergeBtn = el('button', { type: 'button', id: 'smConflictMergeBtn', class: 'sm-btn' }, 'Merge both edits');
 
     keepBtn.addEventListener('click', async () => {
+      if (!isCurrentRequestContext(c.gen, c.ownerId, false)) {
+        state.conflictPending = null;
+        backdrop.hidden = true;
+        return;
+      }
       const ok = await persistToServer({
         preferences: c.local.preferences,
         voiceProfile: c.local.voiceProfile,
@@ -1700,46 +2255,106 @@
         competitorEntries: c.local.competitorEntries,
         forceVersion: c.server.version,
       });
+      if (!isCurrentRequestContext(c.gen, c.ownerId, false)) return;
       if (ok.ok) {
         state.conflictPending = null;
         backdrop.hidden = true;
-        await fetchRecommendations(true);
+        await fetchRecommendations(true, { gen: c.gen, expectedOwner: c.ownerId, expectedSample: false });
+        if (!isCurrentRequestContext(c.gen, c.ownerId, false)) return;
         renderHomeUI();
         toast('Kept your edits.');
       }
     });
 
     useSrvBtn.addEventListener('click', async () => {
+      if (!isCurrentRequestContext(c.gen, c.ownerId, false)) {
+        state.conflictPending = null;
+        backdrop.hidden = true;
+        return;
+      }
       state.version = c.server.version;
       state.preferences = c.server.preferences;
       state.voiceProfile = c.server.voiceProfile;
       state.memoryEntries = c.server.memoryEntries;
       state.competitorEntries = c.server.competitorEntries;
+      state.serverBaseline = cloneDeep({
+        preferences: state.preferences,
+        voiceProfile: state.voiceProfile,
+        memoryEntries: state.memoryEntries,
+        competitorEntries: state.competitorEntries,
+      });
       state.conflictPending = null;
       backdrop.hidden = true;
-      await fetchRecommendations(true);
+      await fetchRecommendations(true, { gen: c.gen, expectedOwner: c.ownerId, expectedSample: false });
+      if (!isCurrentRequestContext(c.gen, c.ownerId, false)) return;
       renderHomeUI();
       toast('Loaded version saved elsewhere.');
     });
 
     mergeBtn.addEventListener('click', async () => {
-      const mergedEntries = mergeEntriesList(c.server.memoryEntries, c.local.memoryEntries);
-      const mergedPrefs = {
-        ...c.server.preferences,
-        ...c.local.preferences,
-        access: { ...(c.server.preferences?.access || {}), ...(c.local.preferences?.access || {}) },
-      };
+      if (!isCurrentRequestContext(c.gen, c.ownerId, false)) {
+        state.conflictPending = null;
+        backdrop.hidden = true;
+        return;
+      }
+      const base = c.base || {};
+      const mergedEntries = threeWayMergeEntries(
+        base.memoryEntries || [],
+        c.server.memoryEntries || [],
+        c.local.memoryEntries || []
+      );
+      const mergedPrefs = threeWayMerge(
+        base.preferences || {},
+        c.server.preferences || {},
+        c.local.preferences || {}
+      );
+      const mergedVoice = threeWayMerge(
+        base.voiceProfile || {},
+        c.server.voiceProfile || {},
+        c.local.voiceProfile || {}
+      );
+      const mergedComps = mergeCompetitorEntries(
+        base.competitorEntries || [],
+        c.server.competitorEntries || [],
+        c.local.competitorEntries || []
+      );
+      const alignedEntries = mergedEntries.map((entry) => {
+        if (!entry || (entry.scope || 'shop_default') !== 'shop_default' || entry.status === 'dismissed') {
+          return entry;
+        }
+        if (entry.key === 'goal' && mergedPrefs.goal && mergedPrefs.goal !== c.local.preferences?.goal) {
+          return { ...entry, value: mergedPrefs.goal };
+        }
+        if (
+          entry.key === 'audience' &&
+          mergedPrefs.audience &&
+          mergedPrefs.audience !== c.local.preferences?.audience
+        ) {
+          return { ...entry, value: mergedPrefs.audience };
+        }
+        const mergedMins = mergedPrefs.access?.minutes_per_week;
+        if (
+          entry.key === 'minutes_per_week' &&
+          mergedMins &&
+          mergedMins !== c.local.preferences?.access?.minutes_per_week
+        ) {
+          return { ...entry, value: `${mergedMins} minutes / week` };
+        }
+        return entry;
+      });
       const ok = await persistToServer({
         preferences: mergedPrefs,
-        voiceProfile: c.local.voiceProfile,
-        memoryEntries: mergedEntries,
-        competitorEntries: c.local.competitorEntries?.length ? c.local.competitorEntries : c.server.competitorEntries,
+        voiceProfile: mergedVoice,
+        memoryEntries: alignedEntries,
+        competitorEntries: mergedComps,
         forceVersion: c.server.version,
       });
+      if (!isCurrentRequestContext(c.gen, c.ownerId, false)) return;
       if (ok.ok) {
         state.conflictPending = null;
         backdrop.hidden = true;
-        await fetchRecommendations(true);
+        await fetchRecommendations(true, { gen: c.gen, expectedOwner: c.ownerId, expectedSample: false });
+        if (!isCurrentRequestContext(c.gen, c.ownerId, false)) return;
         renderHomeUI();
         toast('Merged both versions.');
       }
@@ -1769,11 +2384,46 @@
   }
 
   // --- /today & /create Studio Integration ---
+  function resolveActiveStudioContext() {
+    const handoff = readActiveStudioHandoff();
+    const recos = state.recommendResult?.recommendations || [];
+    const matchedRec = handoff?.recommendation_id
+      ? recos.find((r) => r.id === handoff.recommendation_id)
+      : null;
+    const selectedRec = matchedRec || (handoff ? handoff : recos[0]) || null;
+    const def =
+      matchedRec?.editor_defaults ||
+      (handoff
+        ? {
+            recommendation_id: handoff.recommendation_id,
+            recommendation_title: handoff.title,
+            recommendation_action: handoff.action,
+            business_name: handoff.business_name,
+            product_name: handoff.product_name,
+            destination: handoff.destination,
+            channel: handoff.channel,
+            goal: handoff.goal,
+            cta: handoff.cta,
+            caption_length: handoff.caption_length,
+            tone: handoff.tone,
+            words_to_avoid: handoff.words_to_avoid,
+            price_claim: handoff.price_claim,
+            minutes_per_week: handoff.minutes_per_week,
+            context_summary: handoff.context_summary,
+            why_this_fits: handoff.why_this_fits,
+          }
+        : state.recommendResult?.editor_defaults || {});
+    return { handoff, selectedRec, def };
+  }
+
   function renderStudioBar() {
     const isToday = location.pathname.startsWith('/today');
     const isCreate = location.pathname.startsWith('/create');
     if (!isToday && !isCreate) return;
     if (isSampleMode() && !state.draftOverride?.active) return;
+
+    const { handoff, selectedRec, def } = resolveActiveStudioContext();
+    if (!handoff && !state.recommendResult && !state.preferences?.goal) return;
 
     const main = document.querySelector('main') || document.body;
     let bar = document.getElementById('smStudioContextBar');
@@ -1781,12 +2431,15 @@
       bar = el('section', { id: 'smStudioContextBar', class: 'sm-card', style: 'margin:10px auto;max-width:1120px;' });
       main.prepend(bar);
     }
+    bar.hidden = false;
+    bar.dataset.smSelectedRecoId = selectedRec?.recommendation_id || selectedRec?.id || '';
 
-    const def = state.recommendResult?.editor_defaults || {};
-    const top = state.recommendResult?.recommendations?.[0];
     const badges = el('div', { class: 'sm-badge-row' },
-      el('span', { class: 'sm-badge sm-badge-goal' }, `Goal: ${state.draftOverride?.goal || state.preferences?.goal || def.goal || 'Focus post'}`)
+      el('span', { class: 'sm-badge sm-badge-goal' }, `Goal: ${state.draftOverride?.goal || def.goal || state.preferences?.goal || 'Focus post'}`)
     );
+    if (selectedRec?.title) {
+      badges.appendChild(el('span', { class: 'sm-badge sm-badge-preference' }, `Selected move: ${selectedRec.title}`));
+    }
     if (def.minutes_per_week) {
       badges.appendChild(el('span', { class: 'sm-badge sm-badge-preference' }, `<= ${def.minutes_per_week} min/wk`));
     }
@@ -1796,8 +2449,8 @@
     if (def.words_to_avoid?.length) {
       badges.appendChild(el('span', { class: 'sm-badge sm-badge-warn' }, `Avoid: ${def.words_to_avoid.join(', ')}`));
     }
-    if (top?.competitor_used) {
-      badges.appendChild(el('span', { class: 'sm-badge' }, `Compare: ${top.competitor_used} (${ROLE_LABELS[top.competitor_role] || top.competitor_role})`));
+    if (selectedRec?.competitor_used) {
+      badges.appendChild(el('span', { class: 'sm-badge' }, `Compare: ${selectedRec.competitor_used} (${ROLE_LABELS[selectedRec.competitor_role] || selectedRec.competitor_role})`));
     }
 
     const memBtn = el('button', { type: 'button', class: 'sm-btn' }, 'What Muse remembers');
@@ -1805,15 +2458,16 @@
     const applyBtn = el('button', { type: 'button', id: 'smStudioApplyBtn', class: 'sm-btn sm-btn-primary' }, 'Apply defaults to editor');
     applyBtn.addEventListener('click', () => {
       applyEditorDefaults(true);
-      toast('Applied your saved context to empty/default studio fields.');
+      toast('Applied your selected context to studio fields.');
     });
 
+    const subtitleWhy = selectedRec?.why_this_fits || def.why_this_fits || '';
     bar.textContent = '';
     bar.append(
       el('div', { class: 'sm-card-header' },
         el('div', {},
           el('strong', {}, def.business_name ? `Your context · ${def.business_name}` : 'Your context'),
-          top?.why_this_fits ? el('div', { class: 'sm-sub', style: 'margin:2px 0 0;' }, `Why this fits: ${top.why_this_fits}`) : null
+          subtitleWhy ? el('div', { class: 'sm-sub', style: 'margin:2px 0 0;' }, `Why this fits: ${subtitleWhy}`) : null
         ),
         el('div', { class: 'sm-btn-row' }, memBtn, applyBtn)
       ),
@@ -1824,8 +2478,9 @@
   }
 
   function applyEditorDefaults(force) {
-    const def = state.recommendResult?.editor_defaults;
-    if (!def) return;
+    const { handoff, def } = resolveActiveStudioContext();
+    if (!def || !Object.keys(def).length) return;
+    if (handoff && !force) return;
     const fields = [
       ['sellerName', def.business_name],
       ['productName', def.product_name],
@@ -1871,17 +2526,40 @@
     }
 
     window.addEventListener('muse:signals-updated', async () => {
-      if (!currentOwnerId()) return;
-      const evalRes = await apiJson('/api/v1/seller-memory/suggestions/evaluate', { method: 'POST' });
+      const uid = currentOwnerId();
+      const boundGen = state.activeGeneration;
+      const boundSample = isSampleMode();
+      if (!uid) return;
+      const evalRes = await apiJson('/api/v1/seller-memory/suggestions/evaluate', {
+        method: 'POST',
+        headers: { 'X-Muse-Owner': uid },
+      });
+      if (!isCurrentRequestContext(boundGen, uid, boundSample)) return;
       if (evalRes.ok && evalRes.data) {
         state.suggestedUpdates = evalRes.data.suggested_updates || [];
         renderHomeUI();
       }
     });
 
+    window.addEventListener('muse:account-change', () => {
+      const nextTag = stateTagForCurrent();
+      if (state.loadedForOwner !== '__init__' && nextTag !== state.loadedForOwner) {
+        clearPrivateMemoryUI();
+        loadServerMemory(true);
+      } else if (state.loadedForOwner === '__init__') {
+        loadServerMemory(false);
+      }
+    });
+
+    window.addEventListener('muse:workspace-reset', () => {
+      clearPrivateMemoryUI();
+      loadServerMemory(true);
+    });
+
     window.addEventListener('focus', () => {
-      const uid = currentOwnerId();
-      if (uid !== state.ownerId) {
+      const nextTag = stateTagForCurrent();
+      if (state.loadedForOwner !== '__init__' && nextTag !== state.loadedForOwner) {
+        clearPrivateMemoryUI();
         loadServerMemory(true);
       }
     });
@@ -1891,14 +2569,17 @@
     initOnboardingHooks();
     initObservers();
     if (window.museAccount?.ready) {
-      window.museAccount.ready().then(() => loadServerMemory(true)).catch(() => loadServerMemory(true));
+      window.museAccount.ready().then(() => loadServerMemory(false)).catch(() => loadServerMemory(false));
       // React cleanly to sign-in / sign-out transitions
       setInterval(() => {
-        const uid = currentOwnerId();
-        if (uid !== state.ownerId) loadServerMemory(true);
+        const nextTag = stateTagForCurrent();
+        if (state.loadedForOwner !== '__init__' && nextTag !== state.loadedForOwner) {
+          clearPrivateMemoryUI();
+          loadServerMemory(true);
+        }
       }, 900);
     } else {
-      loadServerMemory(true);
+      loadServerMemory(false);
     }
   }
 

@@ -1,14 +1,28 @@
 'use strict';
 (() => {
   const $ = (id) => document.getElementById(id);
-  const state = { accountLive: false, step: 0, presets: null, workspace: 'sarabjit_singh', custom: false, copyEdited: false, sceneEdited: false, goal: 'story', placement: 'instagram_feed', original: '', image: '', imageKind: 'original', sampleImage: '', key: '', live: false, defaultLive: false, readiness: null, busy: false, revision: 0, paint: 0, product: {}, headline: '', caption: '', scene: '', provenance: 'Original-photo layout. No new image generated.', idea_id: null };
+  const state = { accountLive: false, step: 0, presets: null, workspace: 'sarabjit_singh', custom: false, copyEdited: false, sceneEdited: false, goal: 'story', placement: 'instagram_feed', original: '', image: '', imageKind: 'original', sampleImage: '', key: '', live: false, defaultLive: false, readiness: null, busy: false, revision: 0, paint: 0, product: {}, headline: '', caption: '', scene: '', cta: '', provenance: 'Original-photo layout. No new image generated.', idea_id: null };
 
   const draftNamespace = 'creator';
-  const draftFields = ['workspace', 'custom', 'copyEdited', 'sceneEdited', 'goal', 'placement', 'original', 'image', 'imageKind', 'sampleImage', 'product', 'headline', 'caption', 'scene', 'provenance', 'artwork', 'idea_id'];
+  const draftFields = ['workspace', 'custom', 'copyEdited', 'sceneEdited', 'goal', 'placement', 'original', 'image', 'imageKind', 'sampleImage', 'product', 'headline', 'caption', 'scene', 'cta', 'provenance', 'artwork', 'idea_id'];
   function isSampleMode() {
     try {
       return typeof location !== 'undefined' && new URLSearchParams(location.search).get('workspace') === 'sample';
     } catch (_) { return false; }
+  }
+  function readRecommendationHandoff(uid = window.museAccount?.getSnapshot?.()?.user?.id || window.museAccount?.current?.()?.id || null) {
+    try {
+      const hid = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('sm_handoff') : null;
+      if (!hid) return null;
+      const ns = uid ? String(uid) : 'guest';
+      const mode = isSampleMode() ? 'sample' : 'own';
+      const raw = localStorage.getItem(`muse.sm.handoff.${encodeURIComponent(ns)}.${encodeURIComponent(hid)}`);
+      const payload = raw ? JSON.parse(raw) : null;
+      if (!payload || payload.owner_id !== ns || payload.workspace_mode !== mode) return null;
+      return payload;
+    } catch (_) {
+      return null;
+    }
   }
   function activePlacement() {
     if (state.placement) return state.placement;
@@ -53,7 +67,7 @@
   function recoverDevice() {
     try {
       const requestedIdea = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('idea') : null;
-      if (requestedIdea) return;
+      if (requestedIdea && findPreviewSpec(requestedIdea)) return;
       const raw = localStorage.getItem(deviceKey());
       if (raw) { installDocument(JSON.parse(raw)); draftStatus('Recovered this device’s draft. Review before sharing.'); }
     } catch { draftStatus('Could not recover device storage. Keep this tab open; download a backup or load your account draft.'); }
@@ -162,6 +176,13 @@
   const destinations = { pixels: 'Pixels', fineartamerica: 'Fine Art America', saatchi: 'Saatchi Art', website: 'Artist website', other: 'My shop / inquiry page' };
   let offers = {};
   function postingChannels() { return [['postInstagram', 'instagram'], ['postFacebook', 'facebook']].filter(([id]) => $(id).checked).map(([, name]) => name); }
+  const isSampleProductUrl = (url) => /sarabjit|fineartamerica\.com\/profiles\/sarabjit|saatchiart\.com\/sarabjit/i.test(String(url || ''));
+  function stripSampleOffersAndLink() {
+    Object.keys(offers).forEach((k) => {
+      if (isSampleProductUrl(offers[k]?.link)) delete offers[k];
+    });
+    if (isSampleProductUrl(state.product.link)) state.product.link = '';
+  }
   function resetOffers(artist) {
     offers = artist ? {
       pixels: { link: 'https://sarabjit-singh.pixels.com/', price: '' },
@@ -372,10 +393,11 @@
       state.sampleImage = samplePath(spec.image_ref);
       state.imageKind = 'original';
     }
+    state.cta = spec.cta || '';
     const mappedGoal = spec.goal || (spec.insight_id.includes('gift') ? 'gift' : (spec.insight_id.includes('starter') || spec.insight_id.includes('visit') || spec.insight_id.includes('home') ? 'visit' : 'story'));
     if (Object.hasOwn(goals, mappedGoal)) {
       state.goal = mappedGoal;
-      document.querySelectorAll?.('.goal').forEach((b) => {
+      document.querySelectorAll?.('.goal, [data-goal]').forEach((b) => {
         const active = b.dataset.goal === mappedGoal;
         b.classList.toggle('selected', active);
         b.setAttribute('aria-pressed', String(active));
@@ -398,6 +420,81 @@
     $('productImageCaption').textContent = `${state.product.name || spec.headline} · loaded from research recommendation.`;
     refreshPreview();
     notify(`Loaded recommendation: ${spec.headline}. Evidence: ${spec.why_this || ''}`);
+  }
+  function applyRecommendationHandoff(handoff) {
+    if (!handoff) return;
+    const ownSession = !isSampleMode();
+    if (ownSession) {
+      state.custom = true;
+      stripSampleOffersAndLink();
+      if (!state.original || samplePath(state.original)) {
+        state.original = '';
+        state.image = '';
+        state.sampleImage = '';
+      } else {
+        state.image = state.image && !samplePath(state.image) ? state.image : state.original;
+      }
+      state.artwork = null;
+      state.imageKind = 'original';
+      if ($('artistExample')) { $('artistExample').hidden = true; if ($('artistExample').style) $('artistExample').style.display = 'none'; }
+      if ($('tryNext')) { $('tryNext').hidden = true; if ($('tryNext').style) $('tryNext').style.display = 'none'; }
+    }
+    const existingProduct = String(state.product.name || '').trim();
+    const isGenericProduct = !existingProduct || existingProduct === 'Ek Onkar · artwork promotion' || existingProduct === 'Your Artwork' || existingProduct.startsWith('Artwork by ');
+    if (handoff.business_name) {
+      state.product.seller = handoff.business_name;
+    }
+    if (handoff.product_name && (handoff.product_name !== handoff.business_name || isGenericProduct)) {
+      state.product.name = handoff.product_name;
+    } else if (isGenericProduct && handoff.business_name) {
+      state.product.name = `${handoff.business_name} featured work`;
+    }
+    if (handoff.price_claim !== undefined) {
+      state.product.price = handoff.price_claim || '';
+    }
+    if (handoff.destination) {
+      const destKey = Object.hasOwn(destinations, handoff.destination) ? handoff.destination : 'other';
+      state.product.destination = destKey;
+      $('promotionDestination').value = destKey;
+    }
+    const mappedGoal = Object.hasOwn(goals, handoff.goal) ? handoff.goal : 'story';
+    state.goal = mappedGoal;
+    document.querySelectorAll?.('.goal, [data-goal]').forEach((b) => {
+      const active = b.dataset.goal === mappedGoal;
+      b.classList.toggle('selected', active);
+      b.setAttribute('aria-pressed', String(active));
+    });
+    const ch = String(handoff.channel || '').toLowerCase();
+    if (ch === 'facebook') {
+      state.placement = 'facebook_feed';
+      $('postFacebook').checked = true;
+      $('postInstagram').checked = false;
+    } else {
+      state.placement = 'instagram_feed';
+      $('postInstagram').checked = true;
+      $('postFacebook').checked = false;
+    }
+    state.idea_id = handoff.recommendation_id || handoff.id || null;
+    state.cta = handoff.cta || '';
+    state.headline = handoff.title || state.product.name || 'Your next shop post';
+    state.caption = handoff.action || `Share ${state.product.name || 'your work'} with buyers.`;
+    state.copyEdited = true;
+    state.sceneEdited = true;
+    state.provenance = state.original ? 'Original-photo layout. Using your selected recommendation.' : 'Original-photo layout. Add your product photo if not attached yet.';
+    state.revision += 1;
+    setProductFields();
+    $('headline').value = state.headline;
+    $('caption').value = state.caption;
+    if ($('ideaTitle')) $('ideaTitle').textContent = state.headline;
+    if ($('ideaReason')) $('ideaReason').textContent = handoff.why_this_fits || '';
+    $('productImageCaption').textContent = state.original
+      ? `${state.product.name || state.headline} · your photo kept with selected move.`
+      : 'Your product photo will appear here.';
+    $('reviewed').checked = false;
+    updateChoices();
+    refreshPreview();
+    persistDraft();
+    notify(`Loaded selected move: ${state.headline}.`);
   }
   function sync() {
     for (const [id, key] of Object.entries(fields)) state.product[key] = $(id).value.trim();
@@ -586,7 +683,7 @@
   async function drawLayout(height) {
     const canvas = document.createElement('canvas'); canvas.width = 1080; canvas.height = height; const ctx = canvas.getContext('2d'); ctx.fillStyle = '#f6f3eb'; ctx.fillRect(0, 0, 1080, height); ctx.fillStyle = '#263d35'; ctx.font = '24px sans-serif'; ctx.fillText((state.product.seller || 'Made with care').slice(0, 55), 80, 90);
     if (state.image) { const img = await imageElement(state.image); const area = { x: 80, y: 150, w: 920, h: height - 510 }; const scale = Math.min(area.w / img.width, area.h / img.height); const w = img.width * scale, h = img.height * scale; ctx.fillStyle = '#e9e7dc'; ctx.fillRect(area.x, area.y, area.w, area.h); ctx.drawImage(img, area.x + (area.w - w) / 2, area.y + (area.h - h) / 2, w, h); }
-    ctx.fillStyle = '#263d35'; ctx.font = '46px Georgia'; wrap(ctx, state.headline || state.product.name || 'Your next shop post', 80, height - 280, 920, 55, 3); ctx.font = '25px sans-serif'; ctx.fillText((state.product.price || '').slice(0, 45), 80, height - 90); ctx.textAlign = 'right'; ctx.fillText('Discover the story', 1000, height - 90); return canvas;
+    ctx.fillStyle = '#263d35'; ctx.font = '46px Georgia'; wrap(ctx, state.headline || state.product.name || 'Your next shop post', 80, height - 280, 920, 55, 3); ctx.font = '25px sans-serif'; ctx.fillText((state.product.price || '').slice(0, 45), 80, height - 90); ctx.textAlign = 'right'; ctx.fillText((state.cta || 'Discover the story').slice(0, 35), 1000, height - 90); return canvas;
   }
   function spendLive(label) {
     try { if (window.museShell?.spendLive) window.museShell.spendLive(label); else if (window.museShell?.spend) window.museShell.spend(label); } catch {}
@@ -734,7 +831,7 @@
       setBusy(false);
     }
   }
-  function campaignPack() { sync(); return { product: { ...state.product, link: safeLink(state.product.link) }, goal: state.goal, headline: state.headline, caption: state.caption, scene_prompt: state.scene, image_provenance: state.provenance, mode: state.imageKind, posting_channels: postingChannels(), note: 'Download the image separately. This pack does not launch ads or publish posts. Destination details are kept only in this tab; prices are not synced.', posting_checklist: postingChecklist() }; }
+  function campaignPack() { sync(); return { product: { ...state.product, link: safeLink(state.product.link) }, goal: state.goal, idea_id: state.idea_id || undefined, cta: state.cta || undefined, headline: state.headline, caption: state.caption, scene_prompt: state.scene, image_provenance: state.provenance, mode: state.imageKind, posting_channels: postingChannels(), note: 'Download the image separately. This pack does not launch ads or publish posts. Destination details are kept only in this tab; prices are not synced.', posting_checklist: postingChecklist() }; }
   for (const id of [...Object.keys(fields), 'headline', 'caption', 'scene']) $(id).addEventListener('input', changed);
   $('artistExample').addEventListener('click', () => selectExample('sarabjit_singh')); $('ceramicsExample').addEventListener('click', () => selectExample('etsy_ceramics')); $('customProduct').addEventListener('click', newProduct);
   $('importProducts').addEventListener('click', importProducts);
@@ -782,7 +879,7 @@
   });
   $('nextButton').addEventListener('click', () => go(Math.min(3, state.step + 1))); $('backButton').addEventListener('click', () => go(Math.max(0, state.step - 1))); $('originalButton').addEventListener('click', () => { originalLayout(); $('reviewed').checked = false; }); $('draftButton').addEventListener('click', draft); $('generateButton').addEventListener('click', generate);
   $('downloadFeed').addEventListener('click', () => download(activePlacement() === 'facebook_feed' ? 1080 : 1350)); $('downloadStory').addEventListener('click', () => download(1920)); $('downloadPack').addEventListener('click', () => { if (state.busy) return; if (!$('reviewed').checked) { notify('Review your product details and wording before downloading.', 'error'); return; } saveBlob(new Blob([JSON.stringify(campaignPack(), null, 2)], { type: 'application/json' }), 'campaign.json'); markIdeaExported(); });
-  $('copyCaption').addEventListener('click', async () => { sync(); try { await navigator.clipboard.writeText(`${state.headline}\n\n${state.caption}${safeLink(state.product.link) ? '\n\n' + safeLink(state.product.link) : ''}`); notify('Your current caption and link are copied.'); } catch { notify('Clipboard access is unavailable. Select and copy your caption from the edit screen.', 'error'); } });
+  $('copyCaption').addEventListener('click', async () => { sync(); const ctaLine = state.cta && !state.caption.includes(state.cta) ? `\n\n${state.cta}` : ''; try { await navigator.clipboard.writeText(`${state.headline}\n\n${state.caption}${ctaLine}${safeLink(state.product.link) ? '\n\n' + safeLink(state.product.link) : ''}`); notify('Your current caption and link are copied.'); } catch { notify('Clipboard access is unavailable. Select and copy your caption from the edit screen.', 'error'); } });
   $('unlockKey').addEventListener('input', () => { state.key = $('unlockKey').value.trim(); });
   $('liveMode').addEventListener('change', () => { if ($('liveMode').checked && state.readiness && !state.readiness.provider_key_configured) { $('liveMode').checked = false; notify('The server has no Muse provider key configured. Saved examples still work.', 'error'); } if ($('liveMode').checked && !state.key && !state.defaultLive && !state.accountLive) { $('liveMode').checked = false; notify('Enter the configured demo unlock key first.', 'error'); } state.live = $('liveMode').checked; updateMode(); });
   // Signed-in accounts with runs left create live by default; anyone can switch back to saved examples.
@@ -818,27 +915,34 @@
     notify(`Loaded from the saved Muse ad: ${name}. Choose “Preview a room scene” in step 3 to use its saved Muse image.`);
   }
   const requestedIdea = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('idea') : null;
+  const requestedHandoffId = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('sm_handoff') : null;
   const ideaSpec = requestedIdea ? findPreviewSpec(requestedIdea) : null;
-  if (ideaSpec) {
+  if (ideaSpec && !requestedHandoffId) {
     applyIdea(ideaSpec);
     window.museTrack?.('post_started', { idea_id: requestedIdea, source: 'creator' });
   } else {
     // Ranked ideas on the portal link here with ?goal=story|gift|visit; only known goals are accepted.
     const requestedGoal = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('goal') : null;
     if (requestedGoal && Object.hasOwn(goals, requestedGoal)) document.querySelector?.(`[data-goal="${requestedGoal}"]`)?.click();
-    window.museTrack?.('post_started', { idea_id: null, goal: requestedGoal || 'default', source: 'creator' });
+    window.museTrack?.('post_started', { idea_id: requestedHandoffId || null, goal: requestedGoal || 'default', source: 'creator' });
   }
   if (window.museAccount?.ready) {
     window.museAccount.ready().then(async (snap) => {
       const acc = snap?.user || window.museAccount.getSnapshot()?.user || window.museAccount.current?.();
-      if (acc && !isSampleMode() && !requestedIdea) {
+      const handoff = readRecommendationHandoff(acc?.id || null);
+      const validSampleIdea = Boolean(ideaSpec && (!acc || isSampleMode()) && !handoff);
+      if (acc && !isSampleMode() && !validSampleIdea) {
         if ($('artistExample')) { $('artistExample').hidden = true; if ($('artistExample').style) $('artistExample').style.display = 'none'; }
         if ($('tryNext')) { $('tryNext').hidden = true; if ($('tryNext').style) $('tryNext').style.display = 'none'; }
         if (!localDraftPresent()) {
           state.custom = true;
+          resetOffers(false);
           state.product.seller = 'Your Studio';
           state.product.name = 'Your Artwork';
           state.product.description = 'Fine art collection.';
+          state.product.price = '';
+          state.product.link = '';
+          state.product.collection = '';
           state.original = '';
           state.image = '';
           state.sampleImage = '';
@@ -868,9 +972,28 @@
               }
             }
           } catch (_) {}
+        } else {
+          stripSampleOffersAndLink();
+          if (!state.custom || (state.original && samplePath(state.original))) {
+            state.custom = true;
+            state.original = '';
+            state.image = '';
+            state.sampleImage = '';
+            state.artwork = null;
+            updateChoices();
+            refreshPreview();
+          }
         }
+        if (handoff) {
+          applyRecommendationHandoff(handoff);
+        }
+      } else if (handoff) {
+        applyRecommendationHandoff(handoff);
       }
     });
+  } else {
+    const handoff = readRecommendationHandoff(null);
+    if (handoff) applyRecommendationHandoff(handoff);
   }
   // Expose a read-only snapshot for focused offline contract checks; never expose the unlock key.
   window.museCreatorSnapshot = () => JSON.parse(JSON.stringify({ ...campaignPack(), placement: activePlacement() }));

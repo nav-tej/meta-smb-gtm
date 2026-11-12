@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 FormalityLevel = Literal["casual", "neutral", "formal"]
 VoiceAdjustment = Literal["casual", "formal", "shorter"]
@@ -17,6 +17,8 @@ class VoiceProfile(BaseModel):
     Stores style parameters and short sample lines from the seller's own listings,
     never full copies of external inspiration posts.
     """
+
+    model_config = ConfigDict(extra="allow")
 
     avg_sentence_words: float = Field(default=14.0, ge=3.0, le=50.0)
     formality: FormalityLevel = "neutral"
