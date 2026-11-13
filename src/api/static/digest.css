@@ -98,6 +98,34 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--success); outli
 
 .dg-account-gate { padding: 1.1rem 1.25rem; border-radius: 12px; background: var(--gold-soft); border: 1px solid rgba(217, 119, 6, 0.35); margin-bottom: 1rem; }
 .dg-account-gate p { margin: 0 0 0.75rem; color: #78350f; font-size: 0.9rem; line-height: 1.45; }
+
+/* Batch 2A: Personal digest draft preferences & preview */
+.dg-draft-section { padding: 1.25rem 1.4rem; border: 1px solid var(--border); border-top: 4px solid var(--gold); border-radius: 16px; background: var(--surface); }
+.dg-draft-badge { font-size: 0.75rem; font-weight: 700; padding: 0.25rem 0.65rem; border-radius: 999px; background: var(--gold-soft); color: #78350f; white-space: nowrap; }
+.dg-draft-banner { margin: 0 0 0.75rem; padding: 0.75rem 0.9rem; border-radius: 10px; background: var(--gold-soft); border: 1px solid #e6d3a7; color: #5b3b09; font-size: 0.86rem; line-height: 1.45; }
+.dg-draft-form select { min-height: 44px; padding: 0.55rem 0.7rem; border: 1px solid var(--border); border-radius: 10px; font: inherit; background: var(--bg); }
+.dg-options-group { grid-column: 1 / -1; margin: 0; padding: 0.85rem 1rem; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-subtle); }
+.dg-options-group legend { font-size: 0.85rem; font-weight: 700; padding: 0 0.35rem; }
+.dg-topics-list { display: grid; gap: 0.45rem; }
+.dg-check-label { display: flex !important; align-items: center; gap: 0.55rem; font-weight: 500 !important; }
+.dg-check-label input { min-height: 20px !important; width: 18px; height: 18px; }
+.dg-next-send { grid-column: 1 / -1; margin: 0; padding: 0.6rem 0.85rem; border-radius: 10px; background: var(--success-soft); color: #154e31; font-size: 0.86rem; font-weight: 600; }
+.dg-draft-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 0.65rem; align-items: center; }
+.dg-draft-actions button { grid-column: auto !important; }
+.dg-secondary-btn { background: var(--surface-subtle) !important; color: var(--text) !important; border: 1px solid var(--border) !important; }
+.dg-preview-box { margin-top: 1.2rem; border: 1px solid var(--border); border-radius: 14px; background: var(--bg); overflow: hidden; }
+.dg-preview-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 0.75rem; padding: 0.9rem 1rem; border-bottom: 1px solid var(--border); background: var(--surface); }
+.dg-preview-eyebrow { margin: 0 0 0.2rem; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--success); }
+.dg-preview-head h3 { margin: 0; font-size: 1rem; }
+.dg-preview-tabs { display: inline-flex; gap: 0.35rem; }
+.dg-preview-tabs button { min-height: 36px; padding: 0.35rem 0.75rem; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: 600 0.82rem var(--font-sans); cursor: pointer; }
+.dg-preview-tabs button.is-active { background: var(--success); border-color: var(--success); color: #fff; }
+.dg-preview-frame { display: block; width: 100%; min-height: 420px; border: 0; background: #faf8f5; }
+.dg-preview-text { margin: 0; padding: 1rem; white-space: pre-wrap; word-break: break-word; font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--text); max-height: 420px; overflow: auto; }
+@media (max-width: 640px) {
+  .dg-draft-section { padding: 1rem; }
+  .dg-draft-actions { flex-direction: column; align-items: stretch; }
+}
 .dg-account-gate button { min-height: 44px; padding: 0.6rem 1.2rem; border: 0; border-radius: 10px; background: var(--success); color: #fff; font: 600 0.95rem var(--font-sans); cursor: pointer; }
 .dg-account-gate button:hover { filter: brightness(1.08); }
 

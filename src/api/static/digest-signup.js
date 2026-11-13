@@ -85,21 +85,29 @@
     });
   }
 
-  window.addEventListener('account-change', (e) => updateAccountState(e.detail));
-  window.addEventListener('muse:account-change', (e) => updateAccountState(e.detail));
+  window.addEventListener('account-change', (e) => { updateAccountState(e.detail); syncDraftAccountState(e.detail); });
+  window.addEventListener('muse:account-change', (e) => { updateAccountState(e.detail); syncDraftAccountState(e.detail); });
 
   fetch('/api/v1/digest/subscription', { credentials: 'same-origin' })
     .then((r) => (r.ok ? r.json() : { available: false }))
     .then(async (data) => {
-      if (data?.available !== true && !location.search.includes('preview_digest')) return;
-      section.hidden = false;
-      try { window.museTrack?.('digest_prompt_shown', { surface: 'digest' }); } catch {}
+      const subNote = $('draftExistingSubNote');
+      if (subNote) {
+        subNote.textContent = data?.available === true
+          ? 'Live email delivery is open below (separate from your draft settings). Active subscriptions are managed via confirmation and unsubscribe links.'
+          : 'Live email delivery is not configured right now — you can still save draft schedule preferences and preview your personal digest below.';
+      }
       try {
         const snap = await window.museAccount?.ready?.();
         updateAccountState(snap);
+        syncDraftAccountState(snap);
       } catch {
         updateAccountState(null);
+        syncDraftAccountState(null);
       }
+      if (data?.available !== true && !location.search.includes('preview_digest')) return;
+      section.hidden = false;
+      try { window.museTrack?.('digest_prompt_shown', { surface: 'digest' }); } catch {}
     })
     .catch(() => {});
 
@@ -170,4 +178,241 @@
       if (button) button.disabled = false;
     }
   });
+
+  // ---------- Batch 2A: Personal Digest Draft Preferences & Preview ----------
+  const draftSection = $('digestDraftSection');
+  const draftGate = $('draftAccountGate');
+  const draftForm = $('digestDraftForm');
+  const draftSignInBtn = $('digestDraftSignInBtn');
+  const draftCadenceEl = $('draftCadence');
+  const draftAnchorWrap = $('draftAnchorDayWrap');
+  const draftAnchorEl = $('draftAnchorDay');
+  const draftTzEl = $('draftTimezone');
+  const draftNextEl = $('draftNextSendDisplay');
+  const draftSaveBtn = $('draftSaveBtn');
+  const draftPreviewBtn = $('draftPreviewBtn');
+  const draftStatusEl = $('draftSaveStatus');
+  const previewBox = $('digestEmailPreviewBox');
+  const previewSubject = $('previewSubject');
+  const previewWindow = $('previewWindow');
+  const previewFrame = $('digestPreviewFrame');
+  const previewTextEl = $('digestPreviewText');
+  const tabHtmlBtn = $('previewTabHtml');
+  const tabTextBtn = $('previewTabText');
+
+  let draftOwnerId = null;
+  let draftVersion = null;
+  let draftLoadedForOwner = null;
+  let draftSeq = 0;
+
+  if (draftTzEl) {
+    try {
+      const detected = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (detected && ![...draftTzEl.options].some((o) => o.value === detected)) {
+        const opt = document.createElement('option');
+        opt.value = detected;
+        opt.textContent = `${detected} (Device)`;
+        draftTzEl.appendChild(opt);
+      }
+    } catch (_) {}
+  }
+
+  function sayDraft(text, error = false) {
+    if (!draftStatusEl) return;
+    draftStatusEl.textContent = text;
+    draftStatusEl.className = `dg-sub-status${error ? ' error' : ''}`;
+  }
+
+  function toggleAnchorVisibility() {
+    if (!draftAnchorWrap || !draftCadenceEl) return;
+    draftAnchorWrap.hidden = draftCadenceEl.value !== 'monthly';
+  }
+
+  function readDraftPayload() {
+    const shops = [...(draftForm?.querySelectorAll('input[name="draftShop"]') || [])]
+      .map((i) => i.value.trim())
+      .filter(Boolean)
+      .slice(0, 3);
+    const topics = [...(draftForm?.querySelectorAll('input[name="draftTopic"]:checked') || [])]
+      .map((i) => i.value);
+    const anchorRaw = draftAnchorEl?.value?.trim();
+    const anchorDay = anchorRaw ? Number(anchorRaw) : null;
+    return {
+      cadence: draftCadenceEl?.value || 'weekly',
+      topics,
+      timezone: draftTzEl?.value || 'America/Los_Angeles',
+      anchor_day: Number.isInteger(anchorDay) && anchorDay >= 1 && anchorDay <= 31 ? anchorDay : null,
+      competitors: shops,
+    };
+  }
+
+  function applyDraftToForm(data) {
+    const prefs = data?.draft_preferences || {};
+    if (draftCadenceEl && prefs.cadence) draftCadenceEl.value = prefs.cadence;
+    toggleAnchorVisibility();
+    if (draftAnchorEl) draftAnchorEl.value = prefs.anchor_day ? String(prefs.anchor_day) : '';
+    if (draftTzEl && prefs.timezone) {
+      if (![...draftTzEl.options].some((o) => o.value === prefs.timezone)) {
+        const opt = document.createElement('option');
+        opt.value = prefs.timezone;
+        opt.textContent = prefs.timezone;
+        draftTzEl.appendChild(opt);
+      }
+      draftTzEl.value = prefs.timezone;
+    }
+    const activeTopics = new Set(Array.isArray(prefs.topics) ? prefs.topics : []);
+    draftForm?.querySelectorAll('input[name="draftTopic"]').forEach((box) => {
+      box.checked = activeTopics.has(box.value);
+    });
+    const shopInputs = [...(draftForm?.querySelectorAll('input[name="draftShop"]') || [])];
+    const savedShops = Array.isArray(prefs.competitors) ? prefs.competitors : [];
+    shopInputs.forEach((inp, idx) => { inp.value = savedShops[idx] || ''; });
+    if (draftNextEl && data?.next_send_display) draftNextEl.textContent = data.next_send_display;
+  }
+
+  function renderPreviewOutput(data) {
+    if (!previewBox) return;
+    previewBox.hidden = false;
+    if (previewSubject) previewSubject.textContent = data.subject || 'Personal digest preview';
+    if (previewWindow) previewWindow.textContent = data.next_send_display || '';
+    if (draftNextEl && data.next_send_display) draftNextEl.textContent = data.next_send_display;
+    if (previewFrame) previewFrame.srcdoc = data.html || '';
+    if (previewTextEl) previewTextEl.textContent = data.text || '';
+  }
+
+  async function refreshPreview(seqAtStart = draftSeq) {
+    if (!draftOwnerId) return;
+    const ownerAtStart = draftOwnerId;
+    const payload = { ...readDraftPayload(), expected_owner: ownerAtStart };
+    if (draftPreviewBtn) draftPreviewBtn.disabled = true;
+    try {
+      const r = await fetch('/api/v1/digest/preview', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-Muse-Owner': ownerAtStart },
+        body: JSON.stringify(payload),
+      });
+      if (seqAtStart !== draftSeq || ownerAtStart !== draftOwnerId) return;
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'Could not load preview.');
+      renderPreviewOutput(data);
+    } catch (err) {
+      if (seqAtStart === draftSeq) sayDraft(err.message, true);
+    } finally {
+      if (draftPreviewBtn) draftPreviewBtn.disabled = false;
+    }
+  }
+
+  async function loadDraftAndPreview(ownerId) {
+    const seqAtStart = ++draftSeq;
+    sayDraft('Loading your draft digest settings…');
+    try {
+      const r = await fetch('/api/v1/digest/preferences', {
+        credentials: 'same-origin',
+        headers: { 'X-Muse-Owner': ownerId },
+      });
+      if (seqAtStart !== draftSeq || ownerId !== draftOwnerId) return;
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'Could not load draft preferences.');
+      draftVersion = Number.isInteger(data.version) ? data.version : 0;
+      draftLoadedForOwner = ownerId;
+      applyDraftToForm(data);
+      sayDraft('');
+      await refreshPreview(seqAtStart);
+    } catch (err) {
+      if (seqAtStart === draftSeq) sayDraft(err.message, true);
+    }
+  }
+
+  function syncDraftAccountState(snap) {
+    if (!draftSection) return;
+    const user = snap?.user || null;
+    if (!user) {
+      draftOwnerId = null;
+      draftVersion = null;
+      draftLoadedForOwner = null;
+      draftSeq++;
+      if (draftGate) draftGate.hidden = false;
+      if (draftForm) draftForm.hidden = true;
+      if (previewBox) previewBox.hidden = true;
+      return;
+    }
+    draftOwnerId = user.id;
+    if (draftGate) draftGate.hidden = true;
+    if (draftForm) draftForm.hidden = false;
+    if (draftLoadedForOwner !== user.id) {
+      loadDraftAndPreview(user.id);
+    }
+  }
+
+  if (draftSignInBtn) {
+    draftSignInBtn.addEventListener('click', () => {
+      try {
+        window.museAccount?.open?.('signin', 'Sign in to save draft digest settings and preview your personal digest.');
+      } catch (_) {}
+    });
+  }
+
+  if (draftCadenceEl) {
+    draftCadenceEl.addEventListener('change', () => {
+      toggleAnchorVisibility();
+      refreshPreview(draftSeq);
+    });
+  }
+  if (draftTzEl) draftTzEl.addEventListener('change', () => refreshPreview(draftSeq));
+  if (draftPreviewBtn) draftPreviewBtn.addEventListener('click', () => refreshPreview(draftSeq));
+
+  if (tabHtmlBtn && tabTextBtn && previewFrame && previewTextEl) {
+    tabHtmlBtn.addEventListener('click', () => {
+      tabHtmlBtn.classList.add('is-active');
+      tabHtmlBtn.setAttribute('aria-selected', 'true');
+      tabTextBtn.classList.remove('is-active');
+      tabTextBtn.setAttribute('aria-selected', 'false');
+      previewFrame.hidden = false;
+      previewTextEl.hidden = true;
+    });
+    tabTextBtn.addEventListener('click', () => {
+      tabTextBtn.classList.add('is-active');
+      tabTextBtn.setAttribute('aria-selected', 'true');
+      tabHtmlBtn.classList.remove('is-active');
+      tabHtmlBtn.setAttribute('aria-selected', 'false');
+      previewFrame.hidden = true;
+      previewTextEl.hidden = false;
+    });
+  }
+
+  if (draftForm) {
+    draftForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (!draftOwnerId) return;
+      const seqAtStart = draftSeq;
+      const ownerAtStart = draftOwnerId;
+      const payload = {
+        ...readDraftPayload(),
+        expected_version: draftVersion,
+        expected_owner: ownerAtStart,
+      };
+      if (draftSaveBtn) draftSaveBtn.disabled = true;
+      sayDraft('Saving draft preferences to your workspace…');
+      try {
+        const r = await fetch('/api/v1/digest/preferences', {
+          method: 'PUT',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', 'X-Muse-Owner': ownerAtStart },
+          body: JSON.stringify(payload),
+        });
+        if (seqAtStart !== draftSeq || ownerAtStart !== draftOwnerId) return;
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'Could not save draft preferences.');
+        draftVersion = Number.isInteger(data.version) ? data.version : draftVersion;
+        applyDraftToForm(data);
+        sayDraft('Draft preferences saved to your workspace (no email subscription changed).');
+        await refreshPreview(seqAtStart);
+      } catch (err) {
+        if (seqAtStart === draftSeq) sayDraft(err.message, true);
+      } finally {
+        if (draftSaveBtn) draftSaveBtn.disabled = false;
+      }
+    });
+  }
 })();
