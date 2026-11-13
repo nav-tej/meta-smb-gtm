@@ -49,6 +49,8 @@
     original: bootAsSample ? originalSample : '',
     image: bootAsSample ? originalSample : '',
     imageMode: 'original',
+    imageMeta: null,
+    imageFrame: { fit: 'contain', x: 0, y: 0 },
     source: bootAsSample ? 'Suggested from the artist example' : 'Suggested from my workspace',
     shopWebsiteUrl: '', cta: '', why_this: '', idea_id: null,
     channel: 'instagram',
@@ -69,13 +71,14 @@
   };
 
   const draftNamespace = 'daily';
-  function editorDocument() { return { schema: 1, ...Object.fromEntries(['product', 'original', 'image', 'imageMode', 'source', 'channel', 'selected', 'format', 'goal', 'salesGoal', 'performance', 'plans', 'edits', 'posted', 'offers', 'cta', 'why_this', 'idea_id'].map(key => [key, state[key]])) }; }
+  function editorDocument() { return { schema: 1, ...Object.fromEntries(['product', 'original', 'image', 'imageMode', 'imageMeta', 'imageFrame', 'source', 'channel', 'selected', 'format', 'goal', 'salesGoal', 'performance', 'plans', 'edits', 'posted', 'offers', 'cta', 'why_this', 'idea_id'].map(key => [key, state[key]])) }; }
   const isDraftObject = value => !!value && typeof value === 'object' && !Array.isArray(value);
   function applyDocument(data) {
     if (!data || (data.schema !== undefined && data.schema !== 1) || typeof data.product?.title !== 'string' || (data.original !== '' && !imageSource(data.original))) throw new Error('Unsupported daily draft.');
     for (const key of ['plans', 'edits', 'posted', 'offers']) if (data[key] !== undefined && !isDraftObject(data[key])) throw new Error('Invalid daily draft fields.');
-    state.plans = {}; state.edits = {}; state.posted = {}; state.offers = {}; state.performance = null; state.salesGoal = null; state.cta = ''; state.why_this = ''; state.idea_id = null;
-      for (const key of ['product', 'original', 'source', 'salesGoal', 'performance', 'posted', 'offers', 'cta', 'why_this', 'idea_id']) if (data[key] !== undefined) state[key] = data[key];
+    state.plans = {}; state.edits = {}; state.posted = {}; state.offers = {}; state.performance = null; state.salesGoal = null; state.cta = ''; state.why_this = ''; state.idea_id = null; state.imageMeta = null; state.imageFrame = { fit: 'contain', x: 0, y: 0 };
+      for (const key of ['product', 'original', 'imageMeta', 'imageFrame', 'source', 'salesGoal', 'performance', 'posted', 'offers', 'cta', 'why_this', 'idea_id']) if (data[key] !== undefined) state[key] = data[key];
+      if (!isDraftObject(state.imageFrame)) state.imageFrame = { fit: 'contain', x: 0, y: 0 };
       state.channel = Object.hasOwn(names, data.channel) ? data.channel : 'instagram';
       state.format = ['image', 'video', 'text'].includes(data.format) ? data.format : 'image';
       state.goal = ['visits', 'inquiries', 'sales'].includes(data.goal) ? data.goal : 'visits';
@@ -576,7 +579,24 @@
   async function layout(height, src = state.image, copy = currentCopy()) {
     const canvas = document.createElement('canvas'); canvas.width = 1080; canvas.height = height; const ctx = canvas.getContext('2d');
     ctx.fillStyle = '#f6f3eb'; ctx.fillRect(0, 0, 1080, height); ctx.fillStyle = '#253d34'; ctx.font = '25px sans-serif'; ctx.fillText((state.product.seller || 'Made with care').slice(0, 50), 80, 95);
-    if (src) { const image = await loadImage(src); const area = { x: 80, y: 150, w: 920, h: height - 520 }; const scale = Math.min(area.w / image.width, area.h / image.height); const w = image.width * scale; const h = image.height * scale; ctx.drawImage(image, area.x + (area.w - w) / 2, area.y + (area.h - h) / 2, w, h); }
+    if (src) {
+      const image = await loadImage(src);
+      const area = { x: 80, y: 150, w: 920, h: height - 520 };
+      const frame = isDraftObject(state.imageFrame) ? state.imageFrame : { fit: 'contain', x: 0, y: 0 };
+      const scale = frame.fit === 'cover'
+        ? Math.max(area.w / image.width, area.h / image.height)
+        : Math.min(area.w / image.width, area.h / image.height);
+      const w = image.width * scale;
+      const h = image.height * scale;
+      const offX = (Math.max(-50, Math.min(50, Number(frame.x) || 0)) / 100) * Math.abs(area.w - w);
+      const offY = (Math.max(-50, Math.min(50, Number(frame.y) || 0)) / 100) * Math.abs(area.h - h);
+      ctx.save?.();
+      ctx.beginPath?.();
+      ctx.rect?.(area.x, area.y, area.w, area.h);
+      ctx.clip?.();
+      ctx.drawImage(image, area.x + (area.w - w) / 2 + offX, area.y + (area.h - h) / 2 + offY, w, h);
+      ctx.restore?.();
+    }
     ctx.fillStyle = '#253d34'; fitText(ctx, copy.hook || state.product.title, 80, height - 280, 880, 46, 3);
     ctx.font = '24px sans-serif'; ctx.fillText((state.cta || currentPost()?.cta || 'Explore the work').slice(0, 55), 80, height - 95); return canvas;
   }
@@ -647,13 +667,231 @@
     const next = $('destination').value; const offer = state.offers[next] || { price: '', url: '' }; state.product.destination = next; $('price').value = offer.price; $('productLink').value = offer.url;
     $('itemHint').textContent = `${shops[next]} keeps its own price and link. Choose a matching listing; other shops may carry different work.`;
   }
-  async function useReference(url) {
+  const TODAY_SAMPLE_ORIGINALS = [
+    { id: 'sample-orig-ek-onkar', title: 'Ek Onkar — Original artwork', image_data_url: '/samples/ek_onkar_original.jpg', source_url: 'https://www.artofsarabjitsingh.com/guru-nanak-dev-ekonkar.html', source_label: 'Art of Sarabjit Singh · Original artwork', width: 900, height: 900, is_low_res: false, provenance: 'sample_original' },
+    { id: 'sample-orig-naam-japo', title: 'Naam Japo — Original artwork', image_data_url: '/samples/naam_japo_original.jpg', source_url: 'https://www.artofsarabjitsingh.com/', source_label: 'Art of Sarabjit Singh · Original artwork', width: 900, height: 900, is_low_res: false, provenance: 'sample_original' },
+    { id: 'sample-orig-kirat-karo', title: 'Kirat Karo — Original artwork', image_data_url: '/samples/kirat_karo_original.jpg', source_url: 'https://www.artofsarabjitsingh.com/', source_label: 'Art of Sarabjit Singh · Original artwork', width: 900, height: 900, is_low_res: false, provenance: 'sample_original' }
+  ];
+  const TODAY_SAMPLE_GENERATED = [
+    { id: 'sample-gen-ek-onkar', title: 'Ek Onkar collector room (Saved AI scene)', image_data_url: '/samples/ek_onkar_collector_room_live.webp', source_url: 'https://www.artofsarabjitsingh.com/guru-nanak-dev-ekonkar.html', source_label: 'Saved AI ad example (not original painting)', width: 1024, height: 1024, is_low_res: false, provenance: 'sample_generated' },
+    { id: 'sample-gen-naam-japo', title: 'Naam Japo gallery wall (Saved AI scene)', image_data_url: '/samples/naam_japo_restored_gallery_live.webp', source_url: 'https://www.artofsarabjitsingh.com/', source_label: 'Saved AI ad example (not original painting)', width: 1024, height: 1024, is_low_res: false, provenance: 'sample_generated' },
+    { id: 'sample-gen-kirat-karo', title: 'Kirat Karo collector room (Saved AI scene)', image_data_url: '/samples/kirat_karo_collector_room_live.webp', source_url: 'https://www.artofsarabjitsingh.com/', source_label: 'Saved AI ad example (not original painting)', width: 1024, height: 1024, is_low_res: false, provenance: 'sample_generated' }
+  ];
+  const IMAGE_EMPTY_MSG = 'We couldn’t retrieve an image from this page. Try an artwork/product link or upload a photo.';
+  let todayImageSource = isEffectiveSample() ? 'sample' : 'website';
+  let todayWebsiteCandidates = [];
+  let todayImgController = null;
+  let todayImgSeq = 0;
+
+  function abortTodayImageFetch() {
+    todayImgSeq += 1;
+    if (todayImgController) {
+      try { todayImgController.abort(); } catch {}
+      todayImgController = null;
+    }
+  }
+
+  function syncTodayFrameControls() {
+    const f = isDraftObject(state.imageFrame) ? state.imageFrame : { fit: 'contain', x: 0, y: 0 };
+    if ($('todayCropToggle')) $('todayCropToggle').textContent = f.fit === 'cover' ? 'Fill / Crop (active)' : 'Fit full image';
+    if ($('todayFrameX')) $('todayFrameX').value = String(Number.isFinite(Number(f.x)) ? Number(f.x) : 0);
+    if ($('todayFrameY')) $('todayFrameY').value = String(Number.isFinite(Number(f.y)) ? Number(f.y) : 0);
+  }
+
+  function formatTodayImageNote(meta) {
+    if (!meta) return '';
+    const dims = meta.width && meta.height ? `${meta.width} × ${meta.height} px` : 'Size unknown';
+    if (meta.isLowRes) return `Low-res web preview (${dims}) — suitable for social preview, not a print master.`;
+    if (meta.provenance === 'sample_original') return `Original artwork preview (${dims}) · Sample studio.`;
+    if (meta.provenance === 'sample_generated') return `Saved AI ad example (${dims}) · Staging example.`;
+    if (meta.provenance === 'upload') return `Uploaded photo (${dims}) · Kept on this device.`;
+    return `Selected from your website (${dims}) · Confirm it matches your work.`;
+  }
+
+  function selectTodayCandidateImage(item) {
+    if (!item || !item.image_data_url) return;
+    if (!isEffectiveSample() && item.provenance?.startsWith('sample_')) return;
+    state.original = item.image_data_url;
+    state.image = item.image_data_url;
+    state.imageMode = item.provenance === 'sample_generated' ? 'live' : 'original';
+    state.imageFrame = { fit: 'contain', x: 0, y: 0 };
+    state.imageMeta = {
+      id: item.id || '',
+      title: String(item.title || 'Selected image').slice(0, 160),
+      sourceUrl: safeURL(item.source_url) || '',
+      imageUrl: safeURL(item.image_url) || '',
+      width: item.width || null,
+      height: item.height || null,
+      isLowRes: Boolean(item.is_low_res),
+      provenance: item.provenance || 'website',
+      confirmed: true,
+    };
+    state.source = formatTodayImageNote(state.imageMeta);
+    syncTodayFrameControls();
+    invalidate();
+    render();
+    renderTodayImagePicker();
+    persist();
+    notice('Image selected. You can reposition, crop, or swap it anytime.');
+  }
+
+  function renderTodayCandidateCard(item) {
+    const card = document.createElement('div');
+    card.className = 'muse-image-card' + (state.original && state.original === item.image_data_url ? ' is-selected' : '');
+    const img = document.createElement('img');
+    img.src = item.image_data_url;
+    img.alt = String(item.title || 'Product candidate');
+    card.append(img);
+
+    const titleEl = document.createElement('strong');
+    titleEl.textContent = String(item.title || 'Found on page');
+    card.append(titleEl);
+
+    const metaEl = document.createElement('span');
+    metaEl.className = 'muse-image-meta';
+    const dims = item.width && item.height ? `${item.width} × ${item.height} px` : 'Dimensions unknown';
+    metaEl.textContent = item.source_label ? `${item.source_label} · ${dims}` : dims;
+    card.append(metaEl);
+
+    if (item.is_low_res) {
+      const warn = document.createElement('span');
+      warn.className = 'muse-image-warn';
+      warn.textContent = `Low-resolution web preview (${dims}) — not a print master.`;
+      card.append(warn);
+    }
+
+    const srcHref = safeURL(item.source_url);
+    if (srcHref) {
+      const a = document.createElement('a');
+      a.href = srcHref;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      a.textContent = 'Source page ↗';
+      card.append(a);
+    }
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'secondary';
+    btn.textContent = state.original === item.image_data_url ? 'Selected ✓' : 'Use this image';
+    btn.setAttribute('data-use-image-id', String(item.id || ''));
+    btn.addEventListener('click', () => selectTodayCandidateImage(item));
+    card.append(btn);
+    return card;
+  }
+
+  function renderTodayImagePicker() {
+    const picker = $('todayImagePicker');
+    const grid = $('todayImageCandidatesGrid');
+    const status = $('todayImagePickerStatus');
+    const sampleBtn = $('todayImgSrcSampleBtn');
+    const websiteBtn = $('todayImgSrcWebsiteBtn');
+    const confirmEl = $('todayImagePickerConfirm');
+    if (!picker || !grid || !status) return;
+
+    const inSample = isEffectiveSample();
+    if (sampleBtn) sampleBtn.hidden = !inSample;
+    if (!inSample && todayImageSource === 'sample') todayImageSource = 'website';
+    if (websiteBtn) websiteBtn.classList.toggle('is-active', todayImageSource === 'website');
+    if (sampleBtn) sampleBtn.classList.toggle('is-active', inSample && todayImageSource === 'sample');
+    if (confirmEl) confirmEl.textContent = state.imageMeta ? formatTodayImageNote(state.imageMeta) : '';
+
+    grid.replaceChildren();
+    if (inSample && todayImageSource === 'sample') {
+      status.textContent = 'Checked-in sample artwork (originals separated from saved AI examples).';
+      const origHeading = document.createElement('div');
+      origHeading.className = 'muse-image-group-title';
+      origHeading.textContent = 'Original artwork';
+      grid.append(origHeading);
+      for (const art of TODAY_SAMPLE_ORIGINALS) grid.append(renderTodayCandidateCard(art));
+
+      const genHeading = document.createElement('div');
+      genHeading.className = 'muse-image-group-title';
+      genHeading.textContent = 'Saved generated ad examples';
+      grid.append(genHeading);
+      for (const art of TODAY_SAMPLE_GENERATED) grid.append(renderTodayCandidateCard(art));
+      return;
+    }
+
+    if (!todayWebsiteCandidates.length) {
+      if (!status.dataset.explicitMessage) {
+        status.textContent = 'Enter your shop or product URL above to browse verified images, or upload your own photo.';
+      }
+      return;
+    }
+    status.textContent = `Found ${todayWebsiteCandidates.length} image option${todayWebsiteCandidates.length === 1 ? '' : 's'} on your page. Select “Use this image” to apply.`;
+    for (const item of todayWebsiteCandidates) grid.append(renderTodayCandidateCard(item));
+  }
+
+  async function useReference(url, { preserveExisting = false, selectIfEmpty = true } = {}) {
     const ownerEpoch = draftEpoch;
     const safe = safeURL(url); if (!safe) throw new Error('Enter a complete shop or listing link.');
-    const data = await jsonRequest('/api/v1/product-reference', { url: safe });
-    if (ownerEpoch !== draftEpoch) return;
-    state.product = { title: data.title || new URL(safe).hostname, description: data.description || '', price: data.price_hint || '', seller: new URL(safe).hostname, destination_url: safeURL(data.url) || safe, destination: 'other', collection: '' };
-    state.original = inline(data.image_data_url) ? data.image_data_url : ''; state.image = state.original; state.imageMode = 'original'; state.offers = {}; state.plans = {}; state.edits = {}; state.selected = 0; state.performance = null; state.source = `From ${new URL(safe).hostname} · check product facts`; invalidate(); populateSetup(); $('importStatus').textContent = data.source_note || 'Listing ready. Check the item and photo.';
+    abortTodayImageFetch();
+    const seq = ++todayImgSeq;
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    todayImgController = controller;
+    const statusEl = $('todayImagePickerStatus');
+    if (statusEl) {
+      delete statusEl.dataset.explicitMessage;
+      statusEl.textContent = 'Checking this page for product & artwork images…';
+    }
+    try {
+      const response = await fetch('/api/v1/product-reference', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: safe }),
+        signal: controller?.signal,
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'Could not read listing.');
+      if (ownerEpoch !== draftEpoch || seq !== todayImgSeq) return;
+
+      const hadPhoto = Boolean(state.original);
+      const hasEdits = Object.keys(state.edits || {}).length > 0;
+      if (!preserveExisting || (!hasEdits && !hadPhoto)) {
+        state.product = { title: data.title || new URL(safe).hostname, description: data.description || '', price: data.price_hint || '', seller: new URL(safe).hostname, destination_url: safeURL(data.url) || safe, destination: 'other', collection: '' };
+        state.offers = {}; state.plans = {}; state.selected = 0; state.performance = null;
+        if (!preserveExisting) state.edits = {};
+      }
+
+      const candidates = Array.isArray(data.image_candidates) && data.image_candidates.length
+        ? data.image_candidates
+        : (inline(data.image_data_url) ? [{ id: 'web-1', image_data_url: data.image_data_url, source_url: data.url || safe, title: data.title || new URL(safe).hostname, width: data.image_width || null, height: data.image_height || null, is_low_res: Boolean(data.is_low_res), provenance: 'website' }] : []);
+      todayWebsiteCandidates = candidates;
+      if (!candidates.length && statusEl) {
+        statusEl.dataset.explicitMessage = '1';
+        statusEl.textContent = IMAGE_EMPTY_MSG;
+      }
+      if (!preserveExisting) {
+        const first = candidates[0] || null;
+        state.original = first ? first.image_data_url : '';
+        state.image = state.original;
+        state.imageMode = 'original';
+        state.imageMeta = first ? { id: first.id, title: first.title, sourceUrl: safeURL(first.source_url) || safe, imageUrl: safeURL(first.image_url) || '', width: first.width || null, height: first.height || null, isLowRes: Boolean(first.is_low_res), provenance: 'website', confirmed: true } : null;
+        state.source = first ? formatTodayImageNote(state.imageMeta) : `From ${new URL(safe).hostname} · check product facts`;
+      } else if (!hadPhoto && selectIfEmpty && candidates[0]) {
+        const first = candidates[0];
+        state.original = first.image_data_url;
+        state.image = first.image_data_url;
+        state.imageMode = 'original';
+        state.imageMeta = { id: first.id, title: first.title, sourceUrl: safeURL(first.source_url) || safe, imageUrl: safeURL(first.image_url) || '', width: first.width || null, height: first.height || null, isLowRes: Boolean(first.is_low_res), provenance: 'website', confirmed: true };
+        state.source = formatTodayImageNote(state.imageMeta);
+      }
+      invalidate(); populateSetup(); renderTodayImagePicker();
+      if ($('importStatus')) $('importStatus').textContent = candidates.length ? (data.source_note || 'Listing ready. Choose an image or check details.') : IMAGE_EMPTY_MSG;
+    } catch (err) {
+      if (err?.name === 'AbortError') return;
+      if (ownerEpoch !== draftEpoch || seq !== todayImgSeq) return;
+      todayWebsiteCandidates = [];
+      if (statusEl) {
+        statusEl.dataset.explicitMessage = '1';
+        statusEl.textContent = IMAGE_EMPTY_MSG;
+      }
+      renderTodayImagePicker();
+      throw err;
+    } finally {
+      if (todayImgController === controller) todayImgController = null;
+    }
   }
   async function readListing() {
     if (state.busy) return;
@@ -719,14 +957,14 @@
         notice('No product listings came back automatically. Enter your item details manually below — your existing draft is still here.');
         return;
       }
-      for (const [i, item] of choices.entries()) { const button = document.createElement('button'); button.type = 'button'; button.textContent = `${i === 0 ? 'Suggested: ' : ''}${item.title || 'View listing'}`; button.addEventListener('click', async () => { if (state.busy) return; lock(true, 'readListing'); try { await useReference(item.url); render(); persist(); } catch (error) { $('importStatus').textContent = error.message; notice(error.message, true); } finally { lock(false); } }); $('importItems').append(button); }
-      await useReference(choices[0].url);
+      for (const [i, item] of choices.entries()) { const button = document.createElement('button'); button.type = 'button'; button.textContent = `${i === 0 ? 'Suggested: ' : ''}${item.title || 'View listing'}`; button.addEventListener('click', async () => { if (state.busy) return; lock(true, 'readListing'); try { await useReference(item.url, { preserveExisting: true, selectIfEmpty: false }); render(); persist(); } catch (error) { $('importStatus').textContent = error.message; notice(error.message, true); } finally { lock(false); } }); $('importItems').append(button); }
+      await useReference(choices[0].url, { preserveExisting: true, selectIfEmpty: false });
       if (ownerEpoch !== draftEpoch) return;
       render();
       await buildPlan(false, true);
       persist();
-      $('importStatus').textContent = 'First product listing selected. Change it below or use this item.';
-      notice('Product loaded from your website. Review the post and add or swap a photo anytime.');
+      $('importStatus').textContent = 'Listings loaded. Choose an image in “Choose an image” or select a listing.';
+      notice('Website scanned. Your existing draft & photo are preserved — choose an image below when ready.');
     } catch (error) {
       $('importStatus').textContent = error.message;
       notice(`${error.message} Your existing draft is intact.`, true);
@@ -736,7 +974,7 @@
     const ownerEpoch = draftEpoch;
     if (!file || state.busy) return; if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 10000000) { notice('Choose a JPEG, PNG or WebP under 10 MB.', true); return; }
     const url = URL.createObjectURL(file); lock(true);
-    try { const image = await loadImage(url); if (ownerEpoch !== draftEpoch) return; const canvas = document.createElement('canvas'); const scale = Math.min(1, 1400 / Math.max(image.width, image.height)); canvas.width = Math.round(image.width * scale); canvas.height = Math.round(image.height * scale); const ctx = canvas.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height); ctx.drawImage(image, 0, 0, canvas.width, canvas.height); const data = canvas.toDataURL('image/jpeg', .8); if (!inline(data)) throw new Error('Try a smaller photo.'); state.original = data; state.image = data; state.imageMode = 'original'; invalidate(); render(); persist(); notice('Photo ready. Check your post and take it with you.'); }
+    try { const image = await loadImage(url); if (ownerEpoch !== draftEpoch) return; const canvas = document.createElement('canvas'); const scale = Math.min(1, 1400 / Math.max(image.width, image.height)); canvas.width = Math.round(image.width * scale); canvas.height = Math.round(image.height * scale); const ctx = canvas.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height); ctx.drawImage(image, 0, 0, canvas.width, canvas.height); const data = canvas.toDataURL('image/jpeg', .8); if (!inline(data)) throw new Error('Try a smaller photo.'); state.original = data; state.image = data; state.imageMode = 'original'; state.imageFrame = { fit: 'contain', x: 0, y: 0 }; state.imageMeta = { id: 'upload-local', title: file.name || 'Uploaded product photo', sourceUrl: '', width: image.width, height: image.height, isLowRes: Math.min(image.width, image.height) < 600 || Math.max(image.width, image.height) < 800, provenance: 'upload', confirmed: true }; state.source = formatTodayImageNote(state.imageMeta); syncTodayFrameControls(); invalidate(); render(); renderTodayImagePicker(); persist(); notice('Photo ready. Check your post and take it with you.'); }
     catch (error) { notice(error.message, true); } finally { URL.revokeObjectURL(url); lock(false); }
   }
   // Signed-in accounts with verified emails and runs left unlock live Muse AI (1 run per live request).
@@ -956,6 +1194,10 @@
     activeSampleMode = !!s.isSample;
     draftOwner = nextOwner;
     draftOwnerBound = true;
+    abortTodayImageFetch();
+    todayWebsiteCandidates = [];
+    todayImageSource = activeSampleMode ? 'sample' : 'website';
+    if ($('todayImagePickerStatus')) delete $('todayImagePickerStatus').dataset.explicitMessage;
 
     if ($('todayWebsiteSaveRow')) $('todayWebsiteSaveRow').hidden = s.state !== 'account_own';
     if ($('todaySampleLink')) $('todaySampleLink').hidden = !!s.isSample;
@@ -992,6 +1234,8 @@
         todayInitializedOnce = true;
       }
       draftReady = true;
+      syncTodayFrameControls();
+      renderTodayImagePicker();
       buildPlan();
       return;
     }
@@ -1042,11 +1286,35 @@
     }
     const handoff = readRecommendationHandoff(s.ownerId);
     if (handoff) applyRecommendationHandoff(handoff);
+    syncTodayFrameControls();
+    renderTodayImagePicker();
     buildPlan();
   }
 
+  if ($('todayImgSrcWebsiteBtn')) $('todayImgSrcWebsiteBtn').addEventListener('click', () => { todayImageSource = 'website'; renderTodayImagePicker(); });
+  if ($('todayImgSrcSampleBtn')) $('todayImgSrcSampleBtn').addEventListener('click', () => { if (!isEffectiveSample()) return; todayImageSource = 'sample'; renderTodayImagePicker(); });
+  if ($('todayCropToggle')) $('todayCropToggle').addEventListener('click', () => {
+    const cur = isDraftObject(state.imageFrame) ? state.imageFrame : { fit: 'contain', x: 0, y: 0 };
+    state.imageFrame = { ...cur, fit: cur.fit === 'cover' ? 'contain' : 'cover' };
+    syncTodayFrameControls(); paint(); persist();
+  });
+  if ($('todayFrameX')) $('todayFrameX').addEventListener('input', (e) => {
+    const cur = isDraftObject(state.imageFrame) ? state.imageFrame : { fit: 'contain', x: 0, y: 0 };
+    state.imageFrame = { ...cur, x: Number(e.target.value) || 0 };
+    paint(); persist();
+  });
+  if ($('todayFrameY')) $('todayFrameY').addEventListener('input', (e) => {
+    const cur = isDraftObject(state.imageFrame) ? state.imageFrame : { fit: 'contain', x: 0, y: 0 };
+    state.imageFrame = { ...cur, y: Number(e.target.value) || 0 };
+    paint(); persist();
+  });
+  if ($('todayFrameReset')) $('todayFrameReset').addEventListener('click', () => {
+    state.imageFrame = { fit: 'contain', x: 0, y: 0 };
+    syncTodayFrameControls(); paint(); persist();
+  });
+
   if (standaloneVm) {
-    populateSetup(); render(); initDrafts();
+    populateSetup(); render(); initDrafts(); syncTodayFrameControls(); renderTodayImagePicker();
     const requestedIdea = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('idea') : null;
     const ideaSpec = requestedIdea ? findPreviewSpec(requestedIdea) : null;
     if (ideaSpec) {
@@ -1064,5 +1332,5 @@
   }
 
   fetch('/api/v1/readiness').then(response => response.json()).then(data => { state.readiness = data; syncAccountLive(); }).catch(() => { if ($('readinessNote')) $('readinessNote').textContent = 'Could not check server configuration. Your draft is still available.'; });
-  window.museDailySnapshot = () => JSON.parse(JSON.stringify({ product: state.product, channel: state.channel, format: state.format, copy: currentCopy(), cta: state.cta || currentPost()?.cta || '', why_this: state.why_this, idea_id: state.idea_id, plan: currentPlan(), performance: state.performance, imageMode: state.imageMode, source: state.source }));
+  window.museDailySnapshot = () => JSON.parse(JSON.stringify({ product: state.product, channel: state.channel, format: state.format, copy: currentCopy(), cta: state.cta || currentPost()?.cta || '', why_this: state.why_this, idea_id: state.idea_id, plan: currentPlan(), performance: state.performance, imageMode: state.imageMode, imageMeta: state.imageMeta, imageFrame: state.imageFrame, source: state.source }));
 })();

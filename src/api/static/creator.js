@@ -1,10 +1,10 @@
 'use strict';
 (() => {
   const $ = (id) => document.getElementById(id);
-  const state = { accountLive: false, step: 0, presets: null, workspace: 'sarabjit_singh', custom: false, copyEdited: false, sceneEdited: false, goal: 'story', placement: 'instagram_feed', original: '', image: '', imageKind: 'original', sampleImage: '', live: false, defaultLive: false, readiness: null, busy: false, revision: 0, paint: 0, product: {}, headline: '', caption: '', scene: '', cta: '', provenance: 'Original-photo layout. No new image generated.', idea_id: null, shopWebsiteUrl: '' };
+  const state = { accountLive: false, step: 0, presets: null, workspace: 'sarabjit_singh', custom: false, copyEdited: false, sceneEdited: false, goal: 'story', placement: 'instagram_feed', original: '', image: '', imageKind: 'original', sampleImage: '', imageMeta: null, imageFrame: { fit: 'contain', x: 0, y: 0 }, live: false, defaultLive: false, readiness: null, busy: false, revision: 0, paint: 0, product: {}, headline: '', caption: '', scene: '', cta: '', provenance: 'Original-photo layout. No new image generated.', idea_id: null, shopWebsiteUrl: '' };
 
   const draftNamespace = 'creator';
-  const draftFields = ['workspace', 'custom', 'copyEdited', 'sceneEdited', 'goal', 'placement', 'original', 'image', 'imageKind', 'sampleImage', 'product', 'headline', 'caption', 'scene', 'cta', 'provenance', 'artwork', 'idea_id'];
+  const draftFields = ['workspace', 'custom', 'copyEdited', 'sceneEdited', 'goal', 'placement', 'original', 'image', 'imageKind', 'sampleImage', 'imageMeta', 'imageFrame', 'product', 'headline', 'caption', 'scene', 'cta', 'provenance', 'artwork', 'idea_id'];
   function isSampleMode() {
     if (window.museModes?.isSampleMode) return window.museModes.isSampleMode();
     try {
@@ -43,12 +43,13 @@
     if (!isDraftObject(data.offers || {}) || !Array.isArray(data.channels) || ['headline', 'caption', 'scene', 'provenance'].some(key => typeof data[key] !== 'string')) throw new Error('Invalid creator draft fields.');
     state.artwork = null;
     for (const key of draftFields) if (data[key] !== undefined) state[key] = cloneDraft(data[key]);
+    if (!isDraftObject(state.imageFrame)) state.imageFrame = { fit: 'contain', x: 0, y: 0 };
     offers = cloneDraft(data.offers || {}); state.revision += 1;
     setProductFields(); $('promotionDestination').value = state.product.destination || 'other';
     $('headline').value = state.headline; $('caption').value = state.caption; $('scene').value = state.scene;
     $('postInstagram').checked = data.channels?.includes('instagram'); $('postFacebook').checked = data.channels?.includes('facebook');
     $('artistChannels').hidden = state.custom; $('reviewed').checked = false;
-    updateChoices(); refreshPreview();
+    syncFrameControls(); updateChoices(); refreshPreview();
     go(Number.isInteger(data.step) ? Math.max(0, Math.min(2, data.step)) : 0);
   }
   function localDraftPresent() { try { return !!localStorage.getItem(deviceKey()); } catch { return true; } }
@@ -597,9 +598,234 @@
       const image = await imageElement(url); if (ownerEpoch !== draftEpoch) return; const scale = Math.min(1, 1400 / Math.max(image.width, image.height)); const canvas = document.createElement('canvas'); canvas.width = Math.max(1, Math.round(image.width * scale)); canvas.height = Math.max(1, Math.round(image.height * scale)); const ctx = canvas.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height); ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
       let quality = .88; let data = canvas.toDataURL('image/jpeg', quality); while (data.length > 1300000 && quality > .35) { quality -= .1; data = canvas.toDataURL('image/jpeg', quality); }
       if (data.length > 1300000) throw new Error('This photo is still too large. Please choose a smaller image.');
-      if (!state.custom) newProduct(); state.original = data; state.revision += 1; originalLayout(); $('reviewed').checked = false; notify('Photo ready. Add your product details, then choose an idea.');
+      if (!state.custom) newProduct();
+      state.original = data;
+      state.imageMeta = { id: 'upload-local', title: file.name || 'Uploaded product photo', sourceUrl: '', width: image.width, height: image.height, isLowRes: Math.min(image.width, image.height) < 600 || Math.max(image.width, image.height) < 800, provenance: 'upload', confirmed: true };
+      state.imageFrame = { fit: 'contain', x: 0, y: 0 };
+      syncFrameControls();
+      state.revision += 1; originalLayout(); $('reviewed').checked = false; renderImagePicker(); notify('Photo ready. Add your product details, then choose an idea.');
     } finally { URL.revokeObjectURL(url); }
   }
+  const SAMPLE_IMAGE_ORIGINALS = [
+    { id: 'sample-orig-ek-onkar', title: 'Ek Onkar — Original artwork', image_data_url: '/samples/ek_onkar_original.jpg', source_url: 'https://www.artofsarabjitsingh.com/guru-nanak-dev-ekonkar.html', source_label: 'Art of Sarabjit Singh · Original artwork', width: 900, height: 900, is_low_res: false, provenance: 'sample_original' },
+    { id: 'sample-orig-naam-japo', title: 'Naam Japo — Original artwork', image_data_url: '/samples/naam_japo_original.jpg', source_url: 'https://www.artofsarabjitsingh.com/', source_label: 'Art of Sarabjit Singh · Original artwork', width: 900, height: 900, is_low_res: false, provenance: 'sample_original' },
+    { id: 'sample-orig-kirat-karo', title: 'Kirat Karo — Original artwork', image_data_url: '/samples/kirat_karo_original.jpg', source_url: 'https://www.artofsarabjitsingh.com/', source_label: 'Art of Sarabjit Singh · Original artwork', width: 900, height: 900, is_low_res: false, provenance: 'sample_original' }
+  ];
+  const SAMPLE_IMAGE_GENERATED = [
+    { id: 'sample-gen-ek-onkar', title: 'Ek Onkar collector room (Saved AI scene)', image_data_url: '/samples/ek_onkar_collector_room_live.webp', source_url: 'https://www.artofsarabjitsingh.com/guru-nanak-dev-ekonkar.html', source_label: 'Saved AI ad example (not original painting)', width: 1024, height: 1024, is_low_res: false, provenance: 'sample_generated' },
+    { id: 'sample-gen-naam-japo', title: 'Naam Japo gallery wall (Saved AI scene)', image_data_url: '/samples/naam_japo_restored_gallery_live.webp', source_url: 'https://www.artofsarabjitsingh.com/', source_label: 'Saved AI ad example (not original painting)', width: 1024, height: 1024, is_low_res: false, provenance: 'sample_generated' },
+    { id: 'sample-gen-kirat-karo', title: 'Kirat Karo collector room (Saved AI scene)', image_data_url: '/samples/kirat_karo_collector_room_live.webp', source_url: 'https://www.artofsarabjitsingh.com/', source_label: 'Saved AI ad example (not original painting)', width: 1024, height: 1024, is_low_res: false, provenance: 'sample_generated' }
+  ];
+  const IMAGE_EMPTY_MSG = 'We couldn’t retrieve an image from this page. Try an artwork/product link or upload a photo.';
+  let imagePickerSource = isEffectiveSample() ? 'sample' : 'website';
+  let websiteImageCandidates = [];
+  let imageFetchController = null;
+  let imageFetchSeq = 0;
+
+  function abortWebsiteImageFetch() {
+    imageFetchSeq += 1;
+    if (imageFetchController) {
+      try { imageFetchController.abort(); } catch {}
+      imageFetchController = null;
+    }
+  }
+
+  function syncFrameControls() {
+    const f = isDraftObject(state.imageFrame) ? state.imageFrame : { fit: 'contain', x: 0, y: 0 };
+    if ($('creatorCropToggle')) $('creatorCropToggle').textContent = f.fit === 'cover' ? 'Fill / Crop (active)' : 'Fit full image';
+    if ($('creatorFrameX')) $('creatorFrameX').value = String(Number.isFinite(Number(f.x)) ? Number(f.x) : 0);
+    if ($('creatorFrameY')) $('creatorFrameY').value = String(Number.isFinite(Number(f.y)) ? Number(f.y) : 0);
+  }
+
+  function formatImageMetaNote(meta) {
+    if (!meta) return '';
+    const dims = meta.width && meta.height ? `${meta.width} × ${meta.height} px` : 'Size unknown';
+    if (meta.isLowRes) return `Low-res web preview (${dims}) — suitable for social preview, not a print master.`;
+    if (meta.provenance === 'sample_original') return `Original artwork preview (${dims}) · Sample studio.`;
+    if (meta.provenance === 'sample_generated') return `Saved AI ad example (${dims}) · Staging example.`;
+    if (meta.provenance === 'upload') return `Uploaded photo (${dims}) · Kept on this device.`;
+    return `Selected from your website (${dims}) · Confirm it matches your work.`;
+  }
+
+  function selectCandidateImage(item) {
+    if (!item || !item.image_data_url) return;
+    if (!isEffectiveSample() && item.provenance?.startsWith('sample_')) return;
+    state.original = item.image_data_url;
+    state.image = item.image_data_url;
+    state.imageKind = item.provenance === 'sample_generated' ? 'saved' : 'original';
+    state.imageFrame = { fit: 'contain', x: 0, y: 0 };
+    state.imageMeta = {
+      id: item.id || '',
+      title: String(item.title || 'Selected image').slice(0, 160),
+      sourceUrl: safeLink(item.source_url) || '',
+      imageUrl: safeLink(item.image_url) || '',
+      width: item.width || null,
+      height: item.height || null,
+      isLowRes: Boolean(item.is_low_res),
+      provenance: item.provenance || 'website',
+      confirmed: true,
+    };
+    if (!isEffectiveSample()) state.custom = true;
+    state.provenance = item.provenance === 'sample_generated'
+      ? 'Saved AI scene example. Compare against the original artwork.'
+      : item.provenance === 'website'
+        ? 'Selected from your website. Confirm this image matches your work.'
+        : 'Original-photo layout. No new image generated.';
+    state.revision += 1;
+    $('reviewed').checked = false;
+    if ($('productFactNote')) $('productFactNote').textContent = formatImageMetaNote(state.imageMeta);
+    if ($('productImageCaption')) $('productImageCaption').textContent = formatImageMetaNote(state.imageMeta);
+    syncFrameControls();
+    refreshPreview();
+    renderImagePicker();
+    notify('Image selected. You can reposition, crop, or swap it anytime.');
+  }
+
+  function renderCandidateCard(item) {
+    const card = document.createElement('div');
+    card.className = 'muse-image-card' + (state.original && state.original === item.image_data_url ? ' is-selected' : '');
+    const img = document.createElement('img');
+    img.src = item.image_data_url;
+    img.alt = String(item.title || 'Product candidate');
+    card.append(img);
+
+    const titleEl = document.createElement('strong');
+    titleEl.textContent = String(item.title || 'Found on page');
+    card.append(titleEl);
+
+    const metaEl = document.createElement('span');
+    metaEl.className = 'muse-image-meta';
+    const dims = item.width && item.height ? `${item.width} × ${item.height} px` : 'Dimensions unknown';
+    metaEl.textContent = item.source_label ? `${item.source_label} · ${dims}` : dims;
+    card.append(metaEl);
+
+    if (item.is_low_res) {
+      const warn = document.createElement('span');
+      warn.className = 'muse-image-warn';
+      warn.textContent = `Low-resolution web preview (${dims}) — not a print master.`;
+      card.append(warn);
+    }
+
+    const srcHref = safeLink(item.source_url);
+    if (srcHref) {
+      const a = document.createElement('a');
+      a.href = srcHref;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      a.textContent = 'Source page ↗';
+      card.append(a);
+    }
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'secondary';
+    btn.textContent = state.original === item.image_data_url ? 'Selected ✓' : 'Use this image';
+    btn.setAttribute('data-use-image-id', String(item.id || ''));
+    btn.addEventListener('click', () => selectCandidateImage(item));
+    card.append(btn);
+    return card;
+  }
+
+  function renderImagePicker() {
+    const picker = $('imagePicker');
+    const grid = $('imageCandidatesGrid');
+    const status = $('imagePickerStatus');
+    const sampleBtn = $('imgSrcSampleBtn');
+    const websiteBtn = $('imgSrcWebsiteBtn');
+    const confirmEl = $('imagePickerConfirm');
+    if (!picker || !grid || !status) return;
+
+    const inSample = isEffectiveSample();
+    if (sampleBtn) sampleBtn.hidden = !inSample;
+    if (!inSample && imagePickerSource === 'sample') imagePickerSource = 'website';
+    if (websiteBtn) websiteBtn.classList.toggle('is-active', imagePickerSource === 'website');
+    if (sampleBtn) sampleBtn.classList.toggle('is-active', inSample && imagePickerSource === 'sample');
+    if (confirmEl) confirmEl.textContent = state.imageMeta ? formatImageMetaNote(state.imageMeta) : '';
+
+    grid.replaceChildren();
+    if (inSample && imagePickerSource === 'sample') {
+      status.textContent = 'Checked-in sample artwork (originals separated from saved AI examples).';
+      const origHeading = document.createElement('div');
+      origHeading.className = 'muse-image-group-title';
+      origHeading.textContent = 'Original artwork';
+      grid.append(origHeading);
+      for (const art of SAMPLE_IMAGE_ORIGINALS) grid.append(renderCandidateCard(art));
+
+      const genHeading = document.createElement('div');
+      genHeading.className = 'muse-image-group-title';
+      genHeading.textContent = 'Saved generated ad examples';
+      grid.append(genHeading);
+      for (const art of SAMPLE_IMAGE_GENERATED) grid.append(renderCandidateCard(art));
+      return;
+    }
+
+    if (!websiteImageCandidates.length) {
+      if (!status.dataset.explicitMessage) {
+        status.textContent = 'Enter your website or choose a listing to browse verified images, or upload a photo.';
+      }
+      return;
+    }
+    status.textContent = `Found ${websiteImageCandidates.length} image option${websiteImageCandidates.length === 1 ? '' : 's'} on your page. Select “Use this image” to apply.`;
+    for (const item of websiteImageCandidates) grid.append(renderCandidateCard(item));
+  }
+
+  async function fetchWebsiteImageCandidates(rawPageUrl) {
+    if (!$('imageCandidatesGrid')?.tagName || isEffectiveSample()) return;
+    const cleanUrl = safeLink(rawPageUrl);
+    if (!cleanUrl) return;
+    abortWebsiteImageFetch();
+    const seq = ++imageFetchSeq;
+    const ownerEpoch = draftEpoch;
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    imageFetchController = controller;
+    const status = $('imagePickerStatus');
+    if (status) {
+      delete status.dataset.explicitMessage;
+      status.textContent = 'Checking this page for product & artwork images…';
+    }
+    imagePickerSource = 'website';
+    try {
+      const response = await fetch('/api/v1/product-reference', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: cleanUrl }),
+        signal: controller?.signal,
+      });
+      if (ownerEpoch !== draftEpoch || seq !== imageFetchSeq || isEffectiveSample()) return;
+      const data = await response.json().catch(() => ({}));
+      if (ownerEpoch !== draftEpoch || seq !== imageFetchSeq || isEffectiveSample()) return;
+      if (!response.ok) {
+        websiteImageCandidates = [];
+        if (status) {
+          status.dataset.explicitMessage = '1';
+          status.textContent = IMAGE_EMPTY_MSG;
+        }
+        renderImagePicker();
+        return;
+      }
+      const list = Array.isArray(data.image_candidates) && data.image_candidates.length
+        ? data.image_candidates
+        : (validInline(data.image_data_url) ? [{ id: 'web-1', image_data_url: data.image_data_url, source_url: data.url || cleanUrl, title: data.title || 'Found on page', width: data.image_width || null, height: data.image_height || null, is_low_res: Boolean(data.is_low_res), provenance: 'website' }] : []);
+      websiteImageCandidates = list;
+      if (!list.length && status) {
+        status.dataset.explicitMessage = '1';
+        status.textContent = IMAGE_EMPTY_MSG;
+      }
+      renderImagePicker();
+    } catch (err) {
+      if (err?.name === 'AbortError') return;
+      if (ownerEpoch !== draftEpoch || seq !== imageFetchSeq || isEffectiveSample()) return;
+      websiteImageCandidates = [];
+      if (status) {
+        status.dataset.explicitMessage = '1';
+        status.textContent = IMAGE_EMPTY_MSG;
+      }
+      renderImagePicker();
+    } finally {
+      if (imageFetchController === controller) imageFetchController = null;
+    }
+  }
+
   function showImportedItems(items, businessName) {
     const box = $('importResults'); box.replaceChildren();
     if (!items.length) { box.hidden = false; $('importHint').textContent = 'No product listings were found. Some marketplaces block automatic reading; add the details and photo below, or try your own website.'; return; }
@@ -614,14 +840,20 @@
       button.append(info);
       if (item.price_hint) { const price = document.createElement('span'); price.textContent = item.price_hint; button.append(price); }
       button.addEventListener('click', () => {
-        newProduct(); $('productName').value = listingName.slice(0, 180); $('productLink').value = safeLink(item.url) || '';
+        if (!state.original) newProduct();
+        else state.custom = true;
+        $('productName').value = listingName.slice(0, 180); $('productLink').value = safeLink(item.url) || '';
         $('sellerName').value = (businessName || '').slice(0, 120); $('productPrice').value = (item.price_hint || '').slice(0, 40);
-        $('productDescription').value = '';
-        sync(); starter(); changed(); $('productImageCaption').textContent = 'Add the product photo that matches this listing.';
-        notify('Listing details added. Check them, then add a matching product photo.'); $('productName').focus();
+        if (!state.copyEdited) $('productDescription').value = '';
+        sync();
+        if (!state.copyEdited) starter();
+        changed();
+        if (!state.original) $('productImageCaption').textContent = 'Choose an image from your website or upload a matching product photo.';
+        if (item.url) fetchWebsiteImageCandidates(item.url);
+        notify('Listing details added. Review and choose an image beside the listing.'); $('productName').focus();
       }); box.append(button);
     }
-    box.hidden = false; $('importHint').textContent = 'Choose a listing to fill its title, price hint, and link. Review every detail and add the matching photo.';
+    box.hidden = false; $('importHint').textContent = 'Choose a listing to fill its title, price hint, and link, then pick an image in “Choose an image”.';
   }
   async function importProducts() {
     const ownerEpoch = draftEpoch;
@@ -642,6 +874,10 @@
       const fetched = (data.channels || []).some((channel) => channel.status === 'fetched');
       if (fetched && $('saveShopWebsite')?.checked && !isEffectiveSample()) {
         await persistShopWebsiteUrl(url);
+      }
+      if (!isEffectiveSample()) {
+        const candidatePage = items[0]?.url || url;
+        fetchWebsiteImageCandidates(candidatePage);
       }
       notify(items.length ? `Found ${items.length} public listing${items.length === 1 ? '' : 's'}. Choose one to bring its details into your post.` : fetched ? 'We reached your website but did not find product listings. You can enter details below.' : 'This site did not allow automatic reading. You can still enter details below or try your own website.');
     } catch (error) {
@@ -719,7 +955,25 @@
   }
   async function drawLayout(height) {
     const canvas = document.createElement('canvas'); canvas.width = 1080; canvas.height = height; const ctx = canvas.getContext('2d'); ctx.fillStyle = '#f6f3eb'; ctx.fillRect(0, 0, 1080, height); ctx.fillStyle = '#263d35'; ctx.font = '24px sans-serif'; ctx.fillText((state.product.seller || 'Made with care').slice(0, 55), 80, 90);
-    if (state.image) { const img = await imageElement(state.image); const area = { x: 80, y: 150, w: 920, h: height - 510 }; const scale = Math.min(area.w / img.width, area.h / img.height); const w = img.width * scale, h = img.height * scale; ctx.fillStyle = '#e9e7dc'; ctx.fillRect(area.x, area.y, area.w, area.h); ctx.drawImage(img, area.x + (area.w - w) / 2, area.y + (area.h - h) / 2, w, h); }
+    if (state.image) {
+      const img = await imageElement(state.image);
+      const area = { x: 80, y: 150, w: 920, h: height - 510 };
+      const frame = isDraftObject(state.imageFrame) ? state.imageFrame : { fit: 'contain', x: 0, y: 0 };
+      const scale = frame.fit === 'cover'
+        ? Math.max(area.w / img.width, area.h / img.height)
+        : Math.min(area.w / img.width, area.h / img.height);
+      const w = img.width * scale, h = img.height * scale;
+      const offX = (Math.max(-50, Math.min(50, Number(frame.x) || 0)) / 100) * Math.abs(area.w - w);
+      const offY = (Math.max(-50, Math.min(50, Number(frame.y) || 0)) / 100) * Math.abs(area.h - h);
+      ctx.fillStyle = '#e9e7dc';
+      ctx.fillRect(area.x, area.y, area.w, area.h);
+      ctx.save?.();
+      ctx.beginPath?.();
+      ctx.rect?.(area.x, area.y, area.w, area.h);
+      ctx.clip?.();
+      ctx.drawImage(img, area.x + (area.w - w) / 2 + offX, area.y + (area.h - h) / 2 + offY, w, h);
+      ctx.restore?.();
+    }
     ctx.fillStyle = '#263d35'; ctx.font = '46px Georgia'; wrap(ctx, state.headline || state.product.name || 'Your next shop post', 80, height - 280, 920, 55, 3); ctx.font = '25px sans-serif'; ctx.fillText((state.product.price || '').slice(0, 45), 80, height - 90); ctx.textAlign = 'right'; ctx.fillText((state.cta || 'Discover the story').slice(0, 35), 1000, height - 90); return canvas;
   }
   function spendLive(label) {
@@ -869,7 +1123,28 @@
       setBusy(false);
     }
   }
-  function campaignPack() { sync(); return { product: { ...state.product, link: safeLink(state.product.link) }, goal: state.goal, idea_id: state.idea_id || undefined, cta: state.cta || undefined, headline: state.headline, caption: state.caption, scene_prompt: state.scene, image_provenance: state.provenance, mode: state.imageKind, posting_channels: postingChannels(), note: 'Download the image separately. This pack does not launch ads or publish posts. Destination details are kept only in this tab; prices are not synced.', posting_checklist: postingChecklist() }; }
+  function campaignPack() { sync(); return { product: { ...state.product, link: safeLink(state.product.link) }, goal: state.goal, idea_id: state.idea_id || undefined, cta: state.cta || undefined, headline: state.headline, caption: state.caption, scene_prompt: state.scene, image_provenance: state.provenance, image_meta: state.imageMeta, image_frame: state.imageFrame, mode: state.imageKind, posting_channels: postingChannels(), note: 'Download the image separately. This pack does not launch ads or publish posts. Destination details are kept only in this tab; prices are not synced.', posting_checklist: postingChecklist() }; }
+  if ($('imgSrcWebsiteBtn')) $('imgSrcWebsiteBtn').addEventListener('click', () => { imagePickerSource = 'website'; renderImagePicker(); });
+  if ($('imgSrcSampleBtn')) $('imgSrcSampleBtn').addEventListener('click', () => { if (!isEffectiveSample()) return; imagePickerSource = 'sample'; renderImagePicker(); });
+  if ($('creatorCropToggle')) $('creatorCropToggle').addEventListener('click', () => {
+    const cur = isDraftObject(state.imageFrame) ? state.imageFrame : { fit: 'contain', x: 0, y: 0 };
+    state.imageFrame = { ...cur, fit: cur.fit === 'cover' ? 'contain' : 'cover' };
+    syncFrameControls(); refreshPreview();
+  });
+  if ($('creatorFrameX')) $('creatorFrameX').addEventListener('input', (e) => {
+    const cur = isDraftObject(state.imageFrame) ? state.imageFrame : { fit: 'contain', x: 0, y: 0 };
+    state.imageFrame = { ...cur, x: Number(e.target.value) || 0 };
+    refreshPreview();
+  });
+  if ($('creatorFrameY')) $('creatorFrameY').addEventListener('input', (e) => {
+    const cur = isDraftObject(state.imageFrame) ? state.imageFrame : { fit: 'contain', x: 0, y: 0 };
+    state.imageFrame = { ...cur, y: Number(e.target.value) || 0 };
+    refreshPreview();
+  });
+  if ($('creatorFrameReset')) $('creatorFrameReset').addEventListener('click', () => {
+    state.imageFrame = { fit: 'contain', x: 0, y: 0 };
+    syncFrameControls(); refreshPreview();
+  });
   for (const id of [...Object.keys(fields), 'headline', 'caption', 'scene']) $(id).addEventListener('input', changed);
   $('artistExample').addEventListener('click', () => {
     if (window.museModes && !isEffectiveSample()) { window.museModes.enterSampleMode({ sample: 'sarabjit_singh' }); return; }
@@ -1126,6 +1401,10 @@
     activeSampleMode = !!s.isSample;
     draftOwner = nextOwner;
     draftOwnerBound = true;
+    abortWebsiteImageFetch();
+    websiteImageCandidates = [];
+    imagePickerSource = activeSampleMode ? 'sample' : 'website';
+    if ($('imagePickerStatus')) delete $('imagePickerStatus').dataset.explicitMessage;
 
     const saveRow = $('shopWebsiteSaveRow');
     if (saveRow) saveRow.hidden = s.state !== 'account_own';
@@ -1165,6 +1444,8 @@
           refreshPreview();
         }
         updateChoices();
+        syncFrameControls();
+        renderImagePicker();
       } finally {
         applyingDraft = false;
         creatorInitializedOnce = true;
@@ -1186,6 +1467,8 @@
         refreshPreview();
       }
       updateChoices();
+      syncFrameControls();
+      renderImagePicker();
     } finally {
       applyingDraft = false;
       creatorInitializedOnce = true;
@@ -1227,6 +1510,8 @@
     const vmPlacement = requestedPlacementParam();
     if (vmPlacement) applyPlacementChoice(vmPlacement);
     initDrafts();
+    syncFrameControls();
+    renderImagePicker();
   } else {
     initDrafts();
     if (window.museModes?.subscribe) window.museModes.subscribe((m) => { applyCreatorMode(m); });

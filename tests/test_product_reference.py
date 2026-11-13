@@ -186,3 +186,64 @@ def test_route_returns_validated_reference_and_typed_page_failure(
             ).status_code
             == 422
         )
+
+
+def _make_png_bytes(width: int, height: int, color: tuple[int, int, int] = (40, 120, 90)) -> bytes:
+    import io
+
+    from PIL import Image
+
+    buf = io.BytesIO()
+    Image.new("RGB", (width, height), color).save(buf, format="PNG")
+    return buf.getvalue()
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_bounded_candidates_prefer_ld_json_filter_icons_and_flag_low_res(
+    respx_mock: respx.MockRouter,
+) -> None:
+    """Candidate discovery prefers JSON-LD/og:image, filters icons/SVGs, flags low-res."""
+    allow_robots(respx_mock)
+    page_html = """
+    <html><head>
+      <title>Alpine Linocut Print</title>
+      <meta property="og:image" content="/art/og-view.png">
+      <script type="application/ld+json">
+        {"@context": "https://schema.org", "@type": "VisualArtwork",
+         "name": "Alpine Linocut Primary",
+         "image": ["/art/ld-hero.png", "/art/og-view.png"]}
+      </script>
+    </head><body>
+      <img src="/assets/site-logo.png" alt="Shop Logo" width="200" height="60">
+      <img src="/assets/tracking-1x1.png" alt="" width="1" height="1">
+      <img src="/assets/icon.svg" alt="Cart">
+      <img src="/art/tiny-thumb.png" alt="Tiny thumbnail">
+      <img src="/art/studio-detail.png" alt="Linen paper detail">
+    </body></html>
+    """
+    respx_mock.get(PAGE).respond(200, text=page_html)
+    respx_mock.get(f"{ORIGIN}/art/ld-hero.png").respond(
+        200, content=_make_png_bytes(1200, 900, (30, 80, 60))
+    )
+    respx_mock.get(f"{ORIGIN}/art/og-view.png").respond(
+        200, content=_make_png_bytes(1000, 800, (80, 40, 60))
+    )
+    respx_mock.get(f"{ORIGIN}/art/tiny-thumb.png").respond(
+        200, content=_make_png_bytes(48, 48, (10, 10, 10))
+    )
+    respx_mock.get(f"{ORIGIN}/art/studio-detail.png").respond(
+        200, content=_make_png_bytes(400, 300, (120, 90, 40))
+    )
+
+    result = await ProductReferenceService(resolver=public_resolver).read(PAGE)
+
+    assert len(result.image_candidates) == 3
+    ids_titles = [(c.title, c.width, c.height, c.is_low_res) for c in result.image_candidates]
+    assert ids_titles[0] == ("Alpine Linocut Primary", 1200, 900, False)
+    assert ids_titles[1] == ("Alpine Linocut Primary", 1000, 800, False)
+    assert ids_titles[2] == ("Linen paper detail", 400, 300, True)
+    assert result.image_data_url == result.image_candidates[0].image_data_url
+    assert result.image_width == 1200
+    assert result.image_height == 900
+    assert result.is_low_res is False
