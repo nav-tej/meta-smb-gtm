@@ -35,6 +35,9 @@ MAX_IMAGE_PIXELS = 25_000_000
 MIN_CANDIDATE_DIMENSION = 120
 LOW_RES_MIN_EDGE = 600
 LOW_RES_MAX_EDGE = 800
+MAX_PREVIEW_EDGE = 1200
+MAX_CANDIDATE_PREVIEW_BYTES = 220_000
+MAX_SERIALIZED_RESPONSE_BYTES = 3_500_000
 _RATE_LIMITER = HostRateLimiter()
 
 _SKIP_IMAGE_TOKEN_RE = re.compile(
@@ -246,20 +249,50 @@ class _PreviewImageParser(HTMLParser):
 MAX_CANDIDATES_TO_FETCH = MAX_IMAGE_CANDIDATES
 
 
-def _inspect_image_dimensions(data: bytes) -> tuple[int | None, int | None, bool]:
-    """Decode JPEG/PNG/WebP dimensions safely, rejecting decompression bombs."""
+def _decode_and_prepare_preview(data: bytes, mime: str) -> tuple[int, int, bytes, str] | None:
+    """Decode JPEG/PNG/WebP pixels, reject corrupt/oversized/tiny images, and bound preview."""
     previous_max = Image.MAX_IMAGE_PIXELS
     Image.MAX_IMAGE_PIXELS = MAX_IMAGE_PIXELS
     try:
         with Image.open(io.BytesIO(data)) as img:
             w, h = img.size
-            if w * h > MAX_IMAGE_PIXELS:
-                return None, None, True
-            return int(w), int(h), False
-    except Image.DecompressionBombError:
-        return None, None, True
-    except (UnidentifiedImageError, OSError, ValueError, SyntaxError, EOFError):
-        return None, None, False
+            if w <= 0 or h <= 0 or w * h > MAX_IMAGE_PIXELS:
+                return None
+            # Force full pixel decode so truncated/corrupt bodies are rejected.
+            img.load()
+            if w < MIN_CANDIDATE_DIMENSION or h < MIN_CANDIDATE_DIMENSION:
+                return None
+            out_bytes, out_mime = data, mime
+            if len(data) > MAX_CANDIDATE_PREVIEW_BYTES or max(w, h) > MAX_PREVIEW_EDGE:
+                preview = img.copy()
+                if max(w, h) > MAX_PREVIEW_EDGE:
+                    preview.thumbnail(
+                        (MAX_PREVIEW_EDGE, MAX_PREVIEW_EDGE), Image.Resampling.LANCZOS
+                    )
+                if preview.mode in ("RGBA", "LA") or (
+                    preview.mode == "P" and "transparency" in preview.info
+                ):
+                    rgba = preview.convert("RGBA")
+                    bg = Image.new("RGB", rgba.size, (255, 255, 255))
+                    bg.paste(rgba, mask=rgba.split()[-1])
+                    preview = bg
+                elif preview.mode != "RGB":
+                    preview = preview.convert("RGB")
+                buf = io.BytesIO()
+                preview.save(buf, format="JPEG", quality=82, optimize=True)
+                compact = buf.getvalue()
+                if compact and len(compact) < len(data):
+                    out_bytes, out_mime = compact, "image/jpeg"
+            return int(w), int(h), out_bytes, out_mime
+    except (
+        Image.DecompressionBombError,
+        UnidentifiedImageError,
+        OSError,
+        ValueError,
+        SyntaxError,
+        EOFError,
+    ):
+        return None
     finally:
         Image.MAX_IMAGE_PIXELS = previous_max
 
@@ -371,23 +404,14 @@ class ProductReferenceService:
                     if mime is None:
                         blocked_or_failed = True
                         continue
-                    w, h, too_many_pixels = _inspect_image_dimensions(image)
-                    if too_many_pixels:
+                    decoded = _decode_and_prepare_preview(image, mime)
+                    if decoded is None:
                         blocked_or_failed = True
                         continue
-                    if (
-                        w is not None
-                        and h is not None
-                        and (w < MIN_CANDIDATE_DIMENSION or h < MIN_CANDIDATE_DIMENSION)
-                    ):
-                        continue
-                    is_low_res = bool(
-                        w is not None
-                        and h is not None
-                        and (min(w, h) < LOW_RES_MIN_EDGE or max(w, h) < LOW_RES_MAX_EDGE)
-                    )
-                    encoded = base64.b64encode(image).decode("ascii")
-                    data_url = f"data:{mime};base64,{encoded}"
+                    w, h, preview_bytes, preview_mime = decoded
+                    is_low_res = min(w, h) < LOW_RES_MIN_EDGE or max(w, h) < LOW_RES_MAX_EDGE
+                    encoded = base64.b64encode(preview_bytes).decode("ascii")
+                    data_url = f"data:{preview_mime};base64,{encoded}"
                     candidates.append(
                         ProductImageCandidate(
                             id=f"web-{idx + 1}",
@@ -412,12 +436,26 @@ class ProductReferenceService:
                 result.image_width = first.width
                 result.image_height = first.height
                 result.is_low_res = first.is_low_res
-                result.image_candidates = candidates
-                result.source_note = (
-                    "Photo and details imported from the public listing. "
-                    "Check they match the item and current offer."
-                )
-            elif blocked_or_failed:
+                result.image_candidates = list(candidates)
+                while (
+                    len(result.image_candidates) > 1
+                    and len(result.model_dump_json().encode("utf-8"))
+                    > MAX_SERIALIZED_RESPONSE_BYTES
+                ):
+                    result.image_candidates.pop()
+                if len(result.model_dump_json().encode("utf-8")) > MAX_SERIALIZED_RESPONSE_BYTES:
+                    result.image_data_url = None
+                    result.image_width = None
+                    result.image_height = None
+                    result.is_low_res = False
+                    result.image_candidates = []
+                    blocked_or_failed = True
+                else:
+                    result.source_note = (
+                        "Photo and details imported from the public listing. "
+                        "Check they match the item and current offer."
+                    )
+            if not result.image_candidates and blocked_or_failed:
                 result.source_note = (
                     "Listing details imported. Its photo could not be imported safely; add a photo."
                 )

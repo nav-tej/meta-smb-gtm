@@ -282,6 +282,32 @@ def test_shop_image_suggestions_sample_own_fallback_isolation_and_export_e2e(
 
     base_url, muse_calls, img_2 = shop_images_server
 
+    late_payload_a = json.dumps(
+        {
+            "url": "https://wildmeadow.test/botanical",
+            "title": "Botanical Linocut",
+            "description": "Hand-pulled print",
+            "price_hint": "$48",
+            "image_data_url": img_2,
+            "image_width": 900,
+            "image_height": 900,
+            "is_low_res": False,
+            "image_candidates": [
+                {
+                    "id": "late-a-1",
+                    "image_data_url": img_2,
+                    "source_url": "https://wildmeadow.test/botanical",
+                    "image_url": "https://wildmeadow.test/botanical.png",
+                    "title": "Late Account A Print",
+                    "width": 900,
+                    "height": 900,
+                    "is_low_res": False,
+                    "provenance": "website",
+                }
+            ],
+        }
+    )
+
     script = textwrap.dedent(
         f"""
         import json
@@ -290,6 +316,7 @@ def test_shop_image_suggestions_sample_own_fallback_isolation_and_export_e2e(
 
         base_url = {json.dumps(base_url)}
         img_2 = {json.dumps(img_2)}
+        late_payload_a = {json.dumps(late_payload_a)}
 
         def assert_no_overflow(page, label):
             dims = page.evaluate(
@@ -417,26 +444,140 @@ def test_shop_image_suggestions_sample_own_fallback_isolation_and_export_e2e(
             assert pt.evaluate("document.getElementById('todayImgSrcSampleBtn')?.hidden === true")
             assert_no_overflow(pt, "own /today 375px")
 
-            # Hold Account A's /api/v1/product-reference while switching to Account B
-            held = []
-            def hold_ref(route):
-                if len(held) == 0:
-                    held.append(route)
+            # Hold Account A's /api/v1/product-reference while switching same-page to Account B
+            held_today = []
+            def hold_today_ref(route):
+                if len(held_today) == 0:
+                    held_today.append(route)
                 else:
                     route.continue_()
-            pt.route("**/api/v1/product-reference", hold_ref)
+            pt.route("**/api/v1/product-reference", hold_today_ref)
             pt.click("#quickFindItems")
             pt.wait_for_timeout(250)
-            assert len(held) == 1
-            # Switch cookie to user-b and abort held route cleanly without leaking to B
+            assert len(held_today) == 1
+            # Same-page owner switch to user-b (no reload, no abort)
             set_cookie(ctx_tm, "user-b")
-            held[0].abort()
+            pt.evaluate("window.museAccount.refresh()")
+            pt.wait_for_function("window.museAccount?.getSnapshot?.()?.user?.id === 'user-b'")
+            # Deliver Account A's late response while Account B is active
+            try:
+                held_today[0].fulfill(
+                    status=200,
+                    content_type="application/json",
+                    body=late_payload_a,
+                )
+            except Exception:
+                pass
+            pt.wait_for_timeout(200)
             pt.unroute("**/api/v1/product-reference")
-            pt.reload(wait_until="domcontentloaded")
-            pt.wait_for_selector("#quickShopUrl")
             snap_b = pt.evaluate("window.museDailySnapshot()")
             assert "Botanical Linocut" not in json.dumps(snap_b)
+            today_grid_b = pt.text_content("#todayImageCandidatesGrid") or ""
+            assert "Late Account A Print" not in today_grid_b
             assert snap_b["imageMeta"] is None
+
+            # Same-page Own -> Sample mode switch on /today with late website response delivered
+            held_today_mode = []
+            def hold_today_mode_ref(route):
+                if len(held_today_mode) == 0:
+                    held_today_mode.append(route)
+                else:
+                    route.continue_()
+            pt.route("**/api/v1/product-reference", hold_today_mode_ref)
+            pt.fill("#quickShopUrl", "https://wildmeadow.test")
+            pt.click("#quickFindItems")
+            pt.wait_for_timeout(250)
+            assert len(held_today_mode) == 1
+            pt.evaluate("window.museModes.enterSampleMode({{ artwork: 'naam_japo' }})")
+            pt.wait_for_selector("#todayImgSrcSampleBtn:not([hidden])")
+            try:
+                held_today_mode[0].fulfill(
+                    status=200,
+                    content_type="application/json",
+                    body=late_payload_a,
+                )
+            except Exception:
+                pass
+            pt.wait_for_timeout(200)
+            pt.unroute("**/api/v1/product-reference")
+            today_grid_sample = pt.text_content("#todayImageCandidatesGrid") or ""
+            assert "Late Account A Print" not in today_grid_sample
+            assert "Original artwork" in today_grid_sample
+            ctx_tm.close()
+
+            # 5. Creator (/create) same-page delayed-response race isolation (A->B and Own->Sample)
+            ctx_cr = browser.new_context(
+                viewport={{"width": 1280, "height": 860}}, accept_downloads=True
+            )
+            set_cookie(ctx_cr, "user-a")
+            pc = ctx_cr.new_page()
+            pc.on("pageerror", lambda e: errors.append(str(e)))
+            pc.goto(f"{{base_url}}/create", wait_until="domcontentloaded")
+            pc.wait_for_selector("#shopUrl")
+            pc.fill("#shopUrl", "https://wildmeadow.test")
+            pc.click("#importProducts")
+            pc.wait_for_selector("#importResults button.import-item")
+            held_cr_acct = []
+            def hold_cr_acct_ref(route):
+                if len(held_cr_acct) == 0:
+                    held_cr_acct.append(route)
+                else:
+                    route.continue_()
+            pc.route("**/api/v1/product-reference", hold_cr_acct_ref)
+            pc.locator("#importResults button.import-item").first.click()
+            pc.wait_for_timeout(250)
+            assert len(held_cr_acct) == 1
+            set_cookie(ctx_cr, "user-b")
+            pc.evaluate("window.museAccount.refresh()")
+            pc.wait_for_function("window.museAccount?.getSnapshot?.()?.user?.id === 'user-b'")
+            pc.fill("#productName", "Account B Product")
+            try:
+                held_cr_acct[0].fulfill(
+                    status=200,
+                    content_type="application/json",
+                    body=late_payload_a,
+                )
+            except Exception:
+                pass
+            pc.wait_for_timeout(200)
+            pc.unroute("**/api/v1/product-reference")
+            assert pc.input_value("#productName") == "Account B Product"
+            assert "Botanical Linocut" not in pc.input_value("#productName")
+            assert "Late Account A Print" not in (pc.text_content("#imageCandidatesGrid") or "")
+            assert pc.get_attribute("#productImage", "src") != img_2
+
+            # Own -> Sample on /create while website candidate response is in-flight
+            pc.evaluate("window.museModes.goToOwnWorkspace()")
+            pc.wait_for_selector("#shopUrl")
+            pc.fill("#shopUrl", "https://wildmeadow.test")
+            pc.click("#importProducts")
+            pc.wait_for_selector("#importResults button.import-item")
+            held_cr_mode = []
+            def hold_cr_mode_ref(route):
+                if len(held_cr_mode) == 0:
+                    held_cr_mode.append(route)
+                else:
+                    route.continue_()
+            pc.route("**/api/v1/product-reference", hold_cr_mode_ref)
+            pc.locator("#importResults button.import-item").first.click()
+            pc.wait_for_timeout(250)
+            assert len(held_cr_mode) == 1
+            pc.evaluate("window.museModes.enterSampleMode({{ artwork: 'naam_japo' }})")
+            pc.wait_for_selector("#imgSrcSampleBtn:not([hidden])")
+            try:
+                held_cr_mode[0].fulfill(
+                    status=200,
+                    content_type="application/json",
+                    body=late_payload_a,
+                )
+            except Exception:
+                pass
+            pc.wait_for_timeout(200)
+            pc.unroute("**/api/v1/product-reference")
+            cr_sample_grid = pc.text_content("#imageCandidatesGrid") or ""
+            assert "Late Account A Print" not in cr_sample_grid
+            assert "Original artwork" in cr_sample_grid
+            ctx_cr.close()
 
             assert not errors, f"Uncaught browser errors: {{errors}}"
             browser.close()
