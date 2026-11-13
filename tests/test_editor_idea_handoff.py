@@ -246,7 +246,9 @@ def test_all_5_demo_ideas_in_creator_e2e(live_server_url: str, viewport_width: i
             page.goto(f"{{base}}/create?idea=non-existent-idea-xyz", wait_until="domcontentloaded")
             page.locator("#headline").wait_for(state="attached", timeout=5000)
             default_headline = page.locator("#headline").input_value()
-            assert "Ek Onkar" in default_headline or "My product" in default_headline
+            assert "Ek Onkar" not in default_headline
+            assert page.evaluate("document.documentElement.dataset.museMode") == "guest_entry"
+            assert default_headline == "My studio artwork"
 
             # 3. Test export flow marks idea done in muse.actions and offers Log result
             page.goto(
@@ -358,7 +360,8 @@ def test_today_idea_handoff_e2e(live_server_url: str) -> None:
             page.goto(f"{{base}}/today?idea=unknown-invalid-id", wait_until="domcontentloaded")
             page.locator("#itemTitle").wait_for(state="attached", timeout=5000)
             default_title = page.locator("#itemTitle").inner_text()
-            assert "Ek Onkar" in default_title
+            assert "Ek Onkar" not in default_title
+            assert page.evaluate("document.documentElement.dataset.museMode") == "guest_entry"
 
             browser.close()
         """

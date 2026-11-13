@@ -854,7 +854,7 @@ def test_batch1_corrections_security_merge_drafts_and_handoff_e2e(
             assert_no_overflow(page, "/create desktop 1440")
 
             # Must carry non-top recommendation & uploaded photo, ZERO Sarabjit leak
-            assert not page.locator("#artistExample").is_visible()
+            assert page.evaluate("document.documentElement.dataset.museMode") == "account_own"
             snap_create = page.evaluate("window.museCreatorSnapshot()")
             assert snap_create["idea_id"] == non_top_rec["id"], snap_create
             assert snap_create["headline"] == non_top_rec["title"], snap_create
@@ -894,7 +894,7 @@ def test_batch1_corrections_security_merge_drafts_and_handoff_e2e(
                 wait_until="domcontentloaded",
             )
             page.wait_for_timeout(300)
-            assert not page.locator("#artistExample").is_visible()
+            assert page.evaluate("document.documentElement.dataset.museMode") == "account_own"
             bogus_hl = page.locator("#headline").input_value()
             assert "ek onkar" not in bogus_hl.lower(), bogus_hl
 

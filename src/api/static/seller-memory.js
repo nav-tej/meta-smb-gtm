@@ -176,6 +176,7 @@
   }
 
   function isSampleMode() {
+    if (window.museModes?.isSampleMode) return window.museModes.isSampleMode();
     if (new URLSearchParams(location.search).get('workspace') === 'sample') return true;
     const uid = currentOwnerId();
     if (uid) return false;
@@ -2554,6 +2555,13 @@
     window.addEventListener('muse:workspace-reset', () => {
       clearPrivateMemoryUI();
       loadServerMemory(true);
+    });
+
+    window.addEventListener('muse:mode-change', () => {
+      if (stateTagForCurrent() !== state.loadedForOwner) {
+        clearPrivateMemoryUI();
+        loadServerMemory(true);
+      }
     });
 
     window.addEventListener('focus', () => {

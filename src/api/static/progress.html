@@ -8,10 +8,10 @@
   <meta name="description" content="Track your marketing moves, log real sales results, and measure your return on investment against your plan cost.">
   <link rel="canonical" href="https://meta-smb-gtm.vercel.app/progress">
   <meta name="robots" content="index, follow">
-  <link rel="stylesheet" href="/static/digest.css?v=20261109-sub">
-  <link rel="stylesheet" href="/static/muse-shell.css?v=20261109-ux3">
-  <link rel="stylesheet" href="/static/account.css?v=20261110-fix1">
-  <link rel="stylesheet" href="/static/reco-actions.css?v=20261109-reco1">
+  <link rel="stylesheet" href="/static/digest.css?v=20261112-integrated">
+  <link rel="stylesheet" href="/static/muse-shell.css?v=20261112-integrated">
+  <link rel="stylesheet" href="/static/account.css?v=20261112-integrated">
+  <link rel="stylesheet" href="/static/reco-actions.css?v=20261112-integrated">
   <style>
     .pg-wrap { max-width: 960px; margin: 2rem auto; padding: 0 1.25rem 4rem; }
     .pg-head { margin-bottom: 2rem; }
@@ -45,8 +45,9 @@
     .pg-actions { display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 0.5rem; }
   </style>
   <script src="/static/analytics.js?v=20261109-ux" defer></script>
-  <script src="/static/account.js?v=20261110-fix1" defer></script>
-  <script src="/static/muse-shell.js?v=20261110-fix1" defer></script>
+  <script src="/static/account.js?v=20261112-integrated" defer></script>
+  <script src="/static/workspace-modes.js?v=20261112-integrated" defer></script>
+  <script src="/static/muse-shell.js?v=20261112-integrated" defer></script>
 </head>
 <body>
   <header class="topbar ms-topbar">
@@ -181,6 +182,7 @@
       let currentUser = null;
 
       function storageKey() {
+        if (window.museModes?.isSampleMode?.()) return 'muse.outcomes.sample';
         return currentUser && currentUser.id ? 'muse.outcomes.' + currentUser.id : 'muse.outcomes.anon';
       }
 
@@ -198,27 +200,41 @@
       }
 
       let serverSummary = null;
+      let syncSeq = 0;
 
       async function syncAccount() {
+        const seq = ++syncSeq;
+        const guard = window.museModes?.bindAsyncGuard?.() || { isCurrent: () => true };
+        serverSummary = null;
         try {
-          if (window.museAccount && typeof window.museAccount.getSnapshot === 'function') {
-            const snap = window.museAccount.getSnapshot();
-            if (snap && snap.user) currentUser = snap.user;
+          const modeState = window.museModes?.resolve ? await window.museModes.resolve() : null;
+          if (seq !== syncSeq) return;
+          if (modeState && (modeState.isLoading || modeState.isError || modeState.isExpired)) {
+            currentUser = null;
+            return;
           }
-          if (!currentUser) {
-            const resp = await fetch('/api/v1/account/me', { credentials: 'same-origin' });
-            if (resp.ok) {
-              const data = await resp.json();
-              if (data && data.user) currentUser = data.user;
-            }
+          if (modeState && modeState.isSample) {
+            currentUser = null;
+            render();
+            return;
+          }
+          if (window.museAccount && typeof window.museAccount.getSnapshot === 'function') {
+            if (window.museAccount.ready) await window.museAccount.ready();
+            const snap = window.museAccount.getSnapshot();
+            if (seq !== syncSeq || !guard.isCurrent()) return;
+            currentUser = snap?.user || null;
           }
           if (currentUser && currentUser.id) {
+            const ownerAtStart = currentUser.id;
             const res = await fetch('/api/v1/outcomes', {
               credentials: 'same-origin',
-              headers: { 'x-muse-owner': currentUser.id },
+              headers: { 'x-muse-owner': ownerAtStart },
             });
+            if (seq !== syncSeq || !guard.isCurrent()) return;
+            if (!currentUser || currentUser.id !== ownerAtStart) return;
             if (res.ok) {
               const data = await res.json();
+              if (seq !== syncSeq || !guard.isCurrent()) return;
               if (data.summary) serverSummary = data.summary;
               if (Array.isArray(data.outcomes) && data.outcomes.length > 0) {
                 saveOutcomes(data.outcomes);
@@ -226,12 +242,18 @@
             }
           }
         } catch (_) {}
-        render();
+        if (seq === syncSeq) render();
       }
 
       window.addEventListener('muse:account-change', (ev) => {
+        syncSeq += 1;
+        serverSummary = null;
         currentUser = ev?.detail?.user || null;
         render();
+        const snapUser = window.museAccount?.getSnapshot?.()?.user || null;
+        if (currentUser?.id && snapUser?.id === currentUser.id) {
+          syncAccount();
+        }
       });
 
       function render() {
@@ -385,7 +407,9 @@
         render();
       });
 
-      render();
+      if (window.museModes?.subscribe) {
+        window.museModes.subscribe(() => { syncAccount(); });
+      }
       syncAccount();
     })();
   </script>

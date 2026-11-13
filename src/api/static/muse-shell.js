@@ -986,7 +986,13 @@
   ];
   const isSampleShopMode = () => {
     try {
-      return typeof location !== 'undefined' && new URLSearchParams(location.search).get('workspace') === 'sample';
+      if (typeof window !== 'undefined' && window.museModes && typeof window.museModes.isSampleMode === 'function') {
+        return window.museModes.isSampleMode();
+      }
+      if (typeof location === 'undefined') return false;
+      const params = new URLSearchParams(location.search);
+      if (params.get('workspace') === 'own') return false;
+      return params.get('workspace') === 'sample' || Boolean(params.get('idea') || params.get('artwork'));
     } catch (_) { return false; }
   };
 
@@ -994,7 +1000,6 @@
     if (!location.pathname.startsWith('/today')) return;
     const main = document.querySelector('main');
     if (!main || document.getElementById('msBrief')) return;
-    const isSample = isSampleShopMode();
     const today = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
     const section = el('section', { class: 'ms-brief', id: 'msBrief', 'aria-labelledby': 'msBriefTitle' });
     const head = el('div', { class: 'ms-brief-head' });
@@ -1004,7 +1009,7 @@
     titleBox.appendChild(el('p', { class: 'ms-brief-plan' }, 'Built once a day from your watchlist, the competitor monitor and campaign trends. No Muse credit is used to read it.'));
     const meta = el('p', { class: 'ms-brief-meta' });
     meta.appendChild(el('span', { class: 'ms-dot', 'aria-hidden': 'true' }));
-    meta.appendChild(document.createTextNode(isSample ? 'Watchlist: 4 competitors · 6 shop pages · last checked Nov 3 · social accounts not checked yet' : 'Watchlist: Monitored competitors · social accounts not checked yet'));
+    meta.appendChild(document.createTextNode('Checking your workspace…'));
     titleBox.appendChild(meta);
     const recheck = el('button', { type: 'button', class: 'ms-secondary ms-small', title: 'Check competitors’ public pages and rebuild today’s brief · 1 run' }, 'Re-check now');
     const toggle = el('button', { type: 'button', class: 'ms-link ms-brief-toggle', 'aria-expanded': 'true', 'aria-controls': 'msBriefBody' }, 'Hide');
@@ -1026,22 +1031,26 @@
         list.appendChild(li);
       }
     };
-    if (isSample) renderItems(WATCH);
-    const statusLine = el('p', { class: 'ms-brief-status', role: 'status', 'aria-live': 'polite' }, 'Loading today’s brief…');
+    const statusLine = el('p', { class: 'ms-brief-status', role: 'status', 'aria-live': 'polite' }, 'Checking your account…');
     const retry = el('button', { type: 'button', class: 'ms-link ms-brief-retry', hidden: '' }, 'Try again');
     const statusRow = el('div', { class: 'ms-brief-statusrow' });
     statusRow.append(statusLine, retry);
-    const sourceNote = el('p', { class: 'ms-muted ms-brief-source' }, isSample ? 'From saved public snapshots captured Nov 3. Muse checks again when you run a re-check; it does not watch continuously.' : 'From your account watchlist. No Muse credit is used to read it.');
-    // Focus of the day (server-ranked; the saved snapshot move is shown until the brief loads).
+    const sourceNote = el('p', { class: 'ms-muted ms-brief-source' }, '');
     const move = el('div', { class: 'ms-move' });
     const moveText = el('div');
-    const moveChip = el('span', { class: 'ms-chip high' }, 'Focus of the day · high impact');
-    const moveTitle = el('strong', {}, isSample ? 'Feature your Empowering Women series' : 'Feature a collection or new artwork');
-    const moveReason = el('span', { class: 'ms-note' }, isSample ? 'SikhiArt keeps adding warrior and guru editions but has no group for women’s stories.' : 'Highlight unique pieces from your studio and compare with competitor offerings.');
+    const moveChip = el('span', { class: 'ms-chip high' }, 'Workspace focus');
+    const moveTitle = el('strong', {}, 'Preparing your daily workspace');
+    const moveReason = el('span', { class: 'ms-note' }, '');
     moveText.append(moveChip, moveTitle, moveReason);
-    const go = el('a', { class: 'ms-primary ms-small', href: isSample ? '/create?idea=idea-1-empowering-women' : '/create' }, 'Make this post →');
+    const go = el('a', { class: 'ms-primary ms-small', href: '/create' }, 'Make a post →');
     move.append(moveText, go);
-    const safeHref = (href) => (typeof href === 'string' && /^\/(?!\/)/.test(href) ? href : '/create');
+    const safeHref = (href, asSample = false) => {
+      if (typeof href !== 'string' || !/^\/(?!\/)/.test(href)) return asSample ? '/create?workspace=sample' : '/create';
+      if (asSample && href.startsWith('/create') && !href.includes('workspace=sample')) {
+        return href.includes('?') ? `${href}&workspace=sample` : `${href}?workspace=sample`;
+      }
+      return href;
+    };
     const goLabel = (href) => (href.startsWith('/create') ? 'Make this post →' : 'Open →');
     const columns = el('div', { class: 'ms-brief-columns' });
     const overnightBox = el('section', { class: 'ms-brief-card', 'aria-label': 'Overnight competitor changes' });
@@ -1062,14 +1071,14 @@
         moveChip.textContent = `Focus of the day · ${focus.impact || 'high'} impact`;
         moveTitle.textContent = String(focus.title);
         moveReason.textContent = String(focus.reason || '');
-        const href = safeHref(focus.href);
+        const href = safeHref(focus.href, true);
         go.setAttribute('href', href);
         go.textContent = goLabel(href);
       }
       const actions = Array.isArray(brief.action_items) ? brief.action_items.slice(0, 3) : [];
       card(actionsBox, 'Top 3 actions', actions.map((item, index) => {
         const li = el('li', { class: `ms-action ${item.impact || ''}` });
-        const link = el('a', { href: safeHref(item.href) }, `${index + 1}. ${String(item.title || '')}`);
+        const link = el('a', { href: safeHref(item.href, true) }, `${index + 1}. ${String(item.title || '')}`);
         li.append(link, el('span', { class: 'ms-note' }, String(item.reason || '')));
         if (item.source) li.appendChild(el('span', { class: 'ms-where' }, String(item.source)));
         return li;
@@ -1100,31 +1109,120 @@
       statusLine.hidden = !message;
     };
     const loadBrief = async (refresh = false) => {
-      setLoading(true, refresh ? 'Rebuilding today’s brief…' : 'Loading today’s brief…');
+      if (!isSampleShopMode()) return false;
+      const guard = window.museModes?.bindAsyncGuard?.() || { isCurrent: () => true };
+      setLoading(true, refresh ? 'Rebuilding sample brief…' : 'Loading sample brief…');
       retry.hidden = true;
       try {
         const response = await museFetch(`/api/v1/daily-brief${refresh ? '?refresh=true' : ''}`, {}, { retries: 2, timeoutMs: 15000 });
-        if (!response.ok) throw new Error(await errorMessage(response, 'Could not load today’s brief.'));
-        renderBrief(await response.json());
+        if (!guard.isCurrent()) return false;
+        if (!response.ok) throw new Error(await errorMessage(response, 'Could not load sample brief.'));
+        const data = await response.json();
+        if (!guard.isCurrent()) return false;
+        renderBrief(data);
         setLoading(false);
         return true;
       } catch (error) {
-        setLoading(false, `${error.message || 'Could not load today’s brief.'} Showing the saved brief.`);
+        if (!guard.isCurrent()) return false;
+        setLoading(false, `${error.message || 'Could not load today’s brief.'} Showing the saved sample brief.`);
         retry.hidden = false;
         return false;
       }
     };
     const loadWeekly = async () => {
+      if (!isSampleShopMode()) return;
+      const guard = window.museModes?.bindAsyncGuard?.() || { isCurrent: () => true };
       try {
         const response = await museFetch('/api/v1/weekly-digest', {}, { retries: 1, timeoutMs: 10000 });
-        if (!response.ok) return;
+        if (!response.ok || !guard.isCurrent()) return;
         const digest = await response.json();
+        if (!guard.isCurrent()) return;
         const first = Array.isArray(digest.highlights) && digest.highlights[0] ? ` Biggest: ${digest.highlights[0]}.` : '';
         weekly.textContent = digest.checks ? `This week: ${digest.total_changes} competitor change(s) across ${digest.checks} check(s).${first}` : String(digest.note || '');
       } catch { /* the weekly line is optional */ }
     };
+    const applyModeState = (modeState) => {
+      const s = modeState || window.museModes?.current?.() || {
+        state: isSampleShopMode() ? 'guest_sample' : 'guest_entry',
+        isSample: isSampleShopMode(),
+        isLoading: false,
+        isError: false,
+        isExpired: false
+      };
+      retry.hidden = true;
+      weekly.textContent = '';
+      if (s.isLoading) {
+        list.replaceChildren();
+        card(actionsBox, 'Top 3 actions', [], 'Checking your account…');
+        card(overnightBox, 'Overnight changes', [], 'Checking your account…');
+        card(trendsBox, 'Performance trends', [], 'Checking your account…');
+        meta.lastChild.textContent = 'Checking account status…';
+        moveChip.textContent = 'Checking account';
+        moveTitle.textContent = 'Loading your workspace brief…';
+        moveReason.textContent = 'Verifying your account before showing workspace or sample data.';
+        go.setAttribute('href', '/create');
+        go.textContent = 'Open studio →';
+        sourceNote.textContent = '';
+        recheck.disabled = true;
+        setLoading(true, 'Checking your account…');
+        return;
+      }
+      if (s.isError || s.isExpired) {
+        list.replaceChildren();
+        card(actionsBox, 'Top 3 actions', [], 'Sign in or retry account check first.');
+        card(overnightBox, 'Overnight changes', [], 'Unavailable until account check completes.');
+        card(trendsBox, 'Performance trends', [], 'Unavailable until account check completes.');
+        meta.lastChild.textContent = s.isExpired ? 'Session expired' : 'Account check unavailable';
+        moveChip.textContent = s.isExpired ? 'Session expired' : 'Account check needed';
+        moveTitle.textContent = s.isExpired ? 'Sign in again to view your brief' : 'Could not verify your account right now';
+        moveReason.textContent = s.authError || 'Sample data stays separate. Retry or sign in above.';
+        go.setAttribute('href', '/create');
+        go.textContent = 'Open studio →';
+        sourceNote.textContent = 'Sample brief stays separate when your account status is uncertain.';
+        recheck.disabled = true;
+        setLoading(false, '');
+        return;
+      }
+      if (s.isSample) {
+        renderItems(WATCH);
+        meta.lastChild.textContent = 'Sample watchlist: 4 competitors · 6 shop pages · last checked Nov 3';
+        moveChip.textContent = 'Sample focus · high impact';
+        moveTitle.textContent = 'Feature your Empowering Women series';
+        moveReason.textContent = 'SikhiArt keeps adding warrior and guru editions but has no group for women’s stories.';
+        go.setAttribute('href', '/create?workspace=sample&idea=idea-1-empowering-women');
+        go.textContent = 'Make this post →';
+        sourceNote.textContent = 'From saved public snapshots captured Nov 3. Muse checks again when you run a re-check; it does not watch continuously.';
+        recheck.disabled = false;
+        loadBrief(false);
+        loadWeekly();
+        return;
+      }
+      list.replaceChildren();
+      meta.lastChild.textContent = s.isAuthenticated
+        ? 'My workspace · add your shop website & competitors in Setup or /create'
+        : 'Set up your own shop or explore the sample shop';
+      moveChip.textContent = s.isAuthenticated ? 'My workspace' : 'Get started';
+      moveTitle.textContent = s.isAuthenticated
+        ? 'Draft your next post from your own shop website'
+        : 'Add your shop website or explore the sample artist brief';
+      moveReason.textContent = s.isAuthenticated
+        ? 'No personal competitor checks yet. Paste your storefront URL in the studio below or open onboarding to add competitors.'
+        : 'Your workspace starts empty. Paste your own URL below or open the sample shop separately.';
+      go.setAttribute('href', '/create');
+      go.textContent = 'Create a post →';
+      card(actionsBox, 'Top 3 actions', [], 'Add your storefront & competitors to generate your first personal actions.');
+      card(overnightBox, 'Overnight changes', [], 'No personal competitor changes monitored yet.');
+      card(trendsBox, 'Performance trends', [], 'Log campaign results on Progress to track trends.');
+      sourceNote.textContent = 'Personal brief shows only your own workspace data. To view the sample shop example, open Sample shop (/today?workspace=sample).';
+      recheck.disabled = !s.isAuthenticated;
+      setLoading(false, '');
+    };
     retry.addEventListener('click', () => { loadBrief(false); loadWeekly(); });
     recheck.addEventListener('click', async () => {
+      if (!isSampleShopMode()) {
+        toast('Add your shop competitors in onboarding first to run a personal brief check.');
+        return;
+      }
       if (!requireRun('Brief re-check')) return;
       recheck.disabled = true;
       recheck.textContent = 'Checking…';
@@ -1143,8 +1241,9 @@
       recheck.textContent = 'Re-check now';
       toast(ok ? (monitorNote || 'Brief rebuilt with the latest competitor check') : 'Could not rebuild the brief; showing the saved one.', ok && !monitorNote ? '' : 'warn');
     });
-    loadBrief(false);
-    loadWeekly();
+    if (window.museModes?.subscribe) window.museModes.subscribe(applyModeState);
+    if (window.museModes?.resolve) window.museModes.resolve().then(applyModeState);
+    else applyModeState();
     body.append(statusRow, move, columns, list, weekly);
     body.appendChild(sourceNote);
     section.append(head, body);
@@ -1359,7 +1458,10 @@
     return items;
   }
   let bell = null;
-  const currentNotifications = () => notificationItems(signals || {}, { paused: readPaused(), actions: readActions() });
+  const currentNotifications = () => {
+    if (!isSampleShopMode()) return [];
+    return notificationItems(signals || {}, { paused: readPaused(), actions: readActions() });
+  };
   function toggleNotifications(force) {
     if (!bell) return;
     const open = typeof force === 'boolean' ? force : bell.menu.hidden;
@@ -1418,17 +1520,33 @@
     document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !menu.hidden) { toggleNotifications(false); button.focus(); } });
     if (pill?.parentNode) pill.insertAdjacentElement('afterend', wrap);
     else { const anchor = header.querySelector('.status-pill, .topbar-nav'); if (anchor) anchor.insertAdjacentElement('afterend', wrap); else header.appendChild(wrap); }
-    loadSignals().then((loaded) => { signals = loaded; renderNotifications(); });
+    const syncSignals = async (modeState) => {
+      const s = modeState || window.museModes?.current?.() || { isSample: isSampleShopMode(), isLoading: false };
+      if (s.isLoading) return;
+      if (!s.isSample) {
+        signals = {};
+        renderNotifications();
+        return;
+      }
+      const guard = window.museModes?.bindAsyncGuard?.() || { isCurrent: () => true };
+      const loaded = await loadSignals();
+      if (!guard.isCurrent()) return;
+      signals = loaded;
+      renderNotifications();
+    };
+    if (window.museModes?.subscribe) window.museModes.subscribe(syncSignals);
+    if (window.museModes?.resolve) window.museModes.resolve().then(syncSignals);
+    else syncSignals();
   }
 
   // ---------- Portal workspace: every item gets a next step ----------
   const PIXELS_SHOP = 'https://sarabjit-singh.pixels.com/';
   const ROUTES = [
     { test: /checkout|contact form|1-click/i, label: 'Get the checkout template →', to: 'tab:tab-export' },
-    { test: /starter|cheap|under \$25|\$1\d/i, label: 'Promote your prints →', to: '/create?idea=idea-2-starter-prints' },
-    { test: /women|goddess|empower|mai bhago|mata gujri|shop group/i, label: 'Feature it in a post →', to: '/create?idea=idea-1-empowering-women' },
-    { test: /gift|holiday|housewarming|wedding/i, label: 'Make a gift post →', to: '/create?idea=idea-3-gift-ready' },
-    { test: /story|blog|meaning|village/i, label: 'Make a story post →', to: '/create?idea=idea-5-painting-story' },
+    { test: /starter|cheap|under \$25|\$1\d/i, label: 'Promote your prints →', to: '/create?workspace=sample&idea=idea-2-starter-prints' },
+    { test: /women|goddess|empower|mai bhago|mata gujri|shop group/i, label: 'Feature it in a post →', to: '/create?workspace=sample&idea=idea-1-empowering-women' },
+    { test: /gift|holiday|housewarming|wedding/i, label: 'Make a gift post →', to: '/create?workspace=sample&idea=idea-3-gift-ready' },
+    { test: /story|blog|meaning|village/i, label: 'Make a story post →', to: '/create?workspace=sample&idea=idea-5-painting-story' },
     { test: /home|title|seo|metadata|series tag|omit|listing/i, label: 'Open your Pixels shop ↗', to: PIXELS_SHOP },
   ];
   const CONTAINER_DEFAULTS = {
@@ -1439,8 +1557,9 @@
   function routeFor(containerId, text) {
     const fixed = CONTAINER_DEFAULTS[containerId];
     if (fixed?.first) return fixed;
+    if (!isSampleShopMode()) return { label: 'Create a post for this →', to: '/create' };
     const title = text.split('\n').map((t) => t.trim()).find(Boolean) || '';
-    return ROUTES.find((r) => r.test.test(title)) || ROUTES.find((r) => r.test.test(text)) || { label: 'Create a post for this →', to: '/create' };
+    return ROUTES.find((r) => r.test.test(title)) || ROUTES.find((r) => r.test.test(text)) || { label: 'Create a post for this →', to: '/create?workspace=sample' };
   }
   function go(to) {
     if (to.startsWith('tab:')) {

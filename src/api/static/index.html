@@ -981,18 +981,19 @@
     }
 </style>
   <link rel="stylesheet" href="/static/portal-journey.css?v=20261106-ui2">
-  <link rel="stylesheet" href="/static/reco-actions.css?v=20261109-reco1">
+  <link rel="stylesheet" href="/static/reco-actions.css?v=20261112-integrated">
 
   <link rel="stylesheet" href="/static/pricing-modal.css?v=20261109-ux">
-  <link rel="stylesheet" href="/static/account.css?v=20261110-fix1">
-  <link rel="stylesheet" href="/static/muse-shell.css?v=20261109-ux3">
-  <link rel="stylesheet" href="/static/seller-memory.css?v=20261111-sm1">
+  <link rel="stylesheet" href="/static/account.css?v=20261112-integrated">
+  <link rel="stylesheet" href="/static/muse-shell.css?v=20261112-integrated">
+  <link rel="stylesheet" href="/static/seller-memory.css?v=20261112-integrated">
   <script src="/static/analytics.js?v=20261109-ux" defer></script>
-  <script src="/static/reco-actions.js?v=20261110-fix1" defer></script>
-  <script src="/static/account.js?v=20261110-fix1" defer></script>
-  <script src="/static/muse-shell.js?v=20261110-fix1" defer></script>
-  <script src="/static/welcome.js?v=20261110-fix1" defer></script>
-  <script src="/static/seller-memory.js?v=20261111-sm1" defer></script>
+  <script src="/static/reco-actions.js?v=20261112-integrated" defer></script>
+  <script src="/static/account.js?v=20261112-integrated" defer></script>
+  <script src="/static/workspace-modes.js?v=20261112-integrated" defer></script>
+  <script src="/static/muse-shell.js?v=20261112-integrated" defer></script>
+  <script src="/static/welcome.js?v=20261112-integrated" defer></script>
+  <script src="/static/seller-memory.js?v=20261112-integrated" defer></script>
 </head>
 <body>
   <!-- Top Bar -->
@@ -1063,6 +1064,91 @@
   <p class="hero-bridge"><span>↓ Free demo below: one artist’s research → post → next move · Saved Muse outputs, no account needed</span></p>
 
   <main class="shell">
+    <section id="sampleAdFormatsGallery" class="sample-formats-band" aria-labelledby="sampleFormatsTitle">
+      <div class="sample-formats-head">
+        <div>
+          <p class="eyebrow">Sample ad formats gallery</p>
+          <h2 id="sampleFormatsTitle">See every social placement before you sign in</h2>
+          <p class="sample-formats-sub">Illustrative sample creatives built from real artworks by <strong>Art of Sarabjit Singh</strong> (Sample shop). Clearly separated into <em>Original artwork</em> vs. <em>Illustrative saved AI scene</em> — never scraped competitor ads.</p>
+        </div>
+        <a class="sample-format-btn" style="flex:0 0 auto" href="/create?workspace=sample">Open sample studio →</a>
+      </div>
+      <div class="sample-formats-grid" id="sampleFormatsGrid">
+        <article class="sample-format-card" data-placement="instagram_feed" data-artwork="ek_onkar">
+          <div>
+            <div class="sample-format-media">
+              <div class="sample-format-frame is-feed-4x5">
+                <img class="js-sample-format-img" data-format="Feed 4:5 · 1080×1350" data-title="Ek Onkar — Collector room scene" data-artist="Art of Sarabjit Singh" src="/samples/ek_onkar_collector_room_live.webp" alt="Ek Onkar 4:5 Instagram Feed sample creative in a collector room" width="208" height="260" loading="eager">
+              </div>
+            </div>
+            <div class="sample-format-badges">
+              <span class="sample-format-badge">Feed 4:5 · 1080×1350</span>
+              <span class="sample-format-badge kind-ai">Illustrative saved AI scene</span>
+            </div>
+            <h3>Ek Onkar — Collector room scene</h3>
+            <p class="sample-format-meta">Sample artist: Art of Sarabjit Singh</p>
+            <div class="sample-format-orig">
+              <img class="js-sample-format-img" data-format="Original artwork · Source" data-title="Ek Onkar original" data-artist="Art of Sarabjit Singh" src="/samples/ek_onkar_original.jpg" alt="Original Ek Onkar artwork by Sarabjit Singh" width="34" height="34">
+              <span><strong>Original artwork</strong> paired with a 4:5 scene</span>
+            </div>
+            <p class="sample-format-disclaimer">Sample showcase · not a competitor ad</p>
+          </div>
+          <div class="sample-format-actions">
+            <button type="button" class="sample-format-btn js-sample-preview" data-artwork="ek_onkar" data-sample-placement="instagram_feed" data-format-label="Feed 4:5 · 1080×1350" data-source-kind="Illustrative saved AI scene (paired with original artwork)" data-title="Ek Onkar — Collector room scene" data-text="Illustrative Instagram Feed 4:5 (1080×1350) sample showing Ek Onkar original artwork in a warm collector room." data-image="/samples/ek_onkar_collector_room_live.webp">Preview format</button>
+            <a class="sample-format-link" href="/create?workspace=sample&amp;placement=instagram_feed&amp;artwork=ek_onkar">Customize 4:5 →</a>
+          </div>
+        </article>
+        <article class="sample-format-card" data-placement="instagram_story" data-artwork="naam_japo">
+          <div>
+            <div class="sample-format-media">
+              <div class="sample-format-frame is-story-9x16">
+                <img class="js-sample-format-img" data-format="Story 9:16 · 1080×1920" data-title="Naam Japo — Gallery story format" data-artist="Art of Sarabjit Singh" src="/samples/naam_japo_restored_gallery_live.webp" alt="Naam Japo 9:16 Story sample creative" width="146" height="260" loading="eager">
+              </div>
+            </div>
+            <div class="sample-format-badges">
+              <span class="sample-format-badge">Story 9:16 · 1080×1920</span>
+              <span class="sample-format-badge kind-ai">Illustrative saved AI scene</span>
+            </div>
+            <h3>Naam Japo — Gallery story format</h3>
+            <p class="sample-format-meta">Sample artist: Art of Sarabjit Singh</p>
+            <div class="sample-format-orig">
+              <img class="js-sample-format-img" data-format="Original artwork · Source" data-title="Naam Japo original" data-artist="Art of Sarabjit Singh" src="/samples/naam_japo_original.jpg" alt="Original Naam Japo artwork by Sarabjit Singh" width="34" height="34">
+              <span><strong>Original artwork</strong> framed for 9:16 vertical Story</span>
+            </div>
+            <p class="sample-format-disclaimer">Sample showcase · not a competitor ad</p>
+          </div>
+          <div class="sample-format-actions">
+            <button type="button" class="sample-format-btn js-sample-preview" data-artwork="naam_japo" data-sample-placement="instagram_story" data-format-label="Story 9:16 · 1080×1920" data-source-kind="Illustrative saved AI scene (paired with original artwork)" data-title="Naam Japo — Gallery story format" data-text="Illustrative Story 9:16 (1080×1920) sample placing Naam Japo in a vertical gallery story layout." data-image="/samples/naam_japo_restored_gallery_live.webp">Preview format</button>
+            <a class="sample-format-link" href="/create?workspace=sample&amp;placement=instagram_story&amp;artwork=naam_japo">Customize 9:16 →</a>
+          </div>
+        </article>
+        <article class="sample-format-card" data-placement="facebook_feed" data-artwork="kirat_karo">
+          <div>
+            <div class="sample-format-media">
+              <div class="sample-format-frame is-square-1x1">
+                <img class="js-sample-format-img" data-format="Square 1:1 · 1080×1080" data-title="Kirat Karo — Square catalog post" data-artist="Art of Sarabjit Singh" src="/samples/kirat_karo_collector_room_live.webp" alt="Kirat Karo 1:1 Square Facebook feed sample creative" width="240" height="240" loading="eager">
+              </div>
+            </div>
+            <div class="sample-format-badges">
+              <span class="sample-format-badge">Square 1:1 · 1080×1080</span>
+              <span class="sample-format-badge kind-ai">Illustrative saved AI scene</span>
+            </div>
+            <h3>Kirat Karo — Square catalog post</h3>
+            <p class="sample-format-meta">Sample artist: Art of Sarabjit Singh</p>
+            <div class="sample-format-orig">
+              <img class="js-sample-format-img" data-format="Original artwork · Source" data-title="Kirat Karo original" data-artist="Art of Sarabjit Singh" src="/samples/kirat_karo_original.jpg" alt="Original Kirat Karo artwork by Sarabjit Singh" width="34" height="34">
+              <span><strong>Original artwork</strong> framed for 1:1 Square feed</span>
+            </div>
+            <p class="sample-format-disclaimer">Sample showcase · not a competitor ad</p>
+          </div>
+          <div class="sample-format-actions">
+            <button type="button" class="sample-format-btn js-sample-preview" data-artwork="kirat_karo" data-sample-placement="facebook_feed" data-format-label="Square 1:1 · 1080×1080" data-source-kind="Illustrative saved AI scene (paired with original artwork)" data-title="Kirat Karo — Square catalog post" data-text="Illustrative Facebook Square 1:1 (1080×1080) sample framing Kirat Karo for catalog posts." data-image="/samples/kirat_karo_collector_room_live.webp">Preview format</button>
+            <a class="sample-format-link" href="/create?workspace=sample&amp;placement=facebook_feed&amp;artwork=kirat_karo">Customize 1:1 →</a>
+          </div>
+        </article>
+      </div>
+    </section>
+
     <section id="journey" class="journey" aria-label="Your growth loop">
       <div class="jr-hero">
         <div>
@@ -1184,8 +1270,8 @@
             <p style="margin:0 0 0.75rem;font-size:0.88rem;color:#555047;">Direct research with your own words. Muse parses your question into a safe directive without sending raw text to the model. Re-ranking from cache is free.</p>
             
             <form id="jrSteerForm" class="jr-steer-form" novalidate style="display:grid;gap:0.6rem;">
-              <div style="display:flex;gap:0.5rem;align-items:center;">
-                <input id="jrSteerInput" type="text" placeholder="e.g. Look at why SikhiArt dropped prints to $45 or find gift ideas under $50" maxlength="300" style="flex:1;min-height:42px;padding:0.5rem 0.8rem;border:1px solid #d5cfc2;border-radius:10px;font:inherit;">
+              <div style="display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center;min-width:0;">
+                <input id="jrSteerInput" type="text" placeholder="e.g. Look at why SikhiArt dropped prints to $45 or find gift ideas under $50" maxlength="300" style="flex:1 1 200px;min-width:0;max-width:100%;min-height:42px;padding:0.5rem 0.8rem;border:1px solid #d5cfc2;border-radius:10px;font:inherit;">
                 <button type="submit" class="jr-mini primary" id="jrSteerSubmitBtn" style="min-height:42px;padding:0.5rem 1rem;">Parse directive →</button>
               </div>
               
@@ -1288,10 +1374,11 @@
         <img id="adDialogImg" alt="">
         <div class="jr-dialog-body">
           <p class="jr-label" id="adDialogKind"></p>
+          <p class="jr-note" id="adDialogMeta" style="margin:0 0 6px;font-weight:600;color:#253d34;"></p>
           <h3 id="adDialogTitle"></h3>
           <p id="adDialogText"></p>
-          <p class="jr-note">Saved Muse Image 1.0 output (Nov 3). AI scenes can change artwork details; prices and edition details need the artist’s confirmation.</p>
-          <a class="jr-action solid c4" id="adDialogCreate" href="/create">Customize this ad →</a>
+          <p class="jr-note" id="adDialogDisclaimer">Illustrative sample showcase for Art of Sarabjit Singh (not a scraped competitor ad). AI scenes can change artwork details; prices and edition details stay under your control.</p>
+          <a class="jr-action solid c4" id="adDialogCreate" href="/create?workspace=sample">Customize this ad →</a>
         </div>
       </dialog>
     </section>
@@ -2502,30 +2589,136 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
     });
     document.getElementById('addCompetitorInput').addEventListener('input', (event) => event.target.setCustomValidity(''));
 
-    const AD_KIND = { product_visuals: 'Collector room scene', multi_image_combine: 'Two-painting set', restore_enhance: 'Restored scan, framed' };
+    const AD_KIND = { product_visuals: 'Illustrative saved AI scene', multi_image_combine: 'Illustrative saved AI scene (two-painting set)', restore_enhance: 'Illustrative saved AI scene (restored scan)' };
+    const SAMPLE_AD_FALLBACKS = [
+      {
+        id: 'ek_onkar',
+        headline: 'Ek Onkar — Collector room scene',
+        placement: 'instagram_feed',
+        workflow_mode: 'product_visuals',
+        format_label: 'Feed 4:5 · 1080×1350',
+        artist: 'Art of Sarabjit Singh (Sample shop)',
+        primary_text: 'Illustrative Instagram Feed 4:5 (1080×1350) sample showing Ek Onkar original artwork in a warm collector room.',
+        staged_image: '/samples/ek_onkar_collector_room_live.webp',
+        original_image: '/samples/ek_onkar_original.jpg',
+      },
+      {
+        id: 'naam_japo',
+        headline: 'Naam Japo — Gallery story format',
+        placement: 'instagram_story',
+        workflow_mode: 'restore_enhance',
+        format_label: 'Story 9:16 · 1080×1920',
+        artist: 'Art of Sarabjit Singh (Sample shop)',
+        primary_text: 'Illustrative Story 9:16 (1080×1920) sample placing Naam Japo in a vertical gallery story layout.',
+        staged_image: '/samples/naam_japo_restored_gallery_live.webp',
+        original_image: '/samples/naam_japo_original.jpg',
+      },
+      {
+        id: 'kirat_karo',
+        headline: 'Kirat Karo — Square catalog post',
+        placement: 'facebook_feed',
+        workflow_mode: 'product_visuals',
+        format_label: 'Square 1:1 · 1080×1080',
+        artist: 'Art of Sarabjit Singh (Sample shop)',
+        primary_text: 'Illustrative Facebook Square 1:1 (1080×1080) sample framing Kirat Karo for catalog posts.',
+        staged_image: '/samples/kirat_karo_collector_room_live.webp',
+        original_image: '/samples/kirat_karo_original.jpg',
+      },
+    ];
+    function sampleFallbackPosterUrl(title, formatLabel, artist) {
+      const safeTitle = String(title || 'Sample ad preview').replace(/[<>&"]/g, '');
+      const safeFmt = String(formatLabel || 'Feed 4:5 · 1080×1350').replace(/[<>&"]/g, '');
+      const safeArtist = String(artist || 'Art of Sarabjit Singh').replace(/[<>&"]/g, '');
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="540" height="675" viewBox="0 0 540 675"><rect width="540" height="675" fill="#253d34"/><rect x="24" y="24" width="492" height="627" rx="18" fill="#f7f4ec" stroke="#b7c4af" stroke-width="3"/><text x="48" y="88" font-family="Georgia,serif" font-size="22" font-weight="700" fill="#1b6e44">${safeFmt}</text><text x="48" y="140" font-family="Georgia,serif" font-size="28" font-weight="700" fill="#1c2d27">${safeTitle.slice(0, 32)}</text><text x="48" y="185" font-family="sans-serif" font-size="18" fill="#535f59">${safeArtist} · Sample showcase</text><rect x="48" y="220" width="444" height="330" rx="12" fill="#e5eee1"/><text x="270" y="390" text-anchor="middle" font-family="sans-serif" font-size="18" font-weight="700" fill="#253d34">Fallback sample preview</text><text x="48" y="605" font-family="sans-serif" font-size="15" fill="#687167">Sample creative · not a scraped competitor ad</text></svg>`;
+      return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+    }
+    function wireSampleFallback(img, title, formatLabel, artist) {
+      if (!img) return;
+      const applyFallback = () => {
+        if (img.dataset?.fallbackApplied) return;
+        if (img.dataset) img.dataset.fallbackApplied = '1';
+        img.src = sampleFallbackPosterUrl(title, formatLabel, artist);
+      };
+      img.addEventListener?.('error', applyFallback);
+      if (img.complete && img.naturalWidth === 0 && img.getAttribute('src')) applyFallback();
+    }
+    if (typeof document.querySelectorAll === 'function') {
+      document.querySelectorAll('.js-sample-format-img').forEach((img) => {
+        wireSampleFallback(img, img.dataset?.title, img.dataset?.format, img.dataset?.artist);
+      });
+    }
+    function placementAspectClass(placement) {
+      if (placement === 'instagram_story') return 'is-story-9x16';
+      if (placement === 'facebook_feed') return 'is-square-1x1';
+      return 'is-feed-4x5';
+    }
     function openAd(art) {
       const dialog = document.getElementById('adDialog');
+      if (!dialog) return;
       const img = document.getElementById('adDialogImg');
-      img.src = safeUrl(art.staged_image);
-      img.alt = `Saved Muse Image ad: ${art.headline || 'artwork scene'}`;
-      document.getElementById('adDialogKind').textContent = AD_KIND[art.workflow_mode] || 'Muse Image scene';
-      document.getElementById('adDialogTitle').textContent = art.headline || '';
+      const headline = art.headline || art.title || '';
+      const placement = art.placement || 'instagram_feed';
+      const formatLabel = art.format_label || (placement === 'instagram_story' ? 'Story 9:16 · 1080×1920' : placement === 'facebook_feed' ? 'Square 1:1 · 1080×1080' : 'Feed 4:5 · 1080×1350');
+      const kindLabel = art.source_kind || AD_KIND[art.workflow_mode] || (art.staged_image ? 'Illustrative saved AI scene' : 'Original artwork');
+      const artist = art.artist || 'Art of Sarabjit Singh (Sample shop)';
+      if (img) {
+        if (img.dataset) delete img.dataset.fallbackApplied;
+        img.className = placementAspectClass(placement);
+        wireSampleFallback(img, headline, formatLabel, artist);
+        img.src = safeUrl(art.staged_image || art.original_image) || sampleFallbackPosterUrl(headline, formatLabel, artist);
+        img.alt = `Saved Muse Image ad: ${headline || 'artwork scene'}`;
+      }
+      document.getElementById('adDialogKind').textContent = `${formatLabel} · ${kindLabel}`;
+      const metaEl = document.getElementById('adDialogMeta');
+      if (metaEl) metaEl.textContent = `Artist: ${artist}`;
+      document.getElementById('adDialogTitle').textContent = headline;
       document.getElementById('adDialogText').textContent = art.primary_text || '';
-      document.getElementById('adDialogCreate').setAttribute('href', `/create?artwork=${encodeURIComponent(art.id || '')}`);
+      const discEl = document.getElementById('adDialogDisclaimer');
+      if (discEl) discEl.textContent = 'Illustrative sample showcase (not a scraped competitor ad). AI scenes can change artwork details; your workspace stays separate.';
+      const query = new URLSearchParams({ workspace: 'sample', placement });
+      if (art.id) query.set('artwork', art.id);
+      document.getElementById('adDialogCreate').setAttribute('href', `/create?${query.toString()}`);
       if (typeof dialog.showModal === 'function') dialog.showModal(); else dialog.setAttribute('open', '');
     }
-    function renderAdGallery(ws) {
+    if (typeof document.querySelectorAll === 'function') {
+      document.querySelectorAll('.js-sample-preview').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          openAd({
+            id: btn.dataset?.artwork || 'ek_onkar',
+            placement: btn.dataset?.samplePlacement || btn.dataset?.placement || 'instagram_feed',
+            format_label: btn.dataset?.formatLabel || '',
+            source_kind: btn.dataset?.sourceKind || '',
+            headline: btn.dataset?.title || '',
+            primary_text: btn.dataset?.text || '',
+            staged_image: btn.dataset?.image || '',
+            artist: 'Art of Sarabjit Singh (Sample shop)',
+          });
+        });
+      });
+    }
+    function renderAdGallery(ws, fallbackNotice = '') {
       const box = document.getElementById('adGallery');
       if (!box) return;
+      const modeState = window.museModes?.current?.();
+      if (modeState && (modeState.isLoading || modeState.isError || modeState.isExpired || modeState.isOwnWorkspace)) {
+        return;
+      }
       box.textContent = '';
       const arts = (ws.artworks_showcase || []).filter((a) => a && a.staged_image && a.headline).slice(0, 4);
-      if (!arts.length) { const p = document.createElement('p'); p.className = 'jr-note'; p.textContent = 'No saved Muse ads for this workspace.'; box.appendChild(p); return; }
-      for (const art of arts) {
+      const list = arts.length ? arts : SAMPLE_AD_FALLBACKS;
+      if (fallbackNotice || !arts.length) {
+        const p = document.createElement('p');
+        p.className = 'jr-note';
+        p.textContent = fallbackNotice || 'Showing built-in sample creatives.';
+        box.appendChild(p);
+      }
+      for (const art of list) {
         const card = document.createElement('button');
         card.type = 'button'; card.className = 'jr-ad';
         const img = document.createElement('img');
-        img.src = safeUrl(art.staged_image); img.alt = ''; img.loading = 'lazy';
-        const kind = document.createElement('span'); kind.className = 'jr-ad-kind'; kind.textContent = AD_KIND[art.workflow_mode] || 'Muse Image scene';
+        img.src = safeUrl(art.staged_image || art.original_image); img.alt = ''; img.loading = 'lazy';
+        wireSampleFallback(img, art.headline, art.format_label || 'Sample creative', art.artist || 'Art of Sarabjit Singh');
+        const kind = document.createElement('span'); kind.className = 'jr-ad-kind'; kind.textContent = AD_KIND[art.workflow_mode] || 'Illustrative saved AI scene';
         const head = document.createElement('strong'); head.textContent = art.headline;
         const text = document.createElement('span'); text.className = 'jr-ad-text'; text.textContent = art.primary_text || '';
         const more = document.createElement('em'); more.textContent = 'View ad →';
@@ -2537,19 +2730,10 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
     }
     document.getElementById('adDialog').addEventListener('click', (event) => { if (event.target.id === 'adDialog') event.target.close(); });
 
-    async function loadPresets() {
-      let data;
-      try {
-        const resp = await portalFetch('/api/v1/demo-presets');
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        data = await resp.json();
-      } catch (err) {
-        showToast(`Demo could not load: ${err.message}. Reload to retry.`);
-        document.getElementById('compSummaryText').textContent = 'Demo unavailable. Reload the page to retry loading the saved results.';
-        return;
-      }
-      state.presets = data;
-      const ws = data.workspaces[state.activeWorkspace];
+    function renderLoadedSampleWorkspace(data) {
+      if (!data?.workspaces) return;
+      const ws = data.workspaces[state.activeWorkspace] || data.workspaces.sarabjit_singh;
+      if (!ws) return;
       renderCompetitorBrief(ws.competitor_brief);
       renderDiagnosticsAndAds(ws);
       renderArtworksShowcase(ws);
@@ -2557,6 +2741,49 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
       if (typeof window !== 'undefined' && typeof window.__museApplySignedInWorkspace === 'function') {
         window.__museApplySignedInWorkspace();
       }
+    }
+
+    async function loadPresets() {
+      if (typeof document !== 'undefined' && document.readyState === 'loading' && !window.museModes?.resolve) {
+        await new Promise((resolveDone) => document.addEventListener('DOMContentLoaded', resolveDone, { once: true }));
+      }
+      const initialMode = window.museModes?.resolve ? await window.museModes.resolve() : null;
+      const guard = window.museModes?.bindAsyncGuard?.() || { isCurrent: () => true };
+      const shouldShowSample = (m) => !m || (!m.isLoading && !m.isError && !m.isExpired && !m.isOwnWorkspace);
+      let data;
+      try {
+        const resp = await portalFetch('/api/v1/demo-presets');
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        data = await resp.json();
+      } catch (err) {
+        if (!guard.isCurrent()) return;
+        const nowMode = window.museModes?.current?.() || initialMode;
+        if (shouldShowSample(nowMode)) {
+          renderAdGallery({ artworks_showcase: SAMPLE_AD_FALLBACKS }, 'Showing built-in sample creatives (preset server unavailable).');
+          showToast(`Demo could not load: ${err.message}. Built-in sample formats remain available.`);
+          const compEl = document.getElementById('compSummaryText');
+          if (compEl) compEl.textContent = 'Sample presets unavailable right now. Built-in sample creatives remain visible above.';
+        }
+        return;
+      }
+      state.presets = data;
+      if (window.museModes?.subscribe) {
+        window.museModes.subscribe((m) => {
+          if (state.presets && shouldShowSample(m)) {
+            renderLoadedSampleWorkspace(state.presets);
+          }
+        });
+      }
+      const nowMode = window.museModes?.resolve
+        ? await window.museModes.resolve()
+        : (window.museModes?.current?.() || initialMode);
+      if (!guard.isCurrent() || !shouldShowSample(nowMode)) {
+        if (typeof window !== 'undefined' && typeof window.__museApplySignedInWorkspace === 'function' && nowMode?.isOwnWorkspace) {
+          window.__museApplySignedInWorkspace();
+        }
+        return;
+      }
+      renderLoadedSampleWorkspace(data);
     }
 
     // Live API Button: Step 1 Analyze Competitor

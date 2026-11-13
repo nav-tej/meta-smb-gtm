@@ -183,45 +183,84 @@
 
   async function loadServerWorkspaceDoc() {
     try {
-      if (window.museAccount && typeof window.museAccount.ready === 'function') {
+      if (window.museModes && typeof window.museModes.resolve === 'function') {
+        await window.museModes.resolve();
+      } else if (window.museAccount && typeof window.museAccount.ready === 'function') {
         await window.museAccount.ready();
-        const snap = typeof window.museAccount.getSnapshot === 'function'
-          ? window.museAccount.getSnapshot()
-          : null;
+      }
+      if (window.museAccount && typeof window.museAccount.getSnapshot === 'function') {
+        const snap = window.museAccount.getSnapshot();
+        const authStatus = snap?.auth_status || (snap?.user ? 'authenticated' : 'signed_out');
+        if (authStatus === 'error' || authStatus === 'expired' || authStatus === 'loading') {
+          return {
+            doc: null,
+            version: 0,
+            user: null,
+            usage: null,
+            authStatus,
+            authError: snap?.auth_error || null,
+          };
+        }
         if (snap && !snap.user) {
-          return { doc: null, version: 0, user: null, usage: snap.usage || null };
+          return { doc: null, version: 0, user: null, usage: snap.usage || null, authStatus: 'signed_out', authError: null };
         }
         if (snap && snap.user && typeof window.museAccount.loadWorkspace === 'function') {
           const ws = await window.museAccount.loadWorkspace(snap.user.id);
-          return { doc: ws.document || {}, version: ws.version || 0, user: snap.user, usage: snap.usage };
+          return {
+            doc: ws.document || {},
+            version: ws.version || 0,
+            user: snap.user,
+            usage: snap.usage,
+            authStatus: 'authenticated',
+            authError: null,
+          };
         }
       }
       const meResp = await fetch('/api/v1/account/me', {
         credentials: 'same-origin',
         cache: 'no-store',
       });
-      if (meResp.ok) {
-        const me = await meResp.json();
-        if (me && me.user && me.user.id) {
-          const wsResp = await fetch('/api/v1/account/workspace', {
-            credentials: 'same-origin',
-            cache: 'no-store',
-            headers: { 'X-Muse-Owner': me.user.id },
-          });
-          if (wsResp.ok) {
-            const wsData = await wsResp.json();
-            return {
-              doc: wsData.document || {},
-              version: wsData.version || 0,
-              user: me.user,
-              usage: me.usage,
-            };
-          }
-          return { doc: {}, version: 0, user: me.user, usage: me.usage };
-        }
+      if (!meResp.ok) {
+        return {
+          doc: null,
+          version: 0,
+          user: null,
+          usage: null,
+          authStatus: meResp.status === 401 ? 'expired' : 'error',
+          authError: meResp.status === 401 ? 'Your session expired. Sign in again.' : 'Could not verify your account right now.',
+        };
       }
-    } catch (_) {}
-    return { doc: null, user: null, usage: null };
+      const me = await meResp.json();
+      if (me && me.user && me.user.id) {
+        const wsResp = await fetch('/api/v1/account/workspace', {
+          credentials: 'same-origin',
+          cache: 'no-store',
+          headers: { 'X-Muse-Owner': me.user.id },
+        });
+        if (wsResp.ok) {
+          const wsData = await wsResp.json();
+          return {
+            doc: wsData.document || {},
+            version: wsData.version || 0,
+            user: me.user,
+            usage: me.usage,
+            authStatus: 'authenticated',
+            authError: null,
+          };
+        }
+        return { doc: {}, version: 0, user: me.user, usage: me.usage, authStatus: 'authenticated', authError: null };
+      }
+      return { doc: null, version: 0, user: null, usage: me?.usage || null, authStatus: 'signed_out', authError: null };
+    } catch (err) {
+      return {
+        doc: null,
+        version: 0,
+        user: null,
+        usage: null,
+        authStatus: 'error',
+        authError: err?.message || 'Could not verify your account right now.',
+      };
+    }
   }
 
   async function saveServerOnboarding(onboardingState, preferencesObj, userObj) {
@@ -293,8 +332,34 @@
     let runsRemaining = 3;
 
     const server = await loadServerWorkspaceDoc();
+    if (server.authStatus === 'error' || server.authStatus === 'expired') {
+      let errNote = document.getElementById('wkAuthStatusError');
+      if (!errNote) {
+        errNote = document.createElement('div');
+        errNote.id = 'wkAuthStatusError';
+        errNote.setAttribute('role', 'alert');
+        errNote.style.cssText = 'margin:16px 0;padding:14px 16px;border-radius:10px;background:#fbe8df;color:#6c281b;border:1px solid #e2b8a8;';
+        mainEl.prepend(errNote);
+      }
+      errNote.textContent = server.authError || 'Could not verify your account status right now. Retry or sign in above; your saved work on this device stays safe.';
+      const onRecovered = (modeState) => {
+        if (modeState && !modeState.isLoading && !modeState.isError && !modeState.isExpired) {
+          window.location.reload();
+        }
+      };
+      window.museModes?.subscribe?.(onRecovered);
+      return;
+    }
     if (server.user) currentUser = server.user;
     let state = readLocalOnboarding(currentUser) || defaultOnboardingState();
+    window.museModes?.subscribe?.((modeState) => {
+      if (!modeState || modeState.isLoading) return;
+      const nextUid = modeState.ownerId || null;
+      const curUid = currentUser?.id || null;
+      if (nextUid !== curUid) {
+        window.location.reload();
+      }
+    });
     if (server.usage && typeof server.usage.remaining === 'number') {
       runsRemaining = Math.max(0, server.usage.remaining);
     } else {
@@ -1614,62 +1679,128 @@
     }
   }
 
-  async function initHomePageOnboardingSync() {
+  async function applyHomeModeState(modeStateOverride = null) {
     if (window.location.pathname === '/welcome') return;
     if (!document.getElementById('journey')) return;
     const seq = ++homeSyncEpoch;
-
     const query = new URLSearchParams(window.location.search || '');
-    const explicitMode = query.get('workspace'); // 'sample' | 'own'
-    if (explicitMode === 'sample') {
-      try {
-        localStorage.setItem(LOCAL_WORKSPACE_MODE_KEY, 'sample');
-      } catch (_) {}
-      if (lastRenderedUserId || document.getElementById('ownWorkspaceOptionBtn')) {
-        resetSignedOutHomeWorkspace({ preserveMode: true });
-      }
+    const modeState = modeStateOverride || window.museModes?.current?.() || {
+      state: query.get('workspace') === 'sample' ? 'guest_sample' : 'guest_entry',
+      isSample: query.get('workspace') === 'sample',
+      isAuthenticated: false,
+      isLoading: false,
+      isError: false,
+      isExpired: false,
+      ownerId: null,
+    };
+
+    try { localStorage.removeItem(LOCAL_WORKSPACE_MODE_KEY); } catch (_) {}
+
+    if (modeState.isLoading) return;
+    if (modeState.isError || modeState.isExpired) {
+      const rd = document.getElementById('returningDashboard');
+      if (rd) rd.hidden = true;
+      const sf = document.getElementById('sampleAdFormatsGallery');
+      if (sf) sf.hidden = true;
+      window.museModes?.renderModeBanners?.();
       return;
     }
-    if (explicitMode === 'own') {
-      try {
-        localStorage.setItem(LOCAL_WORKSPACE_MODE_KEY, 'own');
-      } catch (_) {}
+
+    const sf = document.getElementById('sampleAdFormatsGallery');
+    if (sf) sf.hidden = modeState.state === 'account_own';
+
+    if (!modeState.isAuthenticated) {
+      if (lastRenderedUserId || document.getElementById('ownWorkspaceOptionBtn')) {
+        resetSignedOutHomeWorkspace({ preserveMode: modeState.isSample });
+      }
+      window.museModes?.renderModeBanners?.();
+      return;
     }
 
+    const guard = window.museModes?.bindAsyncGuard ? window.museModes.bindAsyncGuard() : { isCurrent: () => true };
     const server = await loadServerWorkspaceDoc();
-    if (seq !== homeSyncEpoch) return;
+    if (seq !== homeSyncEpoch || !guard.isCurrent()) return;
+    if (server.authStatus === 'error' || server.authStatus === 'expired' || server.authStatus === 'loading') {
+      const rd = document.getElementById('returningDashboard');
+      if (rd) rd.hidden = true;
+      const sf2 = document.getElementById('sampleAdFormatsGallery');
+      if (sf2) sf2.hidden = true;
+      window.museModes?.renderModeBanners?.();
+      return;
+    }
     const snap = window.museAccount?.getSnapshot?.();
     if (snap && (snap.user?.id || null) !== (server.user?.id || null)) return;
 
     const isSignedIn = Boolean(server.user && server.user.id);
-    // Bind onboarding state to the server document for signed-in accounts.
-    // Unscoped local storage from other accounts on this browser is never trusted.
-    const onboarding = isSignedIn ? (server.doc?.onboarding || null) : readLocalOnboarding(null);
+    const onboarding = isSignedIn ? (server.doc?.onboarding || null) : null;
 
     // Post-auth routing rule: if signed-in user has no completed onboarding, redirect to /welcome
     if (isSignedIn && (!onboarding || !onboarding.completed_at)) {
-      if (window.location.pathname === '/account' || query.has('oauth') || localStorage.getItem(LOCAL_WORKSPACE_MODE_KEY) !== 'sample') {
+      if (window.location.pathname === '/account' || query.has('oauth') || !modeState.isSample) {
         window.location.replace('/welcome');
         return;
       }
     }
 
-    const savedMode = localStorage.getItem(LOCAL_WORKSPACE_MODE_KEY);
-    if ((isSignedIn || onboarding?.completed_at) && savedMode !== 'sample') {
+    if (modeState.isSample) {
+      if (lastRenderedUserId || document.getElementById('ownWorkspaceOptionBtn')) {
+        resetSignedOutHomeWorkspace({ preserveMode: true });
+      }
+      if (isSignedIn) {
+        injectLoginDialogSwitcher(onboarding, server.user);
+        const wsBar = document.getElementById('workspaceBar');
+        const wsLabel = document.getElementById('activeWorkspaceLabel');
+        if (wsBar) wsBar.hidden = false;
+        if (wsLabel) wsLabel.textContent = 'Art of Sarabjit Singh · Sample shop';
+      }
+      window.museModes?.renderModeBanners?.();
+    } else if (isSignedIn) {
+      if (lastRenderedUserId && lastRenderedUserId !== server.user.id) {
+        resetSignedOutHomeWorkspace({ preserveMode: true });
+      }
       injectLoginDialogSwitcher(onboarding, server.user);
       const applyFn = () => renderSignedInHomeWorkspace(onboarding || defaultOnboardingState(), server.user);
       window.__museApplySignedInWorkspace = applyFn;
       applyFn();
-    } else if (isSignedIn && onboarding?.completed_at) {
-      injectLoginDialogSwitcher(onboarding, server.user);
-    } else if (!isSignedIn && (lastRenderedUserId || document.getElementById('ownWorkspaceOptionBtn'))) {
-      resetSignedOutHomeWorkspace();
     }
+  }
+
+  let homeModeSubscribed = false;
+  let lastHandledHomeModeKey = '';
+  function ensureHomeModeSubscription() {
+    if (homeModeSubscribed || !window.museModes?.subscribe) return;
+    homeModeSubscribed = true;
+    window.museModes.subscribe(async (modeState) => {
+      if (window.location.pathname === '/welcome') return;
+      if (!document.getElementById('journey')) return;
+      const modeKey = `${modeState?.state || ''}:${modeState?.ownerId || ''}:${modeState?.isSample ? '1' : '0'}`;
+      if (modeKey && modeKey === lastHandledHomeModeKey) return;
+      lastHandledHomeModeKey = modeKey;
+      await applyHomeModeState(modeState);
+    });
+  }
+
+  async function initHomePageOnboardingSync() {
+    if (window.location.pathname === '/welcome') return;
+    if (!document.getElementById('journey')) return;
+    if (window.museModes?.resolve) {
+      const resolved = await window.museModes.resolve();
+      const modeKey = `${resolved?.state || ''}:${resolved?.ownerId || ''}:${resolved?.isSample ? '1' : '0'}`;
+      lastHandledHomeModeKey = modeKey;
+      await applyHomeModeState(resolved);
+      ensureHomeModeSubscription();
+      return;
+    }
+    await applyHomeModeState();
   }
 
   // Listen for sign-in / sign-out events from account.js so signed-out views reset immediately
   window.addEventListener('muse:account-change', async (ev) => {
     if (window.location.pathname === '/welcome') return;
+    if (window.museModes?.subscribe) {
+      ensureHomeModeSubscription();
+      return;
+    }
     const seq = ++homeSyncEpoch;
     const user = ev?.detail?.user || null;
     if (!user) {

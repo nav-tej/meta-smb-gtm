@@ -1,13 +1,20 @@
 'use strict';
 (() => {
   const $ = (id) => document.getElementById(id);
-  const state = { accountLive: false, step: 0, presets: null, workspace: 'sarabjit_singh', custom: false, copyEdited: false, sceneEdited: false, goal: 'story', placement: 'instagram_feed', original: '', image: '', imageKind: 'original', sampleImage: '', key: '', live: false, defaultLive: false, readiness: null, busy: false, revision: 0, paint: 0, product: {}, headline: '', caption: '', scene: '', cta: '', provenance: 'Original-photo layout. No new image generated.', idea_id: null };
+  const state = { accountLive: false, step: 0, presets: null, workspace: 'sarabjit_singh', custom: false, copyEdited: false, sceneEdited: false, goal: 'story', placement: 'instagram_feed', original: '', image: '', imageKind: 'original', sampleImage: '', live: false, defaultLive: false, readiness: null, busy: false, revision: 0, paint: 0, product: {}, headline: '', caption: '', scene: '', cta: '', provenance: 'Original-photo layout. No new image generated.', idea_id: null, shopWebsiteUrl: '' };
 
   const draftNamespace = 'creator';
   const draftFields = ['workspace', 'custom', 'copyEdited', 'sceneEdited', 'goal', 'placement', 'original', 'image', 'imageKind', 'sampleImage', 'product', 'headline', 'caption', 'scene', 'cta', 'provenance', 'artwork', 'idea_id'];
   function isSampleMode() {
+    if (window.museModes?.isSampleMode) return window.museModes.isSampleMode();
     try {
-      return typeof location !== 'undefined' && new URLSearchParams(location.search).get('workspace') === 'sample';
+      if (typeof location === 'undefined') return false;
+      const params = new URLSearchParams(location.search);
+      if (params.get('workspace') === 'own') return false;
+      if (params.get('workspace') === 'sample') return true;
+      const idea = params.get('idea');
+      const artwork = params.get('artwork');
+      return Boolean((idea && !/^(own|shop|user):/i.test(idea)) || (artwork && !/^(own|shop|user):/i.test(artwork)));
     } catch (_) { return false; }
   }
   function readRecommendationHandoff(uid = window.museAccount?.getSnapshot?.()?.user?.id || window.museAccount?.current?.()?.id || null) {
@@ -25,7 +32,7 @@
     }
   }
   function activePlacement() {
-    if (state.placement) return state.placement;
+    if (state.placement === 'instagram_story' || state.placement === 'facebook_feed' || state.placement === 'instagram_feed') return state.placement;
     if ($('postFacebook')?.checked && !$('postInstagram')?.checked) return 'facebook_feed';
     return 'instagram_feed';
   }
@@ -47,11 +54,13 @@
   function localDraftPresent() { try { return !!localStorage.getItem(deviceKey()); } catch { return true; } }
 
   // Editor-local adapter: keep this contract aligned in creator.js and today.js.
-  let draftReady = false, draftOwner = null, draftEpoch = 0, cloudBusy = false;
+  let draftReady = false, draftOwner = null, draftOwnerBound = false, draftEpoch = 0, cloudBusy = false;
+  let activeSampleMode = isSampleMode(), creatorInitializedOnce = false;
   let cloudBase, conflictValue, recoveryDraft, applyingDraft = false;
   const cloneDraft = value => JSON.parse(JSON.stringify(value));
   const draftStatus = text => { $('draftStatus').textContent = text; };
-  const deviceKey = () => `muse-editor-v1:${draftNamespace}:${draftOwner ? 'account:' + encodeURIComponent(draftOwner) : 'guest'}`;
+  const isEffectiveSample = () => (typeof activeSampleMode === 'boolean' ? activeSampleMode : isSampleMode());
+  const deviceKey = () => `muse-editor-v1:${draftNamespace}:${isEffectiveSample() ? 'sample' : (draftOwner ? 'account:' + encodeURIComponent(draftOwner) : 'guest')}`;
   function persistDraft() {
     if (!draftReady || applyingDraft) return;
     try { localStorage.setItem(deviceKey(), JSON.stringify(editorDocument())); draftStatus('Saved on this device. Account saving is manual.'); return true; }
@@ -66,11 +75,12 @@
   }
   function recoverDevice() {
     try {
-      const requestedIdea = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('idea') : null;
-      if (requestedIdea && findPreviewSpec(requestedIdea)) return;
+      const params = typeof location !== 'undefined' ? new URLSearchParams(location.search) : null;
+      if (isEffectiveSample() && ((params?.get('idea') && findPreviewSpec(params.get('idea'))) || window.museModes?.isSampleArtwork?.(params?.get('artwork')))) return false;
       const raw = localStorage.getItem(deviceKey());
-      if (raw) { installDocument(JSON.parse(raw)); draftStatus('Recovered this device’s draft. Review before sharing.'); }
-    } catch { draftStatus('Could not recover device storage. Keep this tab open; download a backup or load your account draft.'); }
+      if (raw) { installDocument(JSON.parse(raw)); draftStatus('Recovered this device’s draft. Review before sharing.'); return true; }
+      return false;
+    } catch { draftStatus('Could not recover device storage. Keep this tab open; download a backup or load your account draft.'); return false; }
   }
   function currentOwner(epoch, owner) {
     return draftReady && epoch === draftEpoch && owner === draftOwner && owner === window.museAccount?.getSnapshot()?.user?.id;
@@ -78,6 +88,10 @@
   async function accountDraft(action) {
     const api = window.museAccount;
     if (!draftReady || cloudBusy || state.busy) return;
+    if (isEffectiveSample()) {
+      draftStatus('Sample shop mode stays separate from your account drafts. Choose Back to my workspace to save or load your own drafts.');
+      return;
+    }
     if (!draftOwner || !api) { api?.open?.('signin'); draftStatus('Sign in, then choose Save to account or Load from account. Device drafts are not transferred automatically.'); return; }
     const epoch = draftEpoch, owner = draftOwner;
     const local = cloneDraft(editorDocument());
@@ -147,7 +161,11 @@
     });
     const start = () => {
       draftOwner = window.museAccount?.getSnapshot()?.user?.id || null;
-      draftReady = true; recoverDevice();
+      draftOwnerBound = true;
+      if (typeof window.museModes === 'undefined' && typeof window.museAccount === 'undefined') {
+        draftReady = true;
+        recoverDevice();
+      }
       window.addEventListener?.('muse:account-change', event => {
         if ((event.detail?.user?.id || null) === draftOwner) {
           if (!draftReady) {
@@ -159,7 +177,7 @@
         }
         const stored = persistDraft();
         // A new document lifetime prevents pending editor jobs from writing under a new owner.
-        draftReady = false; draftEpoch += 1; state.revision += 1; state.paint += 1; state.key = ''; state.live = false;
+        draftReady = false; draftEpoch += 1; state.revision += 1; state.paint += 1; state.live = false;
         document.querySelector?.('main')?.setAttribute('hidden', '');
         draftStatus('Account changed. Reloading the editor for this account…');
         document.querySelectorAll('dialog').forEach(dialog => dialog.close());
@@ -540,19 +558,23 @@
     updateChoices(); refreshPreview();
   }
   function updateChoices() {
-    const isArtist = !state.custom && state.workspace === 'sarabjit_singh';
-    const isCeramics = !state.custom && state.workspace === 'etsy_ceramics';
-    const hasAccount = !!(window.museAccount?.getSnapshot?.()?.user || window.museAccount?.current?.());
-    if (hasAccount && !isSampleMode()) {
-      if ($('artistExample')) { $('artistExample').hidden = true; if ($('artistExample').style) $('artistExample').style.display = 'none'; }
-      if ($('tryNext')) { $('tryNext').hidden = true; if ($('tryNext').style) $('tryNext').style.display = 'none'; }
+    const isArtist = isEffectiveSample() && !state.custom && state.workspace === 'sarabjit_singh';
+    const isCeramics = isEffectiveSample() && !state.custom && state.workspace === 'etsy_ceramics';
+    const isOwn = !isEffectiveSample() || state.custom;
+    if ($('artistExample')) {
+      $('artistExample').hidden = false;
+      if ($('artistExample').style) $('artistExample').style.display = '';
+      $('artistExample').classList.toggle('selected', isArtist);
+      $('artistExample').setAttribute('aria-pressed', String(isArtist));
     }
-    $('artistExample').classList.toggle('selected', isArtist);
-    $('artistExample').setAttribute('aria-pressed', String(isArtist));
-    $('ceramicsExample').classList.toggle('selected', isCeramics);
-    $('ceramicsExample').setAttribute('aria-pressed', String(isCeramics));
-    $('customProduct').classList.toggle('selected', state.custom);
-    $('customProduct').setAttribute('aria-pressed', String(state.custom));
+    if ($('ceramicsExample')) {
+      $('ceramicsExample').classList.toggle('selected', isCeramics);
+      $('ceramicsExample').setAttribute('aria-pressed', String(isCeramics));
+    }
+    if ($('customProduct')) {
+      $('customProduct').classList.toggle('selected', isOwn);
+      $('customProduct').setAttribute('aria-pressed', String(isOwn));
+    }
     document.querySelectorAll('[data-goal]').forEach((b) => {
       const active = b.dataset.goal === state.goal;
       b.classList.toggle('selected', active);
@@ -618,6 +640,9 @@
       }
       if (ownerEpoch !== draftEpoch) return; const items = data.discovered_catalog_items || []; showImportedItems(items, data.business_name || 'your shop');
       const fetched = (data.channels || []).some((channel) => channel.status === 'fetched');
+      if (fetched && $('saveShopWebsite')?.checked && !isEffectiveSample()) {
+        await persistShopWebsiteUrl(url);
+      }
       notify(items.length ? `Found ${items.length} public listing${items.length === 1 ? '' : 's'}. Choose one to bring its details into your post.` : fetched ? 'We reached your website but did not find product listings. You can enter details below.' : 'This site did not allow automatic reading. You can still enter details below or try your own website.');
     } catch (error) {
       const msg = error.name === 'AbortError'
@@ -659,13 +684,25 @@
     const activePl = activePlacement();
     const feedBtn = $('downloadFeed');
     if (feedBtn) {
-      if (activePl === 'facebook_feed') {
-        feedBtn.innerHTML = 'Download Facebook feed image <span>1080 × 1080 PNG</span>';
+      const feedText = activePl === 'facebook_feed' ? 'Download Facebook feed image ' : 'Download feed image ';
+      const sizeText = activePl === 'facebook_feed' ? '1080 × 1080 PNG' : '1080 × 1350 PNG';
+      if (typeof feedBtn.replaceChildren === 'function' && typeof document.createTextNode === 'function') {
+        feedBtn.replaceChildren();
+        feedBtn.append(document.createTextNode(feedText));
+        const span = document.createElement('span');
+        span.textContent = sizeText;
+        feedBtn.append(span);
       } else {
-        feedBtn.innerHTML = 'Download feed image <span>1080 × 1350 PNG</span>';
+        feedBtn.textContent = `${feedText}${sizeText}`;
       }
     }
-    const previewHeight = activePl === 'facebook_feed' ? 1080 : 1350;
+    const previewHeight = activePl === 'facebook_feed' ? 1080 : activePl === 'instagram_story' ? 1920 : 1350;
+    const previewEl = $('previewCanvas');
+    if (previewEl?.classList) {
+      previewEl.classList.toggle('is-story-9x16', activePl === 'instagram_story');
+      previewEl.classList.toggle('is-square-1x1', activePl === 'facebook_feed');
+      previewEl.classList.toggle('is-feed-4x5', activePl !== 'instagram_story' && activePl !== 'facebook_feed');
+    }
     const paint = ++state.paint; drawLayout(previewHeight).then((canvas) => {
       if (paint !== state.paint) return;
       const preview = $('previewCanvas');
@@ -696,7 +733,7 @@
     }
     state.busy = busy;
     document.querySelectorAll('button').forEach((b) => { b.disabled = busy; });
-    for (const id of [...Object.keys(fields), 'promotionDestination', 'postInstagram', 'postFacebook', 'shopUrl', 'headline', 'caption', 'scene', 'productPhoto', 'liveMode', 'unlockKey', 'reviewed']) $(id).disabled = busy;
+    for (const id of [...Object.keys(fields), 'promotionDestination', 'postInstagram', 'postFacebook', 'shopUrl', 'headline', 'caption', 'scene', 'productPhoto', 'liveMode', 'reviewed', 'saveShopWebsite', 'saveWebsiteOnlyBtn']) if ($(id)) $(id).disabled = busy;
     $('backButton').disabled = busy || state.step === 0;
     const importBusy = busy && activeId === 'importProducts';
     const editorBusy = busy && activeId !== 'importProducts';
@@ -713,9 +750,10 @@
     const encoded = JSON.stringify(payload); if (new TextEncoder().encode(encoded).length > 3500000) throw new Error('This photo and text are too large together. Choose a smaller image.');
     // Account mode: live runs come from the signed-in account's plan; liveReady() shows sign-in/quota prompts.
     if (state.live && state.accountLive && window.museAccount?.liveReady && !window.museAccount.liveReady()) throw new Error('Sign in with a confirmed email and runs left to create with Muse.');
+    if (state.live && !window.museAccount && (!state.readiness || state.readiness.default_mode !== 'live')) throw new Error('Live Muse AI requires a signed-in account with remaining runs.');
     const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), 285000);
     try {
-      const response = await fetch('/api/v1/generate-ads' + (state.live ? '?live=true' : ''), { method: 'POST', headers: { 'Content-Type': 'application/json', ...(state.live && state.key ? { 'X-Demo-Key': state.key } : {}) }, body: encoded, signal: controller.signal });
+      const response = await fetch('/api/v1/generate-ads' + (state.live ? '?live=true' : ''), { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: encoded, signal: controller.signal });
       if (!response.ok) {
         let detail = '';
         try {
@@ -723,7 +761,7 @@
           detail = typeof body.detail === 'string' && !/<html|traceback/i.test(body.detail)
             ? body.detail.slice(0, 350)
             : body.detail?.error === 'media_response_too_large'
-              ? 'Muse finished, but the image was too large to send to this tab. Your original photo is still here. Ask the presenter to check saved output before trying again; do not rerun yet.'
+              ? 'Muse finished, but the image was too large to send to this tab. Your original photo is still here. Check your saved output before trying again; do not rerun yet.'
               : '';
         } catch {}
         if (response.status === 401 || response.status === 403) {
@@ -769,7 +807,7 @@
   async function draft() {
     const ownerEpoch = draftEpoch;
     if (state.busy || !validateProduct()) return;
-    if (!state.live) { notify('Saved mode uses editable starter copy. Enable a configured live presenter session to write a new Muse draft.'); return; }
+    if (!state.live) { notify('Saved mode uses editable starter copy. Enable Live Muse AI below (1 run) to write a new draft.'); return; }
     if (window.museShell?.canRun && !window.museShell.canRun('Fresh Muse draft')) return;
     setBusy(true); notify('Muse is writing your draft. Your current words are kept until the new draft is ready…', 'busy');
     try { const result = await request({ draft: true, product: productPayload(), competitor_brief: promotionResearchContext(), placements: [activePlacement()], variants_per_placement: 1, use_comfyui: false }); if (ownerEpoch !== draftEpoch) return; const variant = result.variants?.[0]; if (!variant) throw new Error('Muse returned no editable draft. Your previous copy is still here.'); state.copyEdited = true; state.sceneEdited = true; state.headline = variant.headline; state.caption = variant.primary_text; state.scene = variant.image_prompt; $('headline').value = state.headline; $('caption').value = state.caption; $('scene').value = state.scene; $('reviewed').checked = false; refreshPreview(); spendLive('Fresh Muse draft'); notify('Fresh Muse draft ready. Read it through and make it sound like you.'); } catch (error) { try { window.museAccount?.refresh?.().catch(() => {}); } catch {} notify(error.message, 'error'); } finally { setBusy(false); }
@@ -793,7 +831,7 @@
       const assetUrl = mediaAssetPath(creative.media_asset_url);
       const inlineUrl = validInline(creative.media_data_url) ? creative.media_data_url : '';
       const nextImage = assetUrl || inlineUrl;
-      if (!nextImage) throw new Error('Muse completed the request, but this server has not delivered a usable inline image. Do not generate again yet; ask the presenter to check image delivery.');
+      if (!nextImage) throw new Error('Muse completed the request, but this server has not delivered a usable inline image. Check saved output before trying again.');
       let chosenImage = nextImage;
       try {
         await imageElement(chosenImage);
@@ -833,7 +871,22 @@
   }
   function campaignPack() { sync(); return { product: { ...state.product, link: safeLink(state.product.link) }, goal: state.goal, idea_id: state.idea_id || undefined, cta: state.cta || undefined, headline: state.headline, caption: state.caption, scene_prompt: state.scene, image_provenance: state.provenance, mode: state.imageKind, posting_channels: postingChannels(), note: 'Download the image separately. This pack does not launch ads or publish posts. Destination details are kept only in this tab; prices are not synced.', posting_checklist: postingChecklist() }; }
   for (const id of [...Object.keys(fields), 'headline', 'caption', 'scene']) $(id).addEventListener('input', changed);
-  $('artistExample').addEventListener('click', () => selectExample('sarabjit_singh')); $('ceramicsExample').addEventListener('click', () => selectExample('etsy_ceramics')); $('customProduct').addEventListener('click', newProduct);
+  $('artistExample').addEventListener('click', () => {
+    if (window.museModes && !isEffectiveSample()) { window.museModes.enterSampleMode({ sample: 'sarabjit_singh' }); return; }
+    selectExample('sarabjit_singh');
+  });
+  $('ceramicsExample').addEventListener('click', () => {
+    if (window.museModes && !isEffectiveSample()) {
+      window.museModes.enterSampleMode({ sample: 'etsy_ceramics' });
+      selectExample('etsy_ceramics');
+      return;
+    }
+    selectExample('etsy_ceramics');
+  });
+  $('customProduct').addEventListener('click', () => {
+    if (window.museModes && isEffectiveSample()) { window.museModes.goToOwnWorkspace(); return; }
+    newProduct();
+  });
   $('importProducts').addEventListener('click', importProducts);
   $('promotionDestination').addEventListener('change', switchDestination);
   for (const id of ['postInstagram', 'postFacebook']) $(id).addEventListener('change', changed);
@@ -878,124 +931,349 @@
     });
   });
   $('nextButton').addEventListener('click', () => go(Math.min(3, state.step + 1))); $('backButton').addEventListener('click', () => go(Math.max(0, state.step - 1))); $('originalButton').addEventListener('click', () => { originalLayout(); $('reviewed').checked = false; }); $('draftButton').addEventListener('click', draft); $('generateButton').addEventListener('click', generate);
-  $('downloadFeed').addEventListener('click', () => download(activePlacement() === 'facebook_feed' ? 1080 : 1350)); $('downloadStory').addEventListener('click', () => download(1920)); $('downloadPack').addEventListener('click', () => { if (state.busy) return; if (!$('reviewed').checked) { notify('Review your product details and wording before downloading.', 'error'); return; } saveBlob(new Blob([JSON.stringify(campaignPack(), null, 2)], { type: 'application/json' }), 'campaign.json'); markIdeaExported(); });
+  $('downloadFeed').addEventListener('click', () => download(activePlacement() === 'facebook_feed' ? 1080 : 1350)); $('downloadStory').addEventListener('click', () => download(1920)); if ($('downloadSquare')) $('downloadSquare').addEventListener('click', () => download(1080)); $('downloadPack').addEventListener('click', () => { if (state.busy) return; if (!$('reviewed').checked) { notify('Review your product details and wording before downloading.', 'error'); return; } saveBlob(new Blob([JSON.stringify(campaignPack(), null, 2)], { type: 'application/json' }), 'campaign.json'); markIdeaExported(); });
   $('copyCaption').addEventListener('click', async () => { sync(); const ctaLine = state.cta && !state.caption.includes(state.cta) ? `\n\n${state.cta}` : ''; try { await navigator.clipboard.writeText(`${state.headline}\n\n${state.caption}${ctaLine}${safeLink(state.product.link) ? '\n\n' + safeLink(state.product.link) : ''}`); notify('Your current caption and link are copied.'); } catch { notify('Clipboard access is unavailable. Select and copy your caption from the edit screen.', 'error'); } });
-  $('unlockKey').addEventListener('input', () => { state.key = $('unlockKey').value.trim(); });
-  $('liveMode').addEventListener('change', () => { if ($('liveMode').checked && state.readiness && !state.readiness.provider_key_configured) { $('liveMode').checked = false; notify('The server has no Muse provider key configured. Saved examples still work.', 'error'); } if ($('liveMode').checked && !state.key && !state.defaultLive && !state.accountLive) { $('liveMode').checked = false; notify('Enter the configured demo unlock key first.', 'error'); } state.live = $('liveMode').checked; updateMode(); });
-  // Signed-in accounts with runs left create live by default; anyone can switch back to saved examples.
+  $('liveMode').addEventListener('change', () => {
+    if ($('liveMode').checked && state.readiness && !state.readiness.provider_key_configured) {
+      $('liveMode').checked = false;
+      notify('Live Muse AI is unavailable on this server right now. Saved examples and manual editing still work.', 'error');
+    } else if ($('liveMode').checked && window.museAccount?.liveReady && !window.museAccount.liveReady()) {
+      $('liveMode').checked = false;
+    } else if ($('liveMode').checked && !window.museAccount && !state.defaultLive) {
+      $('liveMode').checked = false;
+      notify('Sign in with a verified email and remaining runs to use live Muse AI.', 'error');
+    }
+    state.live = $('liveMode').checked;
+    updateMode();
+  });
   function syncAccountLive(snapshot = window.museAccount?.getSnapshot?.()) {
-    if (!state.accountLive) return;
-    const on = !!(snapshot?.user?.email_verified && snapshot.live_available);
-    $('liveMode').checked = on; state.live = on; updateMode();
+    const eligibilityEl = $('liveEligibilityNote');
+    const serverReady = !state.readiness || state.readiness.provider_key_configured !== false;
+    if (!serverReady) {
+      if (state.live) { $('liveMode').checked = false; state.live = false; }
+      $('liveMode').disabled = true;
+      if (eligibilityEl) eligibilityEl.textContent = 'Live Muse AI is unavailable on this server right now. Manual editing and free downloads (0 runs) remain available.';
+      updateMode();
+      return;
+    }
+    $('liveMode').disabled = false;
+    state.accountLive = state.readiness?.accounts_required === true && state.readiness?.provider_key_configured === true;
+    const user = snapshot?.user || null;
+    const remaining = snapshot?.usage && Number.isFinite(snapshot.usage.remaining) ? Math.max(0, snapshot.usage.remaining) : null;
+    const eligible = Boolean(user && user.email_verified && snapshot?.live_available !== false && (remaining === null || remaining > 0));
+    if (window.museAccount) {
+      const autoOn = Boolean(state.accountLive && eligible);
+      if (state.live !== autoOn && snapshot?.user) {
+        $('liveMode').checked = autoOn;
+        state.live = autoOn;
+      } else if (!user && state.live) {
+        $('liveMode').checked = false;
+        state.live = false;
+      }
+    }
+    if (eligibilityEl) {
+      if (!user) eligibilityEl.textContent = 'Sign in with a confirmed email to use live Muse AI (1 run per live request; manual editing & downloads cost 0 runs).';
+      else if (!user.email_verified) eligibilityEl.textContent = 'Confirm your email first to unlock live Muse AI (1 run per live request).';
+      else if (remaining !== null && remaining <= 0) eligibilityEl.textContent = '0 runs remaining this period. Manual editing & downloads remain free (0 runs).';
+      else eligibilityEl.textContent = `${remaining === null ? 'Unlimited' : `${remaining} ${remaining === 1 ? 'run' : 'runs'} left`} · Live AI draft or image uses 1 run. Editing & downloads cost 0 runs.`;
+    }
+    updateMode();
   }
   if (typeof window.addEventListener === 'function') window.addEventListener('account-change', (event) => syncAccountLive(event.detail));
-  function updateMode() { const live = state.live; $('modeBadge').textContent = live ? 'Live requests selected · billed Muse calls' : 'Saved example · no API cost'; $('modeBadge').classList.toggle('live', live); $('generateButton').textContent = live ? 'Create my image' : 'Preview a room scene'; $('draftHint').textContent = live ? 'A live draft uses your product details. Check every claim before sharing.' : 'Saved mode starts with editable example copy. Live mode writes a new draft.'; }
-  selectExample('sarabjit_singh');
-  initDrafts();
-  Promise.allSettled([fetch('/api/v1/demo-presets').then((r) => { if (!r.ok) throw new Error(); return r.json(); }), fetch('/api/v1/readiness').then((r) => { if (!r.ok) throw new Error(); return r.json(); })]).then(([presets, readiness]) => {
-    if (presets.status === 'fulfilled') state.presets = presets.value; else notify('Example product loaded. Research context is unavailable; live drafting may need the server connection restored.', 'error');
-    if (readiness.status === 'fulfilled') { state.readiness = readiness.value; state.defaultLive = readiness.value.default_mode === 'live'; state.accountLive = readiness.value.accounts_required === true && readiness.value.provider_key_configured === true; syncAccountLive(); if (state.defaultLive) notify('This local server supports live requests. Turn on live mode in presenter settings before making billed Muse calls.'); }
-    updateMode();
-    // The portal's saved-ad gallery links here with ?artwork=<id>; only ids in the saved presets are used.
-    const requestedArt = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('artwork') : null;
-    const art = requestedArt && !state.custom ? state.presets?.workspaces?.sarabjit_singh?.artworks_showcase?.find((a) => a && a.id === requestedArt) : null;
-    if (art && !localDraftPresent() && samplePath(art.staged_image)) applyArtwork(art);
-  });
+  function updateMode() { const live = state.live; $('modeBadge').textContent = live ? 'Live Muse AI · 1 run per generation' : 'Draft & manual mode · 0 runs used'; $('modeBadge').classList.toggle('live', live); $('generateButton').textContent = live ? 'Create my image (1 run)' : 'Preview a room scene'; $('draftHint').textContent = live ? 'A live draft uses 1 run with your product details. Check every claim before sharing.' : 'Starter & manual editing cost 0 runs. Enable live Muse AI below (1 run) for custom AI writing.'; }
+
+  const SAMPLE_ARTWORK_FALLBACKS = {
+    ek_onkar: { id: 'ek_onkar', title: 'Ek Onkar · 12×12-inch print', original_image: '/samples/ek_onkar_original.jpg', staged_image: '/samples/ek_onkar_collector_room_live.webp', series: 'Sikh Sacred Word' },
+    naam_japo: { id: 'naam_japo', title: 'Naam Japo · 12×12-inch print', original_image: '/samples/naam_japo_original.jpg', staged_image: '/samples/naam_japo_restored_gallery_live.webp', series: 'Sikh Sacred Word' },
+    kirat_karo: { id: 'kirat_karo', title: 'Kirat Karo · 12×12-inch print', original_image: '/samples/kirat_karo_original.jpg', staged_image: '/samples/kirat_karo_collector_room_live.webp', series: 'Sikh Sacred Word' },
+    golden_temple: { id: 'golden_temple', title: 'Golden Temple · fine art print', original_image: '/samples/golden_temple_holiday_gift_live.webp', staged_image: '/samples/golden_temple_holiday_gift_live.webp', series: 'Sacred Spaces' },
+    diptych: { id: 'diptych', title: 'Ek Onkar + Kirat Karo diptych', original_image: '/samples/ek_onkar_original.jpg', staged_image: '/samples/diptych_ek_onkar_kirat_karo_live.webp', series: 'Sikh Sacred Word' },
+    etsy_chai: { id: 'etsy_chai', title: 'Stoneware & brass chai set', original_image: '/samples/etsy_chai_set_product_visual_live.webp', staged_image: '/samples/etsy_chai_set_product_visual_live.webp', series: 'Tableware' },
+  };
+
+  function requestedPlacementParam() {
+    try {
+      const p = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('placement') : null;
+      return (p === 'instagram_feed' || p === 'instagram_story' || p === 'facebook_feed') ? p : '';
+    } catch (_) { return ''; }
+  }
+
+  function applyPlacementChoice(placement) {
+    if (!placement) return;
+    state.placement = placement;
+    if (placement === 'facebook_feed') {
+      $('postInstagram').checked = false;
+      $('postFacebook').checked = true;
+    } else if (placement === 'instagram_story' || placement === 'instagram_feed') {
+      $('postInstagram').checked = true;
+      $('postFacebook').checked = false;
+    }
+    if ($('downloadFeed') && $('downloadStory') && $('downloadSquare')) {
+      $('downloadFeed').className = placement === 'instagram_feed' ? 'primary' : 'secondary';
+      $('downloadStory').className = placement === 'instagram_story' ? 'primary' : 'secondary';
+      $('downloadSquare').className = placement === 'facebook_feed' ? 'primary' : 'secondary';
+    }
+  }
+
   function applyArtwork(art) {
-    const names = { ek_onkar: 'Ek Onkar', diptych_combine: 'Ek Onkar + Kirat Karo diptych', naam_japo: 'Naam Japo', kirat_karo: 'Kirat Karo' };
+    const names = { ek_onkar: 'Ek Onkar', diptych_combine: 'Ek Onkar + Kirat Karo diptych', diptych: 'Ek Onkar + Kirat Karo diptych', naam_japo: 'Naam Japo', kirat_karo: 'Kirat Karo' };
     const name = names[art.id] || String(art.title || 'Artwork').replace(/^\d+\.\s*[^:]*:\s*/, '').slice(0, 80);
+    state.custom = false;
+    state.workspace = 'sarabjit_singh';
     state.artwork = { id: art.id, name, series: String(art.series || '').slice(0, 80) };
     state.product.name = name;
+    state.product.seller = 'Art of Sarabjit Singh';
     state.product.description = `${name} by Sarabjit Singh. Check the selected shop for the matching artwork, available formats and current offer.`;
     state.original = samplePath(art.original_image) || state.original;
     state.sampleImage = samplePath(art.staged_image) || state.sampleImage;
     state.revision += 1;
-    originalLayout(); setProductFields(); starter(); $('reviewed').checked = false; refreshPreview();
+    originalLayout(); setProductFields(); starter(); $('reviewed').checked = false; updateChoices(); refreshPreview();
     $('productImageCaption').textContent = `${name} · original artwork preview. Source: Art of Sarabjit Singh.`;
-    notify(`Loaded from the saved Muse ad: ${name}. Choose “Preview a room scene” in step 3 to use its saved Muse image.`);
+    notify(`Loaded sample artwork: ${name}. Choose “Preview a room scene” in step 3 to use its saved sample scene.`);
   }
-  const requestedIdea = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('idea') : null;
-  const requestedHandoffId = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('sm_handoff') : null;
-  const ideaSpec = requestedIdea ? findPreviewSpec(requestedIdea) : null;
-  if (ideaSpec && !requestedHandoffId) {
-    applyIdea(ideaSpec);
-    window.museTrack?.('post_started', { idea_id: requestedIdea, source: 'creator' });
-  } else {
-    // Ranked ideas on the portal link here with ?goal=story|gift|visit; only known goals are accepted.
-    const requestedGoal = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('goal') : null;
-    if (requestedGoal && Object.hasOwn(goals, requestedGoal)) document.querySelector?.(`[data-goal="${requestedGoal}"]`)?.click();
-    window.museTrack?.('post_started', { idea_id: requestedHandoffId || null, goal: requestedGoal || 'default', source: 'creator' });
+
+  function initNeutralWorkspace(sellerLabel = 'Your Studio', productLabel = 'My studio product', preserveShopInput = false) {
+    state.custom = true;
+    state.workspace = 'own';
+    state.artwork = null;
+    state.idea_id = null;
+    state.product = {
+      name: productLabel,
+      seller: sellerLabel,
+      series: '',
+      price: '',
+      description: `Original piece from ${sellerLabel}. Add your own details or paste your shop URL above.`,
+      link: '',
+      destination: 'website',
+    };
+    state.original = '';
+    state.image = '';
+    state.sampleImage = '';
+    if (!preserveShopInput && $('shopUrl') && state.shopWebsiteUrl) $('shopUrl').value = state.shopWebsiteUrl;
+    $('productFactNote').textContent = 'Your photo and edits stay on this device until you save or request live Muse AI.';
+    $('productImageCaption').textContent = 'Your product photo will appear here.';
+    originalLayout();
+    setProductFields();
+    starter();
+    updateChoices();
+    $('reviewed').checked = false;
+    refreshPreview();
   }
-  if (window.museAccount?.ready) {
-    window.museAccount.ready().then(async (snap) => {
-      const acc = snap?.user || window.museAccount.getSnapshot()?.user || window.museAccount.current?.();
-      const handoff = readRecommendationHandoff(acc?.id || null);
-      const validSampleIdea = Boolean(ideaSpec && (!acc || isSampleMode()) && !handoff);
-      if (acc && !isSampleMode() && !validSampleIdea) {
-        if ($('artistExample')) { $('artistExample').hidden = true; if ($('artistExample').style) $('artistExample').style.display = 'none'; }
-        if ($('tryNext')) { $('tryNext').hidden = true; if ($('tryNext').style) $('tryNext').style.display = 'none'; }
-        if (!localDraftPresent()) {
-          state.custom = true;
-          resetOffers(false);
-          state.product.seller = 'Your Studio';
-          state.product.name = 'Your Artwork';
-          state.product.description = 'Fine art collection.';
-          state.product.price = '';
-          state.product.link = '';
-          state.product.collection = '';
-          state.original = '';
-          state.image = '';
-          state.sampleImage = '';
-          state.artwork = null;
-          $('productFactNote').textContent = 'Your photo is saved on this device when storage is available. A live request sends it to Muse only when you choose to generate.';
-          $('productImageCaption').textContent = 'Your product photo will appear here.';
-          originalLayout();
-          setProductFields();
-          starter();
-          updateChoices();
-          $('reviewed').checked = false;
-          refreshPreview();
-          try {
-            const wsRes = await fetch('/api/v1/account/workspace', { credentials: 'same-origin', headers: { 'x-muse-owner': acc.id } });
-            if (wsRes.ok) {
-              const wsData = await wsRes.json();
-              const shopName = wsData?.document?.onboarding?.business_name;
-              if (shopName) {
-                state.product.seller = shopName;
-                state.product.name = `Artwork by ${shopName}`;
-                state.product.description = `Fine art collection from ${shopName}.`;
-                originalLayout();
-                setProductFields();
-                starter();
-                updateChoices();
-                refreshPreview();
-              }
-            }
-          } catch (_) {}
-        } else {
-          stripSampleOffersAndLink();
-          if (!state.custom || (state.original && samplePath(state.original))) {
-            state.custom = true;
-            state.original = '';
-            state.image = '';
-            state.sampleImage = '';
-            state.artwork = null;
-            updateChoices();
-            refreshPreview();
-          }
-        }
-        if (handoff) {
-          applyRecommendationHandoff(handoff);
-        }
-      } else if (handoff) {
-        applyRecommendationHandoff(handoff);
-      }
+
+  async function persistShopWebsiteUrl(rawUrl) {
+    const clean = safeLink(rawUrl);
+    if (!clean) {
+      notify('Enter a complete website starting with https:// or http:// first.', 'error');
+      $('shopUrl')?.focus();
+      return false;
+    }
+    const mode = window.museModes?.current?.();
+    if (!mode?.ownerId || mode.state !== 'account_own' || !window.museAccount?.loadWorkspace || !window.museAccount?.saveWorkspace) {
+      notify('Sign in to My workspace to save a permanent shop website.', 'error');
+      return false;
+    }
+    const guard = window.museModes.bindAsyncGuard();
+    try {
+      const ws = await window.museAccount.loadWorkspace(mode.ownerId);
+      if (!guard.isCurrent()) return false;
+      const doc = ws?.document || {};
+      const existingOnb = doc.onboarding || {};
+      const prevUrls = Array.isArray(existingOnb.shop_urls) ? existingOnb.shop_urls.filter(Boolean) : [];
+      const nextUrls = [clean, ...prevUrls.filter((u) => u !== clean)].slice(0, 5);
+      const nextDoc = {
+        ...doc,
+        onboarding: {
+          ...existingOnb,
+          shop_urls: nextUrls,
+        },
+      };
+      await window.museAccount.saveWorkspace(nextDoc, mode.ownerId);
+      if (!guard.isCurrent()) return false;
+      state.shopWebsiteUrl = clean;
+      if ($('savedShopWebsiteNote')) $('savedShopWebsiteNote').textContent = `Saved studio website: ${clean}`;
+      notify(`Saved ${clean} as your shop website in My workspace.`);
+      return true;
+    } catch (err) {
+      if (guard.isCurrent()) notify(err?.message || 'Could not save your shop website right now.', 'error');
+      return false;
+    }
+  }
+
+  if ($('saveWebsiteOnlyBtn')) {
+    $('saveWebsiteOnlyBtn').addEventListener('click', () => {
+      persistShopWebsiteUrl($('shopUrl')?.value?.trim() || '');
     });
-  } else {
-    const handoff = readRecommendationHandoff(null);
+  }
+
+  let creatorModeSeq = 0;
+  async function applyCreatorMode(modeState) {
+    const seq = ++creatorModeSeq;
+    const s = modeState || window.museModes?.current?.() || { state: 'guest_entry', isSample: isSampleMode(), isLoading: false, isError: false, isExpired: false, ownerId: null };
+    if (s.isLoading || s.isError || s.isExpired) {
+      draftReady = false;
+      if ($('shopWebsiteSaveRow')) $('shopWebsiteSaveRow').hidden = true;
+      return;
+    }
+
+    const nextOwner = s.ownerId || window.museAccount?.getSnapshot()?.user?.id || null;
+    if (draftOwnerBound && nextOwner !== draftOwner) {
+      return;
+    }
+
+    if (creatorInitializedOnce && draftReady && activeSampleMode !== !!s.isSample) {
+      persistDraft();
+    }
+    activeSampleMode = !!s.isSample;
+    draftOwner = nextOwner;
+    draftOwnerBound = true;
+
+    const saveRow = $('shopWebsiteSaveRow');
+    if (saveRow) saveRow.hidden = s.state !== 'account_own';
+    if ($('artistExample')) {
+      $('artistExample').hidden = false;
+      if ($('artistExample').style) $('artistExample').style.display = '';
+    }
+    if ($('tryNext')) {
+      $('tryNext').hidden = !s.isSample;
+      if ($('tryNext').style) $('tryNext').style.display = s.isSample ? '' : 'none';
+    }
+
+    const params = typeof location !== 'undefined' ? new URLSearchParams(location.search) : null;
+    const placement = requestedPlacementParam() || s.sampleParams?.placement || '';
+    const requestedIdea = params?.get('idea') || s.sampleParams?.idea || '';
+    const requestedArt = params?.get('artwork') || s.sampleParams?.artwork || '';
+
+    if (s.isSample) {
+      let restored = false;
+      applyingDraft = true;
+      try {
+        const sampleChoice = params?.get('sample') === 'etsy_ceramics' ? 'etsy_ceramics' : 'sarabjit_singh';
+        selectExample(sampleChoice);
+        restored = recoverDevice();
+        const ideaSpec = requestedIdea ? findPreviewSpec(requestedIdea) : null;
+        if (ideaSpec) {
+          applyIdea(ideaSpec);
+        } else if (requestedArt) {
+          const presetArt = state.presets?.workspaces?.sarabjit_singh?.artworks_showcase?.find((a) => a && a.id === requestedArt) || SAMPLE_ARTWORK_FALLBACKS[requestedArt];
+          if (presetArt) applyArtwork(presetArt);
+        } else if (!restored) {
+          const requestedGoal = params?.get('goal') || null;
+          if (requestedGoal && Object.hasOwn(goals, requestedGoal)) document.querySelector?.(`[data-goal="${requestedGoal}"]`)?.click();
+        }
+        if (placement) {
+          applyPlacementChoice(placement);
+          refreshPreview();
+        }
+        updateChoices();
+      } finally {
+        applyingDraft = false;
+        creatorInitializedOnce = true;
+      }
+      draftReady = true;
+      return;
+    }
+
+    // account_own or guest_entry
+    let recovered = false;
+    applyingDraft = true;
+    try {
+      recovered = recoverDevice();
+      if (!recovered) {
+        initNeutralWorkspace('Your Studio', 'My studio artwork');
+      }
+      if (placement) {
+        applyPlacementChoice(placement);
+        refreshPreview();
+      }
+      updateChoices();
+    } finally {
+      applyingDraft = false;
+      creatorInitializedOnce = true;
+    }
+    draftReady = true;
+
+    if (s.state === 'account_own' && s.ownerId && window.museAccount?.loadWorkspace) {
+      const guard = window.museModes?.bindAsyncGuard?.() || { isCurrent: () => true };
+      try {
+        const ws = await window.museAccount.loadWorkspace(s.ownerId);
+        if (seq !== creatorModeSeq || !guard.isCurrent()) return;
+        const onb = ws?.document?.onboarding || {};
+        const shopUrls = Array.isArray(onb.shop_urls) ? onb.shop_urls.filter(Boolean) : [];
+        const shopName = String(onb.business_name || '').trim();
+        state.shopWebsiteUrl = shopUrls[0] || '';
+        if ($('savedShopWebsiteNote')) {
+          $('savedShopWebsiteNote').textContent = state.shopWebsiteUrl
+            ? `Saved studio website: ${state.shopWebsiteUrl}`
+            : 'No shop website saved in My workspace yet.';
+        }
+        if ($('shopUrl') && !$('shopUrl').value && state.shopWebsiteUrl) {
+          $('shopUrl').value = state.shopWebsiteUrl;
+        }
+        if (!recovered && shopName) {
+          initNeutralWorkspace(shopName, `Product from ${shopName}`, true);
+        }
+      } catch {
+        if (seq !== creatorModeSeq) return;
+        if ($('savedShopWebsiteNote')) $('savedShopWebsiteNote').textContent = 'Add a shop website above to import your products.';
+      }
+    }
+    const handoff = readRecommendationHandoff(s.ownerId);
     if (handoff) applyRecommendationHandoff(handoff);
   }
-  // Expose a read-only snapshot for focused offline contract checks; never expose the unlock key.
+
+  const standaloneVm = typeof window.museModes === 'undefined' && typeof window.museAccount === 'undefined';
+  if (standaloneVm) {
+    selectExample('sarabjit_singh');
+    const vmPlacement = requestedPlacementParam();
+    if (vmPlacement) applyPlacementChoice(vmPlacement);
+    initDrafts();
+  } else {
+    initDrafts();
+    if (window.museModes?.subscribe) window.museModes.subscribe((m) => { applyCreatorMode(m); });
+    if (window.museModes?.resolve) window.museModes.resolve().then((m) => { applyCreatorMode(m); });
+    else applyCreatorMode();
+  }
+
+  const presetsGuard = window.museModes?.bindAsyncGuard?.() || { isCurrent: () => true };
+  Promise.allSettled([fetch('/api/v1/demo-presets').then((r) => { if (!r.ok) throw new Error(); return r.json(); }), fetch('/api/v1/readiness').then((r) => { if (!r.ok) throw new Error(); return r.json(); })]).then(([presets, readiness]) => {
+    if (readiness.status === 'fulfilled') {
+      state.readiness = readiness.value;
+      state.defaultLive = readiness.value.default_mode === 'live';
+      state.accountLive = readiness.value.accounts_required === true && readiness.value.provider_key_configured === true;
+      syncAccountLive();
+    }
+    updateMode();
+    if (!presetsGuard.isCurrent()) return;
+    if (presets.status === 'fulfilled') {
+      state.presets = presets.value;
+      const modeNow = window.museModes?.current?.();
+      const requestedArt = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('artwork') : null;
+      if ((modeNow?.isSample || standaloneVm) && requestedArt && !state.custom) {
+        const art = state.presets?.workspaces?.sarabjit_singh?.artworks_showcase?.find((a) => a && a.id === requestedArt) || SAMPLE_ARTWORK_FALLBACKS[requestedArt];
+        if (art && samplePath(art.staged_image)) {
+          applyArtwork(art);
+          const pl = requestedPlacementParam();
+          if (pl) { applyPlacementChoice(pl); refreshPreview(); }
+        }
+      }
+    } else if (window.museModes?.isSampleMode?.() || standaloneVm) {
+      notify('Sample example loaded. Preset research details are temporarily unavailable.', 'error');
+    }
+  });
+
+  if (standaloneVm) {
+    const requestedIdea = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('idea') : null;
+    const ideaSpec = requestedIdea ? findPreviewSpec(requestedIdea) : null;
+    if (ideaSpec) {
+      applyIdea(ideaSpec);
+      window.museTrack?.('post_started', { idea_id: requestedIdea, source: 'creator' });
+    } else {
+      const requestedGoal = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('goal') : null;
+      if (requestedGoal && Object.hasOwn(goals, requestedGoal)) document.querySelector?.(`[data-goal="${requestedGoal}"]`)?.click();
+      window.museTrack?.('post_started', { idea_id: null, goal: requestedGoal || 'default', source: 'creator' });
+    }
+  }
+  // Expose a read-only snapshot for focused offline contract checks; never expose credentials or keys.
   window.museCreatorSnapshot = () => JSON.parse(JSON.stringify({ ...campaignPack(), placement: activePlacement() }));
   window.museDrawLayout = (height) => drawLayout(height);
 })();

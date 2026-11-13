@@ -3,7 +3,7 @@
 (() => {
   if (window.museAccount) return;
   const root = '/api/v1/account';
-  let snapshot = { configured: false, user: null, usage: null, live_available: false };
+  let snapshot = { configured: false, user: null, usage: null, live_available: false, auth_status: 'loading', auth_error: null };
   let accountEpoch = 0;
   let workspaceVersion = 0;
   let workspaceOwner = null;
@@ -68,24 +68,54 @@
       throw error;
     } finally { clearTimeout(timer); }
   }
-  function update(data) {
-    const previous = snapshot.user?.id || null;
-    const user = data?.user && typeof data.user.id === 'string' ? {
-      id: data.user.id, email: String(data.user.email || ''), email_verified: data.user.email_verified === true
-    } : null;
-    snapshot = { configured: data?.configured === true, user, usage: data?.usage || null, live_available: data?.live_available === true };
-    if (previous !== (user?.id || null)) { accountEpoch += 1; workspaceVersion = 0; workspaceOwner = null; }
+  function emitChange() {
     renderAccount();
     const detail = copy(snapshot);
     window.dispatchEvent(new CustomEvent('muse:account-change', { detail }));
     window.dispatchEvent(new CustomEvent('account-change', { detail: copy(snapshot) }));
     return copy(snapshot);
   }
+  function update(data) {
+    const previous = snapshot.user?.id || null;
+    const prevStatus = snapshot.auth_status;
+    const user = data?.user && typeof data.user.id === 'string' ? {
+      id: data.user.id, email: String(data.user.email || ''), email_verified: data.user.email_verified === true
+    } : null;
+    const nextStatus = user ? 'authenticated' : 'signed_out';
+    snapshot = {
+      configured: data?.configured === true,
+      user,
+      usage: data?.usage || null,
+      live_available: data?.live_available === true,
+      auth_status: nextStatus,
+      auth_error: null
+    };
+    if (previous !== (user?.id || null) || prevStatus !== nextStatus) { accountEpoch += 1; workspaceVersion = 0; workspaceOwner = null; }
+    return emitChange();
+  }
   async function refresh() {
     const epoch = accountEpoch;
-    const data = await request('/me');
-    if (epoch !== accountEpoch) return copy(snapshot);
-    return update(data);
+    if (snapshot.auth_status === 'error' || snapshot.auth_status === 'expired') {
+      snapshot = { ...snapshot, auth_status: 'loading', auth_error: null };
+      emitChange();
+    }
+    try {
+      const data = await request('/me');
+      if (epoch !== accountEpoch) return copy(snapshot);
+      return update(data);
+    } catch (error) {
+      if (epoch !== accountEpoch) return copy(snapshot);
+      const expired = error?.status === 401;
+      snapshot = {
+        ...snapshot,
+        user: expired ? null : snapshot.user,
+        live_available: expired ? false : snapshot.live_available,
+        auth_status: expired ? 'expired' : 'error',
+        auth_error: error?.message || (expired ? 'Your session expired. Sign in again to continue.' : 'Could not verify your account right now.')
+      };
+      emitChange();
+      throw error;
+    }
   }
   function renderAccount() {
     if (!accountButton) return;
@@ -425,11 +455,23 @@
   function sessionEnded(text) {
     if (Date.now() - endedNotice < 5000 || busy) return;
     endedNotice = Date.now();
+    const previousEmail = snapshot.user?.email || '';
+    accountEpoch += 1;
+    workspaceVersion = 0;
+    workspaceOwner = null;
+    snapshot = {
+      ...snapshot,
+      user: null,
+      live_available: false,
+      auth_status: 'expired',
+      auth_error: text || 'Your session ended. Sign in again to continue.'
+    };
+    emitChange();
     if (!dialog) mount();
     if (!dialog) return;
     track('session_expired');
     setMode('signin', text);
-    if (snapshot.user?.email) email.value = snapshot.user.email;
+    if (previousEmail) email.value = previousEmail;
     if (!dialog.open) dialog.showModal();
   }
   // Every live Muse request, whichever page made it: refresh the run count afterwards (failed runs
@@ -455,7 +497,17 @@
   mount();
   const readyPromise = (async () => {
     try { if (!await callback()) await refresh(); }
-    catch { renderAccount(); }
+    catch (error) {
+      if (snapshot.auth_status === 'loading') {
+        const expired = error?.status === 401;
+        snapshot = {
+          ...snapshot,
+          auth_status: expired ? 'expired' : 'error',
+          auth_error: error?.message || 'Could not verify your account right now.'
+        };
+      }
+      emitChange();
+    }
     return copy(snapshot);
   })();
   // Back from Stripe Checkout (/account?billing=success|cancelled). The redirect itself grants

@@ -163,16 +163,15 @@ def test_paying_account_users_never_need_the_presenter_key() -> None:
     creator = (STATIC / "creator.js").read_text()
     today = (STATIC / "today.js").read_text()
     account = (STATIC / "account.js").read_text()
-    # Account mode turns live on for verified users with runs and skips the unlock-key check.
-    assert "!state.key && !state.defaultLive && !state.accountLive" in creator
-    assert "state.accountLive = readiness.value.accounts_required === true" in creator
+    # Presenter unlock keys and headers are completely removed from customer surfaces.
+    assert "unlockKey" not in creator and "X-Demo-Key" not in creator
+    assert "unlockKey" not in today and "X-Demo-Key" not in today
+    assert "window.museAccount" in creator
     assert (
-        "if (state.readiness?.accounts_required && state.readiness?.provider_key_configured)"
-        in today
+        "const needsAccount = state.readiness?.accounts_required === true"
+        " || typeof window.museAccount !== 'undefined';" in today
     )
-    # The presenter header is only sent when someone actually entered a key.
-    assert "...(state.live && state.key ? { 'X-Demo-Key':" in creator
-    assert "...(live && state.key ? { 'X-Demo-Key': state.key } : {})" in today
+    assert "window.museAccount?.liveReady" in today
     # Running out of runs leads to plans, not a dead end.
     assert "window.museShell.openPricing()" in account
     assert "Credit purchases are coming later" not in account
