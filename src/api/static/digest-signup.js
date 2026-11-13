@@ -203,7 +203,10 @@
   let draftOwnerId = null;
   let draftVersion = null;
   let draftLoadedForOwner = null;
-  let draftSeq = 0;
+  let accountGen = 0;
+  let previewReqSeq = 0;
+  let loadController = null;
+  let previewController = null;
 
   if (draftTzEl) {
     try {
@@ -280,9 +283,49 @@
     if (previewTextEl) previewTextEl.textContent = data.text || '';
   }
 
-  async function refreshPreview(seqAtStart = draftSeq) {
-    if (!draftOwnerId) return;
+  function isStaleAccount(genAtStart, ownerAtStart) {
+    return genAtStart !== accountGen || ownerAtStart !== draftOwnerId;
+  }
+
+  function setDraftControlsDisabled(disabled) {
+    const flag = Boolean(disabled);
+    draftForm?.querySelectorAll('input, select, button').forEach((el) => {
+      el.disabled = flag;
+    });
+    if (draftSaveBtn) draftSaveBtn.disabled = flag;
+    if (draftPreviewBtn) draftPreviewBtn.disabled = flag;
+  }
+
+  function clearDraftUI() {
+    draftVersion = null;
+    draftLoadedForOwner = null;
+    if (previewBox) previewBox.hidden = true;
+    if (previewSubject) previewSubject.textContent = '';
+    if (previewWindow) previewWindow.textContent = '';
+    if (previewFrame) previewFrame.srcdoc = '';
+    if (previewTextEl) previewTextEl.textContent = '';
+    if (draftNextEl) draftNextEl.textContent = '';
+    if (draftCadenceEl) draftCadenceEl.value = 'weekly';
+    toggleAnchorVisibility();
+    if (draftAnchorEl) draftAnchorEl.value = '';
+    if (draftTzEl && draftTzEl.options.length > 0) {
+      draftTzEl.value = draftTzEl.options[0].value;
+    }
+    draftForm?.querySelectorAll('input[name="draftTopic"]').forEach((box) => {
+      box.checked = false;
+    });
+    draftForm?.querySelectorAll('input[name="draftShop"]').forEach((inp) => {
+      inp.value = '';
+    });
+  }
+
+  async function refreshPreview(genAtStart = accountGen) {
+    if (!draftOwnerId || draftLoadedForOwner !== draftOwnerId || genAtStart !== accountGen) return;
     const ownerAtStart = draftOwnerId;
+    const myPreviewSeq = ++previewReqSeq;
+    if (previewController) previewController.abort();
+    const controller = new AbortController();
+    previewController = controller;
     const payload = { ...readDraftPayload(), expected_owner: ownerAtStart };
     if (draftPreviewBtn) draftPreviewBtn.disabled = true;
     try {
@@ -291,57 +334,100 @@
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json', 'X-Muse-Owner': ownerAtStart },
         body: JSON.stringify(payload),
+        signal: controller.signal,
       });
-      if (seqAtStart !== draftSeq || ownerAtStart !== draftOwnerId) return;
+      if (isStaleAccount(genAtStart, ownerAtStart) || draftLoadedForOwner !== ownerAtStart || myPreviewSeq !== previewReqSeq) return;
       const data = await r.json().catch(() => ({}));
+      if (isStaleAccount(genAtStart, ownerAtStart) || draftLoadedForOwner !== ownerAtStart || myPreviewSeq !== previewReqSeq) return;
       if (!r.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'Could not load preview.');
       renderPreviewOutput(data);
     } catch (err) {
-      if (seqAtStart === draftSeq) sayDraft(err.message, true);
+      if (err?.name === 'AbortError') return;
+      if (isStaleAccount(genAtStart, ownerAtStart) || myPreviewSeq !== previewReqSeq) return;
+      sayDraft(err.message, true);
     } finally {
-      if (draftPreviewBtn) draftPreviewBtn.disabled = false;
+      if (previewController === controller) previewController = null;
+      if (
+        !isStaleAccount(genAtStart, ownerAtStart)
+        && draftLoadedForOwner === ownerAtStart
+        && myPreviewSeq === previewReqSeq
+        && draftPreviewBtn
+      ) {
+        draftPreviewBtn.disabled = false;
+      }
     }
   }
 
-  async function loadDraftAndPreview(ownerId) {
-    const seqAtStart = ++draftSeq;
+  async function loadDraftAndPreview(ownerId, genAtStart) {
+    if (loadController) loadController.abort();
+    const controller = new AbortController();
+    loadController = controller;
     sayDraft('Loading your draft digest settings…');
     try {
       const r = await fetch('/api/v1/digest/preferences', {
         credentials: 'same-origin',
         headers: { 'X-Muse-Owner': ownerId },
+        signal: controller.signal,
       });
-      if (seqAtStart !== draftSeq || ownerId !== draftOwnerId) return;
+      if (isStaleAccount(genAtStart, ownerId)) return;
       const data = await r.json().catch(() => ({}));
+      if (isStaleAccount(genAtStart, ownerId)) return;
       if (!r.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'Could not load draft preferences.');
       draftVersion = Number.isInteger(data.version) ? data.version : 0;
       draftLoadedForOwner = ownerId;
       applyDraftToForm(data);
+      setDraftControlsDisabled(false);
       sayDraft('');
-      await refreshPreview(seqAtStart);
+      await refreshPreview(genAtStart);
+      if (isStaleAccount(genAtStart, ownerId)) return;
     } catch (err) {
-      if (seqAtStart === draftSeq) sayDraft(err.message, true);
+      if (err?.name === 'AbortError') return;
+      if (isStaleAccount(genAtStart, ownerId)) return;
+      clearDraftUI();
+      setDraftControlsDisabled(true);
+      sayDraft(err.message, true);
+    } finally {
+      if (loadController === controller) loadController = null;
     }
   }
 
   function syncDraftAccountState(snap) {
     if (!draftSection) return;
     const user = snap?.user || null;
-    if (!user) {
+    const nextOwnerId = user?.id || null;
+    if (!nextOwnerId) {
+      if (draftOwnerId !== null || draftLoadedForOwner !== null) {
+        accountGen++;
+        previewReqSeq++;
+      }
       draftOwnerId = null;
-      draftVersion = null;
-      draftLoadedForOwner = null;
-      draftSeq++;
+      if (loadController) { loadController.abort(); loadController = null; }
+      if (previewController) { previewController.abort(); previewController = null; }
+      clearDraftUI();
+      setDraftControlsDisabled(true);
+      sayDraft('');
       if (draftGate) draftGate.hidden = false;
       if (draftForm) draftForm.hidden = true;
-      if (previewBox) previewBox.hidden = true;
       return;
     }
-    draftOwnerId = user.id;
+    if (nextOwnerId !== draftOwnerId) {
+      accountGen++;
+      previewReqSeq++;
+      draftOwnerId = nextOwnerId;
+      if (loadController) { loadController.abort(); loadController = null; }
+      if (previewController) { previewController.abort(); previewController = null; }
+      clearDraftUI();
+      setDraftControlsDisabled(true);
+      if (draftGate) draftGate.hidden = true;
+      if (draftForm) draftForm.hidden = false;
+      loadDraftAndPreview(nextOwnerId, accountGen);
+      return;
+    }
     if (draftGate) draftGate.hidden = true;
     if (draftForm) draftForm.hidden = false;
-    if (draftLoadedForOwner !== user.id) {
-      loadDraftAndPreview(user.id);
+    if (draftLoadedForOwner !== nextOwnerId && !loadController) {
+      setDraftControlsDisabled(true);
+      loadDraftAndPreview(nextOwnerId, accountGen);
     }
   }
 
@@ -356,11 +442,11 @@
   if (draftCadenceEl) {
     draftCadenceEl.addEventListener('change', () => {
       toggleAnchorVisibility();
-      refreshPreview(draftSeq);
+      refreshPreview(accountGen);
     });
   }
-  if (draftTzEl) draftTzEl.addEventListener('change', () => refreshPreview(draftSeq));
-  if (draftPreviewBtn) draftPreviewBtn.addEventListener('click', () => refreshPreview(draftSeq));
+  if (draftTzEl) draftTzEl.addEventListener('change', () => refreshPreview(accountGen));
+  if (draftPreviewBtn) draftPreviewBtn.addEventListener('click', () => refreshPreview(accountGen));
 
   if (tabHtmlBtn && tabTextBtn && previewFrame && previewTextEl) {
     tabHtmlBtn.addEventListener('click', () => {
@@ -384,8 +470,8 @@
   if (draftForm) {
     draftForm.addEventListener('submit', async (event) => {
       event.preventDefault();
-      if (!draftOwnerId) return;
-      const seqAtStart = draftSeq;
+      if (!draftOwnerId || draftLoadedForOwner !== draftOwnerId || draftVersion === null) return;
+      const genAtStart = accountGen;
       const ownerAtStart = draftOwnerId;
       const payload = {
         ...readDraftPayload(),
@@ -401,17 +487,22 @@
           headers: { 'Content-Type': 'application/json', 'X-Muse-Owner': ownerAtStart },
           body: JSON.stringify(payload),
         });
-        if (seqAtStart !== draftSeq || ownerAtStart !== draftOwnerId) return;
+        if (isStaleAccount(genAtStart, ownerAtStart)) return;
         const data = await r.json().catch(() => ({}));
+        if (isStaleAccount(genAtStart, ownerAtStart)) return;
         if (!r.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'Could not save draft preferences.');
         draftVersion = Number.isInteger(data.version) ? data.version : draftVersion;
         applyDraftToForm(data);
         sayDraft('Draft preferences saved to your workspace (no email subscription changed).');
-        await refreshPreview(seqAtStart);
+        await refreshPreview(genAtStart);
+        if (isStaleAccount(genAtStart, ownerAtStart)) return;
       } catch (err) {
-        if (seqAtStart === draftSeq) sayDraft(err.message, true);
+        if (isStaleAccount(genAtStart, ownerAtStart)) return;
+        sayDraft(err.message, true);
       } finally {
-        if (draftSaveBtn) draftSaveBtn.disabled = false;
+        if (!isStaleAccount(genAtStart, ownerAtStart) && draftLoadedForOwner === ownerAtStart && draftSaveBtn) {
+          draftSaveBtn.disabled = false;
+        }
       }
     });
   }

@@ -282,9 +282,10 @@ def _extract_draft_prefs(doc: dict[str, Any]) -> DigestDraftPreferences:
 
 
 def _subscription_banner_info(doc: dict[str, Any]) -> dict[str, Any]:
-    """Report existing subscription status separately without altering live delivery."""
+    """Report draft-only semantics cleanly without falsely claiming live subscription state."""
     return {
-        "live_delivery_active": False,
+        "status": "unknown",
+        "live_delivery_active": None,
         "draft_only": True,
         "note": (
             "Draft preview settings only. Saving here updates your workspace draft and does not "

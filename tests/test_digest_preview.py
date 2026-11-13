@@ -344,6 +344,11 @@ async def test_preview_topic_filtering_distinct_sellers_xss_and_zero_cost_spies(
     states = {s["host"]: s["state"] for s in p1["shops_status"]}
     assert states["never-checked.test"] == "never_checked"
 
+    # Subscription state is truthful unknown (no live delivery state claimed)
+    assert p1["subscription_state"]["status"] == "unknown"
+    assert p1["subscription_state"]["live_delivery_active"] is None
+    assert p1["subscription_state"]["draft_only"] is True
+
     # Zero side effects
     assert p1["sends_triggered"] == 0
     assert p1["crawls_triggered"] == 0
