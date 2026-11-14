@@ -101,7 +101,7 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--success); outli
 
 /* Batch 2A: Personal digest draft preferences & preview */
 .dg-draft-section { padding: 1.25rem 1.4rem; border: 1px solid var(--border); border-top: 4px solid var(--gold); border-radius: 16px; background: var(--surface); }
-.dg-draft-badge { font-size: 0.75rem; font-weight: 700; padding: 0.25rem 0.65rem; border-radius: 999px; background: var(--gold-soft); color: #78350f; white-space: nowrap; }
+.dg-draft-badge { font-size: 0.75rem; font-weight: 700; padding: 0.25rem 0.65rem; border-radius: 999px; background: var(--gold-soft); color: #78350f; white-space: normal; max-width: 100%; }
 .dg-draft-banner { margin: 0 0 0.75rem; padding: 0.75rem 0.9rem; border-radius: 10px; background: var(--gold-soft); border: 1px solid #e6d3a7; color: #5b3b09; font-size: 0.86rem; line-height: 1.45; }
 .dg-draft-form select { min-height: 44px; padding: 0.55rem 0.7rem; border: 1px solid var(--border); border-radius: 10px; font: inherit; background: var(--bg); }
 .dg-options-group { grid-column: 1 / -1; margin: 0; padding: 0.85rem 1rem; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-subtle); }

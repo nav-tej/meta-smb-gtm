@@ -190,7 +190,7 @@ def test_digest_preview_and_draft_preferences_mobile_and_desktop_e2e(
             dims = page.evaluate(
                 "() => ({{sw: document.documentElement.scrollWidth, iw: window.innerWidth}})"
             )
-            assert dims["sw"] <= dims["iw"] + 2, f"{{label}} horizontal overflow: {{dims}}"
+            assert dims["sw"] <= dims["iw"], f"{{label}} horizontal overflow: {{dims}}"
 
         with sync_playwright() as p:
             browser = p.chromium.launch()
@@ -493,6 +493,32 @@ def test_digest_preview_account_switch_and_race_regressions_e2e(
 
             assert page.input_value("#draftCadence") == "paused"
             assert "paused" in (page.text_content("#previewWindow") or "").lower()
+
+            # 5) Mobile 375px /create own-mode step 2 has zero horizontal overflow
+            page.set_viewport_size({{"width": 375, "height": 844}})
+            ctx.add_cookies([{{
+                "name": "muse_e2e_user",
+                "value": "user-a",
+                "url": base_url,
+            }}])
+            page.goto(f"{{base_url}}/create", wait_until="networkidle")
+            page.wait_for_function(
+                "() => document.documentElement.dataset.museMode === 'account_own'"
+            )
+            if not (page.input_value("#productName") or "").strip():
+                page.fill("#productName", "Botanical Linocut")
+            page.locator("#productPhoto").set_input_files(
+                "tests/fixtures/product_photo.png"
+            )
+            page.wait_for_function("() => !document.getElementById('productImage')?.hidden")
+            page.click("button[data-step='2']")
+            page.wait_for_selector("#headline:visible")
+            dims_create = page.evaluate(
+                "() => ({{sw: document.documentElement.scrollWidth, iw: window.innerWidth}})"
+            )
+            assert dims_create["sw"] <= dims_create["iw"], (
+                f"/create step 2 overflow: {{dims_create}}"
+            )
 
             ctx.close()
             assert not errors, f"Uncaught browser errors: {{errors}}"
