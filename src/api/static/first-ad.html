@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#f6f3eb">
+  <title>Run Your First Ad | Muse Growth Studio</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="stylesheet" href="/static/muse-shell.css?v=20261112-integrated">
+  <link rel="stylesheet" href="/static/account.css?v=20261112-integrated">
+  <link rel="stylesheet" href="/static/first-ad.css?v=20261115-firstad">
+  <script src="/static/analytics.js?v=20261109-ux" defer></script>
+  <script src="/static/account.js?v=20261112-integrated" defer></script>
+  <script src="/static/workspace-modes.js?v=20261112-integrated" defer></script>
+  <script src="/static/muse-shell.js?v=20261112-integrated" defer></script>
+  <script src="/static/first-ad.js?v=20261115-firstad" defer></script>
+</head>
+<body>
+  <header class="fa-topbar">
+    <a class="fa-brand" href="/"><span class="fa-brand-mark">m</span> muse <span class="fa-brand-sub">FIRST AD GUIDE</span></a>
+    <div class="fa-topbar-badges">
+      <span id="faProvenanceBadge" class="fa-badge">Suggested starting approach</span>
+      <span id="faNotPublishedBadge" class="fa-badge fa-badge-warn">Not published · Draft only</span>
+    </div>
+  </header>
+
+  <main class="fa-main">
+    <section class="fa-hero">
+      <p class="fa-eyebrow">GUIDED 4-STEP PREPARATION</p>
+      <h1>Run your first ad</h1>
+      <p class="fa-sub">Prepare your outcome, creative, audience, budget, and dates here, then export your image and manual checklist for Meta Ads Manager. Muse never logs into your Meta account, asks for passwords, or publishes automatically.</p>
+      <p id="faContextStatus" class="fa-context-status" role="status" aria-live="polite"></p>
+      <div id="faNotice" class="fa-notice" role="status" aria-live="polite" hidden></div>
+    </section>
+
+    <nav class="fa-steps" aria-label="First ad steps">
+      <button type="button" class="fa-step-btn is-active" data-fa-step="1" aria-current="step">1. Outcome</button>
+      <button type="button" class="fa-step-btn" data-fa-step="2">2. Creative &amp; destination</button>
+      <button type="button" class="fa-step-btn" data-fa-step="3">3. Audience, budget &amp; dates</button>
+      <button type="button" class="fa-step-btn" data-fa-step="4">4. Review &amp; handoff</button>
+    </nav>
+
+    <!-- STEP 1: OUTCOME -->
+    <section id="faPanel1" class="fa-panel" data-fa-panel="1">
+      <h2>Step 1: What should this first post or ad achieve?</h2>
+      <p class="fa-muted">Choose one clear outcome. Suggestions are starting approaches based on your saved profile — no live ad results are predicted.</p>
+
+      <div class="fa-choice-grid" role="group" aria-label="Campaign outcome">
+        <button type="button" class="fa-choice is-selected" data-fa-outcome="inquiries">
+          <strong>Start conversations &amp; inquiries</strong>
+          <span>Best when you take custom orders or sell via DMs without online checkout.</span>
+        </button>
+        <button type="button" class="fa-choice" data-fa-outcome="visits">
+          <strong>Bring visitors to your shop</strong>
+          <span>Best when you want people to browse an Etsy, Shopify, or studio listing.</span>
+        </button>
+        <button type="button" class="fa-choice" data-fa-outcome="sales">
+          <strong>Test a direct product offer</strong>
+          <span>Requires a working online checkout and Meta Pixel / conversion setup.</span>
+        </button>
+      </div>
+
+      <fieldset class="fa-fieldset">
+        <legend>Organic post vs. manual paid test</legend>
+        <label class="fa-radio-row">
+          <input type="radio" name="faPaidMode" value="organic" checked>
+          <span><strong>Organic post first ($0 spend)</strong> — Test your message on Instagram/Facebook before paying for reach.</span>
+        </label>
+        <label class="fa-radio-row">
+          <input type="radio" name="faPaidMode" value="paid">
+          <span><strong>Prepare a manual paid test</strong> — Set an unconfirmed audience, budget, and dates to enter manually in Meta Ads Manager.</span>
+        </label>
+      </fieldset>
+
+      <div id="faOutcomeGuidance" class="fa-callout"></div>
+    </section>
+
+    <!-- STEP 2: CREATIVE & DESTINATION -->
+    <section id="faPanel2" class="fa-panel" data-fa-panel="2" hidden>
+      <h2>Step 2: Creative &amp; destination</h2>
+      <p class="fa-muted">Reuses your active product photo and draft copy when available, or upload/select an image here.</p>
+
+      <div class="fa-two-col">
+        <div class="fa-form-col">
+          <label for="faProductName">Product or artwork name</label>
+          <input id="faProductName" type="text" maxlength="120" placeholder="e.g., Botanical Linocut Print">
+
+          <label for="faHeadline">Headline</label>
+          <input id="faHeadline" type="text" maxlength="120" placeholder="Short clear headline">
+
+          <label for="faCaption">Primary text / caption</label>
+          <textarea id="faCaption" rows="5" maxlength="600" placeholder="What it is, why it matters, and next step"></textarea>
+
+          <label for="faCta">Call to action</label>
+          <input id="faCta" type="text" maxlength="60" placeholder="e.g., Shop now, Send message, Learn more">
+
+          <label for="faDestinationType">Where should people go?</label>
+          <select id="faDestinationType">
+            <option value="website">Studio website / product page</option>
+            <option value="etsy">Etsy shop / listing</option>
+            <option value="shopify">Shopify store</option>
+            <option value="instagram_dm">Instagram DM / inquiry</option>
+            <option value="other">Other link</option>
+          </select>
+
+          <label for="faDestinationUrl">Destination URL (optional for organic / DM)</label>
+          <input id="faDestinationUrl" type="url" maxlength="400" placeholder="https://your-shop.example/product">
+          <p id="faUrlError" class="fa-error" hidden></p>
+
+          <div class="fa-image-tools">
+            <label class="fa-btn fa-btn-secondary" for="faPhotoUpload">Upload photo (PNG/JPEG/WebP)</label>
+            <input id="faPhotoUpload" type="file" accept="image/jpeg,image/png,image/webp" hidden>
+
+            <div class="fa-import-row">
+              <input id="faShopUrl" type="url" placeholder="https://your-shop.example">
+              <button id="faImportBtn" type="button" class="fa-btn fa-btn-secondary">Load shop images</button>
+            </div>
+            <div id="faCandidatesGrid" class="fa-candidates-grid"></div>
+          </div>
+        </div>
+
+        <div class="fa-preview-col">
+          <div class="fa-preview-card">
+            <p class="fa-eyebrow">LIVE EXPORT PREVIEW (1080 × 1350 FEED)</p>
+            <canvas id="faPreviewCanvas" width="1080" height="1350" aria-label="Ad image preview"></canvas>
+            <p id="faPreviewHeadline" class="fa-preview-headline"></p>
+            <p id="faPreviewCaption" class="fa-preview-caption"></p>
+            <p class="fa-muted fa-small">App export preset (1080 × 1350 PNG — not verified Meta policy).</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- STEP 3: AUDIENCE, BUDGET & DATES -->
+    <section id="faPanel3" class="fa-panel" data-fa-panel="3" hidden>
+      <h2>Step 3: Audience, budget &amp; dates</h2>
+      <p class="fa-muted">All suggestions are unconfirmed starting points. Double-check targeting, currency, and dates inside Meta Ads Manager.</p>
+
+      <div class="fa-form-col">
+        <label for="faAudience">Suggested starting audience (unconfirmed — edit before using in Ads Manager)</label>
+        <input id="faAudience" type="text" maxlength="220" placeholder="e.g., People looking for handmade botanical prints and home gifts">
+
+        <label for="faLocation">Geographic area</label>
+        <input id="faLocation" type="text" maxlength="120" placeholder="e.g., United States, Canada, or your city">
+
+        <div id="faPaidBudgetSection" class="fa-budget-box">
+          <div class="fa-budget-grid">
+            <div>
+              <label for="faBudgetType">Budget type</label>
+              <select id="faBudgetType">
+                <option value="daily">Daily budget (USD)</option>
+                <option value="lifetime">Lifetime budget (USD)</option>
+              </select>
+            </div>
+            <div>
+              <label for="faBudgetAmount">Test budget ($ USD)</label>
+              <input id="faBudgetAmount" type="number" min="1" step="1" placeholder="e.g., 10">
+            </div>
+          </div>
+          <p id="faBudgetError" class="fa-error" hidden></p>
+          <p id="faBudgetHint" class="fa-muted fa-small"></p>
+
+          <div class="fa-budget-grid">
+            <div>
+              <label for="faStartDate">Start date</label>
+              <input id="faStartDate" type="date">
+            </div>
+            <div>
+              <label for="faEndDate">End date</label>
+              <input id="faEndDate" type="date">
+            </div>
+          </div>
+          <p id="faDateError" class="fa-error" hidden></p>
+        </div>
+
+        <div id="faOrganicBudgetNotice" class="fa-callout" hidden>
+          <strong>Organic mode selected ($0 ad spend):</strong> No paid budget or ad schedule is needed. You can switch to a paid test in Step 1 at any time.
+        </div>
+      </div>
+    </section>
+
+    <!-- STEP 4: REVIEW & MANUAL ADS MANAGER HANDOFF -->
+    <section id="faPanel4" class="fa-panel" data-fa-panel="4" hidden>
+      <h2>Step 4: Review &amp; manual Ads Manager handoff</h2>
+      <div id="faPublishStatus" class="fa-callout fa-callout-warn">
+        <strong>Not published · Draft only:</strong> Muse does not connect to Meta, transfer this ad automatically, verify your Meta policy status, or spend money. Never share your Meta password with any tool.
+      </div>
+
+      <h3>Prerequisites &amp; readiness</h3>
+      <ul id="faPrereqList" class="fa-prereq-list"></ul>
+
+      <h3>Manual Ads Manager values</h3>
+      <div id="faHandoffSummary" class="fa-summary-box"></div>
+
+      <label class="fa-check-row">
+        <input id="faReviewed" type="checkbox">
+        <span>I’ve reviewed my image, wording, destination, audience, budget, and dates. I understand nothing is published automatically.</span>
+      </label>
+
+      <div class="fa-export-actions">
+        <button id="faFinalFeedBtn" type="button" class="fa-btn fa-btn-primary">Download feed image (1080 × 1350 PNG)</button>
+        <button id="faFinalSquareBtn" type="button" class="fa-btn fa-btn-secondary">Download square image (1080 × 1080 PNG)</button>
+        <button id="faDownloadChecklistBtn" type="button" class="fa-btn fa-btn-secondary">Download Ads Manager checklist (.txt)</button>
+        <button id="faCopyCopyBtn" type="button" class="fa-btn fa-btn-secondary">Copy ad wording</button>
+      </div>
+    </section>
+
+    <footer class="fa-footer">
+      <button id="faBackBtn" type="button" class="fa-btn fa-btn-secondary">← Back</button>
+      <span id="faStepLabel" class="fa-muted">Step 1 of 4</span>
+      <button id="faNextBtn" type="button" class="fa-btn fa-btn-primary">Next →</button>
+    </footer>
+  </main>
+</body>
+</html>

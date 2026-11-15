@@ -102,6 +102,12 @@ async def creator_studio() -> FileResponse:
     return FileResponse(STATIC_DIR / "creator.html", headers=PAGE_HEADERS)
 
 
+@app.get("/first-ad", include_in_schema=False)
+async def first_ad_workflow() -> FileResponse:
+    """Serve the bounded 4-step 'Run your first ad' guided workflow."""
+    return FileResponse(STATIC_DIR / "first-ad.html", headers=NOINDEX_PAGE_HEADERS)
+
+
 @app.get("/today", include_in_schema=False)
 async def daily_studio() -> FileResponse:
     """Serve the compact item-to-post daily workspace."""
