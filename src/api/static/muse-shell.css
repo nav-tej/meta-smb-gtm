@@ -428,7 +428,7 @@
 
   /* 7. Tap targets: at least 44px on everything people tap often. */
   .ms-triage { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-  .ms-triage button { min-height: 44px; font-size: 13px; padding: 0 10px; }
+  .ms-triage button { min-height: 44px; font-size: 12.5px; padding: 0 8px; white-space: nowrap; }
   .jr-mini, .jr-action, .ms-restore, .ms-do, .ms-adjust-row button, .ms-adjust-row input { min-height: 44px; }
   /* Full workspace buttons and refine chips. */
   .btn, .ms-rerun, .ms-refine-row button, .ms-refine-row input, .jr-tour-btn { min-height: 44px; }
