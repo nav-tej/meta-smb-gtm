@@ -1145,6 +1145,11 @@ def _build_editor_defaults_for_move(
 
     raw_price = move.get("price_claim") if move else None
     move_price = str(raw_price if raw_price is not None else short_price)
+    default_placement = (
+        "facebook_feed"
+        if (move and move.get("channel") == "facebook") or primary_channel == "facebook"
+        else "instagram_feed"
+    )
     return {
         "recommendation_id": move["id"] if move else None,
         "recommendation_title": move["title"] if move else "",
@@ -1163,6 +1168,25 @@ def _build_editor_defaults_for_move(
         "context_summary": effective_context_note or effective_goal,
         "why_this_fits": move["why_this_fits"] if move else "",
         "is_draft_override": is_draft_override,
+        "output_provenance": move.get("output_provenance", "suggested_starting_approach")
+        if move
+        else "suggested_starting_approach",
+        "output_label": move.get("output_label", "Suggested starting approach")
+        if move
+        else "Suggested starting approach",
+        "organic_first": move.get("organic_first", True) if move else True,
+        "organic_guidance_note": move.get(
+            "organic_guidance_note",
+            "Organic post first — no paid ad spend or ad account required.",
+        )
+        if move
+        else "Organic post first — no paid ad spend or ad account required.",
+        "unconfirmed_audience": move.get("unconfirmed_audience", "") if move else "",
+        "audience_confirmed": False,
+        "approved_facts": list(move.get("approved_facts", [])) if move else [],
+        "missing_facts": list(move.get("missing_facts", [])) if move else [],
+        "placement": move.get("placement", default_placement) if move else default_placement,
+        "placement_note": "App export preset (not verified Meta policy)",
     }
 
 
@@ -1568,11 +1592,84 @@ def rank_seller_recommendations(
             "; ".join(reasons)
             if reasons
             else (
-                f"Matches {business_name}'s available {str(move['channel']).title()} channel."
+                f"Matches {business_name}'s available {str(move['channel']).title()} channel "
+                "(no fresh research ran)."
                 if move.get("channel")
-                else f"Prepared for {business_name}."
+                else f"Prepared from {business_name}'s saved profile (no fresh research ran)."
             )
         )
+        # Explicit missing-fact prompts (never fabricate price, audience, or checkout readiness)
+        missing_facts: list[str] = []
+        if not short_price:
+            missing_facts.append(
+                "Price not set — leave price blank or add your starting price before sharing."
+            )
+        if not effective_product:
+            missing_facts.append("Product not specified — choose a product or artwork.")
+        if any(tok in combined_intent for tok in ("sale", "sales", "buy", "checkout", "order")):
+            if not effective_destination:
+                missing_facts.append(
+                    "Sales goal selected without a verified checkout destination — "
+                    "start with shop visits or buyer inquiries."
+                )
+            else:
+                missing_facts.append(
+                    "Checkout and conversion tracking are not verified — "
+                    "start with organic reach or shop visits."
+                )
+        audience_entry = _first_entry("audience")
+        raw_audience = (
+            (audience_entry.value if audience_entry else "") or (pref.audience or "")
+        ).strip()
+        if not raw_audience:
+            missing_facts.append(
+                "Audience not confirmed — review and edit the starting audience hypothesis."
+            )
+            unconfirmed_audience = (
+                f"Unconfirmed starting hypothesis (edit before sharing): "
+                f"Buyers interested in {subject_label}"
+            )
+        else:
+            unconfirmed_audience = (
+                f"Unconfirmed starting hypothesis (edit before sharing): {raw_audience}"
+            )
+        if not active_comps:
+            missing_facts.append(
+                "No watched competitor yet — ranked from your saved shop profile only."
+            )
+
+        approved_facts: list[dict[str, str]] = [
+            {
+                "id": u["id"],
+                "label": u["label"],
+                "value": u["value"],
+                "source": u["source"],
+                "scope": u["scope"],
+            }
+            for u in dedup_entries
+        ]
+        if effective_goal:
+            approved_facts.append(
+                {
+                    "id": "fact:goal",
+                    "label": "Selected goal",
+                    "value": effective_goal,
+                    "source": "draft_override" if draft_goal_raw else "seller_preferences",
+                    "scope": "draft" if draft_goal_raw else "shop_default",
+                }
+            )
+        if short_price:
+            approved_facts.append(
+                {
+                    "id": "fact:price",
+                    "label": "Starting price",
+                    "value": short_price,
+                    "source": "seller_preferences",
+                    "scope": "shop_default",
+                }
+            )
+
+        move_placement = "facebook_feed" if move.get("channel") == "facebook" else "instagram_feed"
         ranked.append(
             {
                 **move,
@@ -1580,6 +1677,18 @@ def rank_seller_recommendations(
                 "priority": "high" if score >= 85 else ("medium" if score >= 55 else "low"),
                 "why_this_fits": why_this_fits,
                 "used_entries": dedup_entries,
+                "output_provenance": "suggested_starting_approach",
+                "output_label": "Suggested starting approach",
+                "organic_first": True,
+                "organic_guidance_note": (
+                    "Organic post first — no paid ad spend or ad account required."
+                ),
+                "unconfirmed_audience": unconfirmed_audience,
+                "audience_confirmed": False,
+                "approved_facts": approved_facts,
+                "missing_facts": missing_facts,
+                "placement": move_placement,
+                "placement_note": "App export preset (not verified Meta policy)",
             }
         )
 

@@ -17,15 +17,24 @@
       return Boolean((idea && !/^(own|shop|user):/i.test(idea)) || (artwork && !/^(own|shop|user):/i.test(artwork)));
     } catch (_) { return false; }
   }
+  function requestedHandoffId() {
+    try {
+      return typeof location !== 'undefined' ? new URLSearchParams(location.search).get('sm_handoff') : null;
+    } catch (_) {
+      return null;
+    }
+  }
   function readRecommendationHandoff(uid = window.museAccount?.getSnapshot?.()?.user?.id || window.museAccount?.current?.()?.id || null) {
     try {
-      const hid = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('sm_handoff') : null;
+      const hid = requestedHandoffId();
       if (!hid) return null;
       const ns = uid ? String(uid) : 'guest';
       const mode = isSampleMode() ? 'sample' : 'own';
       const raw = localStorage.getItem(`muse.sm.handoff.${encodeURIComponent(ns)}.${encodeURIComponent(hid)}`);
       const payload = raw ? JSON.parse(raw) : null;
       if (!payload || payload.owner_id !== ns || payload.workspace_mode !== mode) return null;
+      const createdMs = payload.created_at ? Date.parse(payload.created_at) : NaN;
+      if (!Number.isFinite(createdMs) || (Date.now() - createdMs) > 24 * 60 * 60 * 1000) return null;
       return payload;
     } catch (_) {
       return null;
@@ -440,8 +449,54 @@
     refreshPreview();
     notify(`Loaded recommendation: ${spec.headline}. Evidence: ${spec.why_this || ''}`);
   }
+  function renderHandoffGuidance() {
+    const box = $('handoffGuidanceBox');
+    const quickBtn = $('quickExportFeedBtn');
+    const ctx = state.handoffActive ? state.handoffContext : null;
+    if (quickBtn) quickBtn.hidden = !ctx;
+    if (!box) return;
+    if (!ctx) {
+      box.hidden = true;
+      return;
+    }
+    box.hidden = false;
+    if ($('handoffProvenanceBadge')) $('handoffProvenanceBadge').textContent = ctx.output_label || 'Suggested starting approach';
+    if ($('handoffPlacementNote')) $('handoffPlacementNote').textContent = ctx.placement_note || 'App export preset (not verified Meta policy)';
+    if ($('handoffWhyFits')) $('handoffWhyFits').textContent = ctx.why_this_fits ? `Why this fits: ${ctx.why_this_fits}` : '';
+    if ($('handoffOrganicNote')) $('handoffOrganicNote').textContent = ctx.organic_guidance_note || '';
+    if ($('handoffApprovedFacts')) {
+      const facts = Array.isArray(ctx.approved_facts)
+        ? ctx.approved_facts
+            .map((f) => (typeof f === 'string' ? f : (f && (f.label || f.value) ? `${f.label ? `${f.label}: ` : ''}${f.value || ''}` : '')))
+            .filter(Boolean)
+        : [];
+      $('handoffApprovedFacts').textContent = facts.length ? `Approved facts: ${facts.join(' · ')}` : '';
+      $('handoffApprovedFacts').hidden = !facts.length;
+    }
+    if ($('handoffMissingFacts')) {
+      const missing = Array.isArray(ctx.missing_facts) ? ctx.missing_facts.filter(Boolean) : [];
+      $('handoffMissingFacts').textContent = missing.length ? `Missing facts (not assumed): ${missing.join(' · ')}` : '';
+      $('handoffMissingFacts').hidden = !missing.length;
+    }
+    if ($('audienceHypothesis') && document.activeElement !== $('audienceHypothesis')) {
+      $('audienceHypothesis').value = ctx.unconfirmed_audience || '';
+    }
+  }
   function applyRecommendationHandoff(handoff) {
     if (!handoff) return;
+    state.handoffActive = true;
+    state.handoffContext = {
+      output_provenance: isSampleMode() ? 'artist_example' : (handoff.output_provenance || 'suggested_starting_approach'),
+      output_label: isSampleMode() ? 'Artist example' : (handoff.output_label || 'Suggested starting approach'),
+      organic_first: handoff.organic_first !== false,
+      organic_guidance_note: handoff.organic_guidance_note || 'Start with an organic post or story first; only promote if you already have a product and offer ready.',
+      unconfirmed_audience: handoff.unconfirmed_audience || '',
+      audience_confirmed: Boolean(handoff.audience_confirmed),
+      approved_facts: Array.isArray(handoff.approved_facts) ? handoff.approved_facts : [],
+      missing_facts: Array.isArray(handoff.missing_facts) ? handoff.missing_facts : [],
+      placement_note: handoff.placement_note || 'App export preset (not verified Meta policy)',
+      why_this_fits: handoff.why_this_fits || '',
+    };
     const ownSession = !isSampleMode();
     if (ownSession) {
       state.custom = true;
@@ -511,9 +566,10 @@
       : 'Your product photo will appear here.';
     $('reviewed').checked = false;
     updateChoices();
-    refreshPreview();
+    renderHandoffGuidance();
+    go(0);
     persistDraft();
-    notify(`Loaded selected move: ${state.headline}.`);
+    notify(`Loaded selected move (${state.handoffContext.output_label}): ${state.headline}.`);
   }
   function sync() {
     for (const [id, key] of Object.entries(fields)) state.product[key] = $(id).value.trim();
@@ -898,7 +954,7 @@
     state.step = step;
     document.querySelectorAll('[data-panel]').forEach((el) => { el.hidden = Number(el.dataset.panel) !== step; });
     document.querySelectorAll('[data-step]').forEach((el) => { if (Number(el.dataset.step) === step) el.setAttribute('aria-current', 'step'); else el.removeAttribute('aria-current'); });
-    $('backButton').disabled = step === 0; $('nextButton').hidden = step === 3; $('nextButton').textContent = ['Choose an idea →', 'Make it yours →', 'Ready to share →'][step] || 'Continue'; $('stepCount').textContent = `Step ${step + 1} of 4`; $('tryNext').hidden = state.custom || state.workspace !== 'sarabjit_singh';
+    $('backButton').disabled = step === 0; $('nextButton').hidden = step === 3; $('nextButton').textContent = (state.handoffActive && step === 0) ? 'Make it yours →' : (['Choose an idea →', 'Make it yours →', 'Ready to share →'][step] || 'Continue'); $('stepCount').textContent = `Step ${step + 1} of 4`; $('tryNext').hidden = state.custom || state.workspace !== 'sarabjit_singh';
     refreshPreview(); const h = document.querySelector(`[data-panel="${step}"] h2`); h.tabIndex = -1; h.focus({ preventScroll: true }); h.scrollIntoView({ behavior: 'auto', block: 'start' });
   }
   function refreshPreview() {
@@ -918,10 +974,10 @@
     $('postingSteps').replaceChildren(); for (const line of postingChecklist()) { const li = document.createElement('li'); li.textContent = line; $('postingSteps').append(li); }
     $('listingLink').textContent = `Check ${destinations[state.product.destination]} destination ↗`;
     const activePl = activePlacement();
-    const feedBtn = $('downloadFeed');
-    if (feedBtn) {
-      const feedText = activePl === 'facebook_feed' ? 'Download Facebook feed image ' : 'Download feed image ';
-      const sizeText = activePl === 'facebook_feed' ? '1080 × 1080 PNG' : '1080 × 1350 PNG';
+    const feedText = activePl === 'facebook_feed' ? 'Download Facebook feed image ' : 'Download feed image ';
+    const sizeText = activePl === 'facebook_feed' ? '1080 × 1080 PNG' : '1080 × 1350 PNG';
+    for (const feedBtn of [$('downloadFeed'), $('quickExportFeedBtn')]) {
+      if (!feedBtn) continue;
       if (typeof feedBtn.replaceChildren === 'function' && typeof document.createTextNode === 'function') {
         feedBtn.replaceChildren();
         feedBtn.append(document.createTextNode(feedText));
@@ -932,6 +988,7 @@
         feedBtn.textContent = `${feedText}${sizeText}`;
       }
     }
+    renderHandoffGuidance();
     const previewHeight = activePl === 'facebook_feed' ? 1080 : activePl === 'instagram_story' ? 1920 : 1350;
     const previewEl = $('previewCanvas');
     if (previewEl?.classList) {
@@ -1205,7 +1262,14 @@
       next.focus();
     });
   });
-  $('nextButton').addEventListener('click', () => go(Math.min(3, state.step + 1))); $('backButton').addEventListener('click', () => go(Math.max(0, state.step - 1))); $('originalButton').addEventListener('click', () => { originalLayout(); $('reviewed').checked = false; }); $('draftButton').addEventListener('click', draft); $('generateButton').addEventListener('click', generate);
+  $('nextButton').addEventListener('click', () => go((state.handoffActive && state.step === 0) ? 2 : Math.min(3, state.step + 1))); $('backButton').addEventListener('click', () => go((state.handoffActive && state.step === 2) ? 0 : Math.max(0, state.step - 1)));
+  $('quickExportFeedBtn')?.addEventListener('click', () => {
+    if (!postingChannels().length) { notify('Choose Instagram or Facebook for this post before sharing.', 'error'); go(0); return; }
+    download(activePlacement() === 'facebook_feed' ? 1080 : 1350);
+  });
+  $('audienceHypothesis')?.addEventListener('input', () => {
+    if (state.handoffContext) state.handoffContext.unconfirmed_audience = $('audienceHypothesis').value;
+  }); $('originalButton').addEventListener('click', () => { originalLayout(); $('reviewed').checked = false; }); $('draftButton').addEventListener('click', draft); $('generateButton').addEventListener('click', generate);
   $('downloadFeed').addEventListener('click', () => download(activePlacement() === 'facebook_feed' ? 1080 : 1350)); $('downloadStory').addEventListener('click', () => download(1920)); if ($('downloadSquare')) $('downloadSquare').addEventListener('click', () => download(1080)); $('downloadPack').addEventListener('click', () => { if (state.busy) return; if (!$('reviewed').checked) { notify('Review your product details and wording before downloading.', 'error'); return; } saveBlob(new Blob([JSON.stringify(campaignPack(), null, 2)], { type: 'application/json' }), 'campaign.json'); markIdeaExported(); });
   $('copyCaption').addEventListener('click', async () => { sync(); const ctaLine = state.cta && !state.caption.includes(state.cta) ? `\n\n${state.cta}` : ''; try { await navigator.clipboard.writeText(`${state.headline}\n\n${state.caption}${ctaLine}${safeLink(state.product.link) ? '\n\n' + safeLink(state.product.link) : ''}`); notify('Your current caption and link are copied.'); } catch { notify('Clipboard access is unavailable. Select and copy your caption from the edit screen.', 'error'); } });
   $('liveMode').addEventListener('change', () => {
@@ -1500,8 +1564,18 @@
         if ($('savedShopWebsiteNote')) $('savedShopWebsiteNote').textContent = 'Add a shop website above to import your products.';
       }
     }
+    const handoffId = requestedHandoffId();
     const handoff = readRecommendationHandoff(s.ownerId);
-    if (handoff) applyRecommendationHandoff(handoff);
+    if (handoff) {
+      applyRecommendationHandoff(handoff);
+    } else {
+      state.handoffActive = false;
+      state.handoffContext = null;
+      renderHandoffGuidance();
+      if (handoffId) {
+        notify('That recommendation link is expired, invalid, or belongs to a different account/mode. Your current draft was kept safe.', 'error');
+      }
+    }
   }
 
   const standaloneVm = typeof window.museModes === 'undefined' && typeof window.museAccount === 'undefined';

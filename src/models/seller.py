@@ -290,6 +290,25 @@ class SellerFootprintAuditLLM(BaseModel):
     instagram_and_facebook_sales_plays: list[ActionableInsight] = Field(min_length=1, max_length=6)
 
 
+class PromotionGuidanceSummary(BaseModel):
+    """Additive grounded promotion guidance metadata (no fabricated claims or unverified policy)."""
+
+    model_config = ConfigDict(extra="allow")
+
+    output_provenance: Literal[
+        "artist_example", "suggested_starting_approach", "fresh_analysis"
+    ] = "suggested_starting_approach"
+    output_label: str = "Suggested starting approach"
+    organic_first: bool = True
+    organic_guidance_note: str = "Organic post first — no paid ad spend or ad account required."
+    unconfirmed_audience: str = ""
+    audience_confirmed: bool = False
+    approved_facts: list[dict[str, str]] = Field(default_factory=list)
+    missing_facts: list[str] = Field(default_factory=list)
+    placement: str = "instagram_feed"
+    placement_note: str = "App export preset (not verified Meta policy)"
+
+
 class SellerFootprintAudit(BaseModel):
     """Complete own-site + marketplace + IG/FB growth audit for an SMB seller."""
 

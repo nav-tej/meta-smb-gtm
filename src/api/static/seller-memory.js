@@ -1796,6 +1796,7 @@
     const moveDef = rec?.editor_defaults || fallbackDef || {};
     const ns = ownerNamespace();
     const draftId = currentDraftId();
+    const sampleMode = isSampleMode();
     const id = `sm_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
     const payload = {
       id,
@@ -1807,6 +1808,16 @@
       title: rec?.title || moveDef.recommendation_title || '',
       action: rec?.action || moveDef.recommendation_action || '',
       why_this_fits: rec?.why_this_fits || moveDef.why_this_fits || '',
+      output_provenance: sampleMode ? 'artist_example' : (moveDef.output_provenance || rec?.output_provenance || 'suggested_starting_approach'),
+      output_label: sampleMode ? 'Artist example' : (moveDef.output_label || rec?.output_label || 'Suggested starting approach'),
+      organic_first: moveDef.organic_first !== undefined ? Boolean(moveDef.organic_first) : (rec?.organic_first !== undefined ? Boolean(rec.organic_first) : true),
+      organic_guidance_note: moveDef.organic_guidance_note || rec?.organic_guidance_note || 'Start with an organic post or story first; only promote if you already have a product and offer ready.',
+      unconfirmed_audience: moveDef.unconfirmed_audience || rec?.unconfirmed_audience || '',
+      audience_confirmed: Boolean(moveDef.audience_confirmed),
+      approved_facts: Array.isArray(moveDef.approved_facts) ? moveDef.approved_facts : [],
+      missing_facts: Array.isArray(moveDef.missing_facts) ? moveDef.missing_facts : (Array.isArray(rec?.missing_facts) ? rec.missing_facts : []),
+      placement: moveDef.placement || 'feed',
+      placement_note: moveDef.placement_note || 'App export preset (not verified Meta policy)',
       channel: rec?.channel || moveDef.channel || '',
       goal: moveDef.goal || rec?.goal || 'story',
       cta: moveDef.cta || rec?.cta || '',
@@ -1940,6 +1951,7 @@
       const qs = new URLSearchParams();
       qs.set('sm_handoff', handoffId);
       qs.set('draft', draftId);
+      if (isSampleMode()) qs.set('workspace', 'sample');
 
       const usedChips = el('div', { class: 'sm-used-chips' }, el('span', { style: 'font-weight:600;' }, 'Used from memory:'));
       if (rec.used_entries && rec.used_entries.length) {
@@ -1980,8 +1992,24 @@
         usedChips.appendChild(el('span', { class: 'sm-sub', style: 'margin:0;' }, 'Your saved shop defaults'));
       }
 
+      const provenanceLabel = isSampleMode()
+        ? 'Artist example'
+        : (rec.output_label || rec.editor_defaults?.output_label || 'Suggested starting approach');
+      const organicNote = rec.organic_guidance_note || rec.editor_defaults?.organic_guidance_note || '';
+      const missingFacts = Array.isArray(rec.missing_facts)
+        ? rec.missing_facts
+        : (Array.isArray(rec.editor_defaults?.missing_facts) ? rec.editor_defaults.missing_facts : []);
+
       const metaBox = el('div', { class: 'sm-reco-meta' },
+        el('div', { style: 'margin-bottom:4px;' },
+          el('span', {
+            class: 'sm-chip',
+            'data-sm-provenance': isSampleMode() ? 'artist_example' : (rec.output_provenance || 'suggested_starting_approach'),
+          }, provenanceLabel)
+        ),
         el('div', { class: 'sm-why-line' }, `Why this fits: ${rec.why_this_fits || ''}`),
+        organicNote ? el('div', { class: 'sm-why-line' }, organicNote) : null,
+        missingFacts.length ? el('div', { class: 'sm-why-line', 'data-sm-missing-facts': 'true' }, `Missing facts: ${missingFacts.join(' · ')}`) : null,
         usedChips
       );
 
