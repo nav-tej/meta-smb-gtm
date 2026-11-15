@@ -244,7 +244,7 @@ def promotion_guidance_server(monkeypatch: pytest.MonkeyPatch):
             time.sleep(0.05)
 
     try:
-        yield f"http://127.0.0.1:{port}", muse_calls
+        yield f"http://127.0.0.1:{port}", muse_calls, stores
     finally:
         app.dependency_overrides.clear()
         server.should_exit = True
@@ -252,15 +252,15 @@ def promotion_guidance_server(monkeypatch: pytest.MonkeyPatch):
 
 
 def test_promotion_guidance_5_click_handoff_truthfulness_and_isolation_e2e(
-    promotion_guidance_server: tuple[str, dict[str, int]],
+    promotion_guidance_server: tuple[str, dict[str, int], dict[str, Any]],
 ) -> None:
-    """Verify truthful guidance, <=5 click handoff->PNG, recovery, and 375px/1440px layout."""
+    """Verify truthful guidance, handoff->PNG clicks, reload/cloud persistence, and isolation."""
     pw_python = _find_playwright_python()
     if pw_python is None:
         pytest.skip("Playwright Python runtime unavailable")
 
     ARTIFACT_SCRATCH_DIR.mkdir(parents=True, exist_ok=True)
-    base_url, muse_calls = promotion_guidance_server
+    base_url, muse_calls, stores = promotion_guidance_server
 
     script = textwrap.dedent(
         f"""
@@ -308,17 +308,7 @@ def test_promotion_guidance_5_click_handoff_truthfulness_and_isolation_e2e(
                 assert im.size == (1080, 1350), im.size
             ctx_guest.close()
 
-            # 2. Desktop own-account (user-a): pre-attach photo, then handoff -> PNG
-            page.goto(f"{{BASE}}/create", wait_until="networkidle")
-            page.fill("#shopUrl", "https://wildmeadow.test")
-            page.click("#importProducts")
-            page.wait_for_selector('#imageCandidatesGrid [data-use-image-id="web-2"]')
-            page.click('#imageCandidatesGrid [data-use-image-id="web-2"]')
-            page.wait_for_function(
-                "() => (document.getElementById('productImage')?.getAttribute('src') || '')"
-                ".startsWith('data:image/')"
-            )
-
+            # 2. Desktop own-account (user-a): no photo -> import -> select -> handoff -> PNG
             page.goto(f"{{BASE}}/", wait_until="networkidle")
             page.click("#smShowImproveTabBtn")
             page.wait_for_selector("#loop-improve ol.jr-recos li[data-sm-reco-id]")
@@ -329,7 +319,7 @@ def test_promotion_guidance_5_click_handoff_truthfulness_and_isolation_e2e(
             assert "Missing facts:" in card_text, card_text
             page.screenshot(path=str(OUT / "pg-home-1440.png"), full_page=False)
 
-            # Click 1: Make ad -> /create?sm_handoff=... (existing own photo -> 4 clicks total)
+            # Click 1: Make ad -> /create?sm_handoff=...
             clicks = 0
             first_card.locator("a", has_text="Make ad").click()
             clicks += 1
@@ -338,6 +328,22 @@ def test_promotion_guidance_5_click_handoff_truthfulness_and_isolation_e2e(
                 "() => document.getElementById('nextButton')?.textContent?.trim()"
                 " === 'Make it yours →'"
             )
+
+            # Click 2: Import shop products to open/populate image candidates
+            page.fill("#shopUrl", "https://wildmeadow.test")
+            page.click("#importProducts")
+            clicks += 1
+            page.wait_for_selector('#imageCandidatesGrid [data-use-image-id="web-2"]')
+
+            # Click 3: Select existing image candidate
+            page.click('#imageCandidatesGrid [data-use-image-id="web-2"]')
+            clicks += 1
+            page.wait_for_function(
+                "() => (document.getElementById('productImage')?.getAttribute('src') || '')"
+                ".startsWith('data:image/')"
+            )
+
+            # Click 4: Next -> skips Step 1 ("Your idea") and lands on Step 2 ("Make it yours")
             next_btn = page.locator("#nextButton")
             assert next_btn.inner_text().strip() == "Make it yours →", next_btn.inner_text()
             next_btn.click()
@@ -351,15 +357,16 @@ def test_promotion_guidance_5_click_handoff_truthfulness_and_isolation_e2e(
             assert page.locator("#handoffMissingFacts").is_visible()
             assert page.locator("#audienceHypothesis").is_visible()
 
-            # Text edit (counted separately from navigation/review/export clicks)
+            # Text edits (counted separately from navigation/picker/review/export clicks)
             page.fill("#headline", "Botanical Linocut Studio Proof")
+            page.fill("#audienceHypothesis", "Art collectors buying botanical prints")
             page.screenshot(path=str(OUT / "pg-editor-step2-1440.png"), full_page=False)
 
-            # Click 3: Tick #reviewed
+            # Click 5: Tick #reviewed
             page.locator("#reviewed").check()
             clicks += 1
 
-            # Click 4: Quick export feed PNG directly from Step 2
+            # Click 6: Quick export feed PNG directly from Step 2
             quick_btn = page.locator("#quickExportFeedBtn")
             assert quick_btn.is_visible()
             assert quick_btn.bounding_box()["height"] >= 44
@@ -371,14 +378,41 @@ def test_promotion_guidance_5_click_handoff_truthfulness_and_isolation_e2e(
             dl.save_as(str(exported_path))
             with Image.open(exported_path) as im:
                 assert im.size == (1080, 1350), im.size
-            assert clicks <= 5, f"Expected <=5 clicks, got {{clicks}}"
+            assert clicks == 6, f"Expected 6 clicks in no-photo candidate flow, got {{clicks}}"
 
-            # Reload /create and verify edited headline persisted in user-a draft
-            page.goto(f"{{BASE}}/create", wait_until="networkidle")
+            # Reload SAME ?sm_handoff=... URL: consumed handoff must not overwrite edits
+            page.reload(wait_until="networkidle")
             page.wait_for_function(
                 "() => document.getElementById('headline')?.value"
                 " === 'Botanical Linocut Studio Proof'"
             )
+            page.wait_for_selector('#handoffGuidanceBox:not([hidden])')
+            aud_after_reload = page.locator("#audienceHypothesis").input_value()
+            assert aud_after_reload == "Art collectors buying botanical prints", aud_after_reload
+
+            # Save to account, then load in a fresh context (empty localStorage) for user-a
+            page.click("#saveAccountDraft")
+            page.wait_for_function(
+                "() => (document.getElementById('draftStatus')?.textContent || '')"
+                ".includes('Saved to your account')"
+            )
+            ctx_a2 = browser.new_context(viewport={{"width": 1440, "height": 900}})
+            ctx_a2.add_cookies([{{
+                "name": "muse_e2e_user",
+                "value": "user-a",
+                "url": BASE,
+            }}])
+            page_a2 = ctx_a2.new_page()
+            page_a2.goto(f"{{BASE}}/create", wait_until="networkidle")
+            page_a2.click("#loadAccountDraft")
+            page_a2.wait_for_function(
+                "() => document.getElementById('headline')?.value"
+                " === 'Botanical Linocut Studio Proof'"
+            )
+            page_a2.wait_for_selector('#handoffGuidanceBox:not([hidden])')
+            aud_cloud = page_a2.locator("#audienceHypothesis").input_value()
+            assert aud_cloud == "Art collectors buying botanical prints", aud_cloud
+            ctx_a2.close()
 
             # Verify no horizontal overflow at 1440px
             overflow_1440 = page.evaluate(
@@ -442,6 +476,8 @@ def test_promotion_guidance_5_click_handoff_truthfulness_and_isolation_e2e(
             page_b.click('#imageCandidatesGrid [data-use-image-id="web-1"]')
             page_b.locator("#nextButton").click()
             page_b.wait_for_selector('#handoffGuidanceBox:not([hidden])')
+            aud_b = page_b.locator("#audienceHypothesis").input_value()
+            assert "Art collectors buying botanical prints" not in aud_b, aud_b
             assert not page_b.evaluate(
                 "document.documentElement.scrollWidth > window.innerWidth"
             ), "375px editor overflow"
@@ -464,3 +500,6 @@ def test_promotion_guidance_5_click_handoff_truthfulness_and_isolation_e2e(
     )
     assert proc.returncode == 0, f"STDOUT:\n{proc.stdout}\nSTDERR:\n{proc.stderr}"
     assert muse_calls["count"] == 0
+    # Verify draft-only audience edit was NOT written to account-wide seller memory
+    seller_doc_json = json.dumps(stores["user-a"]["document"].get("seller_memory", {}))
+    assert "Art collectors buying botanical prints" not in seller_doc_json

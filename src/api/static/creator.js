@@ -1,10 +1,10 @@
 'use strict';
 (() => {
   const $ = (id) => document.getElementById(id);
-  const state = { accountLive: false, step: 0, presets: null, workspace: 'sarabjit_singh', custom: false, copyEdited: false, sceneEdited: false, goal: 'story', placement: 'instagram_feed', original: '', image: '', imageKind: 'original', sampleImage: '', imageMeta: null, imageFrame: { fit: 'contain', x: 0, y: 0 }, live: false, defaultLive: false, readiness: null, busy: false, revision: 0, paint: 0, product: {}, headline: '', caption: '', scene: '', cta: '', provenance: 'Original-photo layout. No new image generated.', idea_id: null, shopWebsiteUrl: '' };
+  const state = { accountLive: false, step: 0, presets: null, workspace: 'sarabjit_singh', custom: false, copyEdited: false, sceneEdited: false, goal: 'story', placement: 'instagram_feed', original: '', image: '', imageKind: 'original', sampleImage: '', imageMeta: null, imageFrame: { fit: 'contain', x: 0, y: 0 }, live: false, defaultLive: false, readiness: null, busy: false, revision: 0, paint: 0, product: {}, headline: '', caption: '', scene: '', cta: '', provenance: 'Original-photo layout. No new image generated.', idea_id: null, shopWebsiteUrl: '', handoffActive: false, handoffContext: null, handoffId: null };
 
   const draftNamespace = 'creator';
-  const draftFields = ['workspace', 'custom', 'copyEdited', 'sceneEdited', 'goal', 'placement', 'original', 'image', 'imageKind', 'sampleImage', 'imageMeta', 'imageFrame', 'product', 'headline', 'caption', 'scene', 'cta', 'provenance', 'artwork', 'idea_id'];
+  const draftFields = ['workspace', 'custom', 'copyEdited', 'sceneEdited', 'goal', 'placement', 'original', 'image', 'imageKind', 'sampleImage', 'imageMeta', 'imageFrame', 'product', 'headline', 'caption', 'scene', 'cta', 'provenance', 'artwork', 'idea_id', 'handoffActive', 'handoffContext', 'handoffId'];
   function isSampleMode() {
     if (window.museModes?.isSampleMode) return window.museModes.isSampleMode();
     try {
@@ -51,7 +51,15 @@
     if (data?.schema !== 1 || typeof data.product?.name !== 'string' || !Object.hasOwn(goals, data.goal) || !['original', 'image', 'sampleImage'].every(key => !data[key] || samplePath(data[key]) || mediaAssetPath(data[key]) || validInline(data[key]))) throw new Error('Unsupported creator draft.');
     if (!isDraftObject(data.offers || {}) || !Array.isArray(data.channels) || ['headline', 'caption', 'scene', 'provenance'].some(key => typeof data[key] !== 'string')) throw new Error('Invalid creator draft fields.');
     state.artwork = null;
+    state.handoffActive = false;
+    state.handoffContext = null;
+    state.handoffId = null;
     for (const key of draftFields) if (data[key] !== undefined) state[key] = cloneDraft(data[key]);
+    state.handoffActive = Boolean(state.handoffActive && isDraftObject(state.handoffContext));
+    if (!state.handoffActive) {
+      state.handoffContext = null;
+      state.handoffId = null;
+    }
     if (!isDraftObject(state.imageFrame)) state.imageFrame = { fit: 'contain', x: 0, y: 0 };
     offers = cloneDraft(data.offers || {}); state.revision += 1;
     setProductFields(); $('promotionDestination').value = state.product.destination || 'other';
@@ -485,6 +493,7 @@
   function applyRecommendationHandoff(handoff) {
     if (!handoff) return;
     state.handoffActive = true;
+    state.handoffId = handoff.id || requestedHandoffId() || null;
     state.handoffContext = {
       output_provenance: isSampleMode() ? 'artist_example' : (handoff.output_provenance || 'suggested_starting_approach'),
       output_label: isSampleMode() ? 'Artist example' : (handoff.output_label || 'Suggested starting approach'),
@@ -603,7 +612,7 @@
   function setProductFields() { for (const [id, key] of Object.entries(fields)) $(id).value = state.product[key] || ''; }
   function selectExample(workspace) {
     if (state.busy) return;
-    state.workspace = workspace; state.custom = false; state.copyEdited = false; state.sceneEdited = false; state.revision += 1; state.artwork = null;
+    state.workspace = workspace; state.custom = false; state.copyEdited = false; state.sceneEdited = false; state.revision += 1; state.artwork = null; state.handoffActive = false; state.handoffContext = null; state.handoffId = null;
     const ws = state.presets?.workspaces?.[workspace]; const art = ws?.artworks_showcase?.[0];
     state.product = workspace === 'sarabjit_singh' ? { name: 'Ek Onkar · artwork promotion', price: '', seller: 'Art of Sarabjit Singh', description: 'Ek Onkar by Sarabjit Singh explores connection and equality. Check the selected shop for the matching artwork, available formats and current offer.', link: '', collection: '' } : { name: 'Stoneware & brass chai set', price: '$54', seller: 'Saffron & Clay', description: 'Illustrative product example: a stoneware and brass chai set.', link: '', collection: '' };
     resetOffers(workspace === 'sarabjit_singh');
@@ -1268,7 +1277,11 @@
     download(activePlacement() === 'facebook_feed' ? 1080 : 1350);
   });
   $('audienceHypothesis')?.addEventListener('input', () => {
-    if (state.handoffContext) state.handoffContext.unconfirmed_audience = $('audienceHypothesis').value;
+    if (state.handoffContext) {
+      state.handoffContext.unconfirmed_audience = $('audienceHypothesis').value;
+      state.revision += 1;
+      persistDraft();
+    }
   }); $('originalButton').addEventListener('click', () => { originalLayout(); $('reviewed').checked = false; }); $('draftButton').addEventListener('click', draft); $('generateButton').addEventListener('click', generate);
   $('downloadFeed').addEventListener('click', () => download(activePlacement() === 'facebook_feed' ? 1080 : 1350)); $('downloadStory').addEventListener('click', () => download(1920)); if ($('downloadSquare')) $('downloadSquare').addEventListener('click', () => download(1080)); $('downloadPack').addEventListener('click', () => { if (state.busy) return; if (!$('reviewed').checked) { notify('Review your product details and wording before downloading.', 'error'); return; } saveBlob(new Blob([JSON.stringify(campaignPack(), null, 2)], { type: 'application/json' }), 'campaign.json'); markIdeaExported(); });
   $('copyCaption').addEventListener('click', async () => { sync(); const ctaLine = state.cta && !state.caption.includes(state.cta) ? `\n\n${state.cta}` : ''; try { await navigator.clipboard.writeText(`${state.headline}\n\n${state.caption}${ctaLine}${safeLink(state.product.link) ? '\n\n' + safeLink(state.product.link) : ''}`); notify('Your current caption and link are copied.'); } catch { notify('Clipboard access is unavailable. Select and copy your caption from the edit screen.', 'error'); } });
@@ -1376,6 +1389,9 @@
     state.workspace = 'own';
     state.artwork = null;
     state.idea_id = null;
+    state.handoffActive = false;
+    state.handoffContext = null;
+    state.handoffId = null;
     state.product = {
       name: productLabel,
       seller: sellerLabel,
@@ -1566,15 +1582,18 @@
     }
     const handoffId = requestedHandoffId();
     const handoff = readRecommendationHandoff(s.ownerId);
-    if (handoff) {
+    if (handoffId && state.handoffId === handoffId && state.handoffActive && state.handoffContext) {
+      renderHandoffGuidance();
+    } else if (handoff) {
       applyRecommendationHandoff(handoff);
-    } else {
+    } else if (handoffId) {
       state.handoffActive = false;
       state.handoffContext = null;
+      state.handoffId = null;
       renderHandoffGuidance();
-      if (handoffId) {
-        notify('That recommendation link is expired, invalid, or belongs to a different account/mode. Your current draft was kept safe.', 'error');
-      }
+      notify('That recommendation link is expired, invalid, or belongs to a different account/mode. Your current draft was kept safe.', 'error');
+    } else {
+      renderHandoffGuidance();
     }
   }
 

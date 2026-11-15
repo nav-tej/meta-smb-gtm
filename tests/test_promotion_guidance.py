@@ -5,6 +5,7 @@ from __future__ import annotations
 from src.models.seller import (
     AccessPreferences,
     PromotionGuidanceSummary,
+    SellerMemoryEntry,
     SellerPreferences,
     TastePreferences,
 )
@@ -98,3 +99,48 @@ def test_promotion_guidance_summary_model_defaults() -> None:
     assert summary.organic_first is True
     assert summary.audience_confirmed is False
     assert summary.placement_note == "App export preset (not verified Meta policy)"
+
+
+def test_scoped_price_and_draft_override_price_preserve_actual_source() -> None:
+    scoped_entry = SellerMemoryEntry(
+        id="mem-price-prod",
+        key="price_range",
+        label="Linocut price",
+        value="$48",
+        source="shop_scan",
+        scope="product",
+        status="accepted",
+        product_key="Botanical Linocut",
+    )
+    pref = SellerPreferences(
+        goals=["visits"],
+        taste=TastePreferences(preferred_channels=["instagram"]),
+        access=AccessPreferences(minutes_per_week=60),
+        memory_entries=[scoped_entry],
+    )
+    scoped_result = rank_seller_recommendations(
+        business_name="Wild Meadow Press",
+        product_name="Botanical Linocut",
+        preferences=pref,
+    )
+    scoped_facts = scoped_result["recommendations"][0]["editor_defaults"]["approved_facts"]
+    price_facts = [f for f in scoped_facts if f.get("value") == "$48"]
+    assert price_facts, scoped_facts
+    assert price_facts[0]["source"] == "shop_scan"
+    assert price_facts[0]["scope"] == "product"
+    assert all(f["id"] != "fact:price" for f in scoped_facts)
+
+    # Draft override price must be labeled draft_override / draft, never seller_preferences
+    draft_result = rank_seller_recommendations(
+        business_name="Wild Meadow Press",
+        product_name="Botanical Linocut",
+        preferences=pref,
+        draft_override={"price_claim": "$65"},
+    )
+    draft_facts = draft_result["recommendations"][0]["editor_defaults"]["approved_facts"]
+    draft_price_facts = [f for f in draft_facts if f.get("id") == "fact:draft_price"]
+    assert len(draft_price_facts) == 1, draft_facts
+    assert draft_price_facts[0]["value"] == "$65"
+    assert draft_price_facts[0]["source"] == "draft_override"
+    assert draft_price_facts[0]["scope"] == "draft"
+    assert scoped_entry.value == "$48"

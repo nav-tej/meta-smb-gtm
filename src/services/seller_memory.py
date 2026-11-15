@@ -1658,16 +1658,35 @@ def rank_seller_recommendations(
                     "scope": "draft" if draft_goal_raw else "shop_default",
                 }
             )
+        draft_price_raw = str(override.get("price_claim") or "").strip()
         if short_price:
-            approved_facts.append(
-                {
-                    "id": "fact:price",
-                    "label": "Starting price",
-                    "value": short_price,
-                    "source": "seller_preferences",
-                    "scope": "shop_default",
-                }
-            )
+            if draft_price_raw:
+                approved_facts.append(
+                    {
+                        "id": "fact:draft_price",
+                        "label": "Draft price (not saved)",
+                        "value": short_price,
+                        "source": "draft_override",
+                        "scope": "draft",
+                    }
+                )
+            elif price_entry and not any(f["id"] == price_entry.id for f in approved_facts):
+                price_scope = price_entry.scope
+                if price_scope == "shop_default" and price_entry.product_key:
+                    price_scope = "product"
+                elif price_scope == "shop_default" and price_entry.destination:
+                    price_scope = "destination"
+                approved_facts.append(
+                    {
+                        "id": price_entry.id,
+                        "label": price_entry.label or "Starting price",
+                        "value": short_price,
+                        "source": price_entry.source,
+                        "scope": price_scope,
+                        "product_key": price_entry.product_key or "",
+                        "destination": price_entry.destination or "",
+                    }
+                )
 
         move_placement = "facebook_feed" if move.get("channel") == "facebook" else "instagram_feed"
         ranked.append(
