@@ -158,18 +158,11 @@ def test_workspace_put_requires_and_enforces_expected_owner(
     assert rpc_calls[0]["p_user_id"] == user_b.user_id
 
 
-def test_signup_auto_confirms_and_signs_in_immediately(
+def test_signup_requires_email_confirmation_and_sets_no_session(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """POST /api/v1/account/signup creates a confirmed user and returns an active session."""
-    user_a = AccountSession(
-        user_id="00000000-0000-4000-8000-000000000001",
-        email="new@example.test",
-        email_verified=True,
-        access_token="access-token-new",
-        session_id=None,
-    )
-    auth_calls: list[tuple[str, str, bool]] = []
+    """POST /api/v1/account/signup sends a confirmation email and never auto-confirms."""
+    auth_calls: list[tuple[str, str, bool, dict[str, Any] | None]] = []
 
     class FakeSupabase:
         async def auth(
@@ -180,66 +173,32 @@ def test_signup_auto_confirms_and_signs_in_immediately(
             access_token: str | None = None,
             secret: bool = False,
         ) -> dict[str, Any]:
-            auth_calls.append((path, method, secret))
-            if path == "admin/users":
-                assert body == {
-                    "email": "new@example.test",
-                    "password": "very-secure-password-123",
-                    "email_confirm": True,
-                }
-                return {"id": user_a.user_id, "email": user_a.email}
-            if path == "token?grant_type=password":
-                return {
-                    "access_token": "access-token-new",
-                    "refresh_token": "refresh-token-new",
-                    "expires_in": 3600,
-                }
+            auth_calls.append((path, method, secret, body))
+            if path.startswith("signup?"):
+                # Supabase's confirmation-required reply: a user, no session.
+                return {"id": "00000000-0000-4000-8000-000000000001", "email": body["email"]}
             raise AssertionError(f"Unexpected auth call: {path}")
-
-        async def rpc(self, name: str, params: dict[str, Any]) -> dict[str, Any]:
-            assert name == "muse_usage_status"
-            return {
-                "allowed": True,
-                "plan": "trial",
-                "used": 0,
-                "limit": 3,
-                "remaining": 3,
-                "resets_at": None,
-                "live_available": True,
-            }
-
-    async def fake_verify(token: str) -> AccountSession:
-        assert token == "access-token-new"
-        return user_a
 
     monkeypatch.setattr("src.api.accounts.get_supabase_client", lambda: FakeSupabase())
     monkeypatch.setattr(accounts_service, "get_supabase_client", lambda: FakeSupabase())
-    monkeypatch.setattr(accounts_service, "configured", lambda: True)
-    monkeypatch.setattr("src.api.accounts.verify_token", fake_verify)
-    monkeypatch.setenv("ACCOUNTS_REQUIRED", "true")
-    from src.config import get_settings
-
-    get_settings.cache_clear()
-    try:
-        client = TestClient(app)
-        res = client.post(
-            "/api/v1/account/signup",
-            headers={"Origin": "http://localhost:8000"},
-            json={"email": "New@Example.test", "password": "very-secure-password-123"},
-        )
-    finally:
-        get_settings.cache_clear()
+    accounts_service.reset_email_throttle()
+    client = TestClient(app)
+    res = client.post(
+        "/api/v1/account/signup",
+        headers={"Origin": "http://localhost:8000"},
+        json={"email": "New@Example.test", "password": "very-secure-password-123"},
+    )
 
     assert res.status_code == 200
     data = res.json()
-    assert data["user"]["email"] == "new@example.test"
-    assert data["user"]["email_verified"] is True
-    assert data["usage"]["remaining"] == 3
-    assert "muse_access" in res.cookies
-    assert auth_calls == [
-        ("admin/users", "POST", True),
-        ("token?grant_type=password", "POST", False),
-    ]
+    assert data["authenticated"] is False
+    assert "confirm your email" in data["message"]
+    assert "muse_access" not in res.cookies
+    assert len(auth_calls) == 1
+    path, method, secret, body = auth_calls[0]
+    assert path.startswith("signup?redirect_to=") and path.endswith("%2Faccount")
+    assert (method, secret) == ("POST", False)
+    assert body == {"email": "new@example.test", "password": "very-secure-password-123"}
 
 
 def test_google_oauth_start_and_callback_mint_verified_session(
