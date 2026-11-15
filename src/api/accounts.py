@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import AsyncIterator
 from typing import Annotated, Any, Literal
 from urllib.parse import urlencode
@@ -21,6 +22,7 @@ from src.services.accounts import (
     set_cookies,
     snapshot,
     start_google_oauth,
+    throttle_email_send,
     trusted_mutation,
     verify_token,
     verify_workspace_owner,
@@ -35,6 +37,7 @@ async def account_errors() -> AsyncIterator[None]:
         raise HTTPException(err.status_code, err.detail) from err
 
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/account", tags=["accounts"], dependencies=[Depends(account_errors)])
 
 
@@ -97,41 +100,62 @@ async def me(request: Request, response: Response) -> dict[str, Any]:
     return await snapshot(account)
 
 
+CONFIRMATION_SENT = (
+    "Check your inbox for a link to confirm your email, then sign in. "
+    "Already have an account? Sign in or reset your password."
+)
+CONFIRMATION_RESENT = (
+    "If that email is waiting for confirmation, a new link is on its way. "
+    "Check spam too; the link opens Muse signed in."
+)
+
+
 @router.post("/signup")
-async def signup(body: SignupRequest, response: Response, _: Mutation) -> dict[str, Any]:
+async def signup(
+    body: SignupRequest, request: Request, response: Response, _: Mutation
+) -> dict[str, Any]:
+    """Create an unconfirmed account; Supabase emails the confirmation link.
+
+    The reply is the same for new and existing addresses so signup cannot be used to
+    discover who has an account. Nothing here marks an email as confirmed.
+    """
     response.headers["Cache-Control"] = "no-store"
-    payload = body.model_dump()
-    already_exists = False
+    throttle_email_send(request, body.email)
     try:
-        await get_supabase_client().auth(
-            "admin/users",
-            "POST",
-            {"email": body.email, "password": body.password, "email_confirm": True},
-            secret=True,
+        result = await get_supabase_client().auth(
+            "signup?" + callback_query(), "POST", body.model_dump()
         )
     except SupabaseError as err:
-        if err.status_code == 401:
-            already_exists = True
-        else:
-            await get_supabase_client().auth("signup?" + callback_query(), "POST", payload)
-            return {
-                "message": "Check your email to confirm your account, then sign in.",
-                "authenticated": False,
-            }
+        if err.status_code != 401:
+            raise
+        raise HTTPException(
+            422,
+            "We couldn't create that account. Use a longer, less common password, "
+            "or sign in if you already have one.",
+        ) from err
+    if result.get("access_token") and result.get("refresh_token"):
+        # Only happens when the Supabase project has email confirmations turned off.
+        account = await verify_token(result["access_token"])
+        if account.email_verified:
+            logger.warning("Supabase returned a session at signup: email confirmation is off")
+            snap = await snapshot(account)
+            set_cookies(response, result)
+            return snap
+    return {"message": CONFIRMATION_SENT, "authenticated": False}
 
+
+@router.post("/resend")
+async def resend(body: EmailRequest, request: Request, _: Mutation) -> dict[str, str]:
+    """Send a fresh signup confirmation link, without revealing whether the account exists."""
+    throttle_email_send(request, body.email)
     try:
-        tokens = await get_supabase_client().auth("token?grant_type=password", "POST", payload)
+        await get_supabase_client().auth(
+            "resend?" + callback_query(), "POST", {"type": "signup", "email": body.email}
+        )
     except SupabaseError as err:
-        if already_exists and err.status_code == 401:
-            raise HTTPException(
-                409,
-                "An account with this email already exists. Sign in or reset your password.",
-            ) from err
-        raise
-    account = await verify_token(tokens.get("access_token", ""))
-    result = await snapshot(account)
-    set_cookies(response, tokens)
-    return result
+        if err.status_code != 401:
+            raise
+    return {"message": CONFIRMATION_RESENT}
 
 
 @router.post("/oauth")
@@ -215,7 +239,8 @@ async def signout(request: Request, response: Response, _: Mutation) -> dict[str
 
 
 @router.post("/recover")
-async def recover(body: EmailRequest, _: Mutation) -> dict[str, str]:
+async def recover(body: EmailRequest, request: Request, _: Mutation) -> dict[str, str]:
+    throttle_email_send(request, body.email)
     try:
         await get_supabase_client().auth("recover?" + callback_query(), "POST", body.model_dump())
     except SupabaseError as err:

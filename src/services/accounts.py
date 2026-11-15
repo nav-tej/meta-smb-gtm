@@ -6,8 +6,10 @@ import base64
 import hashlib
 import hmac
 import json
+import logging
 import secrets
 import time
+from collections import deque
 from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlencode, urlsplit
@@ -20,6 +22,15 @@ from src.clients.supabase import SupabaseError, configured, get_supabase_client
 from src.config import get_settings
 
 SAFE_NEXT_PATHS = {"/", "/account", "/today", "/create", "/digest", "/portal"}
+logger = logging.getLogger(__name__)
+
+# Signup, resend and reset all reach Supabase from this server's IP, so Supabase's own
+# per-IP limits behave like one shared bucket. This per-instance limiter stops one client
+# from draining that bucket; it is best effort on serverless (each instance counts alone).
+EMAIL_SEND_WINDOW_SECONDS = 15 * 60
+EMAIL_SENDS_PER_IP = 8
+EMAIL_SENDS_PER_ADDRESS = 3
+_email_sends: dict[str, deque[float]] = {}
 
 
 @dataclass(frozen=True)
@@ -98,6 +109,39 @@ def trusted_mutation(request: Request) -> None:
         raise HTTPException(415, "Send account requests as JSON.")
 
 
+def _hashed(value: str) -> str:
+    return hashlib.sha256(value.encode()).hexdigest()
+
+
+def throttle_email_send(request: Request, email: str, now: float | None = None) -> None:
+    """Refuse a confirmation/reset email when this network or address asked too often."""
+    now = time.monotonic() if now is None else now
+    forwarded = request.headers.get("x-forwarded-for", "")
+    ip = forwarded.split(",", 1)[0].strip() or (request.client.host if request.client else "")
+    buckets = (
+        ("ip:" + _hashed(ip), EMAIL_SENDS_PER_IP),
+        ("email:" + _hashed(email.strip().lower()), EMAIL_SENDS_PER_ADDRESS),
+    )
+    cutoff = now - EMAIL_SEND_WINDOW_SECONDS
+    for key in [key for key, times in _email_sends.items() if not times or times[-1] < cutoff]:
+        del _email_sends[key]
+    for key, limit in buckets:
+        times = _email_sends.get(key, deque())
+        while times and times[0] < cutoff:
+            times.popleft()
+        if len(times) >= limit:
+            raise HTTPException(
+                429, "Too many email requests. Wait a few minutes, then check your inbox."
+            )
+    for key, _ in buckets:
+        _email_sends.setdefault(key, deque()).append(now)
+
+
+def reset_email_throttle() -> None:
+    """Forget recorded sends (tests and process restarts)."""
+    _email_sends.clear()
+
+
 def clear_cookies(response: Response) -> None:
     """Remove the two HttpOnly session cookies."""
     for name in ("muse_access", "muse_refresh"):
@@ -154,9 +198,9 @@ async def verify_token(access_token: str) -> AccountSession:
         session_id = str(UUID(claims["session_id"]))
     except (IndexError, KeyError, ValueError, TypeError):
         pass
-    verified = bool(
-        user.get("email_confirmed_at") or (user.get("user_metadata") or {}).get("email_verified")
-    )
+    # Only the Auth server sets email_confirmed_at. user_metadata is writable by the user,
+    # so a self-declared "email_verified" there proves nothing.
+    verified = bool(user.get("email_confirmed_at"))
     return AccountSession(user_id, email, verified, access_token, session_id)
 
 
@@ -378,6 +422,29 @@ async def start_google_oauth(
     )
 
 
+async def _revoke_unproven_password(link: dict[str, Any]) -> None:
+    """Close the pre-registration hijack before Google sign-in confirms an existing account.
+
+    Someone can sign up with another person's address and never confirm it. If that person
+    later signs in with Google, verifying the link would confirm the account and the
+    squatter's password would start working. Replace that unproven password first; if the
+    replacement fails, the error stops sign-in before the email is confirmed.
+    """
+    if link.get("email_confirmed_at") or link.get("confirmed_at"):
+        return
+    try:
+        user_id = str(UUID(str(link.get("id"))))
+    except ValueError:
+        return
+    await get_supabase_client().auth(
+        f"admin/users/{user_id}",
+        "PUT",
+        {"password": secrets.token_urlsafe(48)},
+        secret=True,
+    )
+    logger.info("Replaced an unconfirmed account's password during Google sign-in")
+
+
 async def complete_google_oauth(
     request: Request, code: str | None, state: str | None, error: str | None
 ) -> tuple[str, dict[str, Any] | None, str | None]:
@@ -438,6 +505,7 @@ async def complete_google_oauth(
         hashed_token = link.get("hashed_token")
         if not isinstance(hashed_token, str) or not hashed_token:
             return target, None, "Could not create your Muse session. Please try again."
+        await _revoke_unproven_password(link)
         tokens = await get_supabase_client().auth(
             "verify",
             "POST",

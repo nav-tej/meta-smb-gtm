@@ -23,6 +23,7 @@
   let googleButton;
   let divider;
   let recover;
+  let resend;
   let accountButton;
   let signupButton;
   let signoutButton;
@@ -39,7 +40,7 @@
     message.textContent = text;
     message.className = error ? 'ma-message ma-error' : 'ma-message';
   }
-  const AUTH_PATHS = new Set(['/me', '/signin', '/signup', '/oauth', '/recover', '/password', '/callback', '/signout']);
+  const AUTH_PATHS = new Set(['/me', '/signin', '/signup', '/oauth', '/recover', '/resend', '/password', '/callback', '/signout']);
   async function request(path, method = 'GET', body, extraHeaders = {}) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 15000);
@@ -107,27 +108,29 @@
     if (signoutButton) signoutButton.disabled = value;
   }
   function setMode(next, text = '') {
-    mode = ['signin', 'signup', 'recover', 'password', 'account'].includes(next) ? next : 'signin';
+    mode = ['signin', 'signup', 'recover', 'resend', 'password', 'account'].includes(next) ? next : 'signin';
     const signedIn = mode === 'account';
     const passwordOnly = mode === 'password';
-    const showGoogle = !signedIn && !passwordOnly && mode !== 'recover';
-    title.textContent = { signin: 'Welcome back.', signup: 'Make it your studio.', recover: 'Reset your password.', password: 'Choose a new password.', account: 'Your Muse account' }[mode];
-    description.textContent = signedIn ? `${snapshot.user?.email || ''}${snapshot.user?.email_verified ? ' · email confirmed' : ' · confirm your email to generate'}` : mode === 'signup' ? 'Save your work and unlock 3 free Muse runs.' : mode === 'recover' ? 'We’ll send a password reset link if an account exists.' : passwordOnly ? 'Use at least 12 characters. Your draft stays here.' : 'Sign in to generate with Muse and save your work.';
+    const emailOnly = mode === 'recover' || mode === 'resend';
+    const showGoogle = !signedIn && !passwordOnly && !emailOnly;
+    title.textContent = { signin: 'Welcome back.', signup: 'Make it your studio.', recover: 'Reset your password.', resend: 'Confirm your email.', password: 'Choose a new password.', account: 'Your Muse account' }[mode];
+    description.textContent = signedIn ? `${snapshot.user?.email || ''}${snapshot.user?.email_verified ? ' · email confirmed' : ' · confirm your email to generate'}` : mode === 'signup' ? 'Save your work and unlock 3 free Muse runs.' : mode === 'recover' ? 'We’ll send a password reset link if an account exists.' : mode === 'resend' ? 'We’ll send a new confirmation link if this email is waiting to be confirmed.' : passwordOnly ? 'Use at least 12 characters. Your draft stays here.' : 'Sign in to generate with Muse and save your work.';
     if (googleButton) googleButton.hidden = !showGoogle;
     if (divider) divider.hidden = !showGoogle;
     emailLabel.hidden = passwordOnly || signedIn;
     email.hidden = passwordOnly || signedIn;
     email.required = !passwordOnly && !signedIn;
-    passwordLabel.hidden = mode === 'recover' || signedIn;
-    password.hidden = mode === 'recover' || signedIn;
-    password.required = mode !== 'recover' && !signedIn;
+    passwordLabel.hidden = emailOnly || signedIn;
+    password.hidden = emailOnly || signedIn;
+    password.required = !emailOnly && !signedIn;
     password.autocomplete = mode === 'signin' ? 'current-password' : 'new-password';
     password.minLength = mode === 'signin' ? 1 : 12;
     password.value = '';
     submit.hidden = signedIn;
-    submit.textContent = { signin: 'Sign in', signup: 'Create account', recover: 'Send reset link', password: 'Update password' }[mode] || 'Continue';
+    submit.textContent = { signin: 'Sign in', signup: 'Create account', recover: 'Send reset link', resend: 'Send confirmation link', password: 'Update password' }[mode] || 'Continue';
     tabs.hidden = signedIn || passwordOnly;
     recover.hidden = mode !== 'signin';
+    resend.hidden = mode !== 'signin';
     say(text || (signedIn ? quotaLabel.textContent : 'Saved examples remain available without an account.'));
   }
   const track = (name, props) => { try { window.museTrack?.(name, props); } catch {} };
@@ -176,6 +179,10 @@
         } else {
           setMode('signin', result.message || 'Check your inbox to confirm your email, then sign in.');
         }
+      } else if (selectedMode === 'resend') {
+        const result = await request('/resend', 'POST', { email: emailValue });
+        track('confirmation_resent');
+        setMode('signin', result.message || 'If that email is waiting for confirmation, a new link is on its way.');
       } else if (selectedMode === 'recover') {
         const result = await request('/recover', 'POST', { email: emailValue });
         track('password_reset_requested');
@@ -281,7 +288,7 @@
     if (!access && !refreshToken && !callbackError) return false;
     // Remove credentials from the visible URL before any network transmission.
     history.replaceState(null, '', window.location.pathname + window.location.search);
-    if (callbackError) { try { await refresh(); } catch {} open('signin', 'That sign-in link expired or could not be used. Sign in or request a new password reset link.'); return true; }
+    if (callbackError) { try { await refresh(); } catch {} open('signin', 'That link expired or was already used. Sign in, or use “Resend confirmation email” or “Forgot password?” for a new link.'); return true; }
     if (!access || !refreshToken) { try { await refresh(); } catch {} open('signin', 'That sign-in link is incomplete. Please sign in again.'); return true; }
     try {
       update(await request('/session', 'POST', { access_token: access, refresh_token: refreshToken }));
@@ -320,10 +327,11 @@
     submit = node('button', { type: 'submit', class: 'ma-primary' }, 'Sign in');
     message = node('p', { class: 'ma-message', role: 'status', 'aria-live': 'polite' });
     recover = node('button', { type: 'button', class: 'ma-recover' }, 'Forgot password?'); recover.addEventListener('click', () => { if (!busy) setMode('recover'); });
+    resend = node('button', { type: 'button', class: 'ma-resend' }, 'Resend confirmation email'); resend.addEventListener('click', () => { if (!busy) setMode('resend'); });
     form.append(emailLabel, email, passwordLabel, password, submit); form.addEventListener('submit', onSubmit);
     const refreshButton = node('button', { type: 'button', class: 'ma-refresh' }, 'Refresh account');
     refreshButton.addEventListener('click', async () => { if (busy) return; setBusy(true); try { await refresh(); setMode(snapshot.user ? 'account' : 'signin', 'Account refreshed.'); } catch (error) { say(error.message, true); } finally { setBusy(false); } });
-    dialog.append(close, title, description, tabs, googleButton, divider, form, recover, message, refreshButton);
+    dialog.append(close, title, description, tabs, googleButton, divider, form, recover, resend, message, refreshButton);
     dialog.addEventListener('keydown', event => {
       if (event.key !== 'Tab') return;
       const focusables = [...dialog.querySelectorAll('button:not([hidden]):not([disabled]), input:not([hidden]):not([disabled]), [tabindex]:not([tabindex="-1"])')].filter(el => !el.closest('[hidden]'));
