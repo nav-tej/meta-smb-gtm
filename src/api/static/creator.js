@@ -66,7 +66,7 @@
     $('headline').value = state.headline; $('caption').value = state.caption; $('scene').value = state.scene;
     $('postInstagram').checked = data.channels?.includes('instagram'); $('postFacebook').checked = data.channels?.includes('facebook');
     $('artistChannels').hidden = state.custom; $('reviewed').checked = false;
-    syncFrameControls(); updateChoices(); refreshPreview();
+    syncFrameControls(); clearNotice(); updateChoices(); refreshPreview();
     go(Number.isInteger(data.step) ? Math.max(0, Math.min(2, data.step)) : 0);
   }
   function localDraftPresent() { try { return !!localStorage.getItem(deviceKey()); } catch { return true; } }
@@ -384,6 +384,17 @@
       noticeEl.textContent = message;
     }
   }
+  function clearNotice() {
+    const noticeEl = $('notice');
+    if (noticeEl) {
+      noticeEl.hidden = true;
+      noticeEl.className = 'notice';
+      if (typeof noticeEl.replaceChildren === 'function') noticeEl.replaceChildren();
+      else noticeEl.textContent = '';
+    }
+    const offerEl = $('exportDoneOffer');
+    if (offerEl) offerEl.hidden = true;
+  }
 
   function markIdeaExported() {
     try {
@@ -619,6 +630,7 @@
     state.original = samplePath(art?.original_image) || (workspace === 'sarabjit_singh' ? '/samples/ek_onkar_original.jpg' : '/samples/etsy_chai_set_product_visual_live.webp');
     state.sampleImage = samplePath(art?.staged_image) || (workspace === 'sarabjit_singh' ? '/samples/ek_onkar_collector_room_live.webp' : '/samples/etsy_chai_set_product_visual_live.webp');
     originalLayout(); setProductFields(); starter(); $('reviewed').checked = false; $('moreDetails').open = false;
+    clearNotice();
     $('productFactNote').textContent = workspace === 'sarabjit_singh' ? 'Confirm the matching artwork and offer at your chosen destination. Frame is staging only. Preview image is not a print master.' : 'Illustrative shop and sample pricing. These are saved examples, not a connected shop.';
     $('productImageCaption').textContent = workspace === 'sarabjit_singh' ? 'Ek Onkar · original artwork preview. Source: Art of Sarabjit Singh.' : 'Illustrative product image generated for the example shop.';
     updateChoices(); refreshPreview();
@@ -651,7 +663,7 @@
   function newProduct() {
     if (state.busy) return;
     state.custom = true; state.copyEdited = false; state.sceneEdited = false; state.revision += 1; state.product = { name: '', price: '', seller: '', description: '', link: '', collection: '' }; resetOffers(false); state.original = ''; state.image = ''; state.sampleImage = ''; state.provenance = 'Add a photo to create your own product layout.';
-    setProductFields(); starter(); updateChoices(); $('reviewed').checked = false; $('productFactNote').textContent = 'Your photo is saved on this device when storage is available. A live request sends it to Muse only when you choose to generate.'; $('productImageCaption').textContent = 'Your product photo will appear here.'; $('moreDetails').open = true; refreshPreview(); $('productName').focus();
+    setProductFields(); starter(); updateChoices(); $('reviewed').checked = false; clearNotice(); $('productFactNote').textContent = 'Your photo is saved on this device when storage is available. A live request sends it to Muse only when you choose to generate.'; $('productImageCaption').textContent = 'Your product photo will appear here.'; $('moreDetails').open = true; refreshPreview(); $('productName').focus();
   }
   function imageElement(src) { return new Promise((resolve, reject) => { const image = new Image(); image.onload = () => resolve(image); image.onerror = () => reject(new Error('We could not open that image. Try a JPEG, PNG or WebP photo.')); image.src = src; }); }
   async function upload(file) {
@@ -1284,7 +1296,32 @@
     }
   }); $('originalButton').addEventListener('click', () => { originalLayout(); $('reviewed').checked = false; }); $('draftButton').addEventListener('click', draft); $('generateButton').addEventListener('click', generate);
   $('downloadFeed').addEventListener('click', () => download(activePlacement() === 'facebook_feed' ? 1080 : 1350)); $('downloadStory').addEventListener('click', () => download(1920)); if ($('downloadSquare')) $('downloadSquare').addEventListener('click', () => download(1080)); $('downloadPack').addEventListener('click', () => { if (state.busy) return; if (!$('reviewed').checked) { notify('Review your product details and wording before downloading.', 'error'); return; } saveBlob(new Blob([JSON.stringify(campaignPack(), null, 2)], { type: 'application/json' }), 'campaign.json'); markIdeaExported(); });
-  $('copyCaption').addEventListener('click', async () => { sync(); const ctaLine = state.cta && !state.caption.includes(state.cta) ? `\n\n${state.cta}` : ''; try { await navigator.clipboard.writeText(`${state.headline}\n\n${state.caption}${ctaLine}${safeLink(state.product.link) ? '\n\n' + safeLink(state.product.link) : ''}`); notify('Your current caption and link are copied.'); } catch { notify('Clipboard access is unavailable. Select and copy your caption from the edit screen.', 'error'); } });
+  $('copyCaption').addEventListener('click', async () => {
+    sync();
+    const ctaLine = state.cta && !state.caption.includes(state.cta) ? `\n\n${state.cta}` : '';
+    const text = `${state.headline}\n\n${state.caption}${ctaLine}${safeLink(state.product.link) ? '\n\n' + safeLink(state.product.link) : ''}`;
+    try {
+      await navigator.clipboard.writeText(text);
+      notify('Your current caption and link are copied.');
+      return;
+    } catch {}
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand('copy');
+      ta.remove();
+      if (ok) {
+        notify('Your current caption and link are copied.');
+        return;
+      }
+    } catch {}
+    notify('Clipboard access is unavailable. Select and copy your caption from the edit screen.', 'error', { text: 'Open edit screen', onClick: () => go(2) });
+  });
   $('liveMode').addEventListener('change', () => {
     if ($('liveMode').checked && state.readiness && !state.readiness.provider_key_configured) {
       $('liveMode').checked = false;
