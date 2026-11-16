@@ -328,11 +328,16 @@ def test_google_oauth_start_and_callback_mint_verified_session(
         get_settings.cache_clear()
 
 
-def test_duplicate_signup_returns_409_and_never_signs_in(
+def test_duplicate_signup_never_signs_in_and_never_reveals_the_account(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Duplicate signup rejects both wrong and matching passwords identically with 409."""
+    """Duplicate signup with a wrong or matching password answers exactly like a new address.
+
+    Supersedes the earlier 409 contract: a distinct 409 told a stranger the address was
+    registered. Signup now never signs in and never distinguishes existing addresses.
+    """
     auth_calls: list[str] = []
+    existing = "existing@example.test"
 
     class FakeSupabase:
         async def auth(
@@ -343,15 +348,27 @@ def test_duplicate_signup_returns_409_and_never_signs_in(
             access_token: str | None = None,
             secret: bool = False,
         ) -> dict[str, Any]:
-            auth_calls.append(path)
-            if path == "admin/users":
-                raise SupabaseError(401, "User already registered")
-            raise AssertionError(f"Unexpected downstream auth call on duplicate signup: {path}")
+            auth_calls.append(path.split("?", 1)[0])
+            if path.startswith("signup?"):
+                assert body is not None
+                if body["email"] == existing:
+                    # Supabase answers a confirmed address with an obfuscated user (random id).
+                    return {"id": "00000000-0000-4000-8000-0000000000ff", "email": existing}
+                return {"id": "00000000-0000-4000-8000-000000000001", "email": body["email"]}
+            if path == "admin/users/00000000-0000-4000-8000-0000000000ff":
+                raise SupabaseError(404, "User not found")
+            if path == "admin/users/00000000-0000-4000-8000-000000000001":
+                return {
+                    "id": "00000000-0000-4000-8000-000000000001",
+                    "email": "brand-new@example.test",
+                }
+            raise AssertionError(f"Unexpected downstream auth call on signup: {path}")
 
     monkeypatch.setattr("src.api.accounts.get_supabase_client", lambda: FakeSupabase())
     monkeypatch.setattr(accounts_service, "get_supabase_client", lambda: FakeSupabase())
     monkeypatch.setattr(accounts_service, "configured", lambda: True)
     monkeypatch.setenv("ACCOUNTS_REQUIRED", "true")
+    accounts_service.reset_email_throttle()
     from src.config import get_settings
 
     get_settings.cache_clear()
@@ -361,24 +378,28 @@ def test_duplicate_signup_returns_409_and_never_signs_in(
         res_same = client.post(
             "/api/v1/account/signup",
             headers=headers,
-            json={"email": "existing@example.test", "password": "matching-secret-password"},
+            json={"email": existing, "password": "matching-secret-password"},
         )
         res_diff = client.post(
             "/api/v1/account/signup",
             headers=headers,
-            json={"email": "existing@example.test", "password": "different-secret-password"},
+            json={"email": existing, "password": "different-secret-password"},
+        )
+        res_new = client.post(
+            "/api/v1/account/signup",
+            headers=headers,
+            json={"email": "brand-new@example.test", "password": "brand-new-password-1"},
         )
     finally:
         get_settings.cache_clear()
+        accounts_service.reset_email_throttle()
 
-    assert res_same.status_code == 409
-    assert res_diff.status_code == 409
-    assert res_same.json()["detail"] == res_diff.json()["detail"]
-    assert "already exists" not in res_same.json()["detail"].lower()
-    assert "Forgot password?" in res_same.json()["detail"]
-    assert "muse_access" not in res_same.cookies
-    assert "muse_access" not in res_diff.cookies
-    assert auth_calls == ["admin/users", "admin/users"]
+    assert res_same.status_code == res_diff.status_code == res_new.status_code == 200
+    assert res_same.json() == res_diff.json() == res_new.json()
+    assert res_same.json()["authenticated"] is False
+    for res in (res_same, res_diff, res_new):
+        assert "muse_access" not in res.cookies and "muse_refresh" not in res.cookies
+    assert "token" not in auth_calls  # never a password grant from signup
 
 
 def test_recover_and_password_reset_flow(monkeypatch: pytest.MonkeyPatch) -> None:
