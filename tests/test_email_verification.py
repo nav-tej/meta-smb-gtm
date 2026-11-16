@@ -17,6 +17,8 @@ from src.services.accounts import AccountSession
 ORIGIN = {"Origin": "http://localhost:8000"}
 USER_ID = "00000000-0000-4000-8000-000000000001"
 PASSWORD = "very-secure-password-123"
+OTHER_ID = "00000000-0000-4000-8000-000000000002"
+NOT_FOUND = SupabaseError(404, "User not found")
 
 
 class FakeSupabase:
@@ -77,10 +79,18 @@ def confirmed_user(**extra: Any) -> dict[str, Any]:
 # --- signup --------------------------------------------------------------------------------
 
 
-def test_signup_never_uses_admin_api_or_email_confirm(
+def test_signup_uses_public_signup_and_never_confirms_email(
     monkeypatch: pytest.MonkeyPatch, client: TestClient
 ) -> None:
-    fake = use(monkeypatch, FakeSupabase({"signup": {"id": USER_ID, "email": "a@example.test"}}))
+    fake = use(
+        monkeypatch,
+        FakeSupabase(
+            {
+                "signup": {"id": USER_ID, "email": "a@example.test"},
+                "admin/users/": {"id": USER_ID, "email": "a@example.test"},  # unconfirmed
+            }
+        ),
+    )
     res = client.post(
         "/api/v1/account/signup",
         headers=ORIGIN,
@@ -89,21 +99,29 @@ def test_signup_never_uses_admin_api_or_email_confirm(
     assert res.status_code == 200
     assert res.json()["authenticated"] is False
     assert res.headers["cache-control"] == "no-store"
-    assert "set-cookie" not in res.headers
-    assert fake.paths() == ["signup"]
-    assert all(not call["secret"] for call in fake.calls)
-    assert "email_confirm" not in (fake.calls[0]["body"] or {})
+    assert "muse_access" not in res.cookies and "muse_refresh" not in res.cookies
+    assert fake.paths() == ["signup", f"admin/users/{USER_ID}", f"admin/users/{USER_ID}"]
+    assert fake.calls[0]["secret"] is False  # the account is created by public signup
+    assert all("email_confirm" not in (call["body"] or {}) for call in fake.calls)
+    assert all("email_confirmed_at" not in (call["body"] or {}) for call in fake.calls)
 
 
 def test_signup_reply_is_identical_for_existing_and_new_addresses(
     monkeypatch: pytest.MonkeyPatch, client: TestClient
 ) -> None:
-    # With confirmations on, Supabase answers an existing address with an obfuscated user.
-    use(monkeypatch, FakeSupabase({"signup": {"id": USER_ID, "email": "x@example.test"}}))
+    new_user = {"id": USER_ID, "email": "new@example.test"}
+    use(monkeypatch, FakeSupabase({"signup": new_user, "admin/users/": new_user}))
     first = client.post(
         "/api/v1/account/signup",
         headers=ORIGIN,
         json={"email": "new@example.test", "password": PASSWORD},
+    )
+    # With confirmations on, Supabase answers a confirmed address with a random id.
+    use(
+        monkeypatch,
+        FakeSupabase(
+            {"signup": {"id": OTHER_ID, "email": "old@example.test"}, "admin/users/": NOT_FOUND}
+        ),
     )
     second = client.post(
         "/api/v1/account/signup",
@@ -318,7 +336,7 @@ def test_existing_confirmed_account_signs_in(
     assert res.status_code == 200
     assert res.json()["user"]["email_verified"] is True
     assert "muse_access" in res.cookies
-    assert fake.paths() == ["token", "user"]
+    assert fake.paths() == ["token", "user", "user"]  # binding check, then verification
 
 
 def test_unconfirmed_signin_is_refused_with_confirmation_hint(
@@ -503,3 +521,246 @@ def test_unconfirmed_session_cannot_start_a_live_run(
     assert me["user"]["email_verified"] is False
     assert me["usage"] is None and me["live_available"] is False
     assert all(call["path"] == "user" for call in fake.calls)
+
+
+# --- signup binding: pre-registration takeover through the confirmation link -----------------
+
+
+class FakeGoTrue:
+    """A tiny stateful Supabase Auth, faithful to upstream signup.go on the points that matter:
+    a repeat signup for an unconfirmed address keeps the FIRST password, a confirmed address
+    gets an obfuscated reply with a random id, and clicking the link confirms the account."""
+
+    def __init__(self) -> None:
+        self.user: dict[str, Any] | None = None
+        self.password = ""
+        self.sessions: set[str] = set()
+        self.fail_admin_put = False
+        self.logouts: list[str] = []
+
+    def _public(self) -> dict[str, Any]:
+        assert self.user is not None
+        return dict(self.user)
+
+    def click_confirmation_link(self) -> str:
+        assert self.user is not None
+        self.user["email_confirmed_at"] = "2026-11-16T00:00:00Z"
+        return self._new_session()
+
+    def _new_session(self) -> str:
+        token = f"tok{len(self.sessions) + 1}"
+        self.sessions.add(token)
+        return token
+
+    async def auth(
+        self,
+        path: str,
+        method: str = "GET",
+        body: dict[str, Any] | None = None,
+        access_token: str | None = None,
+        secret: bool = False,
+    ) -> dict[str, Any]:
+        base = path.split("?", 1)[0]
+        body = body or {}
+        if base == "signup":
+            if self.user is None:
+                self.user = {"id": USER_ID, "email": body["email"], "app_metadata": {}}
+                self.password = body["password"]
+            elif self.user.get("email_confirmed_at"):
+                return {"id": OTHER_ID, "email": body["email"]}
+            return self._public()  # unconfirmed: password unchanged, link re-sent
+        if base == f"admin/users/{USER_ID}" and secret:
+            if self.user is None:
+                raise NOT_FOUND
+            if method == "GET":
+                return self._public()
+            if self.fail_admin_put:
+                raise SupabaseError(503, "Auth unavailable")
+            if "password" in body:
+                self.password = body["password"]
+            for key, value in (body.get("app_metadata") or {}).items():
+                if value is None:
+                    self.user["app_metadata"].pop(key, None)
+                else:
+                    self.user["app_metadata"][key] = value
+            return self._public()
+        if base.startswith("admin/users/") and secret:
+            raise NOT_FOUND
+        if base == "token":
+            confirmed = self.user and self.user.get("email_confirmed_at")
+            if not confirmed or body.get("password") != self.password:
+                raise SupabaseError(401, "Invalid login credentials")
+            token = self._new_session()
+            return {"access_token": token, "refresh_token": "r" + token, "expires_in": 3600}
+        if base == "user":
+            if access_token not in self.sessions:
+                raise SupabaseError(401, "Session not found")
+            return self._public()
+        if base == "logout":
+            scope = path.split("scope=", 1)[1]
+            self.logouts.append(scope)
+            if scope == "global":
+                self.sessions.clear()
+            elif scope == "others":
+                self.sessions = {access_token} if access_token in self.sessions else set()
+            return {}
+        raise AssertionError(f"Unexpected auth call: {method} {path}")
+
+    async def rpc(self, name: str, params: dict[str, Any]) -> dict[str, Any]:
+        return {"allowed": True, "plan": "trial", "used": 0, "limit": 3, "remaining": 3}
+
+
+def browser_client() -> TestClient:
+    # The binding cookie is Secure, as on the HTTPS site, so browsers here use https.
+    return TestClient(app, base_url="https://testserver")
+
+
+VICTIM = "victim@example.test"
+ATTACKER_PASSWORD = "attacker-password-123"
+VICTIM_PASSWORD = "victims-own-password-456"
+
+
+@pytest.fixture
+def gotrue(monkeypatch: pytest.MonkeyPatch) -> FakeGoTrue:
+    fake = FakeGoTrue()
+    monkeypatch.setattr("src.api.accounts.get_supabase_client", lambda: fake)
+    monkeypatch.setattr(accounts_service, "get_supabase_client", lambda: fake)
+    return fake
+
+
+def _signup(browser: TestClient, password: str) -> None:
+    res = browser.post(
+        "/api/v1/account/signup", headers=ORIGIN, json={"email": VICTIM, "password": password}
+    )
+    assert res.status_code == 200 and res.json()["message"] == CONFIRMATION_REPLY
+
+
+def _land(browser: TestClient, token: str) -> Any:
+    return browser.post(
+        "/api/v1/account/session",
+        headers=ORIGIN,
+        json={"access_token": token, "refresh_token": "r" + token},
+    )
+
+
+def _signin(browser: TestClient, password: str) -> Any:
+    return browser.post(
+        "/api/v1/account/signin", headers=ORIGIN, json={"email": VICTIM, "password": password}
+    )
+
+
+CONFIRMATION_REPLY = (
+    "Check your inbox for a link to confirm your email, then sign in. "
+    "Already have an account? Sign in or reset your password."
+)
+
+
+def test_squatter_password_dies_when_owner_confirms_after_signing_up(gotrue: FakeGoTrue) -> None:
+    attacker, victim = browser_client(), browser_client()
+    _signup(attacker, ATTACKER_PASSWORD)
+    _signup(victim, VICTIM_PASSWORD)
+    _signup(attacker, ATTACKER_PASSWORD)  # attacker signs up again after the victim
+    landed = _land(victim, gotrue.click_confirmation_link())
+    assert landed.status_code == 200
+    assert landed.json()["password_reset_required"] is True
+    assert landed.json()["user"]["email_verified"] is True  # the owner is signed in
+    assert gotrue.password not in (ATTACKER_PASSWORD, VICTIM_PASSWORD)
+    assert gotrue.logouts == ["others"]
+    assert _signin(attacker, ATTACKER_PASSWORD).status_code == 401
+    assert gotrue.user and gotrue.user["app_metadata"] == {}
+
+
+def test_squatter_password_dies_when_owner_clicks_an_unsolicited_link(
+    gotrue: FakeGoTrue,
+) -> None:
+    attacker, victim = browser_client(), browser_client()
+    _signup(attacker, ATTACKER_PASSWORD)
+    landed = _land(victim, gotrue.click_confirmation_link())
+    assert landed.json()["password_reset_required"] is True
+    assert _signin(attacker, ATTACKER_PASSWORD).status_code == 401
+
+
+def test_owner_who_signed_up_last_keeps_their_password(gotrue: FakeGoTrue) -> None:
+    attacker, victim = browser_client(), browser_client()
+    _signup(attacker, ATTACKER_PASSWORD)
+    _signup(victim, VICTIM_PASSWORD)  # Supabase alone would keep the attacker's password
+    landed = _land(victim, gotrue.click_confirmation_link())
+    assert landed.status_code == 200
+    assert "password_reset_required" not in landed.json()
+    assert gotrue.password == VICTIM_PASSWORD
+    assert gotrue.logouts == []
+    assert "muse_access" in landed.cookies
+    assert _signin(attacker, ATTACKER_PASSWORD).status_code == 401
+    assert _signin(browser_client(), VICTIM_PASSWORD).status_code == 200  # binding is settled
+
+
+def test_confirming_on_another_device_asks_for_a_new_password(gotrue: FakeGoTrue) -> None:
+    laptop, phone = browser_client(), browser_client()
+    _signup(laptop, VICTIM_PASSWORD)
+    landed = _land(phone, gotrue.click_confirmation_link())
+    assert landed.status_code == 200
+    assert landed.json()["password_reset_required"] is True
+    assert "muse_access" in landed.cookies  # signed in on the phone, can set a password there
+
+
+def test_password_signin_before_landing_is_refused_outside_the_signup_browser(
+    gotrue: FakeGoTrue,
+) -> None:
+    # The link was confirmed (for example by a mail scanner) but never reached /session.
+    signup_browser, other = browser_client(), browser_client()
+    _signup(signup_browser, VICTIM_PASSWORD)
+    gotrue.click_confirmation_link()
+    refused = _signin(other, VICTIM_PASSWORD)
+    assert refused.status_code == 401
+    assert "set a new password" in refused.json()["detail"]
+    assert "muse_access" not in refused.cookies
+    assert gotrue.logouts == ["global"] and not gotrue.sessions
+    assert gotrue.password != VICTIM_PASSWORD
+
+
+def test_password_signin_before_landing_is_refused_even_in_the_signup_browser(
+    gotrue: FakeGoTrue,
+) -> None:
+    # The latest signup browser might be the squatter's; only the emailed link proves the owner.
+    attacker = browser_client()
+    _signup(attacker, ATTACKER_PASSWORD)
+    gotrue.click_confirmation_link()  # e.g. a mail scanner opened the owner's link
+    refused = _signin(attacker, ATTACKER_PASSWORD)
+    assert refused.status_code == 401
+    assert gotrue.password != ATTACKER_PASSWORD and not gotrue.sessions
+    assert gotrue.user and gotrue.user["app_metadata"] == {}
+
+
+def test_signup_fails_closed_when_the_binding_cannot_be_stored(gotrue: FakeGoTrue) -> None:
+    browser = browser_client()
+    gotrue.fail_admin_put = True
+    res = browser.post(
+        "/api/v1/account/signup", headers=ORIGIN, json={"email": VICTIM, "password": PASSWORD}
+    )
+    assert res.status_code == 503
+    assert "muse_signup" not in res.cookies
+
+
+def test_landing_fails_closed_when_the_password_cannot_be_replaced(gotrue: FakeGoTrue) -> None:
+    attacker, victim = browser_client(), browser_client()
+    _signup(attacker, ATTACKER_PASSWORD)
+    token = gotrue.click_confirmation_link()
+    gotrue.fail_admin_put = True
+    landed = _land(victim, token)
+    assert landed.status_code == 503
+    assert "muse_access" not in landed.cookies
+    gotrue.fail_admin_put = False
+    assert _signin(attacker, ATTACKER_PASSWORD).status_code == 401  # binding still pending
+
+
+def test_accounts_without_a_binding_are_unaffected(gotrue: FakeGoTrue) -> None:
+    # Accounts confirmed before this change carry no binding and sign in as before.
+    gotrue.user = {
+        "id": USER_ID,
+        "email": VICTIM,
+        "app_metadata": {},
+        "email_confirmed_at": "2026-11-09T00:00:00Z",
+    }
+    gotrue.password = VICTIM_PASSWORD
+    assert _signin(browser_client(), VICTIM_PASSWORD).status_code == 200
+    assert gotrue.logouts == []

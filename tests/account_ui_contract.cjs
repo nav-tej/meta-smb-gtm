@@ -37,7 +37,12 @@ function harness(hash = '') {
       if (suffix === '/oauth') return response({ provider: 'google', url: 'https://auth.example.test/oauth/google' });
       if (suffix === '/signin') { if (failSignin) return response({ detail: 'Invalid credentials.' }, 401); account = signed('user-a'); return response(account); }
       if (suffix === '/signout') { account = anonymous(); return response({ message: 'Signed out.' }); }
-      if (suffix === '/session') { account = signed('confirmed'); return response(account); }
+      if (suffix === '/session') {
+        account = signed('confirmed');
+        // A link opened outside the signup browser: the server replaced the signup password.
+        const reset = JSON.parse(options.body).access_token === 'other-device-access';
+        return response(reset ? { ...account, password_reset_required: true } : account);
+      }
       if (suffix === '/recover') return response({ message: 'If an account exists, a reset link is on its way.' });
       if (suffix === '/resend') return response({ message: 'If that email is waiting for confirmation, a new link is on its way.' });
       if (suffix === '/password') return response({ message: 'Password updated.' });
@@ -172,6 +177,14 @@ function harness(hash = '') {
   await confirmLink.api.ready();
   assert.equal(confirmLink.order[0], 'clear-hash'); assert.equal(confirmLink.calls[0].url, '/api/v1/account/session');
   assert(confirmLink.nodes.some(element => element.textContent.includes('Email confirmed')));
+  assert.notEqual(confirmLink.ids.get('ma-title').textContent, ''); assert(!confirmLink.nodes.some(element => element.textContent.includes('choose a new password')));
+  // Opened on another device: signed in, then asked to choose a password before anything else.
+  const otherDevice = harness('#access_token=other-device-access&refresh_token=other-device-refresh&type=signup');
+  await otherDevice.api.ready();
+  assert.equal(otherDevice.order[0], 'clear-hash');
+  assert(otherDevice.nodes.some(element => element.textContent.includes('choose a new password')));
+  assert(otherDevice.nodes.some(element => element.tagName === 'button' && element.textContent === 'Update password'));
+  assert.equal(otherDevice.dialog().open, true);
   // An expired confirmation link points to both recovery paths.
   const expired = harness('#error=access_denied&error_description=Email+link+is+invalid+or+has+expired');
   await expired.api.ready();
