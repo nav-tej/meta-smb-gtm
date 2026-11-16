@@ -6,15 +6,15 @@ This is the authoritative current coordination entry point. Read this first, the
 - Main workspace /Users/nav/meta-smb-gtm is detached at b442d5e (UX brief-only commit), with substantial existing dirty docs/untracked files. Preserve them. Do not deploy this workspace.
 - Last verified deployed preview:7ed43af, https://meta-smb-fft3iikv0-navtejs-6321s-projects.vercel.app . Full gate558passed/2skipped; hosted health/create/digest200. Production not changed by this work. Browser acceptance blocked by Vercel login, not a confirmed app bug. Share-link creation was rejected by auto-review for broadening access; do not circumvent. No authorized paid test.
 - Promotion correction fa3a439: builder reports563pass/2skip, not independently verified after correction.
-- First-ad12f39b1: released; targeted browser passes, full builder gate558pass/2skip/6fail. Needs clean independent gate; do not claim complete release readiness.
+- First-ad12f39b1: Gemini reran clean offline gate,564passed/2skipped/1warning109.90s. All six prior failures passed without code changes. Report committed asf342db7 (gemini/first-ad-gate-nov16). Released for integration; this is builder evidence, not integrated acceptance.
 - Guest fix00e8536: separate older/divergent branch, needs selective integration. Never replace first-ad branch with it.
 - Several /tmp worktrees vanished and git lists them prunable. Commits/branches still exist. Restore new isolated checkouts from exact refs; do not delete/prune references or assume lost code.
 - Remote fetch November16 located Claude auth commit6b64a3f on origin/claude/email-verification and uptime-test fixb4506d7 on origin/claude/modest-hamilton-guq82o. Review these before any duplicate work. Latest Hermes acceptance remains unverified.
 - Codex/Luna completed META_PUBLISHING_BACKEND_PLAN.md and inventory only. Customer Meta connection/publishing NOT implemented. DIGEST_DELIVERY_IMPLEMENTATION.md is a plan, not active sending. Gifting remains queued.
 
-## Exclusive assignments (Nav reports Gemini and Claude started November16; awaiting written checkpoints)
-- Gemini: .tasks/gemini-test-gate-nov16.txt; first-ad failure diagnosis only, no shared editor/auth changes without coordination.
-- Claude: .tasks/claude-auth-handoff-nov16.txt; locate/finish/review signup security, no editor work.
+## Exclusive assignments — updated November16 after completion reports
+- Gemini: gate diagnosis COMPLETE and RELEASED atf342db7. No further regression fix required unless integration reproduces a failure.
+- Claude: auth review COMPLETE and RELEASED atd0a6eec on origin/claude/auth-review-nov16, including6b64a3f andd2b3edb. Full offline458passed/2skipped; account UI Node contract passes. Not yet reviewed in current integrated candidate.
 - Hermes: .tasks/hermes-evidence-nov16.txt; latest evidence + upcoming acceptance script, read-only.
 - Codex: integration/release, selective guest-fix merge, review exact returned commits; Meta backend planning research only until integration scope is claimed. Do not duplicate Gemini failure reproduction while it owns that task.
 
@@ -51,3 +51,12 @@ Never print credentials or read .env for handoff content. No live Muse calls, pa
 
 ## Persistence
 This file, current task packets, and backend/digest plans are published on the coordination branch. Other local historical files and candidate source branches may remain unpushed. The separate Mac checkout is dirty and must be preserved. No Codex test/deployment processes are currently running. Luna Beauvoir finished/released inventory.
+
+## Latest evidence and immediate coordinator step — November16
+Nav reports both finished; Codex fetched and read handoffs. Claude commits6b64a3f (real verification),d2b3edb (eligibility regression/report),d0a6eec (browser-bound signup password) are on origin/claude/auth-review-nov16. Distinct monitor hydration fixb4506d7 remains on origin/claude/modest-hamilton-guq82o. Claude report: docs/launch/CLAUDE_AUTH_HANDOFF_NOV16.md on its branch. Gemini report: docs/launch/GEMINI_GATE_NOV16.md atf342db7 (local source branch may still need publication).
+
+Next Codex work: create isolated integration checkout fromf342db7, review/auth-merge Claude commits preserving current seller/workspace changes, selectively apply00e8536 andb4506d7, then run full offline suite and browser account audit. Do not concatenate reported test counts or call this integrated acceptance before execution. If conflicts exist in account.js or tests, resolve by preserving both account verification and workspace isolation behavior.
+
+Claude's new security behavior requires careful review: confirmation in a different browser asks user to set a password; pending-binding password login is refused. No plaintext password stored in app_metadata: inspected bind_signup sends password to Auth's admin password update and stores only a hashed nonce as binding metadata. Real provider semantics, existing unconfirmed-account handling, and real email remain unverified. Do not delete unconfirmed accounts as an automatic migration. Source file/contract review and mocked browser audit precede hosted rollout.
+
+No integration/production deploy performed by this update. Gemini/Claude are free for future separately bounded tasks; do not ask them to redo completed work. Hermes latest evidence still pending.
