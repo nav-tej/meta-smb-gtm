@@ -63,3 +63,8 @@ No integration/production deploy performed by this update. Gemini/Claude are fre
 
 ## Integration ownership handoff — November16, low-usage checkpoint
 Codex releases integration scope now; no integration edits or processes are active. Claude is proposed successor, pending Nav relay/Claude acknowledgment; assignment .tasks/claude-integrate-nov16.txt. Source publication refs: codex/integration-input-nov16=f342db7; codex/guest-fixes-input-nov16=00e8536. Claude owns integration after acknowledging; Codex must NOT duplicate it on return. Completed stage: handoffs reviewed; integrated gate NOT run. No production deployment authorized by this packet.
+
+## Integrated candidate received — November16
+Claude finished/released origin/claude/integration-nov16 atf55f688 (runtime/test gate6536348; later commits report-only). Coordinator fetched/read CLAUDE_INTEGRATION_NOV16.md. Builder independent baseline564pass/2skip; integrated601pass/2skip, lint/format clean, real Chromium. Fifteen individual browser tests passed. No main merge/deploy. These are Claude execution results, not a new local Codex run.
+
+Seven failures in separate launch_account_audit.py are reported identical on baseline and integration: harness lacks seller-memory GET/POST fixtures. Mark those cases unverified, not passed; do not relax allowlist/security assertions. Next narrow QA assignment: .tasks/account-audit-fixtures-nov16.txt (pending relay/acknowledgment). Hosted Auth semantics/email/Google/redirect configuration remain unverified, and unconfirmed preexisting accounts require read-only inventory without deletion. Do not assert SMTP is missing merely because untested. Integration scope released; candidate frozen while QA patch is isolated.
