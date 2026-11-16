@@ -68,3 +68,12 @@ Codex releases integration scope now; no integration edits or processes are acti
 Claude finished/released origin/claude/integration-nov16 atf55f688 (runtime/test gate6536348; later commits report-only). Coordinator fetched/read CLAUDE_INTEGRATION_NOV16.md. Builder independent baseline564pass/2skip; integrated601pass/2skip, lint/format clean, real Chromium. Fifteen individual browser tests passed. No main merge/deploy. These are Claude execution results, not a new local Codex run.
 
 Seven failures in separate launch_account_audit.py are reported identical on baseline and integration: harness lacks seller-memory GET/POST fixtures. Mark those cases unverified, not passed; do not relax allowlist/security assertions. Next narrow QA assignment: .tasks/account-audit-fixtures-nov16.txt (pending relay/acknowledgment). Hosted Auth semantics/email/Google/redirect configuration remain unverified, and unconfirmed preexisting accounts require read-only inventory without deletion. Do not assert SMTP is missing merely because untested. Integration scope released; candidate frozen while QA patch is isolated.
+
+## QA complete; release-oriented assignments — November16
+Gemini released27c1f50 on origin/gemini/account-audit-fixtures-nov16, descendant off55f688. Report ACCOUNT_AUDIT_FIXTURES_NOV16.md: before20pass/7fail, after27pass/0fail real Chromium; full601pass/2skip/1expected warning115.16s. No runtime changes. Coordinator read report/diff summary; not a new independent run. The fixture gap is closed by reported evidence; stop reassigning it. Latest release candidate is27c1f50; latest deployed preview remains7ed43af.
+
+Next assignments PREPARED, pending relay/acknowledgment:
+- Codex/replacement coordinator: .tasks/codex-release-candidate-nov16.txt — exact candidate review, hosted config read-only, updated protected preview, no production promotion. Current Codex chat has not started this execution; safe for a fresh Codex session to acknowledge.
+- Gemini: .tasks/gemini-db-gates-nov16.txt — two skipped PGlite tests using disposable LOCAL DB; no app edits.
+- Hermes: .tasks/hermes-hosted-release-nov16.txt — read-only browser acceptance on newly supplied exact preview, do not retest obsolete target.
+These scopes are disjoint. No feature builds necessary for this release. Auth/email/provider semantics remain separate hosted gates; SQL fixture success is not hosted-service validation. Production unchanged.
