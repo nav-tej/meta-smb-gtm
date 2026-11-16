@@ -1,5 +1,15 @@
 # AGENTS.md
 
+## Current coordination — November 16
+
+Read `docs/launch/HANDOFF_CURRENT.md` on branch `codex/coordination-nov16` first (`git fetch origin && git show origin/codex/coordination-nov16:docs/launch/HANDOFF_CURRENT.md`). That branch is documentation only; never deploy or reset an implementation branch to it. Older assignments below are historical.
+
+- Release candidate: `27c1f50` (`gemini/account-audit-fixtures-nov16`), deployed only to a protected preview. Production is unchanged.
+- Latest work on top of it: `claude/ux-gap-nov16`, report `docs/launch/CLAUDE_UX_GAP_NOV16.md`. It is not integrated or deployed until the coordinator says so.
+- The main Mac checkout is detached and dirty. Preserve it and work in an isolated worktree from an exact ref.
+- `/Users/nav/Downloads/UX_GAP_BRIEF.md` describes old production, not the candidate. Check `docs/launch/UX_GAP_RECONCILIATION.md` (coordination branch) and the Claude report before acting on any item in it.
+
+
 ## Active launch sprint, November 7–8, 2026
 
 Read [the launch plan](docs/launch/PLAN.md) and [current assignments](docs/launch/STATUS.md) before editing. These supersede historical sprint assignments and file reservations below for launch work. User authorized parallel corrective work and launch preparation. Codex coordinates integration and release. Respect exclusive write scopes, preserve existing changes, and report evidence in your own launch status. External agent assignments are pending until acknowledged. Keep paid calls and remote mutations within the authorization boundaries in the plan.
@@ -328,7 +338,14 @@ This app fetches arbitrary URLs, parses untrusted XML, and feeds third-party con
 
 ---
 
-## 12. Current status & multi-agent coordination (updated 2026-11-04, afternoon)
+## 12. Current status & multi-agent coordination (updated 2026-11-16)
+
+### UX-gap pass (2026-11-16, Claude, branch `claude/ux-gap-nov16`)
+- Sections 2 and 5 above are hackathon-era. The app now has accounts, billing, seller memory and these pages: `/` (home loop), `/welcome` (onboarding), `/today` (daily desk), `/create` (full studio), `/first-ad` (guided ad preparation), `/digest`, `/progress`. `/creator` redirects to `/create`.
+- `/first-ad` had no inbound link. It is now linked from the home nav, `/today`, the last step of `/create`, and `/progress`.
+- Cross-page links that must keep the visitor in the same workspace (sample example vs. their own) use `data-mode-link="/path"`. `workspace-modes.js` rewrites their `href` on load and on every mode change. Use it for new cross-page links instead of hardcoding `?workspace=sample`.
+- Any new header or nav item must be checked at 375px. A fourth link in the `/today` header overflows the page and fails `tests/test_signup_followup_e2e.py`.
+- Product rules that still hold: Muse prepares and exports; the seller publishes. No "Launch campaign" success state, no projected ROAS, no sample timestamps moved to today without a recrawl, and no increase to free runs while abuse controls are unresolved.
 
 ### Post-hackathon resilience pass (2026-11-06, Claude)
 - Synthesis Spark calls (competitor brief, seller audit, bid advice, creative brief, content

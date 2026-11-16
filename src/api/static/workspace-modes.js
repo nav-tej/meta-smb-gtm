@@ -208,9 +208,26 @@
     }
   }
 
+  // Cross-page links marked data-mode-link="/path" keep the visitor in the workspace
+  // they are in (sample example vs. their own), so a sample draft never opens as "own".
+  function syncModeLinks() {
+    if (typeof document === 'undefined' || typeof document.querySelectorAll !== 'function') return;
+    try {
+      const sample = isSampleMode();
+      document.querySelectorAll('a[data-mode-link]').forEach((link) => {
+        const path = link.getAttribute('data-mode-link');
+        if (!path || !/^\/(?!\/)/.test(path)) return;
+        link.setAttribute('href', sample ? sampleHref(path) : ownHref(path));
+      });
+    } catch {
+      // Links keep their static href when the DOM is unavailable.
+    }
+  }
+
   function notify() {
     const resolved = computeState();
     renderModeBanners();
+    syncModeLinks();
     listeners.forEach((fn) => {
       try { fn(resolved); } catch {}
     });
@@ -392,9 +409,10 @@
     window.addEventListener('popstate', () => { notify(); });
     if (typeof document !== 'undefined') {
       if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => { renderModeBanners(); });
+        document.addEventListener('DOMContentLoaded', () => { renderModeBanners(); syncModeLinks(); });
       } else {
         renderModeBanners();
+        syncModeLinks();
       }
     }
   }

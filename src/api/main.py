@@ -6,7 +6,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from src.api import (
@@ -100,6 +100,13 @@ async def readiness() -> dict[str, str | bool | int]:
 async def creator_studio() -> FileResponse:
     """Serve the guided product-to-post creator journey."""
     return FileResponse(STATIC_DIR / "creator.html", headers=PAGE_HEADERS)
+
+
+@app.get("/creator", include_in_schema=False)
+async def creator_alias(request: Request) -> RedirectResponse:
+    """Send the commonly mistyped /creator to /create, keeping workspace/idea params."""
+    query = request.url.query
+    return RedirectResponse(f"/create?{query}" if query else "/create", status_code=307)
 
 
 @app.get("/first-ad", include_in_schema=False)
