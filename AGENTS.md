@@ -1,5 +1,8 @@
 # AGENTS.md
 
+## Current coordination — November 16
+Read [HANDOFF_CURRENT.md](docs/launch/HANDOFF_CURRENT.md) first for active assignments, known commits and cloud-safe resume steps. Canonical branch: `codex/coordination-nov16`. Older status sections below are historical. Preserve other agents’ work; no concurrent ownership takeover.
+
 ## Active launch sprint, November 7–8, 2026
 
 Read [the launch plan](docs/launch/PLAN.md) and [current assignments](docs/launch/STATUS.md) before editing. These supersede historical sprint assignments and file reservations below for launch work. User authorized parallel corrective work and launch preparation. Codex coordinates integration and release. Respect exclusive write scopes, preserve existing changes, and report evidence in your own launch status. External agent assignments are pending until acknowledged. Keep paid calls and remote mutations within the authorization boundaries in the plan.
