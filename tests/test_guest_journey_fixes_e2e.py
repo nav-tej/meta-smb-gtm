@@ -89,6 +89,12 @@ def test_guest_journey_report_fixes_e2e(guest_creator_server: str, tmp_path: Pat
             page.wait_for_function(
                 "() => (document.querySelector('#productName') || {{}}).value.length > 0"
             )
+            # Guests start in their own workspace; the sample shop is opt-in and kept separate.
+            assert "Ek Onkar" not in page.locator("#productName").input_value()
+            page.locator("#artistExample").click()
+            page.wait_for_function(
+                "() => (document.querySelector('#productName') || {{}}).value.includes('Ek Onkar')"
+            )
 
             # 1. Product name pre-filled for example shop & has placeholder
             assert "Ek Onkar" in page.locator("#productName").input_value()
