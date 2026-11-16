@@ -437,6 +437,14 @@ def test_recover_and_password_reset_flow(monkeypatch: pytest.MonkeyPatch) -> Non
                 return {}
             if path == "user" and method == "PUT":
                 return {"id": user.user_id, "email": user.email}
+            if path == "user" and method == "GET":
+                # The recovery landing checks for a pending signup binding; there is none.
+                return {
+                    "id": user.user_id,
+                    "email": user.email,
+                    "email_confirmed_at": "2026-11-01T00:00:00Z",
+                    "app_metadata": {"provider": "email"},
+                }
             raise AssertionError(f"Unexpected call: {method} {path}")
 
         async def rpc(self, name: str, params: dict[str, Any]) -> dict[str, Any]:
@@ -501,6 +509,9 @@ def test_recover_and_password_reset_flow(monkeypatch: pytest.MonkeyPatch) -> Non
     assert rec_real.json() == rec_missing.json()
     assert sess.status_code == 200
     assert "muse_access" in sess.cookies
+    assert "password_reset_required" not in sess.json()
+    # A recovery landing with no pending signup binding changes no password and revokes nothing.
+    assert not any(c[0].startswith(("admin/", "logout")) for c in auth_calls)
     assert pwd.status_code == 200
     assert auth_calls[-1] == (
         "user",
