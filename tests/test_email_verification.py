@@ -470,3 +470,36 @@ async def test_google_fails_closed_if_password_cannot_be_replaced(
     _, tokens, error = await google_callback()
     assert tokens is None and error
     assert "verify" not in fake.paths()
+
+
+# --- live eligibility for unconfirmed accounts (Nov 16 review) ------------------------------
+
+
+def test_unconfirmed_session_cannot_start_a_live_run(
+    monkeypatch: pytest.MonkeyPatch, client: TestClient
+) -> None:
+    from src.config import get_settings
+    from src.services import usage_meter
+
+    monkeypatch.setenv("ACCOUNTS_REQUIRED", "true")
+    get_settings.cache_clear()
+    authorized: list[str] = []
+
+    async def refuse(*args: Any, **kwargs: Any) -> str:
+        authorized.append("called")
+        raise AssertionError("an unconfirmed account must not reach run authorization")
+
+    monkeypatch.setattr(usage_meter, "authorize_operation", refuse)
+    fake = use(monkeypatch, FakeSupabase({"user": confirmed_user()}))  # no email_confirmed_at
+    client.cookies.set("muse_access", "acc")
+    try:
+        res = client.post("/api/v1/bid-advice?live=true", headers=ORIGIN, json={})
+        me = client.get("/api/v1/account/me").json()
+    finally:
+        get_settings.cache_clear()
+    assert res.status_code == 403
+    assert "Confirm your email" in res.json()["detail"]
+    assert authorized == []
+    assert me["user"]["email_verified"] is False
+    assert me["usage"] is None and me["live_available"] is False
+    assert all(call["path"] == "user" for call in fake.calls)
