@@ -77,3 +77,13 @@ Next assignments PREPARED, pending relay/acknowledgment:
 - Gemini: .tasks/gemini-db-gates-nov16.txt — two skipped PGlite tests using disposable LOCAL DB; no app edits.
 - Hermes: .tasks/hermes-hosted-release-nov16.txt — read-only browser acceptance on newly supplied exact preview, do not retest obsolete target.
 These scopes are disjoint. No feature builds necessary for this release. Auth/email/provider semantics remain separate hosted gates; SQL fixture success is not hosted-service validation. Production unchanged.
+
+## Local PGlite DB gate & Release Candidate Preview — November 16, 2026
+- **DB Gate (`056e114` on `origin/gemini/db-gates-nov16`, based on `27c1f50`):**
+  - Ran `tests/test_billing.py` and `tests/test_digest_email.py` against disposable local `@electric-sql/pglite` (`BILLING_PGLITE_DIR=/tmp/pglite-local/node_modules/@electric-sql/pglite`): **69 passed in 27.57s** (`0` skipped, `0` failed). Both `test_billing_sql_regressions_on_local_postgres` and `test_digest_sql_on_local_postgres` passed. Report: `docs/launch/DATABASE_GATES_NOV16.md`.
+- **Release Candidate (`27c1f50` deployed; report `2fd06b8` on `origin/release/candidate-nov16`):**
+  - Verified ancestry (`f55f688` -> `27c1f50`) and `node tests/account_ui_contract.cjs` (`PASSED`).
+  - **Protected Preview Deployed:** `https://meta-smb-iueugs8zd-navtejs-6321s-projects.vercel.app` (Deployment Protection ON, `Ready in 20s`, deployed from exact SHA `27c1f50`). Verified `HTTP 200` via `vercel curl` on `/api/v1/health`, `/api/v1/readiness`, `/`, `/create`, `/first-ad`, `/today`, `/digest`.
+  - **Hosted Config (read-only):** Supabase Auth `external.email=true`, `mailer_autoconfirm=false`, `disable_signup=false`, `external.google=false`, `total_users=6`, `unconfirmed_users=0`, `confirmed_without_sent_at=4`. Vercel has Supabase/Stripe/Google/Meta/PostHog keys; `EMAIL_TOKEN_SECRET` and `DEMO_KEY` are Production-only; `RESEND_API_KEY` / `DIGEST_FROM_EMAIL` are absent; Supabase custom SMTP & `SITE_URL`/`URI_ALLOW_LIST` remain unverified without Dashboard/Management API access.
+  - **Rollback References:** Prior preview `https://meta-smb-fft3iikv0-navtejs-6321s-projects.vercel.app` (`7ed43af`); Production unchanged at `https://meta-smb-ey7g1mcto-navtejs-6321s-projects.vercel.app` (`https://meta-smb-gtm.vercel.app`).
+  - Report: `docs/launch/RELEASE_CANDIDATE_NOV16.md`. Ownership released.
