@@ -281,6 +281,12 @@ def test_all_5_demo_ideas_in_creator_e2e(live_server_url: str, viewport_width: i
             dims_fb = page.evaluate(eval_fb)
             assert dims_fb["w"] == 1080 and dims_fb["h"] == 1080, f"Got {{dims_fb}}"
 
+            # Applying an idea or restoring a draft resets the review box, and /create finishes
+            # that asynchronously after DOMContentLoaded. Wait until it settles before reviewing.
+            page.wait_for_load_state("networkidle")
+            page.wait_for_function(
+                "() => !window.museModes || !window.museModes.current().isLoading"
+            )
             page.evaluate("document.getElementById('reviewed').checked = true")
             page.evaluate("document.getElementById('downloadPack').click()")
 
