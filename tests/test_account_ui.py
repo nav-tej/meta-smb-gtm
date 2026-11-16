@@ -178,6 +178,9 @@ def test_signup_requires_email_confirmation_and_sets_no_session(
             if path.startswith("signup?"):
                 # Supabase's confirmation-required reply: a user, no session.
                 return {"id": "00000000-0000-4000-8000-000000000001", "email": body["email"]}
+            if path == "admin/users/00000000-0000-4000-8000-000000000001":
+                # The signup binding reads the new, unconfirmed user and stores its nonce hash.
+                return {"id": "00000000-0000-4000-8000-000000000001", "email": "new@example.test"}
             raise AssertionError(f"Unexpected auth call: {path}")
 
     monkeypatch.setattr("src.api.accounts.get_supabase_client", lambda: FakeSupabase())
@@ -194,12 +197,17 @@ def test_signup_requires_email_confirmation_and_sets_no_session(
     data = res.json()
     assert data["authenticated"] is False
     assert "confirm your email" in data["message"]
-    assert "muse_access" not in res.cookies
-    assert len(auth_calls) == 1
+    assert "muse_access" not in res.cookies and "muse_refresh" not in res.cookies
+    assert "muse_signup" in res.cookies
+    assert len(auth_calls) == 3
     path, method, secret, body = auth_calls[0]
     assert path.startswith("signup?redirect_to=") and path.endswith("%2Faccount")
     assert (method, secret) == ("POST", False)
     assert body == {"email": "new@example.test", "password": "very-secure-password-123"}
+    assert [(c[1], c[2]) for c in auth_calls[1:]] == [("GET", True), ("PUT", True)]
+    update = auth_calls[2][3] or {}
+    assert set(update) == {"password", "app_metadata"}
+    assert "email_confirm" not in update
 
 
 def test_google_oauth_start_and_callback_mint_verified_session(

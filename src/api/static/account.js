@@ -395,8 +395,10 @@
     if (callbackError) { try { await refresh(); } catch {} open('signin', 'That link expired or was already used. Sign in, or use “Resend confirmation email” or “Forgot password?” for a new link.'); return true; }
     if (!access || !refreshToken) { try { await refresh(); } catch {} open('signin', 'That sign-in link is incomplete. Please sign in again.'); return true; }
     try {
-      update(await request('/session', 'POST', { access_token: access, refresh_token: refreshToken }));
+      const landed = await request('/session', 'POST', { access_token: access, refresh_token: refreshToken });
+      update(landed);
       if (recovery) open('password');
+      else if (landed.password_reset_required) { track('email_confirmed'); open('password', 'Email confirmed. For your security, choose a new password for this account.'); }
       else if (providerToken) { track('signed_in', { provider: 'google' }); open('account', 'Signed in with Google. Your account is ready.'); }
       else { track('email_confirmed'); open('account', 'Email confirmed. Your account is ready.'); }
     } catch { try { await refresh(); } catch {} open('signin', 'We could not complete that sign-in link. Please sign in again.'); }

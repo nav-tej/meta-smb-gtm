@@ -14,12 +14,14 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from src.clients.supabase import SupabaseError, get_supabase_client
 from src.config import get_settings
 from src.services.accounts import (
+    bind_signup,
     clear_cookies,
     complete_google_oauth,
     load_workspace,
     resolve_account,
     save_workspace,
     set_cookies,
+    settle_signup_binding,
     snapshot,
     start_google_oauth,
     throttle_email_send,
@@ -141,6 +143,7 @@ async def signup(
             snap = await snapshot(account)
             set_cookies(response, result)
             return snap
+    await bind_signup(response, result, body.email, body.password)
     return {"message": CONFIRMATION_SENT, "authenticated": False}
 
 
@@ -221,12 +224,23 @@ async def oauth_google_callback(request: Request) -> RedirectResponse:
     return redirect
 
 
+PASSWORD_RESET_REQUIRED = (
+    "For your security, set a new password to finish creating this account. "
+    "Use \u201cForgot password?\u201d to get a reset link."
+)
+
+
 @router.post("/signin")
-async def signin(body: SigninRequest, response: Response, _: Mutation) -> dict[str, Any]:
+async def signin(
+    body: SigninRequest, request: Request, response: Response, _: Mutation
+) -> dict[str, Any]:
     tokens = await get_supabase_client().auth(
         "token?grant_type=password", "POST", body.model_dump()
     )
-    account = await verify_token(tokens.get("access_token", ""))
+    access = tokens.get("access_token", "")
+    if await settle_signup_binding(request, response, access, from_link=False):
+        raise HTTPException(401, PASSWORD_RESET_REQUIRED)
+    account = await verify_token(access)
     result = await snapshot(account)
     set_cookies(response, tokens)
     response.headers["Cache-Control"] = "no-store"
@@ -240,9 +254,14 @@ async def signin(body: SigninRequest, response: Response, _: Mutation) -> dict[s
 
 
 @router.post("/session")
-async def session(body: SessionRequest, response: Response, _: Mutation) -> dict[str, Any]:
+async def session(
+    body: SessionRequest, request: Request, response: Response, _: Mutation
+) -> dict[str, Any]:
     account = await verify_token(body.access_token)
+    reset = await settle_signup_binding(request, response, body.access_token, from_link=True)
     result = await snapshot(account)
+    if reset:
+        result["password_reset_required"] = True
     set_cookies(response, body.model_dump())
     response.headers["Cache-Control"] = "no-store"
     return result
