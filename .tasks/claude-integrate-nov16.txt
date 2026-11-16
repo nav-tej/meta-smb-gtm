@@ -1,0 +1,15 @@
+Read docs/launch/HANDOFF_CURRENT.md from origin/codex/coordination-nov16 first, plus AGENTS.md and PLAN.md. Nav asks integration to be delegated because Codex is near usage limit. Codex explicitly releases integration scope to Claude upon acknowledgment. Previous Claude auth and Gemini gate scopes are released.
+
+Inputs (fetch origin; do not reset your existing branch):
+- origin/codex/integration-input-nov16 atf342db7: complete first-ad/promotion/memory/images/digest candidate, clean builder564pass/2skip.
+- origin/claude/auth-review-nov16 atd0a6eec: auth commits6b64a3f,d2b3edb,d0a6eec. Auth builder458pass/2skip.
+- origin/codex/guest-fixes-input-nov16 at00e8536: guest patch on divergent older base. Apply ONLY commit00e8536, not its whole branch.
+- b4506d7 on origin/claude/modest-hamilton-guq82o: independent monitor first-hydrate correction.
+
+Create a NEW isolated integration branch fromf342db7, e.g. claude/integration-nov16. Before changes inspect ancestry/diffs. Review auth binding changes, then cherry-pick the three auth commits in chronological order, and guest00e8536/monitorb4506d7. Resolve overlapping account.js/editor/tests by preserving both current workspace isolation and verification. Documentation STATUS conflicts must preserve histories; do not restore an old STATUS wholesale. Do not merge older branch tips wholesale or include unrelated main-workspace edits.
+
+Review security-sensitive password binding: admin password update, nonce metadata, session revocation, other-browser reset; no plaintext password metadata. No deletion of unconfirmed users. Record unresolved hosted provider semantics separately. Keep demo examples separate from real accounts, no fake ad publishing or projected results. Existing first-ad is manual Ads Manager guidance only.
+
+Run complete offline make check with DEMO_MODE=true META_MODEL_API_KEY= DEMO_KEY= and a valid local PY venv path; do not hardcode Mac PY in cloud. Run real browser tests when available for account UI/verification, same-browser own/sample isolation, recommendation -> image/edit -> actual PNG, first-ad draft reload. Do not claim unavailable browser/provider checks passed. No live Muse/email/ad spend, hosted migration, credentials, auth-setting changes or production deployment. Stop on blocking reproducible regression and fix within integrated scope; do not weaken tests.
+
+Keep docs/launch/CLAUDE_INTEGRATION_NOV16.md checkpoint before changes, after meaningful edits/tests, and before handoff. Include branch/SHA, conflicts/resolutions, exact tests, skipped/unverified gates and next executable step. Commit reviewed work; Nav's delegation authorizes publishing the integration branch for handoff, not main merge or deployment. Update HANDOFF_CURRENT.md on coordination branch with the result AFTER fetching its current version, only if no other coordinator owns it; otherwise return a precise update for Nav. Explicitly release ownership on completion. Do not wait on Codex to begin after Nav relays this assignment.
