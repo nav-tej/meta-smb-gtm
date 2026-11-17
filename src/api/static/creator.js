@@ -967,19 +967,19 @@
     }
     finally { clearTimeout(timer); setBusy(false); }
   }
-  // First visit after setup. Onboarding leaves a one-time request on this device (see
-  // requestAutoImport in workspace-modes.js). When My workspace opens here with that request
-  // and a saved shop website, the seller's own listings are offered under "Find products"
+  // First visit on this device. The account workspace says when the seller has a saved shop
+  // website (see autoImportPending in workspace-modes.js). When My workspace opens here with
+  // that signal, the seller's own listings are offered, once per device, under "Find products"
   // without a click and without locking the wizard. Nothing in the draft changes until the
   // seller picks a listing. The scan is a public crawl: no Muse run is used.
   let autoImportRunning = false;
-  async function autoImportSavedShop(owner, shopName = '') {
+  async function autoImportSavedShop(owner, shopName = '', workspace = null) {
     const modes = window.museModes;
-    if (autoImportRunning || !owner || !modes?.autoImportPending?.(owner, 'create')) return;
+    if (autoImportRunning || !owner || !modes?.autoImportPending?.(owner, 'create', workspace)) return;
     const url = safeLink(state.shopWebsiteUrl);
-    // No saved website, a photo already chosen, or past the product step: drop the request.
+    // No saved website, a photo already chosen, or past the product step: do not ask again.
     if (!url || state.original || state.step !== 0) { modes.finishAutoImport?.(owner, 'create'); return; }
-    // Busy or offline: keep the request for the next visit.
+    // Busy or offline: try again on the next visit.
     if (state.busy || isOfflineNow()) return;
     const epoch = draftEpoch;
     const host = new URL(url).hostname.replace(/^www\./, '');
@@ -987,7 +987,7 @@
     let tried = false;
     autoImportRunning = true;
     const hint = $('importHint'); const hintBefore = hint.textContent;
-    const looking = `Looking for your listings on ${host}, the website you saved during setup…`;
+    const looking = `Looking for your listings on ${host}, your saved shop website…`;
     hint.textContent = looking;
     const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), 45000);
     try {
@@ -1663,14 +1663,14 @@
         if (!recovered && shopName) {
           initNeutralWorkspace(shopName, `Product from ${shopName}`, true);
         }
-        savedShop = { name: shopName };
+        savedShop = { name: shopName, workspace: ws };
       } catch {
         if (seq !== creatorModeSeq) return;
         if ($('savedShopWebsiteNote')) $('savedShopWebsiteNote').textContent = 'Add a shop website above to import your products.';
       }
     }
     // Only after this account's workspace loaded, and never over a recommendation handoff.
-    if (savedShop && !requestedHandoffId()) autoImportSavedShop(s.ownerId, savedShop.name);
+    if (savedShop && !requestedHandoffId()) autoImportSavedShop(s.ownerId, savedShop.name, savedShop.workspace);
     const handoffId = requestedHandoffId();
     const handoff = readRecommendationHandoff(s.ownerId);
     if (handoffId && state.handoffId === handoffId && state.handoffActive && state.handoffContext) {

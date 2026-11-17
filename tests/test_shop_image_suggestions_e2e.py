@@ -334,6 +334,16 @@ def test_shop_image_suggestions_sample_own_fallback_isolation_and_export_e2e(
                     "url": base_url,
                 }}])
 
+        def first_visit_import_done(ctx):
+            # The editors bring in a saved shop's listings once per account on a device
+            # (tests/test_first_visit_import_e2e.py). The fakes here return the same listing for
+            # every shop, so these checks run on a device where that has already happened and
+            # each account starts from its placeholder draft, as before.
+            ctx.add_init_script(
+                "for (const uid of ['user-a', 'user-b']) "
+                "localStorage.setItem('muse.autoimport.tried.v1:' + uid, 'today,create');"
+            )
+
         with sync_playwright() as p:
             browser = p.chromium.launch()
             errors = []
@@ -376,6 +386,7 @@ def test_shop_image_suggestions_sample_own_fallback_isolation_and_export_e2e(
                 viewport={{"width": 1440, "height": 900}}, accept_downloads=True
             )
             set_cookie(ctx_d, "user-a")
+            first_visit_import_done(ctx_d)
             pd = ctx_d.new_page()
             pd.on("pageerror", lambda e: errors.append(str(e)))
             pd.goto(f"{{base_url}}/create", wait_until="domcontentloaded")
@@ -437,6 +448,7 @@ def test_shop_image_suggestions_sample_own_fallback_isolation_and_export_e2e(
                 viewport={{"width": 375, "height": 844}}, accept_downloads=True
             )
             set_cookie(ctx_tm, "user-a")
+            first_visit_import_done(ctx_tm)
             pt = ctx_tm.new_page()
             pt.on("pageerror", lambda e: errors.append(str(e)))
             pt.goto(f"{{base_url}}/today", wait_until="domcontentloaded")
@@ -510,6 +522,7 @@ def test_shop_image_suggestions_sample_own_fallback_isolation_and_export_e2e(
                 viewport={{"width": 1280, "height": 860}}, accept_downloads=True
             )
             set_cookie(ctx_cr, "user-a")
+            first_visit_import_done(ctx_cr)
             pc = ctx_cr.new_page()
             pc.on("pageerror", lambda e: errors.append(str(e)))
             pc.goto(f"{{base_url}}/create", wait_until="domcontentloaded")

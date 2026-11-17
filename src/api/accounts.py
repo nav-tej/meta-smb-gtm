@@ -305,13 +305,27 @@ async def password(
     return {"message": "Password updated."}
 
 
+def listing_import_hint(document: Any) -> dict[str, bool]:
+    """Say whether the editors may bring in the seller's listings on a first visit.
+
+    True once the account has a saved shop website. It is derived on every read, so it follows
+    the seller to any device and covers accounts that finished setup before it existed. The
+    editors act only on this explicit signal, never on a saved website alone.
+    """
+    onboarding = document.get("onboarding") if isinstance(document, dict) else None
+    urls = onboarding.get("shop_urls") if isinstance(onboarding, dict) else None
+    saved = isinstance(urls, list) and any(isinstance(url, str) and url.strip() for url in urls)
+    return {"first_visit": saved}
+
+
 @router.get("/workspace")
 async def workspace(request: Request, response: Response) -> dict[str, Any]:
     account = await resolve_account(request, response, require_verified=True)
     assert account is not None
     verify_workspace_owner(account, request.headers.get("x-muse-owner"))
     response.headers["Cache-Control"] = "no-store"
-    return await load_workspace(account)
+    saved = await load_workspace(account)
+    return {**saved, "listing_import": listing_import_hint(saved.get("document"))}
 
 
 @router.put("/workspace")

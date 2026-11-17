@@ -946,10 +946,10 @@
     for (const [i, item] of choices.entries()) { const button = document.createElement('button'); button.type = 'button'; button.textContent = `${i === 0 ? 'Suggested: ' : ''}${item.title || 'View listing'}`; button.addEventListener('click', async () => { if (state.busy) return; lock(true, 'readListing'); try { await useReference(item.url, { preserveExisting: true, selectIfEmpty: false }); render(); await planAfterImport(); persist(); } catch (error) { $('importStatus').textContent = error.message; notice(error.message, true); } finally { lock(false); } }); $('importItems').append(button); }
   }
 
-  // First visit after setup. Onboarding leaves a one-time request on this device (see
-  // requestAutoImport in workspace-modes.js). When My workspace opens here with that request,
-  // a saved shop website and a draft that is still the untouched placeholder, the seller's own
-  // listings are brought in without a click. The scan is a public crawl (no Muse run) and
+  // First visit on this device. The account workspace says when the seller has a saved shop
+  // website (see autoImportPending in workspace-modes.js). When My workspace opens here with
+  // that signal and a draft that is still the untouched placeholder, the seller's own listings
+  // are brought in without a click, once per device. The scan is a public crawl (no Muse run) and
   // does not lock the page; only the short step that applies the first listing does.
   let autoImportRunning = false;
   function placeholderDraft(shopName = '') {
@@ -957,13 +957,13 @@
     const title = state.product?.title || '';
     return title === neutralProduct(shopName).title || title === neutralProduct().title;
   }
-  async function autoImportSavedShop(owner, shopName = '') {
+  async function autoImportSavedShop(owner, shopName = '', workspace = null) {
     const modes = window.museModes;
-    if (autoImportRunning || !owner || !modes?.autoImportPending?.(owner, 'today')) return;
+    if (autoImportRunning || !owner || !modes?.autoImportPending?.(owner, 'today', workspace)) return;
     const url = safeURL(state.shopWebsiteUrl);
-    // Nothing to bring in, or the seller is already working on something: drop the request.
+    // Nothing to bring in, or the seller is already working on something here: do not ask again.
     if (!url || !placeholderDraft(shopName)) { modes.finishAutoImport?.(owner, 'today'); return; }
-    // Busy or offline: keep the request for the next visit.
+    // Busy or offline: try again on the next visit.
     if (state.busy || isOfflineNow()) return;
     const epoch = draftEpoch;
     const host = new URL(url).hostname.replace(/^www\./, '');
@@ -972,7 +972,7 @@
     const count = n => `${n} listing${n === 1 ? '' : 's'}`;
     let tried = false;
     autoImportRunning = true;
-    const looking = `Looking for your listings on ${host}, the website you saved during setup. You can keep working.`;
+    const looking = `Looking for your listings on ${host}, your saved shop website. You can keep working.`;
     status(looking);
     notice(looking, false, true);
     try {
@@ -1005,7 +1005,7 @@
         notice(`Found ${count(choices.length)} on ${host}, but could not open the first one. Choose “Change” to pick a listing.`);
         return;
       }
-      // A workspace refresh can cancel the listing read; keep the request and try next visit.
+      // A workspace refresh can cancel the listing read; try again on the next visit.
       if (placeholderDraft(shopName)) return;
       tried = true;
       state.source = `From ${host} · check product facts`;
@@ -1367,7 +1367,7 @@
         const shopUrls = Array.isArray(onb.shop_urls) ? onb.shop_urls.filter(Boolean) : [];
         const shopName = String(onb.business_name || '').trim();
         state.shopWebsiteUrl = shopUrls[0] || '';
-        savedShop = { name: shopName };
+        savedShop = { name: shopName, workspace: ws };
         if ($('savedShopWebsiteNote')) {
           $('savedShopWebsiteNote').textContent = state.shopWebsiteUrl
             ? `Saved studio website: ${state.shopWebsiteUrl}`
@@ -1394,7 +1394,7 @@
     renderTodayImagePicker();
     buildPlan();
     // Only after this account's workspace loaded, and never over a recommendation handoff.
-    if (savedShop && !handoff) autoImportSavedShop(s.ownerId, savedShop.name);
+    if (savedShop && !handoff) autoImportSavedShop(s.ownerId, savedShop.name, savedShop.workspace);
   }
 
   if ($('todayImgSrcWebsiteBtn')) $('todayImgSrcWebsiteBtn').addEventListener('click', () => { todayImageSource = 'website'; renderTodayImagePicker(); });

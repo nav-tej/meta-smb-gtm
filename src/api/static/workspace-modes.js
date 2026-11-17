@@ -224,32 +224,31 @@
     }
   }
 
-  // One-time request left by onboarding: "bring in this shop's listings the first time each
-  // editor opens on this device". Kept per account, and each editor clears its own name once
-  // it has tried, so the scan runs at most once per editor and never for another account.
+  // First-visit import. The account workspace response carries `listing_import.first_visit`
+  // when the seller has a saved shop website; the editors bring in listings only on that
+  // explicit signal. Drafts live per device, so each editor does it once per account on each
+  // device and remembers here that it tried.
   const AUTO_IMPORT_PAGES = ['today', 'create'];
-  const autoImportKey = (ownerId) => `muse.autoimport.pending.v1:${encodeURIComponent(String(ownerId))}`;
-  function readAutoImport(ownerId) {
+  const autoImportKey = (ownerId) => `muse.autoimport.tried.v1:${encodeURIComponent(String(ownerId))}`;
+  function autoImportTried(ownerId) {
     try {
       return (localStorage.getItem(autoImportKey(ownerId)) || '').split(',').filter((name) => AUTO_IMPORT_PAGES.includes(name));
     } catch {
-      return [];
+      // Storage unavailable: nothing could be remembered, so never scan unasked.
+      return AUTO_IMPORT_PAGES.slice();
     }
   }
-  function requestAutoImport(ownerId) {
-    if (!ownerId) return;
-    try { localStorage.setItem(autoImportKey(ownerId), AUTO_IMPORT_PAGES.join(',')); } catch { /* Storage unavailable: the seller can still press Find products. */ }
-  }
-  function autoImportPending(ownerId, page) {
-    return Boolean(ownerId) && readAutoImport(ownerId).includes(page);
+  function autoImportPending(ownerId, page, workspace) {
+    if (!ownerId || !AUTO_IMPORT_PAGES.includes(page)) return false;
+    if (workspace?.listing_import?.first_visit !== true) return false;
+    return !autoImportTried(ownerId).includes(page);
   }
   function finishAutoImport(ownerId, page) {
-    if (!ownerId) return;
+    if (!ownerId || !AUTO_IMPORT_PAGES.includes(page)) return;
     try {
-      const left = readAutoImport(ownerId).filter((name) => name !== page);
-      if (left.length) localStorage.setItem(autoImportKey(ownerId), left.join(','));
-      else localStorage.removeItem(autoImportKey(ownerId));
-    } catch { /* Nothing to clear. */ }
+      const tried = autoImportTried(ownerId);
+      if (!tried.includes(page)) localStorage.setItem(autoImportKey(ownerId), AUTO_IMPORT_PAGES.filter((name) => name === page || tried.includes(name)).join(','));
+    } catch { /* Not remembered: the next visit may look once more. */ }
   }
 
   function notify() {
@@ -460,7 +459,6 @@
     bindAsyncGuard,
     renderModeBanners,
     subscribe,
-    requestAutoImport,
     autoImportPending,
     finishAutoImport
   });

@@ -1013,10 +1013,6 @@
         localStorage.setItem(LOCAL_WORKSPACE_MODE_KEY, 'own');
       } catch (_) {}
       writeLocalOnboarding(state, currentUser);
-      // Let /today and /create bring in this shop's listings the first time they open here.
-      if (currentUser?.id && (state.shop_urls || []).some(Boolean)) {
-        window.museModes?.requestAutoImport?.(currentUser.id);
-      }
 
       const confirmedSocials = (state.socials || []).filter((s) => s.confirmed !== false);
       const selectedCompetitors = (state.competitors || []).filter((c) => c.selected !== false);

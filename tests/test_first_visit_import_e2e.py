@@ -1,10 +1,12 @@
-"""After onboarding, the editors bring in the seller's own listings without a click.
+"""The editors bring in the seller's own listings without a click.
 
 Onboarding saves the shop website, but /today and /create used to open on a placeholder item
-until the seller pressed "Find products". These checks pin the one-time request onboarding
-leaves on the device, the two editors that honour it, and the guards around it: nothing is
-scanned without the request, in the sample workspace, or over a draft the seller already has.
-Every crawl is mocked in the browser; no network or Muse call is made.
+until the seller pressed "Find products". The account workspace now says when a shop website is
+saved (`listing_import.first_visit`), and each editor acts on that once per account on a device.
+These checks pin the server signal, the per-device memory, the two editors that honour it, and
+the guards around it: nothing is scanned without the signal, in the sample workspace, or over a
+draft the seller already has. Every crawl is mocked in the browser; no network or Muse call is
+made.
 """
 
 from __future__ import annotations
@@ -18,11 +20,16 @@ import threading
 import time
 from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 
 import pytest
 import uvicorn
+from fastapi.testclient import TestClient
 
+from src.api.accounts import listing_import_hint
 from src.api.main import STATIC_DIR, app
+from src.services import accounts as accounts_service
+from src.services.accounts import AccountSession
 
 
 @pytest.fixture(scope="module")
@@ -62,7 +69,73 @@ def _find_playwright_python() -> str | None:
     return None
 
 
-def test_import_request_is_per_account_and_cleared_one_editor_at_a_time() -> None:
+def test_workspace_read_says_when_a_shop_website_is_saved(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert listing_import_hint({"onboarding": {"shop_urls": ["https://fernandkiln.example"]}}) == {
+        "first_visit": True
+    }
+    # Finishing setup is not required: a website saved from an editor counts too.
+    assert listing_import_hint({"onboarding": {"shop_urls": ["", " https://a.example "]}}) == {
+        "first_visit": True
+    }
+    for document in (
+        None,
+        {},
+        {"onboarding": None},
+        {"onboarding": {"completed_at": "2026-11-16T18:00:00Z"}},
+        {"onboarding": {"shop_urls": []}},
+        {"onboarding": {"shop_urls": ["", "  ", None, 7]}},
+        {"onboarding": {"shop_urls": "https://fernandkiln.example"}},
+        {"shop_urls": ["https://fernandkiln.example"]},
+    ):
+        assert listing_import_hint(document) == {"first_visit": False}, document
+
+    user = AccountSession(
+        user_id="00000000-0000-4000-8000-000000000007",
+        email="fern@example.test",
+        email_verified=True,
+        access_token="token-fern",
+        session_id=None,
+    )
+    stored: dict[str, Any] = {
+        # Finished setup long before this signal existed; nothing was ever written for it.
+        "document": {
+            "onboarding": {
+                "business_name": "Fern & Kiln",
+                "shop_urls": ["https://fernandkiln.example"],
+                "completed_at": "2026-11-08T09:00:00Z",
+            },
+            "documents": {"daily": {"hook": "kept"}},
+        },
+        "version": 6,
+    }
+
+    class FakeSupabase:
+        async def workspace(self, user_id: str) -> list[dict[str, Any]]:
+            assert user_id == user.user_id
+            return [stored]
+
+    async def fake_resolve(*_args: Any, **_kwargs: Any) -> AccountSession:
+        return user
+
+    monkeypatch.setattr("src.api.accounts.resolve_account", fake_resolve)
+    monkeypatch.setattr(accounts_service, "get_supabase_client", lambda: FakeSupabase())
+
+    client = TestClient(app)
+    payload = client.get("/api/v1/account/workspace", headers={"X-Muse-Owner": user.user_id}).json()
+    assert payload["listing_import"] == {"first_visit": True}
+    # Derived on the way out: the saved document and its version are untouched.
+    assert payload["document"] == stored["document"]
+    assert "listing_import" not in payload["document"]
+    assert payload["version"] == 6 and payload["owner_id"] == user.user_id
+
+    stored["document"] = {"documents": {"daily": {"hook": "kept"}}}
+    payload = client.get("/api/v1/account/workspace", headers={"X-Muse-Owner": user.user_id}).json()
+    assert payload["listing_import"] == {"first_visit": False}
+
+
+def test_each_editor_remembers_per_account_that_it_tried_on_this_device() -> None:
     node = shutil.which("node")
     if not node:
         pytest.skip("Node.js not installed")
@@ -72,9 +145,16 @@ def test_import_request_is_per_account_and_cleared_one_editor_at_a_time() -> Non
         const vm = require('vm');
         const assert = require('assert');
         const store = new Map();
+        let broken = false;
         const localStorage = {
-          getItem: (key) => (store.has(key) ? store.get(key) : null),
-          setItem: (key, value) => store.set(key, String(value)),
+          getItem: (key) => {
+            if (broken) throw new Error('blocked');
+            return store.has(key) ? store.get(key) : null;
+          },
+          setItem: (key, value) => {
+            if (broken) throw new Error('blocked');
+            store.set(key, String(value));
+          },
           removeItem: (key) => store.delete(key),
         };
         const window = {
@@ -85,31 +165,55 @@ def test_import_request_is_per_account_and_cleared_one_editor_at_a_time() -> Non
           window, localStorage, URL, URLSearchParams, console,
         });
         const modes = window.museModes;
-        const key = 'muse.autoimport.pending.v1:seller-a';
+        const key = 'muse.autoimport.tried.v1:seller-a';
+        const offered = { document: {}, listing_import: { first_visit: true } };
 
-        assert.strictEqual(modes.autoImportPending('seller-a', 'today'), false);
-        modes.requestAutoImport('seller-a');
-        assert.strictEqual(store.get(key), 'today,create');
-        assert.strictEqual(modes.autoImportPending('seller-a', 'today'), true);
-        assert.strictEqual(modes.autoImportPending('seller-a', 'create'), true);
-        // Another account on the same device, a missing owner and unknown editors never match.
-        assert.strictEqual(modes.autoImportPending('seller-b', 'today'), false);
-        assert.strictEqual(modes.autoImportPending('', 'today'), false);
-        assert.strictEqual(modes.autoImportPending('seller-a', 'digest'), false);
+        // The server has to say so. A saved website in the document is not enough.
+        const onboarding = { shop_urls: ['https://a.example'], completed_at: 'x' };
+        const unsignalled = [
+          undefined, null, {}, { document: { onboarding } }, { listing_import: {} },
+          { listing_import: { first_visit: 'true' } }, { listing_import: { first_visit: 1 } },
+        ];
+        for (const ws of unsignalled) {
+          assert.strictEqual(modes.autoImportPending('seller-a', 'today', ws), false);
+        }
+        assert.strictEqual(modes.autoImportPending('seller-a', 'today', offered), true);
+        assert.strictEqual(modes.autoImportPending('seller-a', 'create', offered), true);
+        assert.strictEqual(modes.autoImportPending('', 'today', offered), false);
+        assert.strictEqual(modes.autoImportPending('seller-a', 'digest', offered), false);
+        assert.strictEqual(store.size, 0);
 
-        modes.finishAutoImport('seller-a', 'today');
-        assert.strictEqual(modes.autoImportPending('seller-a', 'today'), false);
-        assert.strictEqual(modes.autoImportPending('seller-a', 'create'), true);
         modes.finishAutoImport('seller-a', 'create');
-        assert.strictEqual(store.has(key), false);
+        assert.strictEqual(store.get(key), 'create');
+        assert.strictEqual(modes.autoImportPending('seller-a', 'create', offered), false);
+        assert.strictEqual(modes.autoImportPending('seller-a', 'today', offered), true);
+        // Another account on the same device starts fresh.
+        assert.strictEqual(modes.autoImportPending('seller-b', 'create', offered), true);
+        modes.finishAutoImport('seller-a', 'today');
+        modes.finishAutoImport('seller-a', 'today');
+        assert.strictEqual(store.get(key), 'today,create');
+        assert.strictEqual(modes.autoImportPending('seller-a', 'today', offered), false);
+
+        // Unknown editors and a missing owner are never recorded.
+        modes.finishAutoImport('seller-a', 'digest');
+        modes.finishAutoImport('', 'today');
+        assert.strictEqual(store.size, 1);
+        assert.strictEqual(store.get(key), 'today,create');
 
         // Anything else stored under the key is ignored rather than trusted.
-        store.set(key, 'digest,<script>,today');
-        assert.strictEqual(modes.autoImportPending('seller-a', 'today'), true);
-        assert.strictEqual(modes.autoImportPending('seller-a', '<script>'), false);
-        modes.requestAutoImport('');
-        assert.strictEqual(store.size, 1);
-        console.log('IMPORT_REQUEST_OK');
+        store.set(key, 'digest,<script>');
+        assert.strictEqual(modes.autoImportPending('seller-a', 'today', offered), true);
+
+        // Storage blocked: nothing can be remembered, so nothing is scanned unasked.
+        broken = true;
+        assert.strictEqual(modes.autoImportPending('seller-b', 'today', offered), false);
+        modes.finishAutoImport('seller-b', 'today');
+        broken = false;
+        assert.strictEqual(store.has('muse.autoimport.tried.v1:seller-b'), false);
+
+        // The earlier device request from onboarding is gone.
+        assert.strictEqual(modes.requestAutoImport, undefined);
+        console.log('IMPORT_MEMORY_OK');
         """
     )
     proc = subprocess.run(
@@ -120,38 +224,33 @@ def test_import_request_is_per_account_and_cleared_one_editor_at_a_time() -> Non
         check=False,
     )
     assert proc.returncode == 0, f"STDOUT: {proc.stdout}\nSTDERR: {proc.stderr}"
-    assert "IMPORT_REQUEST_OK" in proc.stdout
+    assert "IMPORT_MEMORY_OK" in proc.stdout
 
 
-def test_onboarding_leaves_the_request_only_for_a_signed_in_seller_with_a_shop() -> None:
-    script = (STATIC_DIR / "welcome.js").read_text(encoding="utf-8")
-    saved = script.index("state.completed_at = buildResult.completed_at")
-    done = script.index("trackEvent('onboarding_completed'")
-    completion = script[saved:done]
-    assert "if (currentUser?.id && (state.shop_urls || []).some(Boolean)) {" in completion
-    assert "window.museModes?.requestAutoImport?.(currentUser.id);" in completion
-    # Nowhere else: visiting /welcome again or mirroring the server copy must not re-arm it.
-    assert script.count("requestAutoImport") == 1
-
-
-def test_editors_scan_only_on_request_and_without_a_muse_call() -> None:
+def test_editors_scan_only_on_the_server_signal_and_without_a_muse_call() -> None:
     today = (STATIC_DIR / "today.js").read_text(encoding="utf-8")
     create = (STATIC_DIR / "creator.js").read_text(encoding="utf-8")
     for script, page in ((today, "today"), (create, "create")):
         start = script.index("async function autoImportSavedShop(")
         body = script[start : script.index("\n  }\n", start)]
-        assert f"modes?.autoImportPending?.(owner, '{page}')" in body
+        assert f"modes?.autoImportPending?.(owner, '{page}', workspace)" in body
         assert f"modes.finishAutoImport?.(owner, '{page}')" in body
         assert "/api/v1/ingest-storefront" in body
         assert "isEffectiveSample()" in body
         for paid in ("live=true", "use_muse", "generate-ads", "liveReady"):
             assert paid not in body
-    # The request is honoured only once this account's workspace has loaded.
-    assert "if (savedShop && !handoff) autoImportSavedShop(s.ownerId, savedShop.name);" in today
+    # Only with the workspace this account just loaded, and never over a recommendation handoff.
     assert (
-        "if (savedShop && !requestedHandoffId()) autoImportSavedShop(s.ownerId, savedShop.name);"
-        in create
+        "if (savedShop && !handoff) "
+        "autoImportSavedShop(s.ownerId, savedShop.name, savedShop.workspace);" in today
     )
+    assert (
+        "if (savedShop && !requestedHandoffId()) "
+        "autoImportSavedShop(s.ownerId, savedShop.name, savedShop.workspace);" in create
+    )
+    # Onboarding no longer leaves anything on the device for this.
+    for name in ("welcome.js", "today.js", "creator.js", "workspace-modes.js"):
+        assert "requestAutoImport" not in (STATIC_DIR / name).read_text(encoding="utf-8"), name
 
 
 def test_first_visit_brings_in_the_sellers_listings_e2e(live_server_url: str) -> None:
@@ -182,7 +281,29 @@ def test_first_visit_brings_in_the_sellers_listings_e2e(live_server_url: str) ->
             "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQ"
             "DwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
         )
-        FLAG = "muse.autoimport.pending.v1:" + USER["id"]
+        USER_B = {{"id": "u-oak-456", "email": "oak@oakandpine.example", "email_verified": True}}
+        WORKSPACE_B = {{
+            "document": {{
+                "onboarding": {{
+                    "business_name": "Oak & Pine",
+                    "shop_urls": ["https://oakandpine.example"],
+                    "completed_at": "2026-11-12T09:00:00Z",
+                    "competitors": [],
+                }}
+            }},
+            "version": 1,
+            "owner_id": USER_B["id"],
+            "listing_import": {{"first_visit": True}},
+        }}
+        LISTINGS_B = {{
+            "business_name": "Oak & Pine",
+            "channels": [{{"status": "fetched"}}],
+            "discovered_catalog_items": [
+                {{"title": "Turned Oak Bowl", "bucket": "products",
+                  "url": "https://oakandpine.example/products/oak-bowl", "price_hint": "$64"}},
+            ],
+        }}
+        TRIED_PREFIX = "muse.autoimport.tried.v1:"
         DRAFT_KEY = "muse-editor-v1:daily:account:" + USER["id"]
         LISTINGS = {{
             "business_name": "Fern & Kiln",
@@ -198,12 +319,15 @@ def test_first_visit_brings_in_the_sellers_listings_e2e(live_server_url: str) ->
         def reply(route, payload):
             route.fulfill(status=200, content_type="application/json", body=json.dumps(payload))
 
-        def open_page(browser, width=1440, request_import=True, seed=None):
+        # Each call is a new browser context: the same account on a device that remembers nothing.
+        def open_page(browser, width=1440, offer=True, seed=None):
             ctx = browser.new_context(viewport={{"width": width, "height": 900}})
-            calls = {{"ingest": 0, "outside": []}}
+            calls = {{"ingest": 0, "outside": [], "user": USER}}
             seeded = dict(seed or {{}})
-            if request_import:
-                seeded[FLAG] = "today,create"
+            # Without the server signal the response looks like every older mocked workspace.
+            workspace = dict(WORKSPACE)
+            if offer:
+                workspace["listing_import"] = {{"first_visit": True}}
             # Seed once per browser context so a reload keeps whatever the page changed.
             ctx.add_init_script(
                 "if (!localStorage.getItem('__seeded')) {{ localStorage.setItem('__seeded', '1');"
@@ -219,13 +343,13 @@ def test_first_visit_brings_in_the_sellers_listings_e2e(live_server_url: str) ->
                 if url.endswith("/api/v1/account/me"):
                     return reply(route, {{
                         "configured": True,
-                        "user": USER,
+                        "user": calls["user"],
                         "usage": {{"plan": "starter", "used": 0, "limit": 3, "remaining": 3,
                                   "resets_at": None}},
                         "live_available": True,
                     }})
                 if "/api/v1/account/workspace" in url:
-                    return reply(route, WORKSPACE)
+                    return reply(route, WORKSPACE_B if calls["user"] is USER_B else workspace)
                 if url.endswith("/api/v1/onboarding/status"):
                     return reply(route, {{
                         "completed": True, "completed_at": "2026-11-16T18:00:00Z",
@@ -233,13 +357,16 @@ def test_first_visit_brings_in_the_sellers_listings_e2e(live_server_url: str) ->
                     }})
                 if url.endswith("/api/v1/ingest-storefront"):
                     calls["ingest"] += 1
-                    assert (route.request.post_data_json or {{}}).get("website_url", "").startswith(
-                        "https://fernandkiln.example"
-                    )
+                    site = (route.request.post_data_json or {{}}).get("website_url", "")
+                    if site.startswith("https://oakandpine.example"):
+                        return reply(route, LISTINGS_B)
+                    assert site.startswith("https://fernandkiln.example"), site
                     return reply(route, LISTINGS)
                 if url.endswith("/api/v1/product-reference"):
                     link = (route.request.post_data_json or {{}}).get("url", "")
                     title = "Speckled Stoneware Mug" if link.endswith("/mug") else "Ash Glaze Bowl"
+                    if "oakandpine" in link:
+                        title = "Turned Oak Bowl"
                     return reply(route, {{
                         "title": title,
                         "description": "Hand-thrown stoneware with a speckled glaze.",
@@ -266,13 +393,15 @@ def test_first_visit_brings_in_the_sellers_listings_e2e(live_server_url: str) ->
                 "document.documentElement.scrollWidth > document.documentElement.clientWidth"
             ), "Horizontal overflow on " + label
 
-        def flag(page):
-            return page.evaluate("localStorage.getItem(" + json.dumps(FLAG) + ")")
+        def tried(page, user=USER):
+            key = TRIED_PREFIX + user["id"]
+            return page.evaluate("localStorage.getItem(" + json.dumps(key) + ")")
 
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
 
-            # 1. Fresh from onboarding: /today starts on the seller's first listing, unasked.
+            # 1. First visit on a device (two of them here): /today starts on the seller's first
+            #    listing, unasked. The account finished setup earlier; nothing local says so.
             for width in (1440, 375):
                 ctx, page, calls, errors = open_page(browser, width=width)
                 page.goto(BASE + "/today", wait_until="networkidle")
@@ -302,7 +431,7 @@ def test_first_visit_brings_in_the_sellers_listings_e2e(live_server_url: str) ->
                 # The photo is offered, never chosen for the seller.
                 assert page.locator("#todayImageCandidatesGrid .muse-image-card").count() == 1
                 assert page.evaluate("window.museDailySnapshot().imageMeta") is None
-                assert flag(page) == "create"
+                assert tried(page) == "today"
                 no_overflow(page, "/today " + str(width))
 
                 # A reload recovers that draft and scans nothing again.
@@ -321,7 +450,7 @@ def test_first_visit_brings_in_the_sellers_listings_e2e(live_server_url: str) ->
                 assert page.locator("#productName").input_value() == "Product from Fern & Kiln"
                 assert "Found 2 listings" in page.locator("#notice").inner_text()
                 assert not page.evaluate("document.getElementById('importProducts').disabled")
-                assert flag(page) is None
+                assert tried(page) == "today,create"
                 no_overflow(page, "/create " + str(width))
                 page.goto(BASE + "/create", wait_until="networkidle")
                 page.wait_for_timeout(400)
@@ -330,13 +459,14 @@ def test_first_visit_brings_in_the_sellers_listings_e2e(live_server_url: str) ->
                 assert not calls["outside"], calls["outside"]
                 ctx.close()
 
-            # 3. No request from onboarding: neither editor scans on its own.
-            ctx, page, calls, errors = open_page(browser, request_import=False)
+            # 3. The server does not say so: neither editor scans, saved shop website or not.
+            ctx, page, calls, errors = open_page(browser, offer=False)
             page.goto(BASE + "/today", wait_until="networkidle")
             page.wait_for_timeout(400)
             page.goto(BASE + "/create", wait_until="networkidle")
             page.wait_for_timeout(400)
             assert calls["ingest"] == 0
+            assert tried(page) is None
             assert not errors, errors
 
             # 4. Pressing "Find products" still leaves three posts planned for the imported item.
@@ -358,7 +488,7 @@ def test_first_visit_brings_in_the_sellers_listings_e2e(live_server_url: str) ->
             assert not calls["outside"], calls["outside"]
             ctx.close()
 
-            # 5. Request present, sample workspace open: nothing is scanned and the request waits.
+            # 5. Sample workspace open: nothing is scanned and nothing is recorded as tried.
             ctx, page, calls, errors = open_page(browser)
             for path in ("/today?workspace=sample", "/create?workspace=sample"):
                 page.goto(BASE + path, wait_until="networkidle")
@@ -366,11 +496,11 @@ def test_first_visit_brings_in_the_sellers_listings_e2e(live_server_url: str) ->
                 mode = page.evaluate("document.documentElement.dataset.museMode")
                 assert mode == "account_sample"
             assert calls["ingest"] == 0
-            assert flag(page) == "today,create"
+            assert tried(page) is None
             assert not errors, errors
             ctx.close()
 
-            # 6. Request present, but the seller already has their own item: it is left alone.
+            # 6. The seller already has their own item on this device: it is left alone for good.
             draft = {{
                 "schema": 1,
                 "product": {{"title": "Walnut Serving Board", "description": "Hand-oiled walnut.",
@@ -385,12 +515,12 @@ def test_first_visit_brings_in_the_sellers_listings_e2e(live_server_url: str) ->
             page.wait_for_timeout(400)
             assert calls["ingest"] == 0
             assert page.locator("#itemTitle").inner_text() == "Walnut Serving Board"
-            assert flag(page) == "create"
+            assert tried(page) == "today"
             assert not errors, errors
             ctx.close()
 
             # 7. The seller opens the sample shop while the scan is still running: the late
-            #    result lands nowhere, and the request is honoured back in their own workspace.
+            #    result lands nowhere, and the import runs once they are back in their workspace.
             ctx, page, calls, errors = open_page(browser)
             held = []
             page.route("**/api/v1/ingest-storefront", lambda route: held.append(route))
@@ -412,7 +542,7 @@ def test_first_visit_brings_in_the_sellers_listings_e2e(live_server_url: str) ->
             assert "Speckled" not in json.dumps(page.evaluate("window.museDailySnapshot()"))
             assert page.locator("#importItems button").count() == 0
             assert "Looking for your listings" not in (page.text_content("#notice") or "")
-            assert flag(page) == "today,create"
+            assert tried(page) is None
             page.unroute("**/api/v1/ingest-storefront")
             page.evaluate("window.museModes.goToOwnWorkspace()")
             page.wait_for_function(
@@ -421,7 +551,59 @@ def test_first_visit_brings_in_the_sellers_listings_e2e(live_server_url: str) ->
                 timeout=15000,
             )
             assert calls["ingest"] == 1
-            assert flag(page) == "create"
+            assert tried(page) == "today"
+            assert not errors, errors
+            assert not calls["outside"], calls["outside"]
+            ctx.close()
+
+            # 8. Another account signs in on the same tab while the first account's scan is
+            #    still running. The first scan is dropped: whatever it returns lands nowhere and
+            #    is recorded for neither account. The second account gets its own listings.
+            ctx, page, calls, errors = open_page(browser)
+            held = []
+            page.route("**/api/v1/ingest-storefront", lambda route: held.append(route))
+            page.goto(BASE + "/today", wait_until="domcontentloaded")
+            page.wait_for_function(
+                "document.getElementById('notice').textContent"
+                ".startsWith('Looking for your listings on fernandkiln.example')",
+                timeout=15000,
+            )
+            assert len(held) == 1
+            calls["user"] = USER_B
+            page.evaluate("window.museAccount.refresh()")
+            page.wait_for_function(
+                "window.museAccount.getSnapshot().user?.id === 'u-oak-456'"
+                " && document.getElementById('notice').textContent"
+                ".startsWith('Looking for your listings on oakandpine.example')",
+                timeout=15000,
+            )
+            assert len(held) == 2
+            sites = [(r.request.post_data_json or {{}}).get("website_url", "") for r in held]
+            assert sites[0].startswith("https://fernandkiln.example"), sites
+            assert sites[1].startswith("https://oakandpine.example"), sites
+            try:
+                held[0].fulfill(
+                    status=200, content_type="application/json", body=json.dumps(LISTINGS)
+                )
+            except Exception:
+                pass  # Already cancelled by the page when the account changed.
+            page.wait_for_timeout(500)
+            shown = json.dumps(page.evaluate("window.museDailySnapshot()"))
+            assert "Speckled" not in shown and "fernandkiln" not in shown, shown
+            assert page.locator("#importItems button").count() == 0
+            assert tried(page) is None and tried(page, USER_B) is None
+            held[1].fulfill(
+                status=200, content_type="application/json", body=json.dumps(LISTINGS_B)
+            )
+            page.wait_for_function(
+                "document.getElementById('itemTitle').textContent === 'Turned Oak Bowl'"
+                " && document.getElementById('notice').textContent.startsWith('Started with')",
+                timeout=15000,
+            )
+            shown = json.dumps(page.evaluate("window.museDailySnapshot()"))
+            assert "oakandpine.example" in shown and "Speckled" not in shown, shown
+            assert page.locator("#importItems button").count() == 1
+            assert tried(page, USER_B) == "today" and tried(page) is None
             assert not errors, errors
             assert not calls["outside"], calls["outside"]
             ctx.close()
@@ -444,10 +626,15 @@ def test_first_visit_brings_in_the_sellers_listings_e2e(live_server_url: str) ->
     assert "FIRST_VISIT_IMPORT_OK" in proc.stdout
 
 
-def test_finishing_onboarding_leaves_the_request_and_today_uses_it_e2e(
+def test_the_wizard_saves_the_shop_and_the_first_today_visit_uses_it_e2e(
     live_server_url: str,
 ) -> None:
-    """The whole path in one browser: the real wizard, then the first /today visit."""
+    """The whole path in one browser: nothing is scanned before setup; once the real wizard has
+    saved the shop website, the first /today visit starts on the seller's listing.
+
+    The mocked workspace applies the server's rule (a saved shop website), which
+    test_workspace_read_says_when_a_shop_website_is_saved pins against the real route.
+    """
     python_bin = _find_playwright_python()
     if not python_bin:
         pytest.skip("Playwright runtime not installed")
@@ -459,8 +646,13 @@ def test_finishing_onboarding_leaves_the_request_and_today_uses_it_e2e(
 
         BASE = "{live_server_url}"
         USER = {{"id": "u-new-7", "email": "maker@mountainpottery.example", "email_verified": True}}
-        FLAG = "muse.autoimport.pending.v1:" + USER["id"]
+        TRIED = "muse.autoimport.tried.v1:" + USER["id"]
         store = {{"document": {{}}, "version": 1, "owner_id": USER["id"]}}
+
+        def with_signal(ws):
+            urls = (ws["document"].get("onboarding") or {{}}).get("shop_urls") or []
+            saved = any(isinstance(u, str) and u.strip() for u in urls)
+            return {{**ws, "listing_import": {{"first_visit": saved}}}}
         calls = {{"ingest": 0, "outside": []}}
         LISTINGS = {{
             "business_name": "Mountain Pottery Studio",
@@ -499,7 +691,8 @@ def test_finishing_onboarding_leaves_the_request_and_today_uses_it_e2e(
                     payload = json.loads(route.request.post_data or "{{}}")
                     store["document"] = payload.get("document", {{}})
                     store["version"] += 1
-                return reply(route, store)
+                    return reply(route, store)
+                return reply(route, with_signal(store))
             if url.endswith("/api/v1/onboarding/status"):
                 return reply(route, {{
                     "completed": bool(done), "completed_at": done, "used_run": False,
@@ -539,26 +732,33 @@ def test_finishing_onboarding_leaves_the_request_and_today_uses_it_e2e(
                 lambda route: (calls["outside"].append(route.request.url), route.abort()),
             )
 
+            # Signed in, nothing set up yet: the editor has no shop website to look at.
+            page.goto(BASE + "/today", wait_until="networkidle")
+            assert page.evaluate("document.documentElement.dataset.museMode") == "account_own"
+            page.wait_for_timeout(400)
+            assert calls["ingest"] == 0
+            assert page.evaluate("localStorage.getItem(" + json.dumps(TRIED) + ")") is None
+
             page.goto(BASE + "/welcome")
             page.wait_for_selector("#wkStep1:not([hidden])", timeout=10000)
-            assert page.evaluate("localStorage.getItem(" + json.dumps(FLAG) + ")") is None
             page.fill("#wkShopUrl", "mountainpottery.example")
             page.fill("#wkBusinessName", "Mountain Pottery Studio")
             page.click("#wkScanShopBtn")
             page.wait_for_selector("#wkShopProof:not([hidden])")
             page.click("#wkStep1NextBtn")
             page.wait_for_selector("#wkStep2:not([hidden])")
-            # Nothing is requested until the seller actually finishes.
-            assert page.evaluate("localStorage.getItem(" + json.dumps(FLAG) + ")") is None
             page.click("#wkStep2NextBtn")
             page.wait_for_selector("#wkStep3:not([hidden])")
             page.click("#wkStep3NextBtn")
             page.wait_for_selector("#wkStep4:not([hidden])")
             page.click("#wkStep4FinishBtn")
             page.wait_for_selector("#wkStepDone:not([hidden])")
-            assert (
-                page.evaluate("localStorage.getItem(" + json.dumps(FLAG) + ")") == "today,create"
-            )
+            saved_urls = store["document"]["onboarding"]["shop_urls"]
+            assert saved_urls == ["https://mountainpottery.example/"], saved_urls
+            # The wizard itself leaves nothing on the device for the editors.
+            assert page.evaluate(
+                "Object.keys(localStorage).filter((k) => k.includes('autoimport')).length"
+            ) == 0
             scans_in_onboarding = calls["ingest"]
 
             page.goto(BASE + "/today", wait_until="networkidle")
@@ -571,7 +771,7 @@ def test_finishing_onboarding_leaves_the_request_and_today_uses_it_e2e(
                 "document.querySelectorAll('#planCards button').length === 3", timeout=15000
             )
             assert calls["ingest"] == scans_in_onboarding + 1
-            assert page.evaluate("localStorage.getItem(" + json.dumps(FLAG) + ")") == "create"
+            assert page.evaluate("localStorage.getItem(" + json.dumps(TRIED) + ")") == "today"
             assert not errors, errors
             outside = [u for u in calls["outside"] if "fonts.g" not in u]
             assert not outside, outside
