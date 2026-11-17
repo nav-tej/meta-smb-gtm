@@ -4,11 +4,13 @@ Prepared November 17, 2026 by Claude at Nav's request. Status: PROPOSED until Na
 Read-only browser acceptance. No code edits.
 
 ## Target
-- Branch `claude/ux-gap-ad-loop-nov17` at `d8f4ba2` (last runtime change) or a docs-only
-  descendant. It combines `claude/ux-gap-nov16` (`c989f4b`) and `gemini/ad-loop-nov16` (`a982987`)
-  on top of release candidate `27c1f50`, plus the setup notice on every sample page (`d8f4ba2`).
-- Test only a protected preview that the coordinator deployed from that exact SHA and gave you
-  with its URL. If you have no such URL, or the preview's SHA differs, stop and report that. Do
+- Preview A, already deployed: `https://meta-smb-osjisaqzy-navtejs-6321s-projects.vercel.app` from
+  `f83125a` (see the coordination handoff, Nov 17). Run items 1 to 11 there, except 8b.
+- Preview B, only once the coordinator deploys it: branch `claude/ux-gap-ad-loop-nov17` at
+  `b6bbb3a` (last runtime change) or a docs-only descendant. Run 8b and 12 to 14 there, and
+  repeat 7 and 8 (the hero and the notices changed after `f83125a`).
+- Test only a protected preview the coordinator deployed from one of those exact SHAs and gave you
+  with its URL. If the preview's SHA differs, stop and report that. Do
   not test production or the older `27c1f50` preview for these items.
 - The preview has Vercel Deployment Protection. Earlier runs were blocked at the Vercel login;
   get access from Nav (a bypass link or Nav's signed-in browser) before you start, or report the
@@ -52,6 +54,14 @@ Account B, setup finished with a saved shop website:
     profile, the first `/today` visit brings in the seller's listings without a click, and the
     first `/create` visit lists them under "Find products". A second visit does not scan again.
     The crawl is the free public storefront fetch, not a Muse run. Without approval, mark UNVERIFIED.
+12. Account A on `/` (preview B): the hero reads "Finish setup to see your own shop here." with
+    "Finish setup" and "Keep exploring the sample". "No account needed" appears nowhere above the
+    sample gallery. The runs count in the hero matches the header.
+13. Account A opens `/today`, `/create`, `/first-ad`, `/progress` and `/digest` directly (no
+    `workspace=sample`, preview B): a "Setup not finished" notice under the header with "Finish
+    setup". Account B sees no such notice.
+14. `/today` (preview B): the example button reads "Try a saved example" (no "n+α"). For a signed-in
+    seller with no competitor checks the brief reads "My workspace · no competitor checks yet".
 
 ## Report
 `docs/launch/HERMES_UX_GAP_NOV17.md` on your own branch: preview URL and SHA, browser and
