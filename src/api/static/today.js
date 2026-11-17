@@ -1308,6 +1308,8 @@
     const ideaSpec = requestedIdea ? findPreviewSpec(requestedIdea) : null;
 
     if (s.isSample) {
+      // Signed in but setup not finished: say this is demo data and point to the wizard.
+      if (s.state === 'account_sample') window.museModes?.checkSetupPending?.(s.ownerId);
       let restored = false;
       applyingDraft = true;
       try {

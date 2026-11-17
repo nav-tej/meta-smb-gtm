@@ -253,12 +253,29 @@
 
   // Setup not finished. A page that has read this account's workspace reports it here; the
   // sample banner then says the data is a demo, not theirs, and points to the setup wizard.
+  // The home page decides from the workspace it already reads. The editors (/today, /create)
+  // ask through checkSetupPending; they also work before setup, so their notice keeps a way in.
   let setupPendingOwner = null;
-  function setSetupPending(ownerId) {
+  let setupPendingEditor = false;
+  function setSetupPending(ownerId, options = {}) {
     const next = typeof ownerId === 'string' && ownerId ? ownerId : null;
-    if (next === setupPendingOwner) return;
+    const editor = Boolean(next && options.editor);
+    if (next === setupPendingOwner && editor === setupPendingEditor) return;
     setupPendingOwner = next;
+    setupPendingEditor = editor;
     renderModeBanners();
+  }
+  let setupCheckedOwner = null;
+  async function checkSetupPending(ownerId) {
+    if (typeof ownerId !== 'string' || !ownerId || setupCheckedOwner === ownerId) return;
+    setupCheckedOwner = ownerId;
+    try {
+      const ws = await window.museAccount?.loadWorkspace?.(ownerId);
+      if (!ws || current().ownerId !== ownerId) return;
+      setSetupPending(ws.document?.onboarding?.completed_at ? null : ownerId, { editor: true });
+    } catch {
+      setupCheckedOwner = null; // Not known: keep the ordinary sample notice, ask again next time.
+    }
   }
   function isSetupPending(stateObj) {
     const s = stateObj || current();
@@ -443,8 +460,14 @@
     } else if (setupPending) {
       banner.className = 'muse-mode-banner is-sample';
       badge.textContent = 'Demo data';
-      msg.textContent = 'This dashboard shows a sample shop, Art of Sarabjit Singh, not yours. Finish setup to see your own shop and competitors here.';
-      actions.appendChild(buildButton('Finish setup', 'finish-setup', 'primary'));
+      if (setupPendingEditor) {
+        msg.textContent = 'This page shows a sample shop, Art of Sarabjit Singh, not yours. Finish setup to bring in your own shop and competitors.';
+        actions.appendChild(buildButton('Finish setup', 'finish-setup', 'primary'));
+        actions.appendChild(buildButton('Open my workspace', 'back-to-own', 'secondary'));
+      } else {
+        msg.textContent = 'This dashboard shows a sample shop, Art of Sarabjit Singh, not yours. Finish setup to see your own shop and competitors here.';
+        actions.appendChild(buildButton('Finish setup', 'finish-setup', 'primary'));
+      }
     } else if (s.state === 'account_sample') {
       banner.className = 'muse-mode-banner is-sample';
       badge.textContent = 'Sample shop';
@@ -503,6 +526,7 @@
     autoImportPending,
     finishAutoImport,
     setSetupPending,
+    checkSetupPending,
     isSetupPending
   });
 })();

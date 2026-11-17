@@ -69,8 +69,14 @@ def test_demo_notice_copy_and_wiring() -> None:
     assert "a sample shop, Art of Sarabjit Singh, not yours" in notice
     assert "Finish setup to see your own shop and competitors here." in notice
     assert "buildButton('Finish setup', 'finish-setup', 'primary')" in notice
-    # There is no workspace of their own to go back to yet.
-    assert "back-to-own" not in notice
+    editor_notice, home_notice = notice.split("} else {", 1)
+    assert "if (setupPendingEditor) {" in editor_notice
+    assert "This page shows a sample shop" in editor_notice
+    # The editors work before setup, so their notice keeps a way into the seller's own workspace.
+    assert "buildButton('Open my workspace', 'back-to-own', 'secondary')" in editor_notice
+    # The dashboard has no workspace of their own to go back to yet.
+    assert "This dashboard shows a sample shop" in home_notice
+    assert "back-to-own" not in home_notice
     assert "—" not in notice
     assert "window.location.assign('/welcome');" in modes
     # Only for the account a page has actually checked, and only while it views the sample.
@@ -84,6 +90,18 @@ def test_demo_notice_copy_and_wiring() -> None:
     assert "homeSawSignedOut" in rule
     assert "window.museModes.enterSampleMode()" in rule
     assert "setSetupPending?.(setupPending ? server.user.id : null)" in rule
+
+    # The editors ask only while a signed-in seller views the sample shop, never in their own.
+    check = modes[modes.index("async function checkSetupPending(") :]
+    check = check[: check.index("\n  }\n")]
+    assert "window.museAccount?.loadWorkspace?.(ownerId)" in check
+    assert "current().ownerId !== ownerId" in check
+    assert "ws.document?.onboarding?.completed_at ? null : ownerId, { editor: true }" in check
+    for name in ("today.js", "creator.js"):
+        source = (STATIC_DIR / name).read_text(encoding="utf-8")
+        call = "if (s.state === 'account_sample') window.museModes?.checkSetupPending?.(s.ownerId);"
+        assert source.count(call) == 1, name
+        assert source.index("if (s.isSample) {") < source.index(call), name
 
 
 def test_dashboard_before_setup_is_an_explicit_demo_e2e(live_server_url: str) -> None:
@@ -284,6 +302,54 @@ def test_dashboard_before_setup_is_an_explicit_demo_e2e(live_server_url: str) ->
             assert "Finish setup" not in banner["buttons"]
             assert not errors, errors
             ctx.close()
+
+            # 6. The editors say the same thing before setup, and keep a way into the seller's
+            #    own workspace, since /today and /create work without setup.
+            for page_path, width in (("/today", 375), ("/create", 1440), ("/today", 1440)):
+                ctx, page, session, errors = open_page(browser, width=width)
+                page.goto(BASE + page_path + "?workspace=sample", wait_until="domcontentloaded")
+                page.wait_for_function(
+                    "(document.getElementById('museModeBanner') || {{dataset: {{}}}})"
+                    ".dataset.setup === 'pending'",
+                    timeout=15000,
+                )
+                label = page_path + " " + str(width)
+                assert mode(page) == "account_sample", label
+                banner = page.evaluate(BANNER)
+                assert banner["badge"] == "Demo data", label
+                assert "This page shows a sample shop, Art of Sarabjit Singh, not yours" in (
+                    banner["text"]
+                ), label
+                assert banner["buttons"] == ["Finish setup", "Open my workspace"], banner
+                assert banner["top"] < 250, (label, banner["top"])
+                assert page.locator("#museModeBanner").is_visible(), label
+                no_overflow(page, "demo " + label)
+                if width == 375 or page_path == "/create":
+                    page.locator("#museModeBanner button", has_text="Finish setup").click()
+                    page.wait_for_url("**/welcome", wait_until="domcontentloaded")
+                else:
+                    page.locator("#museModeBanner button", has_text="Open my workspace").click()
+                    page.wait_for_function(
+                        "document.documentElement.dataset.museMode === 'account_own'",
+                        timeout=10000,
+                    )
+                    assert "workspace=sample" not in page.url, page.url
+                    assert page.evaluate(BANNER)["hidden"] is True
+                assert not errors, (label, errors)
+                ctx.close()
+
+            #    Setup finished: the editors show the ordinary sample notice.
+            for page_path in ("/today", "/create"):
+                ctx, page, session, errors = open_page(browser, onboarding=DONE)
+                with page.expect_response(lambda r: "/api/v1/account/workspace" in r.url):
+                    page.goto(BASE + page_path + "?workspace=sample", wait_until="domcontentloaded")
+                page.wait_for_timeout(500)
+                banner = page.evaluate(BANNER)
+                assert banner["state"] == "account_sample", (page_path, banner)
+                assert banner["setup"] is None and banner["badge"] == "Sample shop", banner
+                assert banner["buttons"] == ["Back to my workspace"], banner
+                assert not errors, (page_path, errors)
+                ctx.close()
 
             browser.close()
         print("SETUP_DEMO_STATE_OK")
