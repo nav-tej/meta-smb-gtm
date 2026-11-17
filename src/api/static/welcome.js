@@ -8,6 +8,8 @@
   const LOCAL_ONBOARDING_KEY = 'muse.onboarding.v1';
   const LOCAL_WORKSPACE_MODE_KEY = 'muse.workspace_mode.v1'; // 'own' | 'sample'
   let homeSyncEpoch = 0;
+  // True once this page has shown a signed-out visitor: a sign-in after that is a fresh one.
+  let homeSawSignedOut = false;
   let lastRenderedUserId = null;
   let cleanHomeState = null;
 
@@ -1640,6 +1642,8 @@
     const sampleOpt = inner.querySelector('[data-ws="sarabjit_singh"]');
     if (!sampleOpt) return;
 
+    // Until setup is finished there is no workspace of their own to open: point to the wizard.
+    const setupDone = Boolean(onboarding?.completed_at);
     const ownBtn = document.createElement('button');
     ownBtn.type = 'button';
     ownBtn.id = 'ownWorkspaceOptionBtn';
@@ -1653,14 +1657,20 @@
     subDiv.style.fontSize = '0.8rem';
     subDiv.style.color = 'var(--text-muted)';
     subDiv.style.marginTop = '0.2rem';
-    subDiv.textContent = (onboarding?.shop_urls || []).join(' · ') || 'Your personal signed-in workspace';
+    subDiv.textContent = setupDone
+      ? ((onboarding?.shop_urls || []).join(' · ') || 'Your personal signed-in workspace')
+      : 'Finish setup to open your own workspace.';
     titleDiv.append(nameStrong, subDiv);
     const badge = document.createElement('span');
     badge.className = 'badge green';
-    badge.textContent = 'Your shop';
+    badge.textContent = setupDone ? 'Your shop' : 'Finish setup';
     ownBtn.append(titleDiv, badge);
 
     ownBtn.addEventListener('click', () => {
+      if (!setupDone) {
+        window.location.href = '/welcome';
+        return;
+      }
       try {
         localStorage.setItem(LOCAL_WORKSPACE_MODE_KEY, 'own');
       } catch (_) {}
@@ -1684,7 +1694,7 @@
     if (!document.getElementById('journey')) return;
     const seq = ++homeSyncEpoch;
     const query = new URLSearchParams(window.location.search || '');
-    const modeState = modeStateOverride || window.museModes?.current?.() || {
+    let modeState = modeStateOverride || window.museModes?.current?.() || {
       state: query.get('workspace') === 'sample' ? 'guest_sample' : 'guest_entry',
       isSample: query.get('workspace') === 'sample',
       isAuthenticated: false,
@@ -1710,6 +1720,8 @@
     if (sf) sf.hidden = modeState.state === 'account_own';
 
     if (!modeState.isAuthenticated) {
+      homeSawSignedOut = true;
+      window.museModes?.setSetupPending?.(null);
       if (lastRenderedUserId || document.getElementById('ownWorkspaceOptionBtn')) {
         resetSignedOutHomeWorkspace({ preserveMode: modeState.isSample });
       }
@@ -1734,13 +1746,30 @@
     const isSignedIn = Boolean(server.user && server.user.id);
     const onboarding = isSignedIn ? (server.doc?.onboarding || null) : null;
 
-    // Post-auth routing rule: if signed-in user has no completed onboarding, redirect to /welcome
-    if (isSignedIn && (!onboarding || !onboarding.completed_at)) {
-      if (window.location.pathname === '/account' || query.has('oauth') || !modeState.isSample) {
+    const setupPending = isSignedIn && !(onboarding && onboarding.completed_at);
+
+    // Setup not finished. Arriving from sign-in (the /account landing, an OAuth return, or a
+    // sign-in on this page) still goes to the wizard. A seller who comes back to the dashboard
+    // without finishing sees the sample shop as an explicit demo, with a nudge to finish setup.
+    if (setupPending) {
+      const fromSignIn = window.location.pathname === '/account' || query.has('oauth');
+      const canShowDemo = typeof window.museModes?.enterSampleMode === 'function';
+      if (fromSignIn || (!modeState.isSample && (homeSawSignedOut || !canShowDemo))) {
         window.location.replace('/welcome');
         return;
       }
+      if (!modeState.isSample) {
+        // The mode subscriber would repeat this pass for the switch we are about to make.
+        lastHandledHomeModeKey = `account_sample:${server.user.id}:1`;
+        modeState = window.museModes.enterSampleMode();
+        if (!modeState?.isSample) {
+          window.location.replace('/welcome');
+          return;
+        }
+        if (sf) sf.hidden = false;
+      }
     }
+    window.museModes?.setSetupPending?.(setupPending ? server.user.id : null);
 
     if (modeState.isSample) {
       if (lastRenderedUserId || document.getElementById('ownWorkspaceOptionBtn')) {

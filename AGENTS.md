@@ -351,8 +351,12 @@ This app fetches arbitrary URLs, parses untrusted XML, and feeds third-party con
   - Each editor calls `museModes.finishAutoImport(ownerId, page)` once it has tried, including on failure. That is remembered on the device only (drafts are per device). It is not recorded when the editor could not try (busy, offline, sample workspace open, workspace or account switched mid-scan). Do not move this into the workspace document: every workspace write bumps the version, and seller memory opens a conflict dialog on a version it did not expect.
   - The scan is the public `/api/v1/ingest-storefront` crawl. It must never use a Muse run, and it must not lock the page while it runs.
   - `/today` replaces the item only while the draft is still the untouched placeholder (no photo, no edits). The photo is offered, never chosen for the seller.
+- Dashboard before setup (Nav's decision, 2026-11-16): a signed-in seller who has not finished onboarding and opens `/` sees the sample shop as an explicit demo. `welcome.js` (`applyHomeModeState`) switches to the sample workspace and calls `museModes.setSetupPending(ownerId)`; the mode banner then moves directly under the page header and reads "Demo data … Finish setup", linking to `/welcome`. Rules:
+  - Arriving from sign-in still goes to the wizard: the `/account` landing, an OAuth return, and a sign-in made on the home page itself.
+  - Only a page that has read the account's workspace may call `setSetupPending`. Other pages keep the ordinary sample banner.
+  - Do not render the seller's empty workspace on the dashboard before setup, and do not offer "Back to my workspace" there: there is nothing to go back to.
 - `today.js`: `buildPlan` returns early while the page is locked. After an import use `planAfterImport()`, which releases the lock and rebuilds only a missing plan, so a paid Muse plan is never overwritten. Before this fix "Find products" left "Your next three posts" empty.
-- Changed scripts carry `?v=20261116-uxgap2`. Bump the version on every page that loads a script you change. `account.css` and `account.js` versions are pinned by `tests/test_signup_followup_e2e.py`; avoid editing those files for copy changes.
+- Changed scripts carry `?v=20261116-uxgapN` (`workspace-modes.js` and `welcome.js` are at `uxgap3`, `today.js` and `creator.js` at `uxgap2`). Bump the version on every page that loads a script you change. `account.css` and `account.js` versions are pinned by `tests/test_signup_followup_e2e.py`; avoid editing those files for copy changes.
 
 ### Post-hackathon resilience pass (2026-11-06, Claude)
 - Synthesis Spark calls (competitor brief, seller audit, bid advice, creative brief, content

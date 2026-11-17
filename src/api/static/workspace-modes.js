@@ -251,6 +251,20 @@
     } catch { /* Not remembered: the next visit may look once more. */ }
   }
 
+  // Setup not finished. A page that has read this account's workspace reports it here; the
+  // sample banner then says the data is a demo, not theirs, and points to the setup wizard.
+  let setupPendingOwner = null;
+  function setSetupPending(ownerId) {
+    const next = typeof ownerId === 'string' && ownerId ? ownerId : null;
+    if (next === setupPendingOwner) return;
+    setupPendingOwner = next;
+    renderModeBanners();
+  }
+  function isSetupPending(stateObj) {
+    const s = stateObj || current();
+    return Boolean(setupPendingOwner) && s.state === 'account_sample' && s.ownerId === setupPendingOwner;
+  }
+
   function notify() {
     const resolved = computeState();
     renderModeBanners();
@@ -314,18 +328,11 @@
     });
   }
 
-  function ensureBannerElement() {
-    if (typeof document === 'undefined' || !document.body) return null;
-    let banner = document.getElementById('museModeBanner');
-    if (banner) return banner;
-    banner = document.createElement('div');
-    banner.id = 'museModeBanner';
-    banner.className = 'muse-mode-banner';
-    banner.hidden = true;
+  function placeBannerDefault(banner) {
     const host = document.getElementById('museModeBannerHost');
     if (host) {
       host.appendChild(banner);
-      return banner;
+      return;
     }
     const anchor = document.querySelector('main, .shell, .app-shell, .ms-main');
     if (anchor && anchor.parentNode) {
@@ -335,7 +342,30 @@
       if (header && header.parentNode) header.parentNode.insertBefore(banner, header.nextSibling);
       else document.body.insertBefore(banner, document.body.firstChild);
     }
+  }
+
+  function ensureBannerElement() {
+    if (typeof document === 'undefined' || !document.body) return null;
+    let banner = document.getElementById('museModeBanner');
+    if (banner) return banner;
+    banner = document.createElement('div');
+    banner.id = 'museModeBanner';
+    banner.className = 'muse-mode-banner';
+    banner.hidden = true;
+    placeBannerDefault(banner);
     return banner;
+  }
+
+  // The demo notice has to be the first thing a seller sees, so it sits directly under the page
+  // header. On the home page the usual spot is below the hero. Every other banner stays put.
+  function placeBanner(banner, underHeader) {
+    const want = underHeader ? 'top' : 'default';
+    if ((banner.dataset.placement || 'default') === want) return;
+    const header = underHeader ? document.querySelector('body > header') : null;
+    if (underHeader && !(header && header.parentNode)) return;
+    if (underHeader) header.parentNode.insertBefore(banner, header.nextSibling);
+    else placeBannerDefault(banner);
+    banner.dataset.placement = want;
   }
 
   function buildButton(label, action, variant) {
@@ -355,6 +385,8 @@
         window.museAccount?.open?.('signup', 'Create an account to save your own shop workspace.');
       } else if (action === 'back-to-own') {
         goToOwnWorkspace();
+      } else if (action === 'finish-setup') {
+        window.location.assign('/welcome');
       }
     });
     return btn;
@@ -365,7 +397,11 @@
     const banner = customHost || ensureBannerElement();
     if (!banner) return null;
     const s = computeState();
+    const setupPending = isSetupPending(s);
     banner.dataset.modeState = s.state;
+    if (setupPending) banner.dataset.setup = 'pending';
+    else delete banner.dataset.setup;
+    if (!customHost) placeBanner(banner, setupPending);
     banner.textContent = '';
 
     if (s.state === 'account_own' || s.state === 'guest_entry') {
@@ -404,6 +440,11 @@
       msg.textContent = 'Your session ended. Sign in again to open your workspace; your unsaved device edits are safe.';
       actions.appendChild(buildButton('Sign in again', 'signin', 'primary'));
       actions.appendChild(buildButton('Retry', 'retry-auth', 'secondary'));
+    } else if (setupPending) {
+      banner.className = 'muse-mode-banner is-sample';
+      badge.textContent = 'Demo data';
+      msg.textContent = 'This dashboard shows a sample shop, Art of Sarabjit Singh, not yours. Finish setup to see your own shop and competitors here.';
+      actions.appendChild(buildButton('Finish setup', 'finish-setup', 'primary'));
     } else if (s.state === 'account_sample') {
       banner.className = 'muse-mode-banner is-sample';
       badge.textContent = 'Sample shop';
@@ -460,6 +501,8 @@
     renderModeBanners,
     subscribe,
     autoImportPending,
-    finishAutoImport
+    finishAutoImport,
+    setSetupPending,
+    isSetupPending
   });
 })();
