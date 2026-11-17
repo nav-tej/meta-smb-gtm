@@ -4,7 +4,7 @@ Branch `claude/ux-gap-nov16`, based on release candidate `27c1f50`, pushed to or
 
 Two passes, in order:
 1. `18768d0`: the first-ad guide is reachable.
-2. The commit after `52350ec` ("Bring in the seller's own listings after onboarding"): the editors use the shop saved in onboarding.
+2. `a1ee43e`: the editors use the shop saved in onboarding.
 
 `52350ec` is docs only: a proposed assignment for Antigravity, `docs/launch/antigravity-ad-loop-assignment.md`.
 
