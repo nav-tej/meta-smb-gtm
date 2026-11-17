@@ -13,19 +13,25 @@ flow exists at `/first-ad` and is now linked from the home nav, `/today`, `/crea
 2. The first-ad guide ends at the Ads Manager checklist and never tells the seller to bring
    results back for bid advice.
 
-Claude's work on this branch is in `today.js`, `creator.js` and `workspace-modes.js` (bringing
-in the seller's saved shop on the first visit after onboarding). Stay inside the scope below so
-the two branches merge cleanly.
+Claude's work on this branch is in `today.js`, `creator.js`, `workspace-modes.js`, two functions
+in `welcome.js` and one response field in `src/api/accounts.py` (bringing in the seller's saved
+shop on a first visit, and showing the dashboard as a demo before setup is finished). Stay inside
+the scope below so the two branches merge cleanly.
 
 ## Base and branch
 - Base: the tip of `origin/claude/ux-gap-nov16` when you start (`git fetch origin` first). It
-  contains `18768d0` (first-ad links) and the later commit "Bring in the seller's own listings
-  after onboarding". Record the exact SHA you based on in your report.
-- That later commit touched two files in your scope, in places you do not need: four lines in
-  `welcome.js` right after onboarding completion (`requestAutoImport`), and the `?v=` version on
-  the `workspace-modes.js` and `welcome.js` script tags in `index.html`, `first-ad.html` and
-  `welcome.html`. Leave those lines as they are. If you change `welcome.js` or another script,
-  bump its `?v=` on every page that loads it.
+  contains `18768d0` (first-ad links), `5e0bdab` (listings on any device) and `d684369`
+  (dashboard demo before setup). Record the exact SHA you based on in your report.
+- Those commits touched files in your scope, in places you do not need. Leave them as they are:
+  - `welcome.js`: `applyHomeModeState` and `injectLoginDialogSwitcher` (the setup-pending rule),
+    and the `homeSawSignedOut` variable at the top. Your part 7 work is in
+    `renderSignedInHomeWorkspace`, which was not changed.
+  - `index.html`, `first-ad.html`, `welcome.html`: only the `?v=` on the `workspace-modes.js`
+    and `welcome.js` script tags (now `20261116-uxgap3`). If you change `welcome.js` or another
+    script, bump its `?v=` on every page that loads it.
+- New state to keep in mind: a signed-in seller who has not finished setup now sees the home
+  page as the sample shop with a "Demo data" banner under the header. Your links there follow
+  the sample workspace through `data-mode-link`, like any other sample view.
 - If you already started from `18768d0`, keep going and merge the branch tip before you report.
 - Work in a new isolated worktree on a new branch `gemini/ad-loop-nov16`. Do not use the Mac
   checkout at `/Users/nav/meta-smb-gtm` (detached, dirty, must be preserved).
@@ -33,8 +39,8 @@ the two branches merge cleanly.
 ## Step 0: independent baseline (read-only, before any edit)
 1. Run the full offline gate on your base commit and record the exact counts:
    `DEMO_MODE=true META_MODEL_API_KEY= DEMO_KEY= make PY=.venv/bin check`
-   Claude's builder results were 609 passed, 2 skipped on `18768d0`, 613 passed, 2 skipped on
-   `e5daeae` and 614 passed, 2 skipped on the branch tip after one more browser test, each with 1 warning and lint and format clean. Report yours separately;
+   Claude's builder result on `d684369` was 616 passed, 2 skipped, with 1 warning and lint and
+   format clean. Report yours separately;
    do not copy these numbers.
 2. In a real browser against a local demo-mode server, walk `/create` to step 4 (Ready to share)
    at 375px and 1440px and confirm the "Prepare your first ad" offer is visible, does not cause
@@ -60,7 +66,9 @@ the two branches merge cleanly.
 
 ## Do NOT touch
 `today.js`, `today.html`, `creator.js`, `creator.html`, `workspace-modes.js`, `progress.html`,
-`account.js`, `muse-shell.js`, `tests/test_first_ad_entry_points.py`, `AGENTS.md`,
+`account.js`, `account.css`, `muse-shell.js`, `src/api/accounts.py`,
+`tests/test_first_ad_entry_points.py`, `tests/test_first_visit_import_e2e.py`,
+`tests/test_setup_demo_state_e2e.py`, `AGENTS.md`,
 `docs/launch/CLAUDE_UX_GAP_NOV16.md`, anything under billing, auth or `supabase/`. No new runtime
 endpoints. If you believe one of these needs a change, write it in your report instead.
 
