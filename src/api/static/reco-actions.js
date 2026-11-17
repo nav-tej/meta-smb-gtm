@@ -1000,13 +1000,80 @@
     if (steerForm && steerInput) {
       track('directive_suggested_shown', { surface: 'home_research' });
       var activeDirective = null;
+      var steerAnswer = document.getElementById('jrSteerAnswer');
+
+      // Answers come from the moves already on the page (sample shop) or point to the right tool
+      // (own workspace). Nothing here calls the model or uses a run.
+      var SAMPLE_MOVES = {
+        women: { badge: 'High impact', title: 'Feature your Empowering Women series', why: 'SikhiArt groups its art by warriors and saints but has no group for women.', idea: 'idea-1-empowering-women', cta: 'Make this post' },
+        starter: { badge: 'High impact', title: 'Lead with your $14 to $22 Pixels prints', why: 'SikhiArt\u2019s cheapest print is $59.99. Make yours the easy first purchase.', idea: 'idea-2-starter-prints', cta: 'Make a shop-visit post' },
+        gift: { badge: 'Reaches gift buyers', title: 'Make a gift-ready post', why: 'SikhiArt uses gift wording but has nothing under $59.99.', idea: 'idea-3-gift-ready', cta: 'Make a gift post' },
+        titles: { badge: 'Search visibility', title: 'Add \u201cfor your home\u201d to your listing titles', why: 'Buyers search for sacred decor, not generic paintings.', idea: 'idea-4-home-titles', cta: 'Make this post' },
+        story: { badge: 'Quick win', title: 'Tell one painting story', why: 'SikhiArt has only two blog pages. Ek Onkar is ready to go.', idea: 'idea-5-painting-story', cta: 'Create this post' },
+        ad: { badge: 'If you run ads', title: 'Prepare your first ad', why: 'Pick an outcome, audience and budget, then publish it yourself in Ads Manager.', path: '/first-ad', cta: 'Open the first-ad guide' }
+      };
+      var SAMPLE_BY_FOCUS = { posting: ['story', 'women'], pricing: ['starter'], gifting: ['gift', 'starter'], products: ['story', 'titles'], seo: ['titles'], ads: ['ad'], audience: ['women', 'gift'] };
+      var OWN_BY_FOCUS = {
+        posting: { title: 'Plan this week\u2019s posts', why: 'Today\u2019s studio drafts three posts from your own listings.', path: '/today', cta: 'Open today\u2019s studio' },
+        pricing: { title: 'Compare prices with a competitor', why: 'Add a competitor on this page to see where your prices sit.', path: '#loop-research', cta: 'Go to competitors' },
+        gifting: { title: 'Make a gift post', why: 'Pick one of your listings and show it as a gift.', path: '/create', cta: 'Open the studio' },
+        products: { title: 'Start with one quick post', why: 'One post from a listing you already have.', path: '/today', cta: 'Open today\u2019s studio' },
+        seo: { title: 'Rewrite one listing title', why: 'Make one title say what buyers search for.', path: '/create', cta: 'Open the studio' },
+        ads: { title: 'Prepare your first ad', why: 'Pick an outcome, audience and budget, then publish it yourself in Ads Manager.', path: '/first-ad', cta: 'Open the first-ad guide' },
+        audience: { title: 'See who your competitors reach', why: 'Check a competitor on this page and see their ads on Meta.', path: '#loop-research', cta: 'Go to competitors' }
+      };
+      var modes = function () { return window.museModes || null; };
+      var renderSteerAnswer = function (focus) {
+        if (!steerAnswer) return;
+        var m = modes();
+        var sample = !!(m && m.isSampleMode && m.isSampleMode());
+        var items = [];
+        if (sample) {
+          (SAMPLE_BY_FOCUS[focus] || SAMPLE_BY_FOCUS.posting).forEach(function (key) {
+            var move = SAMPLE_MOVES[key];
+            var href = move.idea
+              ? (m && m.sampleHref ? m.sampleHref('/create', { idea: move.idea }) : '/create?workspace=sample&idea=' + move.idea)
+              : (m && m.sampleHref ? m.sampleHref(move.path) : move.path + '?workspace=sample');
+            items.push({ badge: move.badge, title: move.title, why: move.why, href: href, cta: move.cta });
+          });
+        } else {
+          var own = OWN_BY_FOCUS[focus] || OWN_BY_FOCUS.posting;
+          var ownHref = own.path.charAt(0) === '#' ? own.path : (m && m.ownHref ? m.ownHref(own.path) : own.path);
+          items.push({ badge: 'Start here', title: own.title, why: own.why, href: ownHref, cta: own.cta });
+        }
+        while (steerAnswer.firstChild) steerAnswer.removeChild(steerAnswer.firstChild);
+        var lead = document.createElement('p');
+        lead.className = 'jr-steer-answer-lead';
+        lead.textContent = sample ? 'Start with these, from the saved research for Art of Sarabjit Singh:' : 'Start here:';
+        steerAnswer.appendChild(lead);
+        items.forEach(function (item) {
+          var a = document.createElement('a');
+          a.className = 'jr-steer-move';
+          a.href = item.href;
+          a.setAttribute('data-focus', focus);
+          [['span', 'jr-steer-move-badge', item.badge], ['strong', '', item.title], ['span', 'jr-steer-move-why', item.why], ['span', 'jr-steer-move-cta', item.cta + ' \u2192']].forEach(function (part) {
+            var el = document.createElement(part[0]);
+            if (part[1]) el.className = part[1];
+            el.textContent = part[2];
+            a.appendChild(el);
+          });
+          a.addEventListener('click', function () { track('directive_move_opened', { focus: focus }); });
+          steerAnswer.appendChild(a);
+        });
+        steerAnswer.hidden = false;
+      };
+      window.addEventListener('muse:mode-change', function () {
+        if (steerAnswer) steerAnswer.hidden = true;
+        if (directivePreview) directivePreview.hidden = true;
+      });
 
       var parseDirective = async function (text, source) {
         if (!text) return;
         if (steerStatus) {
           steerStatus.hidden = false;
-          steerStatus.textContent = 'Parsing directive safely…';
+          steerStatus.textContent = 'Reading your question…';
         }
+        if (steerAnswer) steerAnswer.hidden = true;
         try {
           var resp = await fetch('/api/v1/directives/parse', {
             method: 'POST',
@@ -1019,16 +1086,18 @@
             throw new Error(data.detail || 'Could not parse directive.');
           }
           activeDirective = data.directive;
-          if (directiveSummary) directiveSummary.textContent = data.summary;
-          if (directiveCost) directiveCost.textContent = 'Cost: ' + (data.cost || '0 runs');
+          if (directiveSummary) directiveSummary.textContent = String(data.summary || '').replace(/^Directive parsed:\s*/, 'Muse understood: ');
+          if (directiveCost) directiveCost.textContent = 'No runs used';
           if (directivePreview) directivePreview.hidden = false;
           if (steerStatus) steerStatus.hidden = true;
+          renderSteerAnswer(activeDirective && activeDirective.focus);
           track('directive_created', { source: source || 'typed', focus: activeDirective.focus });
         } catch (err) {
           if (steerStatus) {
             steerStatus.hidden = false;
-            steerStatus.textContent = 'Refused: ' + err.message;
+            steerStatus.textContent = 'Muse could not use that question: ' + err.message + ' Try one of the suggestions.';
           }
+          if (steerAnswer) steerAnswer.hidden = true;
           track('directive_rejected', { reason: err.message });
         }
       };
@@ -1054,9 +1123,8 @@
           } catch (_) {}
           if (steerStatus) {
             steerStatus.hidden = false;
-            steerStatus.textContent = '✓ Research directive confirmed and saved on this device (0 runs used).';
+            steerStatus.textContent = 'Focus confirmed and remembered on this device. No runs used.';
           }
-          if (directivePreview) directivePreview.hidden = true;
           track('directive_confirmed', { cost: 'free' });
         });
       }

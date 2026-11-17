@@ -979,6 +979,16 @@
       .finding-head { flex-wrap: wrap; }
       code, .channel-chip, .finding-item a, .journey a { overflow-wrap: anywhere; }
     }
+  /* "Ask Muse what to do next": the answer shows the moves to start with. */
+  .jr-steer-answer { display: grid; gap: 10px; margin-top: 12px; }
+  .jr-steer-answer[hidden] { display: none; }
+  .jr-steer-answer-lead { margin: 0; font-weight: 700; }
+  .jr-steer-move { display: block; padding: 12px 14px; border: 1px solid #d9e4dc; border-radius: 10px; background: #fbfdfb; color: inherit; text-decoration: none; min-width: 0; }
+  .jr-steer-move:hover, .jr-steer-move:focus-visible { border-color: #2f6f4f; }
+  .jr-steer-move-badge { display: block; font-size: 0.72rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: #2f6f4f; }
+  .jr-steer-move strong { display: block; margin: 2px 0; }
+  .jr-steer-move-why { display: block; font-size: 0.9rem; color: #4a5a52; overflow-wrap: anywhere; }
+  .jr-steer-move-cta { display: inline-block; margin-top: 6px; font-weight: 700; color: #1b6e44; }
 </style>
   <link rel="stylesheet" href="/static/portal-journey.css?v=20261106-ui2">
   <link rel="stylesheet" href="/static/reco-actions.css?v=20261112-integrated">
@@ -988,7 +998,7 @@
   <link rel="stylesheet" href="/static/muse-shell.css?v=20261112-integrated">
   <link rel="stylesheet" href="/static/seller-memory.css?v=20261112-integrated">
   <script src="/static/analytics.js?v=20261109-ux" defer></script>
-  <script src="/static/reco-actions.js?v=20261112-integrated" defer></script>
+  <script src="/static/reco-actions.js?v=20261117-uxgap7" defer></script>
   <script src="/static/account.js?v=20261112-integrated" defer></script>
   <script src="/static/workspace-modes.js?v=20261117-uxgap6" defer></script>
   <script src="/static/muse-shell.js?v=20261117-uxgap6" defer></script>
@@ -1282,16 +1292,16 @@
           <article class="jr-card c2 jr-steer-card" id="jrSteerResearch" style="grid-column:1 / -1;margin-top:0.5rem;">
             <header>
               <div style="display:flex;justify-content:space-between;align-items:center;">
-                <h3>Tell Muse what to look into</h3>
-                <span class="jr-badge-sub" style="font-size:0.75rem;padding:2px 8px;border-radius:6px;background:#eef7f2;color:#2f6f4f;font-weight:700;">Track I · Steerable research</span>
+                <h3>Ask Muse what to do next</h3>
+                <span class="jr-badge-sub" style="font-size:0.75rem;padding:2px 8px;border-radius:6px;background:#eef7f2;color:#2f6f4f;font-weight:700;">Free · no runs</span>
               </div>
             </header>
-            <p style="margin:0 0 0.75rem;font-size:0.88rem;color:#555047;">Direct research with your own words. Muse parses your question into a safe directive without sending raw text to the model. Re-ranking from cache is free.</p>
+            <p style="margin:0 0 0.75rem;font-size:0.88rem;color:#555047;">Pick a question or type your own. Muse matches it to the moves on this page and shows where to start. Your words are never sent to the AI model, and asking uses no runs.</p>
             
             <form id="jrSteerForm" class="jr-steer-form" novalidate style="display:grid;gap:0.6rem;">
               <div style="display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center;min-width:0;">
                 <input id="jrSteerInput" type="text" placeholder="e.g. Look at why SikhiArt dropped prints to $45 or find gift ideas under $50" maxlength="300" style="flex:1 1 200px;min-width:0;max-width:100%;min-height:42px;padding:0.5rem 0.8rem;border:1px solid #d5cfc2;border-radius:10px;font:inherit;">
-                <button type="submit" class="jr-mini primary" id="jrSteerSubmitBtn" style="min-height:42px;padding:0.5rem 1rem;">Parse directive →</button>
+                <button type="submit" class="jr-mini primary" id="jrSteerSubmitBtn" style="min-height:42px;padding:0.5rem 1rem;">Ask →</button>
               </div>
               
               <div class="jr-steer-chips" id="jrSteerChips" style="display:flex;flex-wrap:wrap;gap:0.4rem;align-items:center;">
@@ -1307,8 +1317,9 @@
                   <strong id="jrDirectiveSummary" style="display:block;font-size:0.88rem;color:#1e3a29;"></strong>
                   <span id="jrDirectiveCost" style="font-size:0.75rem;color:#6b665c;"></span>
                 </div>
-                <button type="button" class="jr-mini primary" id="jrConfirmDirectiveBtn">Confirm &amp; Apply</button>
+                <button type="button" class="jr-mini" id="jrConfirmDirectiveBtn">Remember this focus</button>
               </div>
+              <div id="jrSteerAnswer" class="jr-steer-answer" hidden></div>
               <p id="jrSteerStatus" role="status" aria-live="polite" style="margin:0;font-size:0.82rem;color:#2f6f4f;" hidden></p>
             </form>
           </article>
