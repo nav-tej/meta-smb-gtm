@@ -16,6 +16,7 @@ Commits, in order:
 | `8a113f2` | Merge of Antigravity's `gemini/ad-loop-nov16` (`a982987`) on branch `claude/ux-gap-ad-loop-nov17`. |
 | `d8f4ba2` | Pass 6 (Nov 17): the nudge on every page that shows the sample (`/first-ad`, `/progress`, `/digest`), run from `workspace-modes.js`; home and the wizard opt out. |
 | `b6bbb3a` | Pass 7 (Nov 17): signed-in gaps found by comparing guest, new and set-up sellers: a setup hero in the demo, a "Setup not finished" notice when a page is opened directly in the own workspace, `/today` copy fixes, "Try saved n+α example" renamed. |
+| `0e3ddb7` | Pass 8 (Nov 17): the home "Ask Muse what to do next" card (was "Tell Muse what to look into") answers in place with moves to act on; the old "Confirm & Apply" only saved to the browser. Gate 620 passed, 2 skipped; audits 27/27 and 20/20. |
 
 Passes 3 and 4 are separate commits so the coordinator can take either one. Both touch `workspace-modes.js` and the script version tags, so taking pass 4 alone needs a small manual merge.
 

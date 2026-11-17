@@ -62,6 +62,10 @@ Account B, setup finished with a saved shop website:
     setup". Account B sees no such notice.
 14. `/today` (preview B): the example button reads "Try a saved example" (no "n+α"). For a signed-in
     seller with no competitor checks the brief reads "My workspace · no competitor checks yet".
+15. Home "Ask Muse what to do next" (needs a preview from `0e3ddb7` or later): in the sample shop,
+    "Weekly post ideas" shows "Tell one painting story" and "Feature your Empowering Women series",
+    each linking to `/create?workspace=sample&idea=...`; for a signed-in seller in their own
+    workspace it shows one move pointing to `/today`. No runs used.
 
 ## Report
 `docs/launch/HERMES_UX_GAP_NOV17.md` on your own branch: preview URL and SHA, browser and
