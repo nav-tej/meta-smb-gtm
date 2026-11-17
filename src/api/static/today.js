@@ -929,6 +929,106 @@
       return false;
     }
   }
+  function listingChoices(data) {
+    const items = (data?.discovered_catalog_items || []).filter(item => safeURL(item.url));
+    const products = items.filter(item => ['products', 'listings'].includes(item.bucket));
+    return products.length ? products : items;
+  }
+  // An import clears the three-post plan when it replaces the item. buildPlan returns early
+  // while the page is locked, so release the lock first and let it take its own. A plan the
+  // seller already has (which may be a paid Muse plan) is kept, never rebuilt.
+  async function planAfterImport() {
+    lock(false);
+    if (!currentPlan()) await buildPlan(false, true);
+  }
+  function renderListingChoices(choices) {
+    $('importItems').replaceChildren();
+    for (const [i, item] of choices.entries()) { const button = document.createElement('button'); button.type = 'button'; button.textContent = `${i === 0 ? 'Suggested: ' : ''}${item.title || 'View listing'}`; button.addEventListener('click', async () => { if (state.busy) return; lock(true, 'readListing'); try { await useReference(item.url, { preserveExisting: true, selectIfEmpty: false }); render(); await planAfterImport(); persist(); } catch (error) { $('importStatus').textContent = error.message; notice(error.message, true); } finally { lock(false); } }); $('importItems').append(button); }
+  }
+
+  // First visit after setup. Onboarding leaves a one-time request on this device (see
+  // requestAutoImport in workspace-modes.js). When My workspace opens here with that request,
+  // a saved shop website and a draft that is still the untouched placeholder, the seller's own
+  // listings are brought in without a click. The scan is a public crawl (no Muse run) and
+  // does not lock the page; only the short step that applies the first listing does.
+  let autoImportRunning = false;
+  function placeholderDraft(shopName = '') {
+    if (state.original || state.image || Object.keys(state.edits || {}).length) return false;
+    const title = state.product?.title || '';
+    return title === neutralProduct(shopName).title || title === neutralProduct().title;
+  }
+  async function autoImportSavedShop(owner, shopName = '') {
+    const modes = window.museModes;
+    if (autoImportRunning || !owner || !modes?.autoImportPending?.(owner, 'today')) return;
+    const url = safeURL(state.shopWebsiteUrl);
+    // Nothing to bring in, or the seller is already working on something: drop the request.
+    if (!url || !placeholderDraft(shopName)) { modes.finishAutoImport?.(owner, 'today'); return; }
+    // Busy or offline: keep the request for the next visit.
+    if (state.busy || isOfflineNow()) return;
+    const epoch = draftEpoch;
+    const host = new URL(url).hostname.replace(/^www\./, '');
+    const current = () => epoch === draftEpoch && draftReady && draftOwner === owner && !isEffectiveSample();
+    const status = text => { if ($('importStatus')) $('importStatus').textContent = text; };
+    const count = n => `${n} listing${n === 1 ? '' : 's'}`;
+    let tried = false;
+    autoImportRunning = true;
+    const looking = `Looking for your listings on ${host}, the website you saved during setup. You can keep working.`;
+    status(looking);
+    notice(looking, false, true);
+    try {
+      const data = await jsonRequest('/api/v1/ingest-storefront', { website_url: url, business_name: shopName || host, max_urls_per_source: 20 });
+      if (!current()) return;
+      const choices = listingChoices(data);
+      if (!choices.length) {
+        tried = true;
+        status('No listings found automatically. Paste a product link or enter your item below.');
+        notice(`We could not find listings on ${host} automatically. Paste a product link above, or choose “Enter details manually”.`);
+        return;
+      }
+      renderListingChoices(choices);
+      if (state.busy || !placeholderDraft(shopName)) {
+        // The seller started on something while the scan ran: offer the listings, change nothing.
+        tried = true;
+        status(`Found ${count(choices.length)} on ${host}. Choose one to use it.`);
+        notice(`Found ${count(choices.length)} on ${host}. Choose “Change” to pick one. Your draft is unchanged.`);
+        return;
+      }
+      let opened = true;
+      lock(true, 'findItems');
+      try { await useReference(choices[0].url, { preserveExisting: true, selectIfEmpty: false }); }
+      catch { opened = false; }
+      finally { lock(false); }
+      if (!current()) return;
+      if (!opened) {
+        tried = true;
+        status(`Found ${count(choices.length)} on ${host}. Choose one to use it.`);
+        notice(`Found ${count(choices.length)} on ${host}, but could not open the first one. Choose “Change” to pick a listing.`);
+        return;
+      }
+      // A workspace refresh can cancel the listing read; keep the request and try next visit.
+      if (placeholderDraft(shopName)) return;
+      tried = true;
+      state.source = `From ${host} · check product facts`;
+      state.why_this = '';
+      render();
+      await planAfterImport();
+      if (!current()) return;
+      persist();
+      status(`Listings loaded from ${host}. Choose an image in “Choose an image” or select another listing.`);
+      notice(`Started with “${state.product.title}” from ${host}. Choose an image below, or choose “Change” to pick another listing.`);
+    } catch (error) {
+      if (!current()) return;
+      tried = true;
+      status(`We could not read ${host} automatically. ${error?.message || ''}`.trim());
+      notice(`We could not read ${host} automatically. Choose “Find products” to try again, or enter your item manually.`);
+    } finally {
+      autoImportRunning = false;
+      if (tried) modes.finishAutoImport?.(owner, 'today');
+      // Abandoned part-way (workspace switched or refreshed): never leave "Looking…" on screen.
+      if ($('importStatus')?.textContent === looking) status('Pick from your shop, or enter an item below.');
+      if ($('notice')?.textContent === looking) { $('notice').hidden = true; $('notice').className = ''; $('notice').textContent = ''; }
+    }
+  }
   async function findItems(sourceOverride = '') {
     const ownerEpoch = draftEpoch;
     if (state.busy) return;
@@ -947,7 +1047,7 @@
     try {
       const data = await jsonRequest('/api/v1/ingest-storefront', { website_url: url, business_name: new URL(url).hostname, max_urls_per_source: 20 });
       if (ownerEpoch !== draftEpoch) return;
-      const items = (data.discovered_catalog_items || []).filter(item => safeURL(item.url)); const products = items.filter(item => ['products', 'listings'].includes(item.bucket)); const choices = products.length ? products : items;
+      const choices = listingChoices(data);
       const fetched = (data.channels || []).some(channel => channel.status === 'fetched');
       if (fetched && $('saveShopWebsite')?.checked && !isEffectiveSample()) {
         await persistShopWebsiteUrl(url);
@@ -957,11 +1057,11 @@
         notice('No product listings came back automatically. Enter your item details manually below — your existing draft is still here.');
         return;
       }
-      for (const [i, item] of choices.entries()) { const button = document.createElement('button'); button.type = 'button'; button.textContent = `${i === 0 ? 'Suggested: ' : ''}${item.title || 'View listing'}`; button.addEventListener('click', async () => { if (state.busy) return; lock(true, 'readListing'); try { await useReference(item.url, { preserveExisting: true, selectIfEmpty: false }); render(); persist(); } catch (error) { $('importStatus').textContent = error.message; notice(error.message, true); } finally { lock(false); } }); $('importItems').append(button); }
+      renderListingChoices(choices);
       await useReference(choices[0].url, { preserveExisting: true, selectIfEmpty: false });
       if (ownerEpoch !== draftEpoch) return;
       render();
-      await buildPlan(false, true);
+      await planAfterImport();
       persist();
       $('importStatus').textContent = 'Listings loaded. Choose an image in “Choose an image” or select a listing.';
       notice('Website scanned. Your existing draft & photo are preserved — choose an image below when ready.');
@@ -1191,6 +1291,8 @@
     if (todayInitializedOnce && draftReady && activeSampleMode !== !!s.isSample) {
       persistDraft();
     }
+    // Listings found for one workspace must not stay on offer in the other.
+    if (activeSampleMode !== !!s.isSample) $('importItems')?.replaceChildren?.();
     activeSampleMode = !!s.isSample;
     draftOwner = nextOwner;
     draftOwnerBound = true;
@@ -1255,6 +1357,7 @@
     }
     draftReady = true;
 
+    let savedShop = null;
     if (s.state === 'account_own' && s.ownerId && window.museAccount?.loadWorkspace) {
       const guard = window.museModes?.bindAsyncGuard?.() || { isCurrent: () => true };
       try {
@@ -1264,6 +1367,7 @@
         const shopUrls = Array.isArray(onb.shop_urls) ? onb.shop_urls.filter(Boolean) : [];
         const shopName = String(onb.business_name || '').trim();
         state.shopWebsiteUrl = shopUrls[0] || '';
+        savedShop = { name: shopName };
         if ($('savedShopWebsiteNote')) {
           $('savedShopWebsiteNote').textContent = state.shopWebsiteUrl
             ? `Saved studio website: ${state.shopWebsiteUrl}`
@@ -1289,6 +1393,8 @@
     syncTodayFrameControls();
     renderTodayImagePicker();
     buildPlan();
+    // Only after this account's workspace loaded, and never over a recommendation handoff.
+    if (savedShop && !handoff) autoImportSavedShop(s.ownerId, savedShop.name);
   }
 
   if ($('todayImgSrcWebsiteBtn')) $('todayImgSrcWebsiteBtn').addEventListener('click', () => { todayImageSource = 'website'; renderTodayImagePicker(); });

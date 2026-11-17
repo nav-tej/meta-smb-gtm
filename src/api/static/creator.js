@@ -967,6 +967,54 @@
     }
     finally { clearTimeout(timer); setBusy(false); }
   }
+  // First visit after setup. Onboarding leaves a one-time request on this device (see
+  // requestAutoImport in workspace-modes.js). When My workspace opens here with that request
+  // and a saved shop website, the seller's own listings are offered under "Find products"
+  // without a click and without locking the wizard. Nothing in the draft changes until the
+  // seller picks a listing. The scan is a public crawl: no Muse run is used.
+  let autoImportRunning = false;
+  async function autoImportSavedShop(owner, shopName = '') {
+    const modes = window.museModes;
+    if (autoImportRunning || !owner || !modes?.autoImportPending?.(owner, 'create')) return;
+    const url = safeLink(state.shopWebsiteUrl);
+    // No saved website, a photo already chosen, or past the product step: drop the request.
+    if (!url || state.original || state.step !== 0) { modes.finishAutoImport?.(owner, 'create'); return; }
+    // Busy or offline: keep the request for the next visit.
+    if (state.busy || isOfflineNow()) return;
+    const epoch = draftEpoch;
+    const host = new URL(url).hostname.replace(/^www\./, '');
+    const current = () => epoch === draftEpoch && draftReady && draftOwner === owner && !isEffectiveSample();
+    let tried = false;
+    autoImportRunning = true;
+    const hint = $('importHint'); const hintBefore = hint.textContent;
+    const looking = `Looking for your listings on ${host}, the website you saved during setup…`;
+    hint.textContent = looking;
+    const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), 45000);
+    try {
+      const response = await fetch('/api/v1/ingest-storefront', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ business_name: (shopName || host).slice(0, 160), website_url: url, max_urls_per_source: 30 }), signal: controller.signal });
+      let data = {}; try { data = await response.json(); } catch { /* Gateways may return an HTML timeout page. */ }
+      if (!current()) return;
+      tried = true;
+      if (!response.ok) throw new Error('Shop website could not be read.');
+      // A manual scan started meanwhile shows its own results.
+      if (state.busy) return;
+      const items = data.discovered_catalog_items || [];
+      showImportedItems(items, data.business_name || shopName || 'your shop');
+      if (!items.length) return;
+      if (!state.original) fetchWebsiteImageCandidates(items[0].url || url);
+      notify(`Found ${items.length} listing${items.length === 1 ? '' : 's'} on ${host}. Choose one to bring its details into your post.`);
+    } catch {
+      if (!current()) return;
+      tried = true;
+      hint.textContent = `We could not read ${host} automatically. Choose “Find products” to try again, or enter the details below.`;
+    } finally {
+      clearTimeout(timer);
+      autoImportRunning = false;
+      if (tried) modes.finishAutoImport?.(owner, 'create');
+      // Abandoned part-way or overtaken by a manual scan: never leave "Looking…" on screen.
+      if (hint.textContent === looking) hint.textContent = hintBefore;
+    }
+  }
   function validateProduct() { sync(); if (!state.product.name) { notify('Give your product a name first.', 'error'); $('productName').focus(); return false; } if (!state.original) { if ($('moreDetails')) $('moreDetails').open = true; notify('Add a product photo first to preview or export your image.', 'error', { text: 'Add photo', onClick: promptPhotoUpload }); return false; } if (state.product.link && !safeLink(state.product.link)) { $('moreDetails').open = true; notify('Use a complete http:// or https:// product link, or leave it empty.', 'error'); $('productLink').focus(); return false; } return true; }
   function go(step) {
     if (state.busy || (step > 0 && !validateProduct())) return;
@@ -1515,6 +1563,8 @@
     if (creatorInitializedOnce && draftReady && activeSampleMode !== !!s.isSample) {
       persistDraft();
     }
+    // Listings found for one workspace must not stay on offer in the other.
+    if (activeSampleMode !== !!s.isSample && $('importResults')) { $('importResults').replaceChildren?.(); $('importResults').hidden = true; }
     activeSampleMode = !!s.isSample;
     draftOwner = nextOwner;
     draftOwnerBound = true;
@@ -1592,6 +1642,7 @@
     }
     draftReady = true;
 
+    let savedShop = null;
     if (s.state === 'account_own' && s.ownerId && window.museAccount?.loadWorkspace) {
       const guard = window.museModes?.bindAsyncGuard?.() || { isCurrent: () => true };
       try {
@@ -1612,11 +1663,14 @@
         if (!recovered && shopName) {
           initNeutralWorkspace(shopName, `Product from ${shopName}`, true);
         }
+        savedShop = { name: shopName };
       } catch {
         if (seq !== creatorModeSeq) return;
         if ($('savedShopWebsiteNote')) $('savedShopWebsiteNote').textContent = 'Add a shop website above to import your products.';
       }
     }
+    // Only after this account's workspace loaded, and never over a recommendation handoff.
+    if (savedShop && !requestedHandoffId()) autoImportSavedShop(s.ownerId, savedShop.name);
     const handoffId = requestedHandoffId();
     const handoff = readRecommendationHandoff(s.ownerId);
     if (handoffId && state.handoffId === handoffId && state.handoffActive && state.handoffContext) {

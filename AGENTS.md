@@ -346,6 +346,13 @@ This app fetches arbitrary URLs, parses untrusted XML, and feeds third-party con
 - Cross-page links that must keep the visitor in the same workspace (sample example vs. their own) use `data-mode-link="/path"`. `workspace-modes.js` rewrites their `href` on load and on every mode change. Use it for new cross-page links instead of hardcoding `?workspace=sample`.
 - Any new header or nav item must be checked at 375px. A fourth link in the `/today` header overflows the page and fails `tests/test_signup_followup_e2e.py`.
 - Product rules that still hold: Muse prepares and exports; the seller publishes. No "Launch campaign" success state, no projected ROAS, no sample timestamps moved to today without a recrawl, and no increase to free runs while abuse controls are unresolved.
+- First visit after onboarding: finishing `/welcome` with a shop website calls `museModes.requestAutoImport(ownerId)`, a one-time, per-account request stored on that device. `/today` then starts on the seller's first listing and `/create` lists their listings, each once, without a click. Rules for anyone touching this:
+  - Never scan a shop without that request. Opening an editor with a saved shop website is not enough; many browser tests rely on that, and an unmocked scan would reach the real site.
+  - Each editor calls `museModes.finishAutoImport(ownerId, page)` once it has tried, including on failure. It keeps the request only when it could not try (busy, offline, sample workspace open, workspace switched mid-scan).
+  - The scan is the public `/api/v1/ingest-storefront` crawl. It must never use a Muse run, and it must not lock the page while it runs.
+  - `/today` replaces the item only while the draft is still the untouched placeholder (no photo, no edits). The photo is offered, never chosen for the seller.
+- `today.js`: `buildPlan` returns early while the page is locked. After an import use `planAfterImport()`, which releases the lock and rebuilds only a missing plan, so a paid Muse plan is never overwritten. Before this fix "Find products" left "Your next three posts" empty.
+- Changed scripts carry `?v=20261116-uxgap`. Bump the version on every page that loads a script you change.
 
 ### Post-hackathon resilience pass (2026-11-06, Claude)
 - Synthesis Spark calls (competitor brief, seller audit, bid advice, creative brief, content

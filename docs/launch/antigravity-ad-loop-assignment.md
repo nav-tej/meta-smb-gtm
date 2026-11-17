@@ -13,20 +13,29 @@ flow exists at `/first-ad` and is now linked from the home nav, `/today`, `/crea
 2. The first-ad guide ends at the Ads Manager checklist and never tells the seller to bring
    results back for bid advice.
 
-Claude is working in `today.js` and `creator.js` at the same time (auto-importing the seller's
-saved shop on first visit). Stay inside the scope below so the two branches merge cleanly.
+Claude's work on this branch is in `today.js`, `creator.js` and `workspace-modes.js` (bringing
+in the seller's saved shop on the first visit after onboarding). Stay inside the scope below so
+the two branches merge cleanly.
 
 ## Base and branch
-- Base: `origin/claude/ux-gap-nov16` at `18768d0`. Check it exists:
-  `git fetch origin && git cat-file -e 18768d0^{commit}`.
+- Base: the tip of `origin/claude/ux-gap-nov16` when you start (`git fetch origin` first). It
+  contains `18768d0` (first-ad links) and the later commit "Bring in the seller's own listings
+  after onboarding". Record the exact SHA you based on in your report.
+- That later commit touched two files in your scope, in places you do not need: four lines in
+  `welcome.js` right after onboarding completion (`requestAutoImport`), and the `?v=` version on
+  the `workspace-modes.js` and `welcome.js` script tags in `index.html`, `first-ad.html` and
+  `welcome.html`. Leave those lines as they are. If you change `welcome.js` or another script,
+  bump its `?v=` on every page that loads it.
+- If you already started from `18768d0`, keep going and merge the branch tip before you report.
 - Work in a new isolated worktree on a new branch `gemini/ad-loop-nov16`. Do not use the Mac
   checkout at `/Users/nav/meta-smb-gtm` (detached, dirty, must be preserved).
 
 ## Step 0: independent baseline (read-only, before any edit)
-1. Run the full offline gate on `18768d0` and record the exact counts:
+1. Run the full offline gate on your base commit and record the exact counts:
    `DEMO_MODE=true META_MODEL_API_KEY= DEMO_KEY= make PY=.venv/bin check`
-   Claude's builder result was 609 passed, 2 skipped, 1 warning, lint and format clean. Report
-   yours separately; do not copy this number.
+   Claude's builder results were 609 passed, 2 skipped on `18768d0` and 613 passed, 2 skipped
+   on the branch tip, each with 1 warning and lint and format clean. Report yours separately;
+   do not copy these numbers.
 2. In a real browser against a local demo-mode server, walk `/create` to step 4 (Ready to share)
    at 375px and 1440px and confirm the "Prepare your first ad" offer is visible, does not cause
    horizontal overflow, and lands on `/first-ad` (own workspace) or `/first-ad?workspace=sample`

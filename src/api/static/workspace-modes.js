@@ -224,6 +224,34 @@
     }
   }
 
+  // One-time request left by onboarding: "bring in this shop's listings the first time each
+  // editor opens on this device". Kept per account, and each editor clears its own name once
+  // it has tried, so the scan runs at most once per editor and never for another account.
+  const AUTO_IMPORT_PAGES = ['today', 'create'];
+  const autoImportKey = (ownerId) => `muse.autoimport.pending.v1:${encodeURIComponent(String(ownerId))}`;
+  function readAutoImport(ownerId) {
+    try {
+      return (localStorage.getItem(autoImportKey(ownerId)) || '').split(',').filter((name) => AUTO_IMPORT_PAGES.includes(name));
+    } catch {
+      return [];
+    }
+  }
+  function requestAutoImport(ownerId) {
+    if (!ownerId) return;
+    try { localStorage.setItem(autoImportKey(ownerId), AUTO_IMPORT_PAGES.join(',')); } catch { /* Storage unavailable: the seller can still press Find products. */ }
+  }
+  function autoImportPending(ownerId, page) {
+    return Boolean(ownerId) && readAutoImport(ownerId).includes(page);
+  }
+  function finishAutoImport(ownerId, page) {
+    if (!ownerId) return;
+    try {
+      const left = readAutoImport(ownerId).filter((name) => name !== page);
+      if (left.length) localStorage.setItem(autoImportKey(ownerId), left.join(','));
+      else localStorage.removeItem(autoImportKey(ownerId));
+    } catch { /* Nothing to clear. */ }
+  }
+
   function notify() {
     const resolved = computeState();
     renderModeBanners();
@@ -431,6 +459,9 @@
     ownHref,
     bindAsyncGuard,
     renderModeBanners,
-    subscribe
+    subscribe,
+    requestAutoImport,
+    autoImportPending,
+    finishAutoImport
   });
 })();
