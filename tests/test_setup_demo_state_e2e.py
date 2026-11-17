@@ -102,6 +102,17 @@ def test_demo_notice_copy_and_wiring() -> None:
         call = "if (s.state === 'account_sample') window.museModes?.checkSetupPending?.(s.ownerId);"
         assert source.count(call) == 1, name
         assert source.index("if (s.isSample) {") < source.index(call), name
+    # Every other page asks on its own; home and the wizard decide from the workspace they read.
+    auto = modes[modes.index("function maybeCheckSetup(") : modes.index("function notify()")]
+    assert "s.state !== 'account_sample' || !s.ownerId" in auto
+    assert "dataset?.setupCheck === 'page'" in auto
+    assert "maybeCheckSetup(resolved);" in modes
+    for name in ("index.html", "welcome.html"):
+        head = (STATIC_DIR / name).read_text(encoding="utf-8")[:200]
+        assert '<html lang="en" data-setup-check="page">' in head, name
+    for name in ("first-ad.html", "progress.html", "digest.html", "today.html", "creator.html"):
+        head = (STATIC_DIR / name).read_text(encoding="utf-8")[:300]
+        assert "data-setup-check" not in head, name
 
 
 def test_dashboard_before_setup_is_an_explicit_demo_e2e(live_server_url: str) -> None:
@@ -335,6 +346,24 @@ def test_dashboard_before_setup_is_an_explicit_demo_e2e(live_server_url: str) ->
                     )
                     assert "workspace=sample" not in page.url, page.url
                     assert page.evaluate(BANNER)["hidden"] is True
+                assert not errors, (label, errors)
+                ctx.close()
+
+            # 7. The other pages that show the sample say the same, with no page-specific code.
+            for page_path, width in (("/first-ad", 375), ("/progress", 1440), ("/digest", 375)):
+                ctx, page, session, errors = open_page(browser, width=width)
+                page.goto(BASE + page_path + "?workspace=sample", wait_until="domcontentloaded")
+                page.wait_for_function(
+                    "(document.getElementById('museModeBanner') || {{dataset: {{}}}})"
+                    ".dataset.setup === 'pending'",
+                    timeout=15000,
+                )
+                label = page_path + " " + str(width)
+                banner = page.evaluate(BANNER)
+                assert banner["badge"] == "Demo data", (label, banner)
+                assert banner["buttons"] == ["Finish setup", "Open my workspace"], (label, banner)
+                assert page.locator("#museModeBanner").is_visible(), label
+                no_overflow(page, "demo " + label)
                 assert not errors, (label, errors)
                 ctx.close()
 

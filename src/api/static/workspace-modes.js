@@ -282,8 +282,17 @@
     return Boolean(setupPendingOwner) && s.state === 'account_sample' && s.ownerId === setupPendingOwner;
   }
 
+  // Every page asks once a signed-in seller is viewing the sample, except pages that decide this
+  // from the workspace they already read and say so with <html data-setup-check="page"> (home, wizard).
+  function maybeCheckSetup(s) {
+    if (s.state !== 'account_sample' || !s.ownerId) return;
+    if (typeof document !== 'undefined' && document.documentElement?.dataset?.setupCheck === 'page') return;
+    checkSetupPending(s.ownerId);
+  }
+
   function notify() {
     const resolved = computeState();
+    maybeCheckSetup(resolved);
     renderModeBanners();
     syncModeLinks();
     listeners.forEach((fn) => {
