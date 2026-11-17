@@ -107,3 +107,15 @@ Next one bounded Hermes action: test EXACT new URL above (27c1f50), follow .task
   - **Protected `GET` Checks (`vercel curl`):** `HTTP 200` on `/api/v1/health` (`{"status":"ok"}`), `/api/v1/readiness`, `/`, `/create`, `/first-ad`, `/today`, `/digest`; `HTTP 307` on `/creator`.
   - **Rollback References:** Prior preview `https://meta-smb-iueugs8zd-navtejs-6321s-projects.vercel.app` (`27c1f50`); Production unchanged at `https://meta-smb-ey7g1mcto-navtejs-6321s-projects.vercel.app` (`https://meta-smb-gtm.vercel.app`).
 - **Next Hermes Action:** Run bounded acceptance against `https://meta-smb-osjisaqzy-navtejs-6321s-projects.vercel.app` (`f83125a`) per `docs/launch/hermes-ux-gap-acceptance.md`.
+
+## Preview B (`be453db`, Passes 6–7) — November 17, 2026
+- **Reviewed Branch & SHA:** `origin/claude/ux-gap-ad-loop-nov17` at `be453db` (adds `d8f4ba2` setup notice on every sample page, `b6bbb3a` setup hero for signed-in sellers / `"Setup not finished"` notice on direct visits / `/today` copy, and `be453db` docs split across Previews A and B). Zero migrations, env changes, or new endpoints.
+- **Independent Gate on `be453db` (`DEMO_MODE=true META_MODEL_API_KEY= DEMO_KEY=`):**
+  - `make PY=/Users/nav/meta-smb-gtm/.venv/bin check`: `ruff check .` passed, `ruff format --check .` clean (`249 files already formatted`), `pytest`: **618 passed, 2 skipped, 1 warning in 193.18s (0:03:13)** (2 skips require `BILLING_PGLITE_DIR`).
+  - `tests/launch_account_audit.py` (real Chromium): **27 passed, 0 failed**.
+  - `tests/launch_browser_audit.py` (real Chromium): **20 passed, 0 failed**.
+- **Protected Preview B Deployed (Accepted from `be453db`, Deployment Protection ON, Production Unchanged):**
+  - **Preview B URL:** `https://meta-smb-4vvk11xja-navtejs-6321s-projects.vercel.app` (`Ready in 18s`, Inspect: `https://vercel.com/navtejs-6321s-projects/meta-smb-gtm/C8Vu8bZbLwZwA3acUbU7cFN7X3kS`)
+  - **Protected `GET` Checks (`vercel curl`):** `HTTP 200` on `/api/v1/health` (`{"status":"ok"}`), `/api/v1/readiness`, `/`, `/create`, `/first-ad`, `/today`, `/digest`; `HTTP 307` on `/creator`.
+  - **Rollback References:** Preview A `https://meta-smb-osjisaqzy-navtejs-6321s-projects.vercel.app` (`f83125a`); Production unchanged at `https://meta-smb-ey7g1mcto-navtejs-6321s-projects.vercel.app` (`https://meta-smb-gtm.vercel.app`).
+- **Next Hermes Action (Preview B):** Pass `https://meta-smb-4vvk11xja-navtejs-6321s-projects.vercel.app` (`be453db`) to Hermes for Preview B acceptance per `docs/launch/hermes-ux-gap-acceptance.md`.
