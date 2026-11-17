@@ -94,3 +94,16 @@ Coordinator fetched/read DB and release reports: local PGlite69passed/0skip (inc
 Hermes completed HERMES_EVIDENCE_NOV16.md locally, but explicitly did NO new acceptance run. It compares7ed43af..00e8536 across divergent branches and mistakenly attributes removal of newer image controls/default sample behavior to the guest patch. Do not use that range as the patch: inspect00e8536^..00e8536 and integrated candidate27c1f50. New guests intentionally start in their own workspace; select the artist example explicitly before expecting Ek Onkar. Unchecked review checkbox is an intentional safeguard, not a defect to remove. Its hypothetical test command is not evidence an executable test exists. Report therefore does not clear latest preview.
 
 Next one bounded Hermes action: test EXACT new URL above (27c1f50), follow .tasks/hermes-current-preview-final.txt. Hosted email delivery/redirect/Google configuration still needs explicit real-service acceptance, separate from this guest run. No production readiness inferred from installed env names or local tests. Codex scope here is documentation reconciliation only; no active jobs.
+
+## Combined UX-Gap + Ad-Loop Candidate (`f83125a`) — November 17, 2026
+- **Reviewed Branch & SHA:** `origin/claude/ux-gap-ad-loop-nov17` at `f83125a` (`27c1f50` + `claude/ux-gap-nov16` `c989f4b` + `gemini/ad-loop-nov16` `a982987`, merged at `8a113f2`; `f83125a` adds `docs/launch/hermes-ux-gap-acceptance.md` only).
+- **Runtime Note:** `GET /api/v1/account/workspace` adds read-only `listing_import: {"first_visit": bool}`; `/creator` redirects (307) to `/create`. Zero migrations, zero env changes.
+- **Independent Gate on `f83125a` (`DEMO_MODE=true META_MODEL_API_KEY= DEMO_KEY=`):**
+  - `make PY=/Users/nav/meta-smb-gtm/.venv/bin check`: `ruff check .` passed, `ruff format --check .` clean (`249 files already formatted`), `pytest`: **618 passed, 2 skipped, 1 warning in 146.33s (0:02:26)** (2 skips require `BILLING_PGLITE_DIR`).
+  - `tests/launch_account_audit.py` (real Chromium): **27 passed, 0 failed**.
+  - `tests/launch_browser_audit.py` (real Chromium): **20 passed, 0 failed**.
+- **Protected Preview Deployed (Accepted from `f83125a`, Deployment Protection ON, Production Unchanged):**
+  - **Preview URL:** `https://meta-smb-osjisaqzy-navtejs-6321s-projects.vercel.app` (`Ready in 22s`, Inspect: `https://vercel.com/navtejs-6321s-projects/meta-smb-gtm/BjHaHGT4hqNP7s7vq8jMGjSt9ezW`)
+  - **Protected `GET` Checks (`vercel curl`):** `HTTP 200` on `/api/v1/health` (`{"status":"ok"}`), `/api/v1/readiness`, `/`, `/create`, `/first-ad`, `/today`, `/digest`; `HTTP 307` on `/creator`.
+  - **Rollback References:** Prior preview `https://meta-smb-iueugs8zd-navtejs-6321s-projects.vercel.app` (`27c1f50`); Production unchanged at `https://meta-smb-ey7g1mcto-navtejs-6321s-projects.vercel.app` (`https://meta-smb-gtm.vercel.app`).
+- **Next Hermes Action:** Run bounded acceptance against `https://meta-smb-osjisaqzy-navtejs-6321s-projects.vercel.app` (`f83125a`) per `docs/launch/hermes-ux-gap-acceptance.md`.
