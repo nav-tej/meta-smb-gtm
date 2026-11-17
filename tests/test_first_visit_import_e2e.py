@@ -442,3 +442,152 @@ def test_first_visit_brings_in_the_sellers_listings_e2e(live_server_url: str) ->
         f"Playwright script failed:\nSTDOUT: {proc.stdout}\nSTDERR: {proc.stderr}"
     )
     assert "FIRST_VISIT_IMPORT_OK" in proc.stdout
+
+
+def test_finishing_onboarding_leaves_the_request_and_today_uses_it_e2e(
+    live_server_url: str,
+) -> None:
+    """The whole path in one browser: the real wizard, then the first /today visit."""
+    python_bin = _find_playwright_python()
+    if not python_bin:
+        pytest.skip("Playwright runtime not installed")
+
+    runner_script = textwrap.dedent(
+        f"""
+        import json
+        from playwright.sync_api import sync_playwright
+
+        BASE = "{live_server_url}"
+        USER = {{"id": "u-new-7", "email": "maker@mountainpottery.example", "email_verified": True}}
+        FLAG = "muse.autoimport.pending.v1:" + USER["id"]
+        store = {{"document": {{}}, "version": 1, "owner_id": USER["id"]}}
+        calls = {{"ingest": 0, "outside": []}}
+        LISTINGS = {{
+            "business_name": "Mountain Pottery Studio",
+            "total_channels": 1,
+            "total_pages_crawled": 18,
+            "channels": [{{
+                "kind": "own_website", "url": "https://mountainpottery.example/",
+                "host": "mountainpottery.example", "status": "fetched", "pages_found": 18,
+            }}],
+            "discovered_catalog_items": [
+                {{"url": "https://mountainpottery.example/products/mug",
+                  "title": "Speckled Stoneware Mug", "bucket": "products", "price_hint": "$24"}},
+                {{"url": "https://mountainpottery.example/products/vase",
+                  "title": "Kiln-Fired Vase Set", "bucket": "products", "price_hint": "$180"}},
+            ],
+            "detected_price_hints": ["$24", "$180"],
+            "seller_context": "Mountain Pottery Studio",
+        }}
+
+        def reply(route, payload):
+            route.fulfill(status=200, content_type="application/json", body=json.dumps(payload))
+
+        def handle(route):
+            url = route.request.url.split("?")[0]
+            method = route.request.method
+            done = (store["document"].get("onboarding") or {{}}).get("completed_at")
+            if url.endswith("/api/v1/account/me"):
+                return reply(route, {{
+                    "configured": True, "user": USER,
+                    "usage": {{"plan": "trial", "used": 0, "limit": 3, "remaining": 3,
+                              "resets_at": None}},
+                    "live_available": True,
+                }})
+            if "/api/v1/account/workspace" in url:
+                if method != "GET":
+                    payload = json.loads(route.request.post_data or "{{}}")
+                    store["document"] = payload.get("document", {{}})
+                    store["version"] += 1
+                return reply(route, store)
+            if url.endswith("/api/v1/onboarding/status"):
+                return reply(route, {{
+                    "completed": bool(done), "completed_at": done, "used_run": False,
+                    "plan": "trial", "runs_remaining": 3,
+                }})
+            if url.endswith("/api/v1/onboarding/build") and method == "POST":
+                store["document"]["onboarding"] = {{
+                    **(route.request.post_data_json or {{}}),
+                    "completed_at": "2026-11-16T18:00:00Z", "used_run": False,
+                }}
+                return reply(route, {{
+                    "success": True, "charged": False, "used_run": False,
+                    "runs_remaining": 3, "completed_at": "2026-11-16T18:00:00Z",
+                    "workspace": store,
+                }})
+            if url.endswith("/api/v1/ingest-storefront"):
+                calls["ingest"] += 1
+                return reply(route, LISTINGS)
+            if url.endswith("/api/v1/product-reference"):
+                link = (route.request.post_data_json or {{}}).get("url", "")
+                return reply(route, {{
+                    "title": "Speckled Stoneware Mug",
+                    "description": "Hand-thrown stoneware with a speckled glaze.",
+                    "price_hint": "$24", "url": link, "image_candidates": [],
+                }})
+            return route.continue_()
+
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            ctx = browser.new_context(viewport={{"width": 1440, "height": 900}})
+            page = ctx.new_page()
+            errors = []
+            page.on("pageerror", lambda e: errors.append(str(e)))
+            page.route("**/api/v1/**", handle)
+            page.route(
+                lambda url: not url.startswith(BASE) and not url.startswith("data:"),
+                lambda route: (calls["outside"].append(route.request.url), route.abort()),
+            )
+
+            page.goto(BASE + "/welcome")
+            page.wait_for_selector("#wkStep1:not([hidden])", timeout=10000)
+            assert page.evaluate("localStorage.getItem(" + json.dumps(FLAG) + ")") is None
+            page.fill("#wkShopUrl", "mountainpottery.example")
+            page.fill("#wkBusinessName", "Mountain Pottery Studio")
+            page.click("#wkScanShopBtn")
+            page.wait_for_selector("#wkShopProof:not([hidden])")
+            page.click("#wkStep1NextBtn")
+            page.wait_for_selector("#wkStep2:not([hidden])")
+            # Nothing is requested until the seller actually finishes.
+            assert page.evaluate("localStorage.getItem(" + json.dumps(FLAG) + ")") is None
+            page.click("#wkStep2NextBtn")
+            page.wait_for_selector("#wkStep3:not([hidden])")
+            page.click("#wkStep3NextBtn")
+            page.wait_for_selector("#wkStep4:not([hidden])")
+            page.click("#wkStep4FinishBtn")
+            page.wait_for_selector("#wkStepDone:not([hidden])")
+            assert (
+                page.evaluate("localStorage.getItem(" + json.dumps(FLAG) + ")") == "today,create"
+            )
+            scans_in_onboarding = calls["ingest"]
+
+            page.goto(BASE + "/today", wait_until="networkidle")
+            page.wait_for_function(
+                "document.getElementById('itemTitle').textContent === 'Speckled Stoneware Mug'"
+                " && document.getElementById('notice').textContent.startsWith('Started with')",
+                timeout=15000,
+            )
+            page.wait_for_function(
+                "document.querySelectorAll('#planCards button').length === 3", timeout=15000
+            )
+            assert calls["ingest"] == scans_in_onboarding + 1
+            assert page.evaluate("localStorage.getItem(" + json.dumps(FLAG) + ")") == "create"
+            assert not errors, errors
+            outside = [u for u in calls["outside"] if "fonts.g" not in u]
+            assert not outside, outside
+            browser.close()
+        print("ONBOARDING_TO_TODAY_OK")
+        """
+    )
+
+    proc = subprocess.run(
+        [python_bin, "-c", runner_script],
+        capture_output=True,
+        text=True,
+        timeout=180,
+        check=False,
+    )
+    assert proc.returncode == 0, (
+        f"Playwright script failed:\nSTDOUT: {proc.stdout}\nSTDERR: {proc.stderr}"
+    )
+    assert "ONBOARDING_TO_TODAY_OK" in proc.stdout

@@ -33,13 +33,14 @@ the two branches merge cleanly.
 ## Step 0: independent baseline (read-only, before any edit)
 1. Run the full offline gate on your base commit and record the exact counts:
    `DEMO_MODE=true META_MODEL_API_KEY= DEMO_KEY= make PY=.venv/bin check`
-   Claude's builder results were 609 passed, 2 skipped on `18768d0` and 613 passed, 2 skipped
-   on the branch tip, each with 1 warning and lint and format clean. Report yours separately;
+   Claude's builder results were 609 passed, 2 skipped on `18768d0`, 613 passed, 2 skipped on
+   `e5daeae` and 614 passed, 2 skipped on the branch tip after one more browser test, each with 1 warning and lint and format clean. Report yours separately;
    do not copy these numbers.
 2. In a real browser against a local demo-mode server, walk `/create` to step 4 (Ready to share)
    at 375px and 1440px and confirm the "Prepare your first ad" offer is visible, does not cause
    horizontal overflow, and lands on `/first-ad` (own workspace) or `/first-ad?workspace=sample`
-   (sample). Claude checked only the markup and link target, not the rendered step.
+   (sample). Claude has since checked the sample workspace this way; a seller's own workspace
+   (signed-in, with a photo) is still unchecked, and yours is the independent run.
 
 ## Step 1: build (exclusive write scope)
 - `src/api/static/index.html`: home journey stages `#loop-improve` and `#loop-iterate`, and the

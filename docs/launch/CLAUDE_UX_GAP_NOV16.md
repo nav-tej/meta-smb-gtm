@@ -34,7 +34,7 @@ The brief's path 1 complaint: onboarding takes the shop URL, then `/today` and `
 | `today.js`, `creator.js` | Listings found in one workspace are cleared when the seller switches between their own workspace and the sample. |
 | `today.js` | Bug fix: "Find products" (and picking a listing) left "Your next three posts" empty, because the plan rebuild ran while the page was locked and returned early. Confirmed on `52350ec`: 3 cards before the import, 0 after. Now 3 after, written for the imported item. An existing plan is kept, so a paid Muse plan is never overwritten. |
 | Seven HTML pages | `?v=20261116-uxgap` on the four changed scripts. |
-| `tests/test_first_visit_import_e2e.py` | 4 tests, one of them a real-browser run with seven scenarios. |
+| `tests/test_first_visit_import_e2e.py` | 5 tests. Two run in a real browser: seven editor scenarios, and the real onboarding wizard followed by the first `/today` visit. |
 
 Guards, each covered by the browser test:
 - No request from onboarding: neither editor scans. A saved shop website alone is not enough. This is deliberate: existing browser tests open the editors with saved shop websites and unmocked crawls, and must not start reaching real sites.
@@ -51,14 +51,17 @@ Limits:
 
 ## Verification
 
-- `DEMO_MODE=true META_MODEL_API_KEY= DEMO_KEY= make PY=<main checkout>/.venv/bin check` on the final code: **613 passed, 2 skipped, 1 warning**, ruff lint and format clean (124.01s). The 2 skips are the PGlite SQL tests, which need `BILLING_PGLITE_DIR`. Pass 1 alone was 609 passed, 2 skipped.
+- `DEMO_MODE=true META_MODEL_API_KEY= DEMO_KEY= make PY=<main checkout>/.venv/bin check` on the final code: **614 passed, 2 skipped, 1 warning**, ruff lint and format clean (124.17s). The 2 skips are the PGlite SQL tests, which need `BILLING_PGLITE_DIR`. Pass 1 alone was 609 passed, 2 skipped; pass 2 before the follow-up test was 613.
 - `DEMO_MODE=true META_MODEL_API_KEY= DEMO_KEY= /usr/bin/python3 tests/launch_account_audit.py`: **27 passed, 0 failed** (real Chromium). `node tests/account_ui_contract.cjs`: passed.
 - The new browser test fails on the code before pass 2 (4 failed) and passes after it. It ran three times in a row without a flake. It aborts and records any request that leaves the local test server; none did.
 - Headless Chromium against a local demo-mode server, 375px and 1440px:
   - Pass 1: `/`, `/today`, `/progress`, `/create`, with and without `?workspace=sample`: no horizontal overflow; link is `/first-ad` in own mode and `/first-ad?workspace=sample` in sample mode.
   - Pass 2: signed-in account (mocked), mocked crawl. `/today` shows the first listing as the item, opening line and all three plan cards; one image option offered, none selected; no overflow. `/create` lists both listings; product name unchanged. Reloading either page scans nothing again.
+- Follow-up after pass 2 (tests only, no product code changed):
+  - Onboarding click-through: a browser walks the real wizard (shop scan, four steps, Finish). No request exists before Finish; after it the request is `today,create`; the next `/today` visit starts on the first listing with three plan cards and the request drops to `create`. The test fails when the four `welcome.js` lines are removed.
+  - `/create` step 4 as rendered, sample workspace, 375px and 1440px: the "Prepare your first ad" offer is visible, no horizontal overflow, and the link lands on `/first-ad?workspace=sample`. This was a one-off script, not a test in the suite.
 - One regression caught and fixed in pass 1: the link first went in the `/today` header, which overflowed 375px by 29px and failed `tests/test_signup_followup_e2e.py::test_375px_add_photo_action_and_real_fixture_first_export`. It moved into the page body.
-- Not verified: the hosted preview; a real signed-in account; a real crawl of a real shop from the auto-import (every crawl here was mocked); the onboarding click-through that leaves the request (pinned by a source check, not a browser run); the `/create` step 4 first-ad offer as rendered (markup and link target only).
+- Not verified: the hosted preview; a real signed-in account; a real crawl of a real shop from the auto-import (every crawl here was mocked, including the one inside the onboarding walk); the `/create` step 4 first-ad offer as rendered in a seller's own workspace (link target only; the sample workspace was checked in a browser).
 
 ## Brief items against candidate `27c1f50`
 
