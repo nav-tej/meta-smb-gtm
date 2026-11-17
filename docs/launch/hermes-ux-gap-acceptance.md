@@ -4,9 +4,9 @@ Prepared November 17, 2026 by Claude at Nav's request. Status: PROPOSED until Na
 Read-only browser acceptance. No code edits.
 
 ## Target
-- Branch `claude/ux-gap-ad-loop-nov17`, commit `8a113f2` or a coordinator-approved descendant.
-  It combines `claude/ux-gap-nov16` (`c989f4b`) and `gemini/ad-loop-nov16` (`a982987`) on top of
-  release candidate `27c1f50`.
+- Branch `claude/ux-gap-ad-loop-nov17` at `d8f4ba2` (last runtime change) or a docs-only
+  descendant. It combines `claude/ux-gap-nov16` (`c989f4b`) and `gemini/ad-loop-nov16` (`a982987`)
+  on top of release candidate `27c1f50`, plus the setup notice on every sample page (`d8f4ba2`).
 - Test only a protected preview that the coordinator deployed from that exact SHA and gave you
   with its URL. If you have no such URL, or the preview's SHA differs, stop and report that. Do
   not test production or the older `27c1f50` preview for these items.
@@ -41,6 +41,8 @@ Account A, setup not finished:
 8. `/today?workspace=sample` and `/create?workspace=sample`: "Demo data · This page shows a sample
    shop…" with "Finish setup" and "Open my workspace". "Open my workspace" opens the seller's own
    editor without `workspace=sample`.
+8b. `/first-ad?workspace=sample`, `/progress?workspace=sample` and `/digest?workspace=sample` show the
+   same "Demo data" notice with both buttons.
 9. Sign out, then sign in from the home page: you land on `/welcome`, not the demo.
 
 Account B, setup finished with a saved shop website:
