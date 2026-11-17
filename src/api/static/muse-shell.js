@@ -1199,21 +1199,21 @@
       }
       list.replaceChildren();
       meta.lastChild.textContent = s.isAuthenticated
-        ? 'My workspace · add your shop website & competitors in Setup or /create'
+        ? 'My workspace · no competitor checks yet'
         : 'Set up your own shop or explore the sample shop';
       moveChip.textContent = s.isAuthenticated ? 'My workspace' : 'Get started';
       moveTitle.textContent = s.isAuthenticated
         ? 'Draft your next post from your own shop website'
         : 'Add your shop website or explore the sample artist brief';
       moveReason.textContent = s.isAuthenticated
-        ? 'No personal competitor checks yet. Paste your storefront URL in the studio below or open onboarding to add competitors.'
+        ? 'Your brief fills in once Muse has checked the competitors you track. Pick or change them in setup, or start a post from your shop website below.'
         : 'Your workspace starts empty. Paste your own URL below or open the sample shop separately.';
       go.setAttribute('href', '/create');
       go.textContent = 'Create a post →';
       card(actionsBox, 'Top 3 actions', [], 'Add your storefront & competitors to generate your first personal actions.');
       card(overnightBox, 'Overnight changes', [], 'No personal competitor changes monitored yet.');
       card(trendsBox, 'Performance trends', [], 'Log campaign results on Progress to track trends.');
-      sourceNote.textContent = 'Personal brief shows only your own workspace data. To view the sample shop example, open Sample shop (/today?workspace=sample).';
+      sourceNote.textContent = 'Your brief shows only your own workspace data. The sample shop example stays separate.';
       recheck.disabled = !s.isAuthenticated;
       setLoading(false, '');
     };

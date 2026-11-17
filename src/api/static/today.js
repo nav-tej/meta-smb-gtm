@@ -1365,6 +1365,7 @@
       try {
         const ws = await window.museAccount.loadWorkspace(s.ownerId);
         if (seq !== todayModeSeq || !guard.isCurrent()) return;
+        window.museModes?.noteSetup?.(s.ownerId, ws);
         const onb = ws?.document?.onboarding || {};
         const shopUrls = Array.isArray(onb.shop_urls) ? onb.shop_urls.filter(Boolean) : [];
         const shopName = String(onb.business_name || '').trim();

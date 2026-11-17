@@ -990,9 +990,9 @@
   <script src="/static/analytics.js?v=20261109-ux" defer></script>
   <script src="/static/reco-actions.js?v=20261112-integrated" defer></script>
   <script src="/static/account.js?v=20261112-integrated" defer></script>
-  <script src="/static/workspace-modes.js?v=20261117-uxgap5" defer></script>
-  <script src="/static/muse-shell.js?v=20261112-integrated" defer></script>
-  <script src="/static/welcome.js?v=20261117-adloop1" defer></script>
+  <script src="/static/workspace-modes.js?v=20261117-uxgap6" defer></script>
+  <script src="/static/muse-shell.js?v=20261117-uxgap6" defer></script>
+  <script src="/static/welcome.js?v=20261117-uxgap6" defer></script>
   <script src="/static/seller-memory.js?v=20261112-integrated" defer></script>
 </head>
 <body>
@@ -1059,6 +1059,24 @@
         <li><span class="hero-path-step">Free</span><strong>Explore the demo</strong><span>No account needed</span></li>
         <li data-hero-account><span class="hero-path-step">Free account</span><strong>3 live Muse runs</strong><span>On your own products</span></li>
         <li class="is-plan"><span class="hero-path-step">Starter</span><strong>20 runs a month</strong><span>$9/mo billed yearly or $12 monthly · cancel anytime</span></li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- Signed in, setup not finished, viewing the demo: welcome.js shows this instead. -->
+  <section class="logged-out-hero setup-hero" id="setupHero" hidden>
+    <div class="logged-out-hero-inner">
+      <div class="logged-out-eyebrow">Your account is ready. Your shop isn't set up yet.</div>
+      <h1 id="setupHeroTitle">Finish setup to see your own shop here.</h1>
+      <p class="hero-subtitle">You're looking at Art of Sarabjit Singh, a sample shop. Add your shop website and the sellers you compare yourself to. Muse then brings in your listings and fills this page with your shop and competitors. Setup is 4 steps and uses none of your runs.</p>
+      <div class="logged-out-hero-ctas">
+        <a href="/welcome" class="hero-btn-primary" id="setupHeroFinishBtn">Finish setup</a>
+        <a class="hero-btn-ghost" href="#journey">Keep exploring the sample</a>
+      </div>
+      <ol class="hero-path">
+        <li><span class="hero-path-step">Now</span><strong>Finish setup</strong><span>4 steps, 0 runs</span></li>
+        <li><span class="hero-path-step">Next</span><strong>Make today's post</strong><span>From your own listings</span></li>
+        <li><span class="hero-path-step">When you're ready</span><strong>Try a live Muse run</strong><span id="setupHeroRuns">Research and ad drafts on your products</span></li>
       </ol>
     </div>
   </section>

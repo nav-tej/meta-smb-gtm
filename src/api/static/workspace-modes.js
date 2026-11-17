@@ -277,17 +277,67 @@
       setupCheckedOwner = null; // Not known: keep the ordinary sample notice, ask again next time.
     }
   }
+  // A page that already read this account's workspace reports it instead of reading it again.
+  function noteSetup(ownerId, workspace) {
+    if (typeof ownerId !== 'string' || !ownerId || !workspace || current().ownerId !== ownerId) return;
+    setupCheckedOwner = ownerId;
+    setSetupPending(workspace.document?.onboarding?.completed_at ? null : ownerId, { editor: true });
+  }
   function isSetupPending(stateObj) {
     const s = stateObj || current();
     return Boolean(setupPendingOwner) && s.state === 'account_sample' && s.ownerId === setupPendingOwner;
   }
 
-  // Every page asks once a signed-in seller is viewing the sample, except pages that decide this
-  // from the workspace they already read and say so with <html data-setup-check="page"> (home, wizard).
+  // Every page asks once a signed-in seller is known, in the sample or their own workspace.
+  // <html data-setup-check="page">: the page decides itself from its own read (home, wizard).
+  // <html data-setup-check="editor">: in their own workspace /today and /create report through
+  // noteSetup from the read they already make.
   function maybeCheckSetup(s) {
-    if (s.state !== 'account_sample' || !s.ownerId) return;
-    if (typeof document !== 'undefined' && document.documentElement?.dataset?.setupCheck === 'page') return;
+    if (!s.ownerId || (s.state !== 'account_sample' && s.state !== 'account_own')) return;
+    const mark = typeof document !== 'undefined' ? document.documentElement?.dataset?.setupCheck : null;
+    if (mark === 'page' || (mark === 'editor' && s.state === 'account_own')) return;
     checkSetupPending(s.ownerId);
+  }
+
+  // In their own workspace, a seller who has not finished setup gets a slim notice under the
+  // header. It is separate from the mode banner, which stays hidden in the own workspace.
+  function renderSetupNotice(s) {
+    if (typeof document === 'undefined' || !document.body) return;
+    const show = Boolean(setupPendingOwner) && setupPendingEditor && s.state === 'account_own' && s.ownerId === setupPendingOwner;
+    let notice = document.getElementById('museSetupNotice');
+    if (!show) {
+      if (notice) notice.hidden = true;
+      return;
+    }
+    if (!notice) {
+      notice = document.createElement('div');
+      notice.id = 'museSetupNotice';
+      notice.className = 'muse-mode-banner is-sample';
+      notice.setAttribute('role', 'status');
+      const inner = document.createElement('div');
+      inner.className = 'muse-mode-banner-inner';
+      const textWrap = document.createElement('div');
+      textWrap.className = 'muse-mode-banner-copy';
+      const badge = document.createElement('span');
+      badge.className = 'muse-mode-badge';
+      badge.textContent = 'Setup not finished';
+      const msg = document.createElement('span');
+      msg.className = 'muse-mode-text';
+      msg.textContent = 'Finish setup so Muse can bring in your listings and track the sellers you compare yourself to. It takes 4 steps and uses no runs.';
+      const actions = document.createElement('div');
+      actions.className = 'muse-mode-banner-actions';
+      actions.appendChild(buildButton('Finish setup', 'finish-setup', 'primary'));
+      textWrap.append(badge, msg);
+      inner.append(textWrap, actions);
+      notice.appendChild(inner);
+    }
+    const header = document.querySelector('body > header');
+    if (header && header.parentNode) {
+      if (header.nextSibling !== notice) header.parentNode.insertBefore(notice, header.nextSibling);
+    } else if (document.body.firstChild !== notice) {
+      document.body.insertBefore(notice, document.body.firstChild);
+    }
+    notice.hidden = false;
   }
 
   function notify() {
@@ -423,6 +473,7 @@
     const banner = customHost || ensureBannerElement();
     if (!banner) return null;
     const s = computeState();
+    if (!customHost) renderSetupNotice(s);
     const setupPending = isSetupPending(s);
     banner.dataset.modeState = s.state;
     if (setupPending) banner.dataset.setup = 'pending';
@@ -536,6 +587,7 @@
     finishAutoImport,
     setSetupPending,
     checkSetupPending,
+    noteSetup,
     isSetupPending
   });
 })();

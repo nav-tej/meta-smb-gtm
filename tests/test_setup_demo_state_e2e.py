@@ -104,15 +104,46 @@ def test_demo_notice_copy_and_wiring() -> None:
         assert source.index("if (s.isSample) {") < source.index(call), name
     # Every other page asks on its own; home and the wizard decide from the workspace they read.
     auto = modes[modes.index("function maybeCheckSetup(") : modes.index("function notify()")]
-    assert "s.state !== 'account_sample' || !s.ownerId" in auto
-    assert "dataset?.setupCheck === 'page'" in auto
+    assert "s.state !== 'account_sample' && s.state !== 'account_own'" in auto
+    assert "mark === 'page'" in auto and "dataset?.setupCheck" in auto
     assert "maybeCheckSetup(resolved);" in modes
     for name in ("index.html", "welcome.html"):
         head = (STATIC_DIR / name).read_text(encoding="utf-8")[:200]
         assert '<html lang="en" data-setup-check="page">' in head, name
-    for name in ("first-ad.html", "progress.html", "digest.html", "today.html", "creator.html"):
+    for name in ("first-ad.html", "progress.html", "digest.html"):
         head = (STATIC_DIR / name).read_text(encoding="utf-8")[:300]
         assert "data-setup-check" not in head, name
+    # In their own workspace the editors report from the read they already make.
+    for name in ("today.html", "creator.html"):
+        head = (STATIC_DIR / name).read_text(encoding="utf-8")[:300]
+        assert '<html lang="en" data-setup-check="editor">' in head, name
+    for name in ("today.js", "creator.js"):
+        source = (STATIC_DIR / name).read_text(encoding="utf-8")
+        assert source.count("window.museModes?.noteSetup?.(s.ownerId, ws);") == 1, name
+    assert "mark === 'editor' && s.state === 'account_own'" in auto
+    notice_fn = modes[modes.index("function renderSetupNotice(") : modes.index("function notify()")]
+    assert "badge.textContent = 'Setup not finished';" in notice_fn
+    assert "buildButton('Finish setup', 'finish-setup', 'primary')" in notice_fn
+    assert "—" not in notice_fn
+
+    # The demo hero speaks to a signed-in seller, not a guest.
+    index = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
+    hero_start = index.index('id="setupHero"')
+    setup_hero = index[hero_start : index.index("</section>", hero_start)]
+    assert "Finish setup to see your own shop here." in setup_hero
+    assert 'href="/welcome"' in setup_hero and "uses none of your runs" in setup_hero
+    for guest_only in ("No account needed", "free demo", "sign in", "—"):
+        assert guest_only.lower() not in setup_hero.lower(), guest_only
+    assert (
+        "syncSetupHero(Boolean(setupPending && modeState.isSample), Boolean(modeState.isSample));"
+        in home
+    )
+
+    # Copy fixes on /today.
+    shell = (STATIC_DIR / "muse-shell.js").read_text(encoding="utf-8")
+    assert "add your shop website & competitors in Setup or /create" not in shell
+    assert "(/today?workspace=sample)" not in shell
+    assert "n+α" not in (STATIC_DIR / "today.html").read_text(encoding="utf-8")
 
 
 def test_dashboard_before_setup_is_an_explicit_demo_e2e(live_server_url: str) -> None:
@@ -233,6 +264,16 @@ def test_dashboard_before_setup_is_an_explicit_demo_e2e(live_server_url: str) ->
                 assert "Sample shop" in label, label
                 # The seller's own (empty) workspace is not what is on screen.
                 assert "Mountain Pottery" not in page.locator("body").inner_text()
+                # The hero speaks to a signed-in seller and points to setup.
+                page.wait_for_selector("#setupHero", state="visible", timeout=10000)
+                assert not page.locator("#loggedOutHero").is_visible()
+                assert not page.locator(".hero-bridge").is_visible()
+                assert page.locator("#setupHeroTitle").inner_text() == (
+                    "Finish setup to see your own shop here."
+                )
+                runs = page.locator("#setupHeroRuns").inner_text()
+                assert runs.startswith("3 of 3 runs left"), runs
+                assert page.locator("#setupHeroFinishBtn").get_attribute("href") == "/welcome"
                 no_overflow(page, "demo dashboard " + str(width))
 
                 # A background account refresh does not throw them out of the demo.
@@ -289,6 +330,8 @@ def test_dashboard_before_setup_is_an_explicit_demo_e2e(live_server_url: str) ->
             assert mode(page) == "account_own"
             banner = page.evaluate(BANNER)
             assert banner["hidden"] is True and banner["setup"] is None
+            assert not page.locator("#setupHero").is_visible()
+            assert not page.locator("#museSetupNotice").is_visible()
 
             #    Looking at the sample shop from there is the ordinary sample view.
             page.goto(BASE + "/?workspace=sample", wait_until="networkidle")
@@ -311,8 +354,57 @@ def test_dashboard_before_setup_is_an_explicit_demo_e2e(live_server_url: str) ->
             assert banner["badge"] == "Sample shop example"
             assert banner["underHeader"] is False
             assert "Finish setup" not in banner["buttons"]
+            assert page.locator("#loggedOutHero").is_visible()
+            assert not page.locator("#setupHero").is_visible()
             assert not errors, errors
             ctx.close()
+
+            #    Signing out of the demo brings the guest hero back.
+            ctx, page, session, errors = open_page(browser)
+            page.goto(BASE + "/", wait_until="domcontentloaded")
+            page.wait_for_selector("#setupHero", state="visible", timeout=15000)
+            session["signed_in"] = False
+            page.evaluate("window.museAccount.refresh()")
+            page.wait_for_selector("#loggedOutHero", state="visible", timeout=10000)
+            assert not page.locator("#setupHero").is_visible()
+            assert page.locator(".hero-bridge").is_visible()
+            assert not errors, errors
+            ctx.close()
+
+            # 8. Opened directly before setup, a page in the seller's own workspace says setup is
+            #    not finished. Sellers who finished setup see nothing extra.
+            for page_path, width in (("/today", 375), ("/first-ad", 1440), ("/digest", 375)):
+                for onboarding, expect in ((None, True), (DONE, False)):
+                    ctx, page, session, errors = open_page(
+                        browser, width=width, onboarding=onboarding
+                    )
+                    with page.expect_response(lambda r: "/api/v1/account/workspace" in r.url):
+                        page.goto(BASE + page_path, wait_until="domcontentloaded")
+                    page.wait_for_timeout(700)
+                    label = page_path + " " + str(width) + " setup_pending=" + str(expect)
+                    assert mode(page) == "account_own", label
+                    assert page.evaluate(BANNER)["hidden"] is True, label
+                    notice = page.locator("#museSetupNotice")
+                    assert notice.is_visible() is expect, label
+                    if expect:
+                        assert notice.locator(".muse-mode-badge").inner_text().lower() == (
+                            "setup not finished"
+                        ), label
+                        prev = page.evaluate(
+                            "document.getElementById('museSetupNotice').previousElementSibling"
+                            "?.matches('body > header') || false"
+                        )
+                        top = page.evaluate(
+                            "Math.round(document.getElementById('museSetupNotice')"
+                            ".getBoundingClientRect().top)"
+                        )
+                        assert prev or top < 5, (label, top)
+                        no_overflow(page, label)
+                        if page_path == "/digest":
+                            notice.locator("button").click()
+                            page.wait_for_url("**/welcome", wait_until="domcontentloaded")
+                    assert not errors, (label, errors)
+                    ctx.close()
 
             # 6. The editors say the same thing before setup, and keep a way into the seller's
             #    own workspace, since /today and /create work without setup.

@@ -1707,6 +1707,35 @@
     }
   }
 
+  // Signed in, setup not finished, viewing the demo: #setupHero says what to do next and replaces
+  // the logged-out hero. Any other state hides it; restoreLoggedOut puts the logged-out hero back
+  // where it belongs (guests and the sample view).
+  let setupHeroHidLoggedOut = [];
+  function syncSetupHero(show, restoreLoggedOut) {
+    const setupHero = document.getElementById('setupHero');
+    if (!setupHero) return;
+    // The logged-out hero and its "Free demo below ... no account needed" line.
+    const guestOnly = [document.getElementById('loggedOutHero'), document.querySelector('.hero-bridge')].filter(Boolean);
+    if (show) {
+      guestOnly.forEach((el) => {
+        if (el.hidden) return;
+        el.hidden = true;
+        setupHeroHidLoggedOut.push(el);
+      });
+      const usage = window.museAccount?.getSnapshot?.()?.usage;
+      const runs = document.getElementById('setupHeroRuns');
+      if (runs) {
+        runs.textContent = usage && Number.isFinite(usage.remaining) && Number.isFinite(usage.limit)
+          ? `${Math.max(0, usage.remaining)} of ${usage.limit} runs left · research and ad drafts on your products`
+          : 'Research and ad drafts on your products';
+      }
+    } else if (setupHeroHidLoggedOut.length) {
+      if (restoreLoggedOut) setupHeroHidLoggedOut.forEach((el) => { el.hidden = false; });
+      setupHeroHidLoggedOut = [];
+    }
+    setupHero.hidden = !show;
+  }
+
   async function applyHomeModeState(modeStateOverride = null) {
     if (window.location.pathname === '/welcome') return;
     if (!document.getElementById('journey')) return;
@@ -1740,6 +1769,7 @@
     if (!modeState.isAuthenticated) {
       homeSawSignedOut = true;
       window.museModes?.setSetupPending?.(null);
+      syncSetupHero(false, true);
       if (lastRenderedUserId || document.getElementById('ownWorkspaceOptionBtn')) {
         resetSignedOutHomeWorkspace({ preserveMode: modeState.isSample });
       }
@@ -1810,6 +1840,7 @@
       window.__museApplySignedInWorkspace = applyFn;
       applyFn();
     }
+    syncSetupHero(Boolean(setupPending && modeState.isSample), Boolean(modeState.isSample));
   }
 
   let homeModeSubscribed = false;
