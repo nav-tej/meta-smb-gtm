@@ -12,6 +12,7 @@ Commits, in order:
 | `bafd4ac` | Tests only: the real onboarding wizard walked through to the first `/today` visit. |
 | `5e0bdab` | Pass 3: the import follows the seller to any device and covers earlier accounts. Replaces the device flag from pass 2. |
 | `d684369` | Pass 4: the dashboard before setup is an explicit demo with a nudge to finish setup. |
+| `f956b74` | Pass 5 (Nov 17): the same nudge on `/today` and `/create` when they show the sample shop. Needs pass 4. |
 
 Passes 3 and 4 are separate commits so the coordinator can take either one. Both touch `workspace-modes.js` and the script version tags, so taking pass 4 alone needs a small manual merge.
 
@@ -89,12 +90,27 @@ What did not change:
 - No CSS file changed. `account.css` and `account.js` versions are pinned by `tests/test_signup_followup_e2e.py`.
 
 Limits:
-- The nudge is on the dashboard only. If the seller follows a link from the demo dashboard to `/today` or `/create`, those pages show the ordinary sample banner with "Back to my workspace", which opens their own empty editor. Those pages do not read the workspace in sample mode, so they do not know setup is unfinished.
+- As shipped in pass 4 the nudge was on the dashboard only; pass 5 extends it to `/today` and `/create`.
 - The demo is the sample shop as it is, including the logged-out hero ("Explore the free demo", "No account needed") and the Nov 3 sample data. Only the banner and the workspace switcher are specific to this state.
+
+## Pass 5: the nudge follows the seller into the editors
+
+Before: following a link from the demo dashboard to `/today` or `/create` showed the ordinary sample banner with "Back to my workspace". Those pages read no workspace in sample mode, so they did not know setup was unfinished.
+
+| File | Change |
+|---|---|
+| `src/api/static/workspace-modes.js` | `museModes.checkSetupPending(ownerId)`: reads the workspace once per account per page load and calls `setSetupPending(ownerId, { editor: true })` when `onboarding.completed_at` is missing. A failed read keeps the ordinary banner. The editor notice reads "Demo data · This page shows a sample shop, Art of Sarabjit Singh, not yours. Finish setup to bring in your own shop and competitors." with "Finish setup" and "Open my workspace". The dashboard notice is unchanged. |
+| `today.js`, `creator.js` | One line each in the sample branch: ask only when a signed-in seller (`account_sample`) is viewing the sample. |
+| Seven HTML pages | `workspace-modes.js`, `today.js` and `creator.js` at `?v=20261117-uxgap4`. |
+| `tests/test_setup_demo_state_e2e.py` | Static checks for the wiring and the two notices; browser scenario 6 (both editors at 375px and 1440px, both buttons, and sellers who finished setup still getting the ordinary banner). |
+
+Why the editors keep "Open my workspace": unlike the dashboard, `/today` and `/create` work before setup (the seller can paste a shop website), so the nudge must not trap them in the sample.
+
+Limits: `/first-ad`, `/progress` and `/digest` still show the ordinary sample banner. The read refreshes the workspace version that `account.js` holds; the editors reload the workspace when the seller switches to their own, so nothing saves against it in sample mode.
 
 ## Verification
 
-- `DEMO_MODE=true META_MODEL_API_KEY= DEMO_KEY= make PY=<main checkout>/.venv/bin check` on the final code: **616 passed, 2 skipped, 1 warning**, ruff lint and format clean (129.79s). The 2 skips are the PGlite SQL tests, which need `BILLING_PGLITE_DIR`. Earlier points: 609 after pass 1, 613 after pass 2, 614 after `bafd4ac`.
+- `DEMO_MODE=true META_MODEL_API_KEY= DEMO_KEY= make PY=<main checkout>/.venv/bin check` on the final code (`f956b74`): **616 passed, 2 skipped, 1 warning**, ruff lint and format clean (133.15s). The 2 skips are the PGlite SQL tests, which need `BILLING_PGLITE_DIR`. Earlier points: 609 after pass 1, 613 after pass 2, 614 after `bafd4ac`.
 - `DEMO_MODE=true META_MODEL_API_KEY= DEMO_KEY= /usr/bin/python3 tests/launch_account_audit.py`: **27 passed, 0 failed**. `tests/launch_browser_audit.py` (guest flows): **20 passed, 0 failed**. `node tests/account_ui_contract.cjs`: passed. All on the final code, real Chromium.
 - Pass 3:
   - The import browser tests ran three times in a row without a flake. They abort and record any browser request that leaves the local test server; none did.
@@ -103,6 +119,9 @@ Limits:
   - The browser test fails when each rule is broken in turn: always redirecting, forgetting that the visitor was signed out, and never reporting setup as pending.
   - Screenshots at 1440px and 375px: the demo notice is the first thing under the header; no horizontal overflow.
   - The dashboard reached by opening `/` was compared with `/?workspace=sample` loaded directly, for the same account: identical visible text, hidden sections, links and API calls, no page or console errors.
+- Pass 5:
+  - The demo-state tests fail when the `/today` call is removed (static check and browser timeout); they and the import tests passed twice more in a row.
+  - Screenshots of `/today` and `/create` at 375px and 1440px: the notice sits directly under the header, both buttons visible, no horizontal overflow, no page errors.
 - Earlier passes:
   - Pass 1, headless Chromium at 375px and 1440px on `/`, `/today`, `/progress`, `/create`, with and without `?workspace=sample`: no horizontal overflow; link is `/first-ad` in own mode and `/first-ad?workspace=sample` in sample mode.
   - `/create` step 4 as rendered, sample workspace, 375px and 1440px: the "Prepare your first ad" offer is visible and lands on `/first-ad?workspace=sample` (one-off script, not a suite test).
@@ -126,8 +145,8 @@ Limits:
 ## Next steps, in order
 
 1. Coordinator: review this branch's diff against `27c1f50` and decide what joins the candidate. Passes 3 and 4 change behaviour for signed-in sellers and `accounts.py` gains a response field, so they deserve an independent gate run and a hosted check with a real account and a real shop.
-2. Antigravity (proposed, pending Nav's relay): `docs/launch/antigravity-ad-loop-assignment.md`. Links from the home performance and bid advice sections to the first-ad guide, and from the end of the guide back to the bid advice upload.
-3. If the setup nudge should follow the seller into `/today` and `/create`, those pages need to learn that setup is unfinished. The cheapest honest source is the workspace read they already make in their own workspace; in sample mode they make none today.
+2. Antigravity: `docs/launch/antigravity-ad-loop-assignment.md`, a paste-ready message given to Nav on Nov 17. Links from the home performance and bid advice sections to the first-ad guide, and from the end of the guide back to the bid advice upload. No `gemini/ad-loop-nov16` branch existed on origin when checked.
+3. If the nudge should also appear on `/first-ad`, `/progress` and `/digest`, each needs the same one-line call in its sample path (`first-ad.js` is in Antigravity's scope until it reports).
 4. The demo dashboard still shows the logged-out hero to a signed-in seller. A hero written for "you have an account, your shop is not set up yet" would make the demo state clearer. That is a copy and design decision for Nav.
 
 Ownership of this scope is released.

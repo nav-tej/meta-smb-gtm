@@ -20,14 +20,14 @@ the scope below so the two branches merge cleanly.
 
 ## Base and branch
 - Base: the tip of `origin/claude/ux-gap-nov16` when you start (`git fetch origin` first). It
-  contains `18768d0` (first-ad links), `5e0bdab` (listings on any device) and `d684369`
-  (dashboard demo before setup). Record the exact SHA you based on in your report.
+  contains `18768d0` (first-ad links), `5e0bdab` (listings on any device), `d684369`
+  (dashboard demo before setup) and `f956b74` (the same notice on `/today` and `/create`). Record the exact SHA you based on in your report.
 - Those commits touched files in your scope, in places you do not need. Leave them as they are:
   - `welcome.js`: `applyHomeModeState` and `injectLoginDialogSwitcher` (the setup-pending rule),
     and the `homeSawSignedOut` variable at the top. Your part 7 work is in
     `renderSignedInHomeWorkspace`, which was not changed.
   - `index.html`, `first-ad.html`, `welcome.html`: only the `?v=` on the `workspace-modes.js`
-    and `welcome.js` script tags (now `20261116-uxgap3`). If you change `welcome.js` or another
+    and `welcome.js` script tags (now `20261117-uxgap4` and `20261116-uxgap3`). If you change `welcome.js` or another
     script, bump its `?v=` on every page that loads it.
 - New state to keep in mind: a signed-in seller who has not finished setup now sees the home
   page as the sample shop with a "Demo data" banner under the header. Your links there follow
@@ -39,7 +39,7 @@ the scope below so the two branches merge cleanly.
 ## Step 0: independent baseline (read-only, before any edit)
 1. Run the full offline gate on your base commit and record the exact counts:
    `DEMO_MODE=true META_MODEL_API_KEY= DEMO_KEY= make PY=.venv/bin check`
-   Claude's builder result on `d684369` was 616 passed, 2 skipped, with 1 warning and lint and
+   Claude's builder result on `f956b74` was 616 passed, 2 skipped, with 1 warning and lint and
    format clean. Report yours separately;
    do not copy these numbers.
 2. In a real browser against a local demo-mode server, walk `/create` to step 4 (Ready to share)
