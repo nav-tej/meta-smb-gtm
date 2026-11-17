@@ -66,6 +66,11 @@ Account B, setup finished with a saved shop website:
     "Weekly post ideas" shows "Tell one painting story" and "Feature your Empowering Women series",
     each linking to `/create?workspace=sample&idea=...`; for a signed-in seller in their own
     workspace it shows one move pointing to `/today`. No runs used.
+16. Setup step 3 (needs a preview from `879a87f` or later): as a guest, "Suggest similar shops (1 run)"
+    opens a free-account prompt; after signing in with account A the wizard is back on step 3 with
+    what you entered. Do not press the button signed in unless Nav approves spending 1 run; if he
+    does, the suggestions come from account A's shop website and arrive unticked. On home as a
+    guest, adding a shop and pressing "Request analysis" both open the free-account prompt.
 
 ## Report
 `docs/launch/HERMES_UX_GAP_NOV17.md` on your own branch: preview URL and SHA, browser and
