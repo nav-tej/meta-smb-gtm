@@ -13,6 +13,8 @@ Commits, in order:
 | `5e0bdab` | Pass 3: the import follows the seller to any device and covers earlier accounts. Replaces the device flag from pass 2. |
 | `d684369` | Pass 4: the dashboard before setup is an explicit demo with a nudge to finish setup. |
 | `f956b74` | Pass 5 (Nov 17): the same nudge on `/today` and `/create` when they show the sample shop. Needs pass 4. |
+| `8a113f2` | Merge of Antigravity's `gemini/ad-loop-nov16` (`a982987`) on branch `claude/ux-gap-ad-loop-nov17`. |
+| `d8f4ba2` | Pass 6 (Nov 17): the nudge on every page that shows the sample (`/first-ad`, `/progress`, `/digest`), run from `workspace-modes.js`; home and the wizard opt out. |
 
 Passes 3 and 4 are separate commits so the coordinator can take either one. Both touch `workspace-modes.js` and the script version tags, so taking pass 4 alone needs a small manual merge.
 
@@ -146,7 +148,7 @@ Limits: `/first-ad`, `/progress` and `/digest` still show the ordinary sample ba
 
 1. Coordinator: review this branch's diff against `27c1f50` and decide what joins the candidate. Passes 3 and 4 change behaviour for signed-in sellers and `accounts.py` gains a response field, so they deserve an independent gate run and a hosted check with a real account and a real shop.
 2. Antigravity: `docs/launch/antigravity-ad-loop-assignment.md`, a paste-ready message given to Nav on Nov 17. Links from the home performance and bid advice sections to the first-ad guide, and from the end of the guide back to the bid advice upload. No `gemini/ad-loop-nov16` branch existed on origin when checked.
-3. If the nudge should also appear on `/first-ad`, `/progress` and `/digest`, each needs the same one-line call in its sample path (`first-ad.js` is in Antigravity's scope until it reports).
+3. Done in pass 6: the nudge shows on every page that shows the sample. Gate on that commit: 618 passed, 2 skipped; account audit 27/27; guest audit 20/20. Still open: a signed-in seller without setup who opens `/today`, `/create`, `/first-ad`, `/progress` or `/digest` directly lands in their own empty workspace with no "Finish setup" prompt.
 4. The demo dashboard still shows the logged-out hero to a signed-in seller. A hero written for "you have an account, your shop is not set up yet" would make the demo state clearer. That is a copy and design decision for Nav.
 
 Ownership of this scope is released.
