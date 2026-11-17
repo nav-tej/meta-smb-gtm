@@ -283,10 +283,11 @@ def test_welcome_onboarding_full_flow_and_honest_workspace(
             page.click("#wkStep2NextBtn")
             page.wait_for_selector("#wkStep3:not([hidden])")
 
-            # 4. Step 3: Competitor watchlist is free (0 runs)
+            # 4. Step 3: adding competitors by hand is free; Muse suggestions say they use 1 run
             cost_banner = page.text_content("#wkCompCostBanner") or ""
-            assert "free" in cost_banner.lower()
-            assert "0 runs" in cost_banner
+            assert "1 run" in cost_banner
+            manual_label = page.text_content("label[for=wkManualCompUrl]") or ""
+            assert "free" in manual_label.lower()
 
             page.fill("#wkManualCompUrl", "desertceramics.com")
             page.fill("#wkManualCompReason", "Similar handmade stoneware mugs")

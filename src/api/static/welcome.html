@@ -11,7 +11,7 @@
   <script src="/static/analytics.js?v=20261109-ux" defer></script>
   <script src="/static/account.js?v=20261112-integrated" defer></script>
   <script src="/static/workspace-modes.js?v=20261117-uxgap6" defer></script>
-  <script src="/static/welcome.js?v=20261117-uxgap6" defer></script>
+  <script src="/static/welcome.js?v=20261117-uxgap8" defer></script>
   <script src="/static/seller-memory.js?v=20261112-integrated" defer></script>
 </head>
 <body class="wk-body">
@@ -126,22 +126,23 @@
 
     <!-- STEP 3: YOUR COMPETITORS -->
     <section class="wk-card" id="wkStep3" aria-labelledby="wkStep3Title" hidden>
-      <span class="wk-eyebrow">Step 3 of 4 · Competitor watchlist (free · 0 runs)</span>
+      <span class="wk-eyebrow">Step 3 of 4 · Competitor watchlist</span>
       <h1 class="wk-title" id="wkStep3Title">Your competitors</h1>
-      <p class="wk-subtitle">Choose 1 to 6 similar shops to watch for price changes and new listings. Ticking, suggesting, or adding competitors here is completely free (0 runs).</p>
+      <p class="wk-subtitle">Choose 1 to 6 similar shops to watch for price changes and new listings. Adding shops by hand is free. Muse can also suggest some from your website for 1 run.</p>
 
       <div class="wk-proof-box" id="wkCompCostBanner">
-        <strong id="wkCompCostTitle">Competitor watchlist (free · 0 runs)</strong>
-        <span id="wkCompCostDetail">Review suggested similar shops, or type competitor URLs by hand below. Steps 1 to 4 are free.</span>
+        <strong id="wkCompCostTitle">Let Muse suggest similar shops</strong>
+        <span id="wkCompCostDetail">Muse reads your shop website and suggests up to 4 shops that sell to the same buyers. Suggestions are unverified, so tick only the ones you want to watch.</span>
         <div style="margin-top:10px;">
-          <button type="button" class="wk-btn wk-btn-gold" id="wkDiscoverCompBtn">Suggest 4–6 similar shops (free · 0 runs)</button>
+          <button type="button" class="wk-btn wk-btn-gold" id="wkDiscoverCompBtn">Suggest similar shops (1 run)</button>
         </div>
+        <p id="wkSuggestNote" role="status" style="margin:8px 0 0;font-size:0.85rem;" hidden></p>
       </div>
 
       <ul class="wk-comp-list" id="wkCompList" aria-live="polite"></ul>
 
       <div class="wk-field" style="margin-top:18px;">
-        <label class="wk-label" for="wkManualCompUrl">Add a competitor shop by hand (free · 0 runs)</label>
+        <label class="wk-label" for="wkManualCompUrl">Add a competitor shop by hand (free)</label>
         <div class="wk-row-inline">
           <input class="wk-input" id="wkManualCompUrl" type="text" inputmode="url" placeholder="e.g. rivalpottery.com or https://their-shop.com" maxlength="300" />
           <input class="wk-input" id="wkManualCompReason" type="text" placeholder="Why watch them? (optional)" maxlength="140" />

@@ -1002,7 +1002,7 @@
   <script src="/static/account.js?v=20261112-integrated" defer></script>
   <script src="/static/workspace-modes.js?v=20261117-uxgap6" defer></script>
   <script src="/static/muse-shell.js?v=20261117-uxgap6" defer></script>
-  <script src="/static/welcome.js?v=20261117-uxgap6" defer></script>
+  <script src="/static/welcome.js?v=20261117-uxgap8" defer></script>
   <script src="/static/seller-memory.js?v=20261112-integrated" defer></script>
 </head>
 <body>
@@ -2412,6 +2412,8 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
     };
     const sellerKey = (btn) => {
       const li = btn.closest('.jr-seller');
+      // A shop the seller added keeps its own address; its only link is the Meta Ad Library one.
+      if (li?.dataset?.url) return li.dataset.url;
       const link = li?.querySelector('a');
       const raw = (link?.href || li?.querySelector('strong')?.textContent || '').trim();
       return raw.includes('://') ? raw : `https://${raw}`;
@@ -2511,6 +2513,32 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
         refreshSellerButtons();
       }
     }
+    // On a live server, a guest is asked to create a free account instead of hitting a dead end.
+    // A shop they added themselves comes with them into setup (welcome.js adopts the note).
+    function rememberSignupHandoff(url) {
+      try {
+        const key = 'muse.signup_handoff.v1';
+        const prev = JSON.parse(localStorage.getItem(key) || 'null') || {};
+        const competitors = Array.isArray(prev.competitors) ? prev.competitors : [];
+        if (!competitors.includes(url)) competitors.push(url);
+        localStorage.setItem(key, JSON.stringify({ ...prev, from: prev.from || 'home', competitors: competitors.slice(-6), at: Date.now() }));
+      } catch {}
+    }
+    function promptForLiveRuns(url, btn) {
+      const snap = liveSnapshot();
+      const host = String(url).replace(/^https?:\/\/(www\.)?/, '').split('/')[0];
+      if (!snap?.user) {
+        const added = btn?.closest?.('.jr-seller')?.dataset?.added === '1';
+        if (added) rememberSignupHandoff(url);
+        window.museAccount?.open?.('signup', added
+          ? `Create a free account to analyze ${host}. You get 3 free runs, and each analysis uses 1. ${host} comes with you into setup.`
+          : 'Create a free account to analyze shops you choose. You get 3 free runs, and each analysis uses 1.');
+        return;
+      }
+      if (!snap.user.email_verified) { showToast('Confirm your email first. The link is in your inbox.'); return; }
+      if (snap.usage && snap.usage.remaining === 0) { showToast('Your runs are used. Pick a plan for more.'); return; }
+      showToast('Live analysis is unavailable right now. Saved research still works.');
+    }
     async function requestBrief(url, btn) {
       if (briefCache[url]) {
         renderCompetitorBrief(briefCache[url]);
@@ -2518,8 +2546,8 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
         return;
       }
       if (!liveRunsReady() && !liveSnapshot()?.configured) { await requestDemoBrief(url, btn); return; }
-      if (window.museAccount && !window.museAccount.liveReady()) return;
-      if (!liveRunsReady()) { showToast('Sign in to analyze new sellers.'); return; }
+      if (window.museAccount && !window.museAccount.liveReady()) { promptForLiveRuns(url, btn); return; }
+      if (!liveRunsReady()) { promptForLiveRuns(url, btn); return; }
       setButtonBusy(btn, true);
       btn.textContent = 'Analyzing…';
       try {
@@ -2601,14 +2629,17 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
       }
       input.setCustomValidity('');
       const live = liveRunsReady();
+      const onServer = !live && !!liveSnapshot()?.configured;
       const li = document.createElement('li');
       li.className = 'jr-seller added';
       li.dataset.added = '1';
+      li.dataset.url = url.href;
       const info = document.createElement('div');
       const name = document.createElement('strong');
       name.textContent = url.hostname.replace(/^www\./, '');
       const meta = document.createElement('span');
-      meta.textContent = live ? 'Analyzing now · 1 run' : 'Analysis needs a live server';
+      meta.textContent = live ? 'Analyzing now · 1 run'
+        : (onServer ? (liveSnapshot()?.user ? 'Needs 1 run to analyze' : 'Sign in to analyze · 1 run') : 'Analysis needs a live server');
       info.appendChild(name); info.appendChild(meta);
       const adLink = document.createElement('a');
       adLink.className = 'jr-meta-ad-link';
@@ -2625,6 +2656,7 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
       input.value = '';
       refreshSellerButtons();
       if (live) requestBrief(sellerKey(btn), btn);
+      else if (onServer) promptForLiveRuns(sellerKey(btn), btn);
       else showToast(`Added ${name.textContent} · analyzing it needs a live server, so no run was used`);
     });
     document.getElementById('addCompetitorInput').addEventListener('input', (event) => event.target.setCustomValidity(''));

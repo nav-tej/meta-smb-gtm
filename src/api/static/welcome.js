@@ -6,6 +6,29 @@
  */
 (function () {
   const LOCAL_ONBOARDING_KEY = 'muse.onboarding.v1';
+  // A guest asked to create an account (for competitor suggestions here, or to analyze a shop
+  // they added on home) leaves a short-lived note. After sign-in the setup wizard adopts it, so
+  // their setup so far and the shops they added come with them.
+  const SIGNUP_HANDOFF_KEY = 'muse.signup_handoff.v1';
+  const SIGNUP_HANDOFF_MAX_AGE_MS = 2 * 60 * 60 * 1000;
+  function saveSignupHandoff(extra) {
+    try {
+      const prev = JSON.parse(localStorage.getItem(SIGNUP_HANDOFF_KEY) || 'null') || {};
+      const competitors = Array.isArray(prev.competitors) ? prev.competitors : [];
+      localStorage.setItem(SIGNUP_HANDOFF_KEY, JSON.stringify({ ...prev, ...extra, competitors, at: Date.now() }));
+    } catch (_) {}
+  }
+  function takeSignupHandoff() {
+    try {
+      const raw = localStorage.getItem(SIGNUP_HANDOFF_KEY);
+      localStorage.removeItem(SIGNUP_HANDOFF_KEY);
+      const handoff = raw ? JSON.parse(raw) : null;
+      if (!handoff || !(Date.now() - Number(handoff.at) < SIGNUP_HANDOFF_MAX_AGE_MS)) return null;
+      return handoff;
+    } catch (_) {
+      return null;
+    }
+  }
   const LOCAL_WORKSPACE_MODE_KEY = 'muse.workspace_mode.v1'; // 'own' | 'sample'
   let homeSyncEpoch = 0;
   // True once this page has shown a signed-out visitor: a sign-in after that is a fresh one.
@@ -377,6 +400,28 @@
     if (server.doc && server.doc.onboarding && typeof server.doc.onboarding === 'object') {
       state = { ...defaultOnboardingState(), ...server.doc.onboarding };
       writeLocalOnboarding(state, currentUser);
+    }
+
+    // Signed in just now from one of those prompts, on this device: adopt the note.
+    if (currentUser && !state.completed_at) {
+      const handoff = takeSignupHandoff();
+      if (handoff) {
+        if (handoff.from === 'wizard' && !(server.doc && server.doc.onboarding)) {
+          const guestState = readLocalOnboarding(null);
+          if (guestState) state = { ...guestState };
+          try { localStorage.removeItem(localKeyForUser(null)); } catch (_) {}
+        }
+        state.competitors = Array.isArray(state.competitors) ? state.competitors : [];
+        (handoff.competitors || []).forEach((raw) => {
+          const url = normalizeShopUrl(raw);
+          if (url && !state.competitors.some((c) => c.url === url)) {
+            state.competitors.push({ name: deriveBusinessName(url), url, role: 'similar_audience', rationale: '', reason: 'Added before you signed in', selected: true });
+          }
+        });
+        if (handoff.step >= 1 && handoff.step <= 4) state.step = handoff.step;
+        writeLocalOnboarding(state, currentUser);
+        trackEvent('signup_handoff_adopted', { from: handoff.from || 'unknown' });
+      }
     }
 
     const query = new URLSearchParams(window.location.search || '');
@@ -801,60 +846,74 @@
       });
     }
 
+    // Suggestions: Muse reads the seller's own shop website (1 live run) and the results arrive
+    // unticked, so the seller picks. A guest is asked to create a free account first.
+    const suggestBtnLabel = 'Suggest similar shops (1 run)';
+    const suggestNote = document.getElementById('wkSuggestNote');
+    const showSuggestNote = (text) => {
+      if (!suggestNote) return;
+      suggestNote.textContent = text || '';
+      suggestNote.hidden = !text;
+    };
+    if (!currentUser) showSuggestNote('Suggestions need a free account. It comes with 3 runs, and your setup so far comes with you.');
     document.getElementById('wkDiscoverCompBtn')?.addEventListener('click', async () => {
       if (step3Err) step3Err.hidden = true;
+      if (!currentUser) {
+        writeLocalOnboarding(state, null);
+        saveSignupHandoff({ from: 'wizard', step: 3 });
+        trackEvent('signup_prompted', { surface: 'onboarding_suggest_competitors' });
+        window.museAccount?.open?.('signup', 'Create a free account and Muse will suggest shops like yours. You get 3 free runs, and suggestions use 1. Your setup so far comes with you.');
+        return;
+      }
+      const shopUrl = (state.shop_urls || []).find(Boolean);
+      if (!shopUrl) {
+        if (step3Err) {
+          step3Err.textContent = 'Add your shop website in step 1 first, so Muse knows what you sell.';
+          step3Err.hidden = false;
+        }
+        return;
+      }
       const btn = document.getElementById('wkDiscoverCompBtn');
       if (btn) {
         btn.disabled = true;
-        btn.textContent = 'Finding similar shops (free · 0 runs)…';
+        btn.textContent = 'Reading your shop and finding similar ones…';
       }
       try {
-        let suggestions = [];
-        try {
-          const resp = await fetch('/api/v1/research-example');
-          if (resp.ok) {
-            const data = await resp.json();
-            suggestions = data.targets || [];
-          }
-        } catch (_) {}
-        if (!suggestions.length) {
-          suggestions = [
-            {
-              name: 'Desert Ceramics Studio',
-              url: 'https://desertceramics.com',
-              role: 'similar_audience',
-              reason: 'Handmade ceramic & stoneware collection',
-            },
-            {
-              name: 'Earth & Clay Art',
-              url: 'https://earthandclay.com',
-              role: 'price_reference',
-              reason: 'Functional pottery & bespoke vase sets',
-            },
-            {
-              name: 'Artisan Kilnworks',
-              url: 'https://artisankiln.com',
-              role: 'inspiration',
-              reason: 'Handmade mugs and gift items under $60',
-            },
-          ];
+        const resp = await fetch('/api/v1/research-targets?live=true', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ website: shopUrl }),
+        });
+        let data = {};
+        try { data = await resp.json(); } catch (_) {}
+        if (!resp.ok) {
+          const detail = typeof data.detail === 'string' && !/<html|traceback/i.test(data.detail) ? data.detail : '';
+          if (resp.status === 401) throw new Error('Your session ended, so no run was used. Sign in again to get suggestions.');
+          throw new Error(detail || 'Muse could not suggest shops right now, so no run was used. Add competitors by hand below.');
         }
-        suggestions.forEach((s) => {
-          const url = normalizeShopUrl(s.url || s.website);
-          if (!url) return;
-          if (!state.competitors.some((c) => c.url === url)) {
-            state.competitors.push({
-              name: s.name || deriveBusinessName(url),
-              url,
-              role: s.role || 'similar_audience',
-              rationale: s.reason || 'Suggested similar storefront',
-              reason: s.reason || 'Suggested similar storefront',
-              selected: true,
-            });
-          }
+        let added = 0;
+        (data.targets || []).forEach((target) => {
+          const url = normalizeShopUrl(target.url);
+          if (!url || state.competitors.some((c) => c.url === url)) return;
+          state.competitors.push({
+            name: target.name || deriveBusinessName(url),
+            url,
+            role: 'similar_audience',
+            rationale: target.reason || '',
+            reason: target.reason || 'Suggested by Muse from your website',
+            selected: false,
+            suggested: true,
+          });
+          added += 1;
         });
         renderStep3Competitors();
+        writeLocalOnboarding(state, currentUser);
         await saveServerOnboarding(state);
+        showSuggestNote(added
+          ? `Muse suggested ${added} ${added === 1 ? 'shop' : 'shops'} from your website. They are unverified, so tick the ones you want to watch.`
+          : 'Muse found no new shops to suggest. Add competitors by hand below.');
+        trackEvent('onboarding_competitors_suggested', { count: added });
       } catch (err) {
         if (step3Err) {
           step3Err.textContent = err.message;
@@ -863,8 +922,12 @@
       } finally {
         if (btn) {
           btn.disabled = false;
-          btn.textContent = 'Suggest 4–6 similar shops (free · 0 runs)';
+          btn.textContent = suggestBtnLabel;
         }
+        try {
+          const snap = await window.museAccount?.refresh?.();
+          if (snap?.usage && typeof snap.usage.remaining === 'number') runsRemaining = Math.max(0, snap.usage.remaining);
+        } catch (_) {}
         updateRunsUI();
       }
     });
