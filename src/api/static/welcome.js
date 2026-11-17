@@ -1490,7 +1490,11 @@
       createBtn.className = 'jr-action';
       createBtn.href = '/create';
       createBtn.textContent = 'Create your first post →';
-      adGallery.append(emptyP, createBtn);
+      const firstAdBtn = document.createElement('a');
+      firstAdBtn.className = 'jr-action';
+      firstAdBtn.href = window.museModes?.ownHref ? window.museModes.ownHref('/first-ad') : '/first-ad';
+      firstAdBtn.textContent = 'Prepare your first ad →';
+      adGallery.append(emptyP, createBtn, firstAdBtn);
     }
 
     const recosList = document.querySelector('#loop-improve ol.jr-recos');
@@ -1516,6 +1520,20 @@
       }
       li.append(badge, title, desc, link);
       recosList.appendChild(li);
+
+      const adLi = document.createElement('li');
+      const adBadge = document.createElement('span');
+      adBadge.className = 'jr-impact medium';
+      adBadge.textContent = 'First ad preparation';
+      const adTitle = document.createElement('strong');
+      adTitle.textContent = 'No ad running yet? Prepare your first ad';
+      const adDesc = document.createElement('p');
+      adDesc.textContent = 'Choose an outcome, review your wording, audience, and budget, and export a manual Ads Manager checklist. Nothing is published automatically.';
+      const adLink = document.createElement('a');
+      adLink.href = window.museModes?.ownHref ? window.museModes.ownHref('/first-ad') : '/first-ad';
+      adLink.textContent = 'Prepare your first ad →';
+      adLi.append(adBadge, adTitle, adDesc, adLink);
+      recosList.appendChild(adLi);
     }
     const movesStrip = document.querySelector('.ra-moves-strip');
     if (movesStrip) movesStrip.hidden = true;

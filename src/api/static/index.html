@@ -992,7 +992,7 @@
   <script src="/static/account.js?v=20261112-integrated" defer></script>
   <script src="/static/workspace-modes.js?v=20261116-uxgap3" defer></script>
   <script src="/static/muse-shell.js?v=20261112-integrated" defer></script>
-  <script src="/static/welcome.js?v=20261116-uxgap3" defer></script>
+  <script src="/static/welcome.js?v=20261117-adloop1" defer></script>
   <script src="/static/seller-memory.js?v=20261112-integrated" defer></script>
 </head>
 <body>
@@ -1352,6 +1352,7 @@
             <header><h3>If you run ads</h3></header>
             <p>Muse Spark reads your campaign numbers and suggests where to move budget, with the metric behind each move.</p>
             <button type="button" class="jr-action" id="journeyBudget">Review budget strategy →</button>
+            <p class="jr-note">No ad running yet? <a id="improveFirstAdLink" href="/first-ad" data-mode-link="/first-ad">Prepare your first ad →</a></p>
             <p class="jr-note">Sample campaign data. Advice only; nothing changes in your ad account.</p>
           </aside>
         </div>
@@ -1366,6 +1367,7 @@
           <a class="jr-next-card" href="#loop-improve"><span class="jr-next-icon c1" aria-hidden="true">↑</span><strong>Try the next idea</strong><span>Pick the next ranked move, such as your Empowering Women series.</span><em>See ranked ideas →</em></a>
           <a class="jr-next-card" href="#loop-research"><span class="jr-next-icon c2" aria-hidden="true">↺</span><strong>Start the next cycle</strong><span>Re-check similar sellers and prices before your next post.</span><em>Back to research →</em></a>
         </div>
+        <p class="jr-note" style="margin-top:12px;">No ad running yet? <a id="iterateFirstAdLink" href="/first-ad" data-mode-link="/first-ad">Prepare your first ad →</a></p>
       </div>
 
 
@@ -1750,6 +1752,7 @@
             </button>
           </div>
         </div>
+        <p class="card-sub" style="margin:0 0 0.75rem 0;">No ad running yet? <a id="bidsFirstAdLink" href="/first-ad" data-mode-link="/first-ad">Prepare your first ad →</a></p>
 
         <p id="bidSummaryBanner" style="font-size:0.9rem;background:var(--surface-subtle);padding:0.85rem 1rem;border-radius:var(--radius-sm);border-left:3px solid var(--success);margin:0 0 1rem 0;"></p>
 
@@ -2550,6 +2553,13 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
       setWorkspaceOpen(open);
       if (open) document.getElementById('workspaceDetail').scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
+    const openTabFromHash = () => {
+      if (window?.location?.hash === '#tab-bids') {
+        openStep('tab-bids', 'tab-bids');
+      }
+    };
+    openTabFromHash();
+    window?.addEventListener?.('hashchange', openTabFromHash);
     document.getElementById('addCompetitorForm').addEventListener('submit', (event) => {
       event.preventDefault();
       const input = document.getElementById('addCompetitorInput');

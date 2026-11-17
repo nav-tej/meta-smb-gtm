@@ -342,6 +342,7 @@
   function syncUiFromState() {
     hydrating = true;
     const sample = isSampleMode();
+    if ($('faBidAdviceLink')) $('faBidAdviceLink').href = sample ? '/?workspace=sample#tab-bids' : '/#tab-bids';
     if ($('faProvenanceBadge')) $('faProvenanceBadge').textContent = sample ? 'Artist example' : 'Suggested starting approach';
     if ($('faContextStatus')) {
       $('faContextStatus').textContent = sample
@@ -424,6 +425,7 @@
     }
 
     const sample = isSampleMode();
+    if ($('faBidAdviceLink')) $('faBidAdviceLink').href = sample ? '/?workspace=sample#tab-bids' : '/#tab-bids';
     let loaded = null;
     try {
       const raw = localStorage.getItem(storageKey());
