@@ -1013,7 +1013,7 @@
   <script src="/static/account.js?v=20261112-integrated" defer></script>
   <script src="/static/workspace-modes.js?v=20261117-uxgap6" defer></script>
   <script src="/static/muse-shell.js?v=20261118-ag1" defer></script>
-  <script src="/static/welcome.js?v=20261118-uxgap9" defer></script>
+  <script src="/static/welcome.js?v=20261118-uxgap11" defer></script>
   <script src="/static/seller-memory.js?v=20261118-uxgap9" defer></script>
 </head>
 <body>
@@ -2492,13 +2492,37 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
         if (addBtn) addBtn.textContent = 'Add shop';
         if (addCost) addCost.textContent = 'No runs remaining on your current plan. Choose a plan in Account to analyze a new shop.';
       }
-      if (snapNote) snapNote.textContent = 'Saved public snapshots from Nov 3, 2026. New analyses use 1 run.';
+      // A seller's own list holds shops they chose, not the Nov 3 sample snapshots.
+      if (snapNote) snapNote.textContent = window.museModes?.isSampleMode?.()
+        ? 'Saved public snapshots from Nov 3, 2026. New analyses use 1 run.'
+        : 'Analyses you run are saved to your workspace. Viewing one again is free.';
     }
     window.addEventListener('muse:mode-change', refreshVisitorCopy);
+    // What Muse is told about the seller when it analyzes a competitor. The sample shop keeps
+    // the artist's context; a seller's own workspace describes their shop from setup.
+    const SAMPLE_SELLER_CONTEXT = 'Fine artist selling Sikh & Punjabi heritage art';
+    let ownOnboarding = null;
+    function sellerContextForAnalysis() {
+      if (!liveSnapshot()?.user || window.museModes?.isSampleMode?.()) return SAMPLE_SELLER_CONTEXT;
+      const o = ownOnboarding || {};
+      const crawl = o.crawl_summary || {};
+      const parts = [];
+      const name = String(o.business_name || crawl.business_name || '').trim();
+      const site = (Array.isArray(o.shop_urls) ? o.shop_urls : []).find(Boolean);
+      if (name || site) parts.push(`Independent seller: ${[name, site].filter(Boolean).join(', ')}.`);
+      const titles = (Array.isArray(crawl.sample_titles) ? crawl.sample_titles : [])
+        .map((t) => String(t).trim()).filter(Boolean).slice(0, 6);
+      if (titles.length) parts.push(`Products include: ${titles.join('; ')}.`);
+      if (crawl.price_range) parts.push(`Prices: ${String(crawl.price_range)}.`);
+      const focus = String(o.preferences?.research_focus || '').trim();
+      if (focus) parts.push(`Seller's focus: ${focus}.`);
+      return (parts.join(' ') || 'Independent online shop owner.').slice(0, 900);
+    }
     let briefLoadEpoch = 0;
     async function loadBriefCache() {
       const epoch = ++briefLoadEpoch;
       Object.keys(briefCache).forEach((k) => delete briefCache[k]);
+      ownOnboarding = null;
       const snap = liveSnapshot();
       const ownerId = snap?.user?.id || null;
       if (snap?.configured && ownerId) {
@@ -2514,6 +2538,7 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
             const payload = await resp.json();
             if (epoch !== briefLoadEpoch || (liveSnapshot()?.user?.id || null) !== ownerId) return;
             Object.assign(briefCache, (payload.document || {}).briefs || {});
+            ownOnboarding = (payload.document || {}).onboarding || null;
           }
         } catch {}
       } else {
@@ -2605,7 +2630,7 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
           body: JSON.stringify({
             competitor_url: url,
             max_urls: 40,
-            seller_context: 'Fine artist selling Sikh & Punjabi heritage art',
+            seller_context: sellerContextForAnalysis(),
           }),
         });
         if (resp.status === 401 || resp.status === 403) {

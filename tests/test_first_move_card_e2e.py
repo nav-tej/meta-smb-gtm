@@ -96,7 +96,9 @@ def test_first_move_card_e2e(live_server_url: str) -> None:
             return {{"business_name": "Mountain Pottery Studio",
                     "shop_urls": ["https://mountainpottery.example/"],
                     "competitors": competitors, "completed_at": "2026-11-17T18:00:00Z",
-                    "used_run": False}}
+                    "used_run": False,
+                    "crawl_summary": {{"sample_titles": ["Speckled stoneware mug"],
+                                      "price_range": "$28-$64"}}}}
 
         def open_page(browser, width, doc, signed_in=True):
             ctx = browser.new_context(viewport={{"width": width, "height": 900}})
@@ -163,6 +165,11 @@ def test_first_move_card_e2e(live_server_url: str) -> None:
                     page.wait_for_timeout(300)
                     assert [a["competitor_url"] for a in s["analyzed"]] == [
                         "https://kilnrow.example"], s["analyzed"]
+                    # Muse is told about this seller's shop, not the sample artist's.
+                    context = s["analyzed"][0]["seller_context"]
+                    assert "Mountain Pottery Studio" in context, context
+                    assert "Speckled stoneware mug" in context and "$28-$64" in context, context
+                    assert "Sikh" not in context and "artist" not in context, context
                 assert not errors, errors
                 ctx.close()
 
@@ -174,6 +181,18 @@ def test_first_move_card_e2e(live_server_url: str) -> None:
             page.wait_for_selector("#firstMoveCard:not([hidden])", timeout=15000)
             assert page.locator("#firstMoveCompetitorBtn").inner_text() == "View analysis"
             assert "Viewing it is free." in card_text(page)
+            # The note under the competitor list fits the workspace and stays that way.
+            page.wait_for_timeout(1500)
+            note = page.locator("#competitorSnapshotsNote").inner_text()
+            assert note == (
+                "Analyses you run are saved to your workspace. Viewing one again is free."), note
+            page.goto(BASE + "/?workspace=sample", wait_until="networkidle")
+            page.wait_for_function(
+                "document.documentElement.dataset.museMode === 'account_sample'", timeout=15000)
+            page.wait_for_timeout(1500)
+            note = page.locator("#competitorSnapshotsNote").inner_text()
+            assert note.startswith("Saved public snapshots from Nov 3, 2026."), note
+            assert not errors, errors
             ctx.close()
 
             # 3. No competitor yet: the card points to adding one. Hiding it sticks.

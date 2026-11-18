@@ -177,7 +177,10 @@ def test_steer_card_answers_with_actionable_moves_e2e(live_server_url: str) -> N
             page.locator("#jrSteerResearch").wait_for(state="visible", timeout=10000)
             moves = ask(page, "Weekly post ideas")
             assert moves == [{{"href": "/today", "title": "Plan this week’s posts"}}], moves
-            moves = ask(page, "Why $59.99 entry")
+            # The sample shop's prices are not offered as questions in a seller's own workspace.
+            chips = page.locator(".jr-chip-btn").all_inner_texts()
+            assert not any("$" in c for c in chips), chips
+            moves = ask(page, "How do my prices compare?")
             assert moves == [{{"href": "#loop-research",
                                "title": "Compare prices with a competitor"}}], moves
             assert not errors, errors

@@ -83,7 +83,22 @@ Account B, setup finished with a saved shop website:
     saved yet") with "Set your goal" and "What Muse remembers"; "Set your goal" opens the full form.
     After signing out, no shop or competitor name from the signed-out account remains on the page.
 
+21. Add-competitor form on `/` (needs a preview with merge `c9efa56`): as a guest the button reads
+    "Add shop" and the note under it says analyzing needs a free account (3 free runs, 1 per analysis);
+    the line after the list reads "Saved public snapshots from Nov 3, 2026. Create a free account to
+    analyze shops you choose." Account B in its own workspace: "Add and analyze · 1 run" and "Analyses
+    you run are saved to your workspace. Viewing one again is free." (no "Nov 3"). Account B on
+    `/?workspace=sample`: "Saved public snapshots from Nov 3, 2026. New analyses use 1 run."
+22. "Ask Muse what to do next" chips: the sample shop shows "Why $59.99 entry" and "Gifts under $50";
+    account B's own workspace shows "How do my prices compare?", "Easier moves", "Gift ideas" and
+    "Weekly post ideas", with no dollar amounts. Switching between the two updates the chips.
+23. Sample shop watchlist on `/?workspace=sample` (guest and account B): no "Couldn't check" badge and
+    no check time later than Nov 3; competitors show "Saved snapshot · Nov 3".
+24. Only if Nav approves the item 19 run: in the browser's network panel, the `analyze-competitors`
+    request's `seller_context` describes account B's shop (its name or website) and does not say
+    "Fine artist selling Sikh & Punjabi heritage art". If you cannot see the request, mark UNVERIFIED.
+
 ## Report
-`docs/launch/HERMES_UX_GAP_NOV17.md` on your own branch: preview URL and SHA, browser and
+`docs/launch/HERMES_UX_GAP_NOV18.md` on your own branch: preview URL and SHA, browser and
 viewports, PASS / FAIL / UNVERIFIED per numbered item with a screenshot or exact text for each
 FAIL, and anything blocked. End with "Ownership released".

@@ -1220,7 +1220,8 @@
       textTargets,
       hiddenTargets,
       childTargets,
-      jrNotes: Array.from(document.querySelectorAll('#journey .jr-note')).map((el) => [el, el.textContent]),
+      // #competitorSnapshotsNote is worded per visitor by index.html (refreshVisitorCopy).
+      jrNotes: Array.from(document.querySelectorAll('#journey .jr-note:not(#competitorSnapshotsNote)')).map((el) => [el, el.textContent]),
       nextSpans: Array.from(document.querySelectorAll('#loop-iterate .jr-next-card span')).map((el) => [el, el.textContent]),
       steerPlaceholder: steerInput ? [steerInput, steerInput.placeholder] : null,
       compInput: compInput ? [compInput, compInput.value, compInput.placeholder] : null,
@@ -1604,7 +1605,7 @@
     if (movesStrip) movesStrip.hidden = true;
 
     // Update static notes in #journey so zero sample-shop references appear on a real account
-    document.querySelectorAll('#journey .jr-note').forEach((noteEl) => {
+    document.querySelectorAll('#journey .jr-note:not(#competitorSnapshotsNote)').forEach((noteEl) => {
       if (/SikhiArt|Nov 3|her website/i.test(noteEl.textContent || '')) {
         noteEl.textContent = `Workspace data for ${shopName}. Switch to "Sample shop" in the top bar anytime to view the demo examples.`;
       }
