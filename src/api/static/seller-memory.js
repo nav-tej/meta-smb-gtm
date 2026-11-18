@@ -1397,8 +1397,29 @@
       )
     );
     panel.appendChild(titleRow);
-
     panel.querySelector('#smOpenMemoryBtn')?.addEventListener('click', openMemoryModal);
+
+    // Nothing remembered yet: one line and a way in, instead of the whole form.
+    const rememberedCount = (state.memoryEntries || []).filter((e) => e.status !== 'dismissed').length;
+    const pendingSuggestion = (state.suggestedUpdates || []).some((s) => !s.status || s.status === 'pending');
+    if (!guestDemo && !isDraftActive && !rememberedCount && !pendingSuggestion && !state.homePanelExpanded) {
+      panel.classList.add('sm-card-compact');
+      const sub = titleRow.querySelector('.sm-sub');
+      if (sub) sub.textContent = 'Muse ranks your moves by your goal and the time you have each week. Nothing saved yet.';
+      const memBtn = titleRow.querySelector('#smOpenMemoryBtn');
+      if (memBtn) memBtn.textContent = 'What Muse remembers';
+      const openBtn = el('button', { type: 'button', id: 'smExpandContextBtn', class: 'sm-btn sm-btn-primary' }, 'Set your goal');
+      openBtn.addEventListener('click', () => {
+        state.homePanelExpanded = true;
+        renderHomeUI();
+      });
+      panel.appendChild(el('div', { class: 'sm-btn-row' }, openBtn));
+      renderWatchlistControls();
+      renderHomeRecommendations();
+      return;
+    }
+    panel.classList.remove('sm-card-compact');
+
 
     // Pending feedback suggestions banner (never auto-applied!)
     if ((state.suggestedUpdates || []).length) {

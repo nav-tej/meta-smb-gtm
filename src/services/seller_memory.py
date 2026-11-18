@@ -1452,11 +1452,11 @@ def rank_seller_recommendations(
                     "id": "move-catalog-refresh",
                     "category": "catalog",
                     "title": (
-                        "Refresh titles & descriptions across 5 listings on "
+                        "Refresh titles & descriptions for up to 5 listings on "
                         f"{effective_destination or 'your shop'}"
                     ),
                     "action": (
-                        "Update 5 shop titles with room-specific search terms and verify "
+                        "Update up to 5 shop titles with room-specific search terms and verify "
                         "cross-channel links (requires ~40 minutes)."
                     ),
                     "channel": refresh_channel,

@@ -120,8 +120,8 @@ def test_ad_loop_copy_and_script_version_contracts() -> None:
     welcome_html = (REPO_ROOT / "src/api/static/welcome.html").read_text(encoding="utf-8")
     first_ad_html = (REPO_ROOT / "src/api/static/first-ad.html").read_text(encoding="utf-8")
 
-    assert "welcome.js?v=20261117-uxgap8" in index_html
-    assert "welcome.js?v=20261117-uxgap8" in welcome_html
+    assert "welcome.js?v=20261118-uxgap9" in index_html
+    assert "welcome.js?v=20261118-uxgap9" in welcome_html
     assert "first-ad.js?v=20261117-adloop1" in first_ad_html
     for link_id in ("improveFirstAdLink", "iterateFirstAdLink", "bidsFirstAdLink"):
         assert link_id in index_html

@@ -1487,6 +1487,8 @@
         competitors.forEach((comp) => {
           const li = document.createElement('li');
           li.className = 'jr-seller';
+          // Analysis reads this, not the row's first link (that is the Meta Ad Library link).
+          li.dataset.url = competitorUrl(comp.url);
           const d = document.createElement('div');
           const st = document.createElement('strong');
           st.textContent = comp.name || comp.url;
@@ -1773,6 +1775,89 @@
   // Signed in, setup not finished, viewing the demo: #setupHero says what to do next and replaces
   // the logged-out hero. Any other state hides it; restoreLoggedOut puts the logged-out hero back
   // where it belongs (guests and the sample view).
+  const competitorUrl = (url) => (/^https?:\/\//i.test(url || '') ? url : `https://${url}`);
+
+  // A seller who just finished setup gets one card that says what to do first: analyze a
+  // competitor (their first personal result, 1 run) or make today's post (free).
+  function syncFirstMoveCard(show, onboarding, user, doc) {
+    const card = document.getElementById('firstMoveCard');
+    if (!card) return;
+    const hideKey = user?.id ? `muse.firstmove.hidden.v1:${user.id}` : '';
+    let hiddenByUser = false;
+    try { hiddenByUser = Boolean(hideKey && localStorage.getItem(hideKey)); } catch (_) {}
+    if (!show || hiddenByUser) {
+      // Clear it too: a hidden card must not keep another account's shop names in the page.
+      card.textContent = '';
+      card.hidden = true;
+      return;
+    }
+    const first = (onboarding?.competitors || []).find((c) => c && c.url && c.selected !== false) || null;
+    const firstUrl = first ? competitorUrl(first.url) : '';
+    const name = first ? (first.name || first.url) : '';
+    const analyzed = Boolean(first && (doc?.briefs || {})[firstUrl]);
+    const usage = window.museAccount?.getSnapshot?.()?.usage;
+    const runsLeft = usage && Number.isFinite(usage.remaining) ? Math.max(0, usage.remaining) : null;
+    const make = (tag, cls, text) => {
+      const node = document.createElement(tag);
+      if (cls) node.className = cls;
+      if (text) node.textContent = text;
+      return node;
+    };
+    card.textContent = '';
+    const hide = make('button', 'first-move-hide', 'Hide');
+    hide.type = 'button';
+    hide.addEventListener('click', () => {
+      try { if (hideKey) localStorage.setItem(hideKey, '1'); } catch (_) {}
+      card.textContent = '';
+      card.hidden = true;
+    });
+    const title = make('h2', '', 'Your shop is set up. Get your first result.');
+    title.id = 'firstMoveTitle';
+    const actions = make('div', 'first-move-actions');
+
+    const compOption = make('div', 'first-move-option');
+    const compBtn = make('button', 'first-move-btn primary');
+    compBtn.type = 'button';
+    compBtn.id = 'firstMoveCompetitorBtn';
+    if (!first) {
+      compOption.append(make('strong', '', 'Add a competitor to compare with'),
+        make('span', '', 'Muse compares their prices and listings with yours.'));
+      compBtn.textContent = 'Add a competitor';
+      compBtn.addEventListener('click', () => {
+        const input = document.getElementById('addCompetitorInput');
+        input?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+        input?.focus?.();
+      });
+    } else if (analyzed) {
+      compOption.append(make('strong', '', `See what Muse found about ${name}`),
+        make('span', '', 'Your analysis is saved. Viewing it is free.'));
+      compBtn.textContent = 'View analysis';
+    } else {
+      compOption.append(make('strong', '', `Analyze ${name}`),
+        make('span', '', `Muse compares their prices and listings with yours. Uses 1 run${runsLeft === null ? '' : ` (you have ${runsLeft} left)`}.`));
+      compBtn.textContent = `Analyze ${name} · 1 run`;
+    }
+    if (first) {
+      compBtn.addEventListener('click', () => {
+        const row = Array.from(document.querySelectorAll('#sellerList li.jr-seller')).find((li) => li.dataset.url === firstUrl);
+        const rowBtn = row?.querySelector('.js-live-brief');
+        row?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+        if (rowBtn && !rowBtn.disabled) rowBtn.click();
+      });
+    }
+    compOption.append(compBtn);
+
+    const postOption = make('div', 'first-move-option');
+    const postLink = make('a', 'first-move-btn', "Open today's studio");
+    postLink.href = window.museModes?.ownHref ? window.museModes.ownHref('/today') : '/today';
+    postOption.append(make('strong', '', "Make today's post"),
+      make('span', '', 'Muse drafts a post from one of your listings. Free.'), postLink);
+
+    actions.append(compOption, postOption);
+    card.append(make('p', 'first-move-eyebrow', 'Start here'), title, actions, hide);
+    card.hidden = false;
+  }
+
   let setupHeroHidLoggedOut = [];
   function syncSetupHero(show, restoreLoggedOut) {
     const setupHero = document.getElementById('setupHero');
@@ -1833,6 +1918,7 @@
       homeSawSignedOut = true;
       window.museModes?.setSetupPending?.(null);
       syncSetupHero(false, true);
+      syncFirstMoveCard(false);
       if (lastRenderedUserId || document.getElementById('ownWorkspaceOptionBtn')) {
         resetSignedOutHomeWorkspace({ preserveMode: modeState.isSample });
       }
@@ -1904,6 +1990,7 @@
       applyFn();
     }
     syncSetupHero(Boolean(setupPending && modeState.isSample), Boolean(modeState.isSample));
+    syncFirstMoveCard(Boolean(isSignedIn && !setupPending && !modeState.isSample), onboarding, server.user, server.doc);
   }
 
   let homeModeSubscribed = false;
