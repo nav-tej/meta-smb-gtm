@@ -74,6 +74,14 @@ Account B, setup finished with a saved shop website:
 18. Account A (no setup, no listings) on `/today`: report the exact text of "Your context" and its
     "Selected move". In a local run it read "Refresh titles & descriptions across 5 listings on your
     shop" for a seller with no listings; report whether the preview shows that.
+19. Account B on `/` right after setup: a "Start here" card reads "Your shop is set up. Get your first
+    result." with "Analyze <first competitor> · 1 run" (or "View analysis" if one is saved) and "Open
+    today's studio". "Hide" keeps it hidden after a reload. Do not press Analyze unless Nav approves
+    spending 1 run; if he does, confirm the analysis is of the competitor's own site, not a Meta Ad
+    Library page. Account A (setup not finished) and guests do not see the card.
+20. The "Your context" panel on `/` for an account Muse remembers nothing about: one line ("Nothing
+    saved yet") with "Set your goal" and "What Muse remembers"; "Set your goal" opens the full form.
+    After signing out, no shop or competitor name from the signed-out account remains on the page.
 
 ## Report
 `docs/launch/HERMES_UX_GAP_NOV17.md` on your own branch: preview URL and SHA, browser and

@@ -26,7 +26,7 @@ Home copy written for the sample shop or for a guest shows to every visitor:
 
 ## Step 0: baseline (read-only, before any edit)
 `DEMO_MODE=true META_MODEL_API_KEY= DEMO_KEY= make PY=.venv/bin check` on your base. Claude's result
-on `879a87f` was 622 passed, 2 skipped, 1 warning. Report your own numbers.
+on `1d15cb9` was 624 passed, 2 skipped, 1 warning. Report your own numbers.
 
 ## The four visitor states
 Use the helpers already in the `index.html` inline script: `liveSnapshot()` (account snapshot) and
@@ -69,7 +69,7 @@ Use the helpers already in the `index.html` inline script: `liveSnapshot()` (acc
 `seller-memory.js`, `welcome.js`, `workspace-modes.js`, `today.js`, `creator.js`, `first-ad.js`,
 `account.js`, `account.css`, `src/api/accounts.py`, `src/services/`, billing, auth, `supabase/`,
 `AGENTS.md`, `docs/launch/CLAUDE_UX_GAP_NOV16.md`, and existing tests. In `index.html`, leave
-`#setupHero`, `#loggedOutHero`, `#firstMoveCard` (Claude is adding it), the seller-memory panel and
+`#setupHero`, `#loggedOutHero`, `#firstMoveCard` (Claude's, in `welcome.js`), the seller-memory panel and
 everything outside the scope above alone. The "Local tools" nav item and the `/welcome` header for
 guests need Nav's decision: propose in your report, do not change. If you think something outside
 your scope must change, write it in the report.

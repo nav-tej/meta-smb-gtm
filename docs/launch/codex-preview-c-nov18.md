@@ -4,13 +4,16 @@ Prepared November 18, 2026 by Claude at Nav's request. Status: PROPOSED until Na
 
 ## 1. Review and gate
 - Branch `claude/ux-gap-ad-loop-nov17` at the exact SHA in Nav's message. Its last runtime commit is
-  `879a87f`; anything after it in that message's SHA is docs only (check with
-  `git diff --stat 879a87f..<sha> -- src tests`).
+  `1d15cb9`; anything after it in that message's SHA is docs only (check with
+  `git diff --stat 1d15cb9..<sha> -- src tests`).
 - Runtime changes since preview B (`be453db`): `0e3ddb7` (home "Ask Muse what to do next" answers
   in place) and `879a87f` (setup step 3 suggests competitors from the seller's own website for 1 run;
   guests get a free-account prompt and keep their progress after sign-in; a shop added on home is no
-  longer analyzed at its Meta Ad Library link). No migrations, env changes or new endpoints.
-- Claude's run on `879a87f`: gate 622 passed, 2 skipped; account audit 27/27; guest audit 20/20.
+  longer analyzed at its Meta Ad Library link) and `1d15cb9` ("Start here" card after setup; "Analyze
+  seller" in the seller's own workspace analyzes the competitor instead of its Meta Ad Library link;
+  compact memory panel; reworded "up to 5 listings" suggestion). No migrations, env changes or new
+  endpoints.
+- Claude's run on `1d15cb9`: gate 624 passed, 2 skipped; account audit 27/27; guest audit 20/20.
   Run your own gate and both audits.
 
 ## 2. Preview C
