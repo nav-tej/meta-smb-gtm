@@ -4,17 +4,14 @@ Prepared November 17, 2026 by Claude at Nav's request. Status: PROPOSED until Na
 Read-only browser acceptance. No code edits.
 
 ## Target
-- Preview A, already deployed: `https://meta-smb-osjisaqzy-navtejs-6321s-projects.vercel.app` from
-  `f83125a` (see the coordination handoff, Nov 17). Run items 1 to 11 there, except 8b.
-- Preview B, only once the coordinator deploys it: branch `claude/ux-gap-ad-loop-nov17` at
-  `b6bbb3a` (last runtime change) or a docs-only descendant. Run 8b and 12 to 14 there, and
-  repeat 7 and 8 (the hero and the notices changed after `f83125a`).
-- Test only a protected preview the coordinator deployed from one of those exact SHAs and gave you
-  with its URL. If the preview's SHA differs, stop and report that. Do
-  not test production or the older `27c1f50` preview for these items.
-- The preview has Vercel Deployment Protection. Earlier runs were blocked at the Vercel login;
-  get access from Nav (a bypass link or Nav's signed-in browser) before you start, or report the
-  blocker.
+- Preview C only: the protected preview the coordinator deployed from `claude/ux-gap-ad-loop-nov17`
+  and recorded in the handoff
+  (`git show origin/codex/coordination-nov16:docs/launch/HANDOFF_CURRENT.md`). It contains every item
+  below. If the handoff has no preview C yet, or the SHA there differs from the one in Nav's message,
+  stop and report. Previews A (`f83125a`) and B (`be453db`) are superseded.
+- The preview has Vercel Deployment Protection; get access from Nav (a bypass link or Nav's signed-in
+  browser). Google sign-in works only on the fixed preview alias, if the coordinator recorded one and
+  Nav registered its callback; otherwise sign in with email and password.
 
 ## Boundaries
 No new signups (they send real email), no password resets, no purchases or test charges, no
@@ -54,13 +51,13 @@ Account B, setup finished with a saved shop website:
     profile, the first `/today` visit brings in the seller's listings without a click, and the
     first `/create` visit lists them under "Find products". A second visit does not scan again.
     The crawl is the free public storefront fetch, not a Muse run. Without approval, mark UNVERIFIED.
-12. Account A on `/` (preview B): the hero reads "Finish setup to see your own shop here." with
+12. Account A on `/`: the hero reads "Finish setup to see your own shop here." with
     "Finish setup" and "Keep exploring the sample". "No account needed" appears nowhere above the
     sample gallery. The runs count in the hero matches the header.
 13. Account A opens `/today`, `/create`, `/first-ad`, `/progress` and `/digest` directly (no
-    `workspace=sample`, preview B): a "Setup not finished" notice under the header with "Finish
+    `workspace=sample`): a "Setup not finished" notice under the header with "Finish
     setup". Account B sees no such notice.
-14. `/today` (preview B): the example button reads "Try a saved example" (no "n+α"). For a signed-in
+14. `/today`: the example button reads "Try a saved example" (no "n+α"). For a signed-in
     seller with no competitor checks the brief reads "My workspace · no competitor checks yet".
 15. Home "Ask Muse what to do next" (needs a preview from `0e3ddb7` or later): in the sample shop,
     "Weekly post ideas" shows "Tell one painting story" and "Feature your Empowering Women series",
@@ -71,6 +68,12 @@ Account B, setup finished with a saved shop website:
     what you entered. Do not press the button signed in unless Nav approves spending 1 run; if he
     does, the suggestions come from account A's shop website and arrive unticked. On home as a
     guest, adding a shop and pressing "Request analysis" both open the free-account prompt.
+17. `/digest` signed in (accounts A and B): the page loads your digest settings. It must not say
+    "Sign in to load your personal digest preferences." If it does, report the exact text and whether
+    a reload fixes it.
+18. Account A (no setup, no listings) on `/today`: report the exact text of "Your context" and its
+    "Selected move". In a local run it read "Refresh titles & descriptions across 5 listings on your
+    shop" for a seller with no listings; report whether the preview shows that.
 
 ## Report
 `docs/launch/HERMES_UX_GAP_NOV17.md` on your own branch: preview URL and SHA, browser and
