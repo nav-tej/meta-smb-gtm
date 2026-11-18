@@ -1009,10 +1009,10 @@
   <link rel="stylesheet" href="/static/muse-shell.css?v=20261112-integrated">
   <link rel="stylesheet" href="/static/seller-memory.css?v=20261112-integrated">
   <script src="/static/analytics.js?v=20261109-ux" defer></script>
-  <script src="/static/reco-actions.js?v=20261117-uxgap7" defer></script>
+  <script src="/static/reco-actions.js?v=20261118-ag1" defer></script>
   <script src="/static/account.js?v=20261112-integrated" defer></script>
   <script src="/static/workspace-modes.js?v=20261117-uxgap6" defer></script>
-  <script src="/static/muse-shell.js?v=20261117-uxgap6" defer></script>
+  <script src="/static/muse-shell.js?v=20261118-ag1" defer></script>
   <script src="/static/welcome.js?v=20261118-uxgap9" defer></script>
   <script src="/static/seller-memory.js?v=20261118-uxgap9" defer></script>
 </head>
@@ -1282,7 +1282,7 @@
               <div><input id="addCompetitorInput" type="url" inputmode="url" placeholder="https://their-shop.com" maxlength="300" aria-describedby="addCompetitorCost"><button type="submit" class="jr-mini primary" id="addCompetitorBtn">Add · 🪙 1 run (live) / 0 in demo</button></div>
               <p class="jr-add-cost" id="addCompetitorCost">Live crawl uses 1 run. In this saved demo the shop is added to your list and no run is used.</p>
             </form>
-            <p class="jr-note">Public snapshots captured Nov 3, 2026. Only SikhiArt.com has a saved Muse Spark brief; new analyses need a live server.</p>
+            <p class="jr-note" id="competitorSnapshotsNote">Saved public snapshots from Nov 3, 2026. Only SikhiArt.com has a saved analysis; new analyses need a live server.</p>
           </article>
 
           <article class="jr-card c2">
@@ -2460,7 +2460,41 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
         recheck.title = ready ? 'Re-analyze SikhiArt.com · costs 1 run'
           : (serverOn ? 'Sign in to re-check competitors' : 'Re-check from the saved snapshot · costs 1 run');
       }
+      refreshVisitorCopy();
     }
+    function refreshVisitorCopy() {
+      const snap = liveSnapshot();
+      const serverOn = !!snap?.configured;
+      const user = snap?.user || null;
+      const ready = liveRunsReady();
+      const addBtn = document.getElementById('addCompetitorBtn');
+      const addCost = document.getElementById('addCompetitorCost');
+      const snapNote = document.getElementById('competitorSnapshotsNote');
+      if (!serverOn) {
+        if (addBtn) addBtn.textContent = 'Add · 🪙 1 run (live) / 0 in demo';
+        if (addCost) addCost.textContent = 'Live crawl uses 1 run. In this saved demo the shop is added to your list and no run is used.';
+        if (snapNote) snapNote.textContent = 'Saved public snapshots from Nov 3, 2026. Only SikhiArt.com has a saved analysis; new analyses need a live server.';
+        return;
+      }
+      if (!user) {
+        if (addBtn) addBtn.textContent = 'Add shop';
+        if (addCost) addCost.textContent = 'Analyzing a shop needs a free account. You get 3 free runs, and each analysis uses 1.';
+        if (snapNote) snapNote.textContent = 'Saved public snapshots from Nov 3, 2026. Create a free account to analyze shops you choose.';
+        return;
+      }
+      if (ready) {
+        if (addBtn) addBtn.textContent = 'Add and analyze · 1 run';
+        if (addCost) addCost.textContent = 'Muse checks the shop and compares it with yours. Uses 1 run.';
+      } else if (!user.email_verified) {
+        if (addBtn) addBtn.textContent = 'Add shop';
+        if (addCost) addCost.textContent = 'Confirm your email address first to analyze a new shop. Check your inbox or resend the link from Account.';
+      } else {
+        if (addBtn) addBtn.textContent = 'Add shop';
+        if (addCost) addCost.textContent = 'No runs remaining on your current plan. Choose a plan in Account to analyze a new shop.';
+      }
+      if (snapNote) snapNote.textContent = 'Saved public snapshots from Nov 3, 2026. New analyses use 1 run.';
+    }
+    window.addEventListener('muse:mode-change', refreshVisitorCopy);
     let briefLoadEpoch = 0;
     async function loadBriefCache() {
       const epoch = ++briefLoadEpoch;

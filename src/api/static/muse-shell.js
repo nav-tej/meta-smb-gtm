@@ -1284,8 +1284,10 @@
       .map(([kind, n]) => [KIND_BADGE[kind][0], plural(Number(n), KIND_BADGE[kind][1])]);
   }
   // One watched shop: the latest monitor check when there is one, else the saved Nov 3 snapshot.
+  // In the sample shop, always show the saved Nov 3 snapshot so stale monitor errors never leak into sample mode.
   function competitorStatus(name, run) {
-    const check = Array.isArray(run?.competitors) ? run.competitors.find((c) => c?.name === name) : null;
+    const inSample = !!window.museModes?.isSampleMode?.();
+    const check = !inSample && Array.isArray(run?.competitors) ? run.competitors.find((c) => c?.name === name) : null;
     if (check) {
       const badges = check.status === 'error' ? [['error', 'Couldn’t check']] : changeBadges(check.counts);
       if (!badges.length) badges.push(['none', 'No changes']);
@@ -1347,11 +1349,14 @@
       signals = loaded;
       sellerPainters.forEach((paint) => paint());
       const line = document.querySelector('.jr-watch');
-      if (loaded.run && line) {
+      if (loaded.run && line && !window.museModes?.isSampleMode?.()) {
         for (const node of line.childNodes) {
           if (node.nodeType === 3 && /last checked/.test(node.textContent)) node.textContent = node.textContent.replace(/last checked .*$/, `last checked ${fmtWhen(loaded.run.checked_at)} `);
         }
       }
+    });
+    window.addEventListener?.('muse:mode-change', () => {
+      sellerPainters.forEach((paint) => paint());
     });
   }
 

@@ -1107,6 +1107,38 @@
         parseDirective(steerInput.value.trim(), 'typed');
       });
 
+      var SAMPLE_CHIPS = [
+        { label: 'Why $59.99 entry', directive: 'Look at why SikhiArt starts at $59.99' },
+        { label: 'Easier moves', directive: 'Show me easier moves for solo makers' },
+        { label: 'Gifts under $50', directive: 'Gift ideas for upcoming season under $50' },
+        { label: 'Weekly post ideas', directive: 'What should I post on Instagram this week?' }
+      ];
+      var OWN_CHIPS = [
+        { label: 'How do my prices compare?', directive: 'How do my prices compare with competitors?' },
+        { label: 'Easier moves', directive: 'Show me easier product moves for solo makers' },
+        { label: 'Gift ideas', directive: 'Gift ideas for my shop this season' },
+        { label: 'Weekly post ideas', directive: 'What should I post on Instagram this week?' }
+      ];
+      var syncSteerChips = function () {
+        var m = modes();
+        var sample = !!(m && m.isSampleMode && m.isSampleMode());
+        var snap = window.museAccount && window.museAccount.getSnapshot ? window.museAccount.getSnapshot() : null;
+        var isOwnSignedIn = !!(snap && snap.user && !sample);
+        var targetSet = isOwnSignedIn ? OWN_CHIPS : SAMPLE_CHIPS;
+        steerChips.forEach(function (btn, idx) {
+          var item = targetSet[idx];
+          if (!item) return;
+          btn.textContent = item.label;
+          btn.dataset.directive = item.directive;
+        });
+      };
+      syncSteerChips();
+      if (window.museAccount && window.museAccount.ready) {
+        window.museAccount.ready().then(syncSteerChips);
+      }
+      window.addEventListener('muse:mode-change', syncSteerChips);
+      window.addEventListener('muse:account-change', syncSteerChips);
+
       steerChips.forEach(function (btn) {
         btn.addEventListener('click', function () {
           var promptText = btn.dataset.directive || btn.textContent;
