@@ -98,6 +98,18 @@ Account B, setup finished with a saved shop website:
     request's `seller_context` describes account B's shop (its name or website) and does not say
     "Fine artist selling Sikh & Punjabi heritage art". If you cannot see the request, mark UNVERIFIED.
 
+25. Needs a preview with pass 12. Account B, "Your account": the dialog shows "Edit shop setup", which
+    opens `/welcome?edit=1` with a banner "Editing the setup for <shop>." and the saved answers in
+    every step, step 4 included. Change one thing (for example the research focus), press "Save
+    changes (free · 0 runs)", reload `/welcome?edit=1` and confirm the change stuck. Runs left must
+    not change.
+26. Setup step 1 shows "What do you offer?" with Products, Services and Both. Only with Nav's
+    approval to scan (the scan is a free public crawl, no run): scanning a services website such as
+    nplusalpha.com preselects "Services" and says "Muse guessed".
+27. Home "Ask Muse what to do next", account B's own workspace: type "How can I get more leads from
+    Clutch or Toptal traffic". The answer reads "Focus: Leads" and offers "Compare how a competitor
+    wins clients". No runs used.
+
 ## Report
 `docs/launch/HERMES_UX_GAP_NOV18.md` on your own branch: preview URL and SHA, browser and
 viewports, PASS / FAIL / UNVERIFIED per numbered item with a screenshot or exact text for each

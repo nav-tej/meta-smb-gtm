@@ -5,13 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Set Up Your Shop — Muse Growth Studio</title>
   <meta name="robots" content="noindex" />
-  <link rel="stylesheet" href="/static/welcome.css?v=20261112-integrated" />
+  <link rel="stylesheet" href="/static/welcome.css?v=20261118-uxgap12" />
   <link rel="stylesheet" href="/static/account.css?v=20261112-integrated" />
   <link rel="stylesheet" href="/static/seller-memory.css?v=20261112-integrated" />
   <script src="/static/analytics.js?v=20261109-ux" defer></script>
-  <script src="/static/account.js?v=20261112-integrated" defer></script>
+  <script src="/static/account.js?v=20261118-uxgap12" defer></script>
   <script src="/static/workspace-modes.js?v=20261117-uxgap6" defer></script>
-  <script src="/static/welcome.js?v=20261118-uxgap11" defer></script>
+  <script src="/static/welcome.js?v=20261118-uxgap12" defer></script>
   <script src="/static/seller-memory.js?v=20261118-uxgap9" defer></script>
 </head>
 <body class="wk-body">
@@ -53,7 +53,7 @@
     <section class="wk-card" id="wkStep1" aria-labelledby="wkStep1Title">
       <span class="wk-eyebrow">Step 1 of 4 · Free crawl (0 runs)</span>
       <h1 class="wk-title" id="wkStep1Title">Your shop</h1>
-      <p class="wk-subtitle">Enter your website or marketplace shop URL. You can type a bare domain like <code>myshop.com</code>—Muse will scan allowed public pages without spending a model run.</p>
+      <p class="wk-subtitle">Enter your website or marketplace shop URL. You can type a bare domain like <code>myshop.com</code>. Muse scans allowed public pages without spending a run.</p>
 
       <div class="wk-field">
         <label class="wk-label" for="wkShopUrl">Website or primary marketplace shop URL</label>
@@ -62,9 +62,19 @@
       </div>
 
       <div class="wk-field">
-        <label class="wk-label" for="wkBusinessName">Shop or artist name (optional — auto-detected from domain if blank)</label>
+        <label class="wk-label" for="wkBusinessName">Business, shop or artist name (optional; Muse uses your domain if you leave it blank)</label>
         <input class="wk-input" id="wkBusinessName" type="text" placeholder="e.g. Mountain Pottery Studio" maxlength="140" />
       </div>
+
+      <fieldset class="wk-field wk-offer" id="wkOfferField">
+        <legend class="wk-label">What do you offer?</legend>
+        <div class="wk-offer-options">
+          <label class="wk-offer-option"><input type="radio" name="wkOffer" value="products" checked> Products</label>
+          <label class="wk-offer-option"><input type="radio" name="wkOffer" value="services"> Services</label>
+          <label class="wk-offer-option"><input type="radio" name="wkOffer" value="both"> Both</label>
+        </div>
+        <span class="wk-hint" id="wkOfferHint">Muse words its research and post ideas for what you offer. You can change this later in Edit shop setup.</span>
+      </fieldset>
 
       <div class="wk-field">
         <label class="wk-label" for="wkMoreShopUrls">Additional marketplace shop pages (optional, comma-separated)</label>

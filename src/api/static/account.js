@@ -28,6 +28,7 @@
   let recover;
   let refreshButton;
   let accountSignoutButton;
+  let setupLink;
   let resend;
   let accountButton;
   let signupButton;
@@ -183,6 +184,7 @@
     recover.hidden = !['signin', 'signup'].includes(mode);
     resend.hidden = mode !== 'signin';
     if (accountSignoutButton) accountSignoutButton.hidden = !signedIn;
+    if (setupLink) setupLink.hidden = !signedIn;
     say(text || (signedIn ? quotaLabel.textContent : 'Saved examples remain available without an account.'), isError);
   }
   const track = (name, props) => { try { window.museTrack?.(name, props); } catch {} };
@@ -437,11 +439,13 @@
     recover = node('button', { type: 'button', class: 'ma-recover' }, 'Forgot password?'); recover.addEventListener('click', () => { if (!busy) { setMode('recover', '', false, { preserveEmail: true }); focusInitialField(); } });
     resend = node('button', { type: 'button', class: 'ma-resend' }, 'Resend confirmation email'); resend.addEventListener('click', () => { if (!busy) { setMode('resend', '', false, { preserveEmail: true }); focusInitialField(); } });
     form.append(emailLabel, email, passwordLabel, password, submit); form.addEventListener('submit', onSubmit);
+    // Settings for the shop itself: what Muse knows about the business, editable any time (free).
+    setupLink = node('a', { href: '/welcome?edit=1', class: 'ma-primary ma-setup-link', style: 'box-sizing:border-box;text-align:center;text-decoration:none', 'data-track': 'account_edit_setup', hidden: '' }, 'Edit shop setup');
     accountSignoutButton = node('button', { type: 'button', class: 'ma-secondary ma-dialog-signout', hidden: '' }, 'Sign out');
     accountSignoutButton.addEventListener('click', signout);
     refreshButton = node('button', { type: 'button', class: 'ma-refresh' }, 'Refresh account');
     refreshButton.addEventListener('click', async () => { if (busy) return; setBusy(true); try { await refresh(); setMode(snapshot.user ? 'account' : 'signin', 'Account refreshed.'); } catch (error) { say(error.message, true); } finally { setBusy(false); } });
-    dialog.append(close, title, description, tabs, googleButton, divider, form, recover, resend, message, accountSignoutButton, refreshButton);
+    dialog.append(close, title, description, tabs, googleButton, divider, form, recover, resend, message, setupLink, accountSignoutButton, refreshButton);
     dialog.addEventListener('keydown', event => {
       if (event.key !== 'Tab') return;
       const focusables = [...dialog.querySelectorAll('button:not([hidden]):not([disabled]), input:not([hidden]):not([disabled]), [tabindex]:not([tabindex="-1"])')].filter(el => !el.closest('[hidden]'));

@@ -1012,7 +1012,7 @@
         story: { badge: 'Quick win', title: 'Tell one painting story', why: 'SikhiArt has only two blog pages. Ek Onkar is ready to go.', idea: 'idea-5-painting-story', cta: 'Create this post' },
         ad: { badge: 'If you run ads', title: 'Prepare your first ad', why: 'Pick an outcome, audience and budget, then publish it yourself in Ads Manager.', path: '/first-ad', cta: 'Open the first-ad guide' }
       };
-      var SAMPLE_BY_FOCUS = { posting: ['story', 'women'], pricing: ['starter'], gifting: ['gift', 'starter'], products: ['story', 'titles'], seo: ['titles'], ads: ['ad'], audience: ['women', 'gift'] };
+      var SAMPLE_BY_FOCUS = { posting: ['story', 'women'], pricing: ['starter'], gifting: ['gift', 'starter'], products: ['story', 'titles'], seo: ['titles'], ads: ['ad'], audience: ['women', 'gift'], leads: ['story', 'ad'] };
       var OWN_BY_FOCUS = {
         posting: { title: 'Plan this week\u2019s posts', why: 'Today\u2019s studio drafts three posts from your own listings.', path: '/today', cta: 'Open today\u2019s studio' },
         pricing: { title: 'Compare prices with a competitor', why: 'Add a competitor on this page to see where your prices sit.', path: '#loop-research', cta: 'Go to competitors' },
@@ -1020,7 +1020,8 @@
         products: { title: 'Start with one quick post', why: 'One post from a listing you already have.', path: '/today', cta: 'Open today\u2019s studio' },
         seo: { title: 'Rewrite one listing title', why: 'Make one title say what buyers search for.', path: '/create', cta: 'Open the studio' },
         ads: { title: 'Prepare your first ad', why: 'Pick an outcome, audience and budget, then publish it yourself in Ads Manager.', path: '/first-ad', cta: 'Open the first-ad guide' },
-        audience: { title: 'See who your competitors reach', why: 'Check a competitor on this page and see their ads on Meta.', path: '#loop-research', cta: 'Go to competitors' }
+        audience: { title: 'See who your competitors reach', why: 'Check a competitor on this page and see their ads on Meta.', path: '#loop-research', cta: 'Go to competitors' },
+        leads: { title: 'Compare how a competitor wins clients', why: 'Muse reads a competitor\u2019s public pages and shows what they lead with, so you can sharpen how you ask for inquiries.', path: '#loop-research', cta: 'Go to competitors' }
       };
       var modes = function () { return window.museModes || null; };
       var renderSteerAnswer = function (focus) {

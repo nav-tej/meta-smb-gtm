@@ -1009,11 +1009,11 @@
   <link rel="stylesheet" href="/static/muse-shell.css?v=20261112-integrated">
   <link rel="stylesheet" href="/static/seller-memory.css?v=20261112-integrated">
   <script src="/static/analytics.js?v=20261109-ux" defer></script>
-  <script src="/static/reco-actions.js?v=20261118-ag1" defer></script>
-  <script src="/static/account.js?v=20261112-integrated" defer></script>
+  <script src="/static/reco-actions.js?v=20261118-uxgap12" defer></script>
+  <script src="/static/account.js?v=20261118-uxgap12" defer></script>
   <script src="/static/workspace-modes.js?v=20261117-uxgap6" defer></script>
   <script src="/static/muse-shell.js?v=20261118-ag1" defer></script>
-  <script src="/static/welcome.js?v=20261118-uxgap11" defer></script>
+  <script src="/static/welcome.js?v=20261118-uxgap12" defer></script>
   <script src="/static/seller-memory.js?v=20261118-uxgap9" defer></script>
 </head>
 <body>
@@ -2509,10 +2509,12 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
       const parts = [];
       const name = String(o.business_name || crawl.business_name || '').trim();
       const site = (Array.isArray(o.shop_urls) ? o.shop_urls : []).find(Boolean);
-      if (name || site) parts.push(`Independent seller: ${[name, site].filter(Boolean).join(', ')}.`);
+      const offer = { products: 'sells products', services: 'sells services (not a product shop)', both: 'sells products and services' }[o.business_type] || '';
+      if (name || site) parts.push(`Independent business: ${[name, site].filter(Boolean).join(', ')}${offer ? `; ${offer}` : ''}.`);
+      else if (offer) parts.push(`Independent business that ${offer}.`);
       const titles = (Array.isArray(crawl.sample_titles) ? crawl.sample_titles : [])
         .map((t) => String(t).trim()).filter(Boolean).slice(0, 6);
-      if (titles.length) parts.push(`Products include: ${titles.join('; ')}.`);
+      if (titles.length) parts.push(`${o.business_type === 'services' ? 'Pages include' : 'Products include'}: ${titles.join('; ')}.`);
       if (crawl.price_range) parts.push(`Prices: ${String(crawl.price_range)}.`);
       const focus = String(o.preferences?.research_focus || '').trim();
       if (focus) parts.push(`Seller's focus: ${focus}.`);

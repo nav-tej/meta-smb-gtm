@@ -25,7 +25,8 @@ business. Seen there (production runs older code, so check each one on your base
 
 ## Step 0: baseline (read-only, before any edit)
 `DEMO_MODE=true META_MODEL_API_KEY= DEMO_KEY= make PY=/Users/nav/meta-smb-gtm/.venv/bin check` on your
-base. Claude's result on `fce7993` was 626 passed, 2 skipped, 1 warning. Report your own numbers.
+base. Claude's latest counts are in the last row of the table in `docs/launch/CLAUDE_UX_GAP_NOV16.md`.
+Report your own numbers.
 
 ## What to change (exclusive write scope: `creator.js`, `creator.html`, one new test file)
 1. The caption: after an upload, `#productImageCaption` describes the uploaded photo (use
@@ -57,7 +58,8 @@ working on business type in setup, the "Ask Muse" parser and `/today` at the sam
 test fails because it pins old `/create` wording, report the test and the line; do not edit it.
 
 ## Script versions
-Bump `creator.js?v=` to `20261118-ag2` on every page that loads it. Claude merges your branch.
+Bump `creator.js?v=` to `20261118-ag2` on every page that loads it. Pass 12 changed the `account.js` version
+on the same line of `creator.html`; keep whatever version your base has there. Claude merges your branch.
 
 ## Product rules
 - Muse prepares; the seller publishes. Never imply Muse posts or spends for them.

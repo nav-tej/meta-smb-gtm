@@ -8,7 +8,7 @@ idempotently charging zero runs on retry or re-entry.
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Header, HTTPException, Request, Response
 from pydantic import BaseModel, ConfigDict, Field
@@ -36,7 +36,66 @@ class OnboardingBuildRequest(BaseModel):
     memory_entries: list[dict[str, Any]] = Field(default_factory=list)
     skipped: list[int] = Field(default_factory=list)
     crawl_summary: dict[str, Any] | None = None
+    business_type: Literal["products", "services", "both"] | None = None
+    # A seller who already finished setup can come back and change it. Only an explicit edit
+    # rewrites a completed setup, so a retried or stale first build stays a no-op.
+    edit: bool = False
     step: int = 5
+
+
+def _merged_preferences(
+    body: OnboardingBuildRequest, doc: dict[str, Any], keep_existing: bool = False
+) -> dict[str, Any] | None:
+    """Setup answers folded into the workspace preferences, or None when setup added none.
+
+    An edit keeps what Muse already saved there (for example seller-memory entries) and
+    overwrites only the answers the seller changed.
+    """
+    if not (body.preferences or body.memory_entries or body.competitors):
+        return None
+    existing = doc.get("preferences") if isinstance(doc.get("preferences"), dict) else {}
+    if keep_existing:
+        merged_pref = {**existing, **(body.preferences or {})}
+    else:
+        merged_pref = dict(body.preferences or existing or {})
+    if body.memory_entries:
+        merged_pref["memory_entries"] = body.memory_entries
+    if body.competitors:
+        merged_pref["competitor_entries"] = [
+            {
+                "name": str(c.get("name") or "")[:140],
+                "url": str(c.get("url") or "")[:500],
+                "role": (
+                    c.get("role")
+                    if c.get("role") in {"similar_audience", "price_reference", "inspiration"}
+                    else "similar_audience"
+                ),
+                "rationale": str(c.get("rationale") or c.get("reason") or "")[:280],
+                "reason": str(c.get("reason") or c.get("rationale") or "")[:280],
+                "selected": c.get("selected", True) is not False,
+            }
+            for c in body.competitors
+            if isinstance(c, dict) and c.get("url")
+        ]
+    return merged_pref
+
+
+def _onboarding_record(
+    body: OnboardingBuildRequest, completed_at: str, used_run: bool
+) -> dict[str, Any]:
+    return {
+        "business_name": body.business_name,
+        "shop_urls": body.shop_urls,
+        "socials": body.socials,
+        "competitors": body.competitors,
+        "preferences": body.preferences,
+        "skipped": body.skipped,
+        "crawl_summary": body.crawl_summary,
+        "business_type": body.business_type,
+        "completed": True,
+        "completed_at": completed_at,
+        "used_run": used_run,
+    }
 
 
 def _require_json(request: Request) -> None:
@@ -112,6 +171,37 @@ async def complete_onboarding(
         except Exception:
             pass
 
+        # Editing a finished setup: save the new answers, keep the original completion record.
+        if existing_onb and existing_onb.get("completed_at") and body.edit:
+            completed_at = str(existing_onb.get("completed_at"))
+            next_doc = dict(doc)
+            next_doc["onboarding"] = _onboarding_record(
+                body, completed_at, bool(existing_onb.get("used_run"))
+            )
+            merged = _merged_preferences(body, next_doc, keep_existing=True)
+            if merged is not None:
+                next_doc["preferences"] = merged
+            try:
+                saved_ws = await save_workspace(
+                    account,
+                    next_doc,
+                    expected_version=ws.get("version"),
+                    expected_owner=account.user_id,
+                )
+            except Exception as err:
+                if isinstance(err, HTTPException):
+                    raise
+                raise HTTPException(500, f"Failed to save your setup changes: {err}") from err
+            return {
+                "success": True,
+                "charged": False,
+                "used_run": False,
+                "updated": True,
+                "runs_remaining": remaining,
+                "completed_at": completed_at,
+                "workspace": saved_ws,
+            }
+
         # Idempotent check: if already completed, return existing completion record
         if existing_onb and existing_onb.get("completed_at"):
             return {
@@ -125,44 +215,11 @@ async def complete_onboarding(
             }
 
         now_iso = datetime.now(UTC).isoformat()
-        onboarding_data = {
-            "business_name": body.business_name,
-            "shop_urls": body.shop_urls,
-            "socials": body.socials,
-            "competitors": body.competitors,
-            "preferences": body.preferences,
-            "skipped": body.skipped,
-            "crawl_summary": body.crawl_summary,
-            "completed": True,
-            "completed_at": now_iso,
-            "used_run": False,
-        }
-
         next_doc = dict(doc)
-        next_doc["onboarding"] = onboarding_data
-        if body.preferences or body.memory_entries or body.competitors:
-            merged_pref = dict(body.preferences or next_doc.get("preferences") or {})
-            if body.memory_entries:
-                merged_pref["memory_entries"] = body.memory_entries
-            if body.competitors:
-                merged_pref["competitor_entries"] = [
-                    {
-                        "name": str(c.get("name") or "")[:140],
-                        "url": str(c.get("url") or "")[:500],
-                        "role": (
-                            c.get("role")
-                            if c.get("role")
-                            in {"similar_audience", "price_reference", "inspiration"}
-                            else "similar_audience"
-                        ),
-                        "rationale": str(c.get("rationale") or c.get("reason") or "")[:280],
-                        "reason": str(c.get("reason") or c.get("rationale") or "")[:280],
-                        "selected": c.get("selected", True) is not False,
-                    }
-                    for c in body.competitors
-                    if isinstance(c, dict) and c.get("url")
-                ]
-            next_doc["preferences"] = merged_pref
+        next_doc["onboarding"] = _onboarding_record(body, now_iso, False)
+        merged = _merged_preferences(body, next_doc)
+        if merged is not None:
+            next_doc["preferences"] = merged
 
         try:
             saved_ws = await save_workspace(

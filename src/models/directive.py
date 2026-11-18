@@ -37,7 +37,7 @@ class PriceBand(BaseModel):
     max: float | None = None
 
 
-FocusArea = Literal["pricing", "products", "posting", "gifting", "seo", "ads", "audience"]
+FocusArea = Literal["pricing", "products", "posting", "gifting", "seo", "ads", "audience", "leads"]
 
 
 class ResearchDirective(BaseModel):
@@ -92,10 +92,19 @@ def parse_research_directive(text: str) -> tuple[ResearchDirective | None, str]:
     tone_note: str | None = None
     price_pattern = r"\b(?:price|pricing|charge|cost|cheap|undercut|discount|drop|under\s+\$\d+)\b"
     gift_pattern = r"\b(?:gift|holiday|vaisakhi|diwali|christmas|mother'?s\s+day|father'?s\s+day)\b"
+    # Service businesses ask about clients, not listings: leads, inquiries, bookings, proposals,
+    # or the marketplaces where buyers hire them.
+    leads_pattern = (
+        r"\b(?:leads?|clients?|inquir(?:y|ies)|enquir(?:y|ies)|bookings?|book\s+a\s+call|"
+        r"consultations?|prospects?|pipeline|referrals?|proposals?|rfps?|"
+        r"clutch|upwork|toptal|fiverr|linkedin)\b"
+    )
     if re.search(gift_pattern, lower_raw):
         focus = "gifting"
     elif re.search(r"\b(?:post|posting|story|reel|instagram|facebook|caption|feed)\b", lower_raw):
         focus = "posting"
+    elif re.search(leads_pattern, lower_raw):
+        focus = "leads"
     elif re.search(r"\b(?:product|catalog|listing|launch|collection|series|item)\b", lower_raw):
         focus = "products"
     elif re.search(r"\b(?:seo|title|tag|search|keyword|google|visibility)\b", lower_raw):

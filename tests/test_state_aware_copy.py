@@ -56,7 +56,7 @@ def test_own_chips_parse_to_four_distinct_focuses_and_versions_match() -> None:
     assert len(set(focuses)) == 4
 
     index_html = (REPO_ROOT / "src/api/static/index.html").read_text(encoding="utf-8")
-    assert "reco-actions.js?v=20261118-ag1" in index_html
+    assert "reco-actions.js?v=20261118-uxgap12" in index_html
     for name in (
         "index.html",
         "creator.html",

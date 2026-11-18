@@ -183,6 +183,17 @@ def test_steer_card_answers_with_actionable_moves_e2e(live_server_url: str) -> N
             moves = ask(page, "How do my prices compare?")
             assert moves == [{{"href": "#loop-research",
                                "title": "Compare prices with a competitor"}}], moves
+            # A service business asking about leads gets a leads answer, not a pricing one.
+            page.fill("#jrSteerInput", "How can i get more leads from clutch or toptal traffic")
+            page.click("#jrSteerSubmitBtn")
+            page.wait_for_function(
+                "(() => {{ const a = document.getElementById('jrSteerAnswer');"
+                " const t = a && a.querySelector('.jr-steer-move strong');"
+                " return t && t.textContent === 'Compare how a competitor wins clients'; }})()",
+                timeout=8000,
+            )
+            summary = page.locator("#jrDirectiveSummary").inner_text()
+            assert "Focus: Leads" in summary and "Pricing" not in summary, summary
             assert not errors, errors
             ctx.close()
             browser.close()

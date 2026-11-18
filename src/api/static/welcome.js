@@ -168,10 +168,25 @@
     return min === max ? fmt(min) : `${fmt(min)} to ${fmt(max)}`;
   }
 
+  // What the business offers, guessed from the scanned pages. The seller confirms or changes it
+  // in step 1, and their own choice always wins over a later scan.
+  const OFFER_LABELS = { products: 'Products', services: 'Services', both: 'Both' };
+  function guessBusinessType(items, priceRange) {
+    const list = Array.isArray(items) ? items : [];
+    const productPages = list.filter((i) => ['products', 'listings'].includes(i?.bucket)).length;
+    const text = list.map((i) => `${i?.url || ''} ${i?.title || ''}`).join(' ').toLowerCase();
+    const serviceHits = (text.match(/\b(services?|consult\w*|case[-\s]stud\w*|advisory|agency|engagements?|work[-\s]with[-\s]us|book[-\s]a[-\s]call|our[-\s]clients|solutions?|retainers?)\b/g) || []).length;
+    if (productPages >= 3 && serviceHits >= 3) return 'both';
+    if (productPages >= 3 || (productPages >= 1 && priceRange)) return 'products';
+    if (serviceHits >= 1) return 'services';
+    return null;
+  }
+
   function defaultOnboardingState() {
     return {
       step: 1,
       business_name: '',
+      business_type: null,
       shop_urls: [],
       crawl_summary: null,
       socials: [],
@@ -429,6 +444,29 @@
     if (forcedStep >= 1 && forcedStep <= 4) {
       state.step = forcedStep;
     }
+    // A seller who finished setup and comes back is editing it: their answers load into each
+    // step and the last step saves the changes (free) instead of building a new workspace.
+    const editing = Boolean(currentUser && state.completed_at);
+    if (editing && !(forcedStep >= 1 && forcedStep <= 4)) state.step = 1;
+    if (editing) {
+      let banner = document.getElementById('wkEditBanner');
+      if (!banner) {
+        banner = document.createElement('div');
+        banner.id = 'wkEditBanner';
+        banner.className = 'wk-edit-banner';
+        banner.setAttribute('role', 'status');
+        mainEl.prepend(banner);
+      }
+      banner.textContent = '';
+      const strong = document.createElement('strong');
+      strong.textContent = `Editing the setup for ${state.business_name || 'your shop'}.`;
+      const text = document.createElement('span');
+      text.textContent = ' Change any step, then press “Save changes” on step 4. Saving uses no runs.';
+      const back = document.createElement('a');
+      back.href = '/';
+      back.textContent = 'Back to my workspace';
+      banner.append(strong, text, ' ', back);
+    }
 
     trackEvent('onboarding_started', {});
 
@@ -442,13 +480,13 @@
       const finishBtn = document.getElementById('wkStep4FinishBtn');
       const skipBtn = document.getElementById('wkStep4SkipBtn');
 
-      if (discTitle) discTitle.textContent = 'Building your workspace is free (0 runs used).';
+      if (discTitle) discTitle.textContent = editing ? 'Saving your changes is free (0 runs used).' : 'Building your workspace is free (0 runs used).';
       if (discDetail) {
         discDetail.textContent =
           `This uses 0 runs. All ${runsRemaining} ${runsRemaining === 1 ? 'run' : 'runs'} are kept for your ad generations and live research.`;
       }
-      if (finishBtn) finishBtn.textContent = 'Build my workspace (free · 0 runs)';
-      if (skipBtn) skipBtn.textContent = 'Skip & build workspace (0 runs) →';
+      if (finishBtn) finishBtn.textContent = editing ? 'Save changes (free · 0 runs)' : 'Build my workspace (free · 0 runs)';
+      if (skipBtn) skipBtn.textContent = editing ? 'Keep these answers & save →' : 'Skip & build workspace (0 runs) →';
     };
     updateRunsUI();
 
@@ -484,6 +522,27 @@
     if (state.business_name && bizNameInput) {
       bizNameInput.value = state.business_name;
     }
+
+    const offerInputs = Array.from(document.querySelectorAll('input[name="wkOffer"]'));
+    const offerHint = document.getElementById('wkOfferHint');
+    const offerHintDefault = offerHint ? offerHint.textContent : '';
+    let offerChosen = Boolean(state.business_type);
+    const setOffer = (value) => { offerInputs.forEach((i) => { i.checked = i.value === value; }); };
+    const selectedOffer = () => offerInputs.find((i) => i.checked)?.value || 'products';
+    if (state.business_type) setOffer(state.business_type);
+    offerInputs.forEach((input) => input.addEventListener('change', () => {
+      if (!input.checked) return;
+      offerChosen = true;
+      state.business_type = input.value;
+      if (offerHint) offerHint.textContent = offerHintDefault;
+      writeLocalOnboarding(state, currentUser);
+    }));
+    // Step 1 also records the name the seller typed and what they offer, scanned again or not.
+    const keepStep1Answers = () => {
+      const typedName = String(bizNameInput?.value || '').trim();
+      if (typedName) state.business_name = typedName.slice(0, 140);
+      if (offerInputs.length) state.business_type = selectedOffer();
+    };
 
     const renderCrawlProof = (summary) => {
       if (!proofBox || !summary) return;
@@ -565,6 +624,14 @@
         state.business_name = summary.business_name;
         state.shop_urls = [primaryUrl, ...extraUrls];
         state.crawl_summary = summary;
+        if (!offerChosen) {
+          const guess = guessBusinessType(items, priceRange);
+          if (guess) {
+            setOffer(guess);
+            state.business_type = guess;
+            if (offerHint) offerHint.textContent = `Muse guessed “${OFFER_LABELS[guess]}” from your website. Change it if that is not right.`;
+          }
+        }
 
         // Extract social handles strictly from crawled pages
         const extractedSocials = extractSocialHandlesFromCrawl(data);
@@ -602,7 +669,12 @@
     document.getElementById('wkScanShopBtn')?.addEventListener('click', performStep1Crawl);
 
     document.getElementById('wkStep1NextBtn')?.addEventListener('click', async () => {
-      if (!state.crawl_summary && shopUrlInput?.value.trim()) {
+      const typedUrl = normalizeShopUrl(shopUrlInput?.value || '');
+      const websiteChanged = Boolean(typedUrl && state.crawl_summary && typedUrl !== (state.shop_urls || [])[0]);
+      if (websiteChanged) {
+        const ok = await performStep1Crawl();
+        if (!ok) return;
+      } else if (!state.crawl_summary && shopUrlInput?.value.trim()) {
         const ok = await performStep1Crawl();
         if (!ok) return;
       } else if (!state.crawl_summary && !shopUrlInput?.value.trim()) {
@@ -612,6 +684,7 @@
         }
         return;
       }
+      keepStep1Answers();
       trackEvent('onboarding_step_completed', { step: 1 });
       renderStep2Socials();
       state.step = 2;
@@ -621,6 +694,7 @@
 
     document.getElementById('wkStep1SkipBtn')?.addEventListener('click', async () => {
       if (!state.skipped.includes(1)) state.skipped.push(1);
+      keepStep1Answers();
       trackEvent('onboarding_skipped', { step: 1 });
       renderStep2Socials();
       state.step = 2;
@@ -982,6 +1056,30 @@
     // =========================================================================
     // STEP 4: HOW YOU WORK & WORKSPACE COMPLETION
     // =========================================================================
+    // Saved step 4 answers go back into the form, so editing setup never resets them to defaults.
+    function hydrateStep4(prefs) {
+      if (!prefs || typeof prefs !== 'object') return;
+      const setVal = (id, value) => {
+        const el = document.getElementById(id);
+        if (el && value !== undefined && value !== null && value !== '') el.value = String(value);
+      };
+      setVal('wkPrefExperience', prefs.experience);
+      const access = prefs.access || {};
+      if (typeof access.can_change_prices === 'boolean') setVal('wkPrefPriceControl', access.can_change_prices ? 'yes' : 'no');
+      setVal('wkPrefMinutes', access.minutes_per_week);
+      setVal('wkPrefBudget', access.ads_budget_band);
+      if (Array.isArray(access.channels)) {
+        document.querySelectorAll('#wkPrefChannels input[type="checkbox"]').forEach((el) => {
+          el.checked = access.channels.includes(el.value);
+        });
+      }
+      const taste = prefs.taste || {};
+      setVal('wkPrefTone', taste.tone);
+      setVal('wkPrefAvoid', taste.subjects_to_avoid);
+      setVal('wkPrefFocus', prefs.research_focus);
+    }
+    if (editing) hydrateStep4(state.preferences);
+
     function collectStep4Preferences() {
       const channels = [...document.querySelectorAll('#wkPrefChannels input[type="checkbox"]:checked')].map((el) => el.value);
       return {
@@ -1005,7 +1103,9 @@
     }
 
     async function completeOnboarding(skippedStep4) {
-      if (skippedStep4) {
+      if (skippedStep4 && editing) {
+        // Editing: keep the saved step 4 answers as they are.
+      } else if (skippedStep4) {
         if (!state.skipped.includes(4)) state.skipped.push(4);
         trackEvent('onboarding_skipped', { step: 4 });
       } else {
@@ -1028,12 +1128,14 @@
       try {
         const payload = {
           business_name: state.business_name,
+          business_type: state.business_type || null,
           shop_urls: state.shop_urls,
           socials: state.socials,
           competitors: state.competitors,
           preferences: state.preferences,
           skipped: state.skipped,
           crawl_summary: state.crawl_summary,
+          edit: editing,
           step: 5,
         };
 
@@ -1082,7 +1184,7 @@
       const confirmedSocials = (state.socials || []).filter((s) => s.confirmed !== false);
       const selectedCompetitors = (state.competitors || []).filter((c) => c.selected !== false);
 
-      trackEvent('onboarding_completed', {
+      trackEvent(editing ? 'onboarding_edited' : 'onboarding_completed', {
         has_socials: confirmedSocials.length > 0,
         competitor_count: selectedCompetitors.length,
         used_run: Boolean(state.used_run),
@@ -1090,13 +1192,17 @@
 
       const doneTitle = document.getElementById('wkDoneTitle');
       if (doneTitle) {
-        doneTitle.textContent = `${state.business_name || 'Your shop'} workspace is ready`;
+        doneTitle.textContent = editing
+          ? `Changes saved for ${state.business_name || 'your shop'}`
+          : `${state.business_name || 'Your shop'} workspace is ready`;
       }
       const doneSub = document.getElementById('wkDoneSubtitle');
       if (doneSub) {
-        doneSub.textContent =
-          'Workspace configured with your shop crawl data and competitor watchlist (0 runs used):';
+        doneSub.textContent = editing
+          ? 'Muse uses your updated setup from now on (0 runs used):'
+          : 'Workspace configured with your shop crawl data and competitor watchlist (0 runs used):';
       }
+      if (editing) document.getElementById('wkEditBanner')?.remove();
 
       const summaryList = document.getElementById('wkSummaryList');
       if (summaryList) {
