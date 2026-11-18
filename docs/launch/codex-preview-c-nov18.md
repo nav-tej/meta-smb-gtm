@@ -6,8 +6,8 @@ PROPOSED until Nav relays it.
 
 ## 1. Review and gate
 - Branch `claude/ux-gap-ad-loop-nov17` at the exact SHA in Nav's message. Its last runtime commit is
-  pass 11 (the commit after merge `c9efa56`); anything after it in that message's SHA is docs only
-  (check with `git diff --stat <pass-11 commit>..<sha> -- src tests`).
+  `fce7993` (pass 11); anything after it in that message's SHA is docs only (check with
+  `git diff --stat fce7993..<sha> -- src tests`).
 - Runtime changes since preview B (`be453db`):
   - `0e3ddb7`: home "Ask Muse what to do next" answers in place.
   - `879a87f`: setup step 3 suggests competitors from the seller's own website for 1 run; guests get a
@@ -19,10 +19,11 @@ PROPOSED until Nav relays it.
   - `c9efa56`: merge of `gemini/state-copy-nov18` (Antigravity's visitor-state copy for the
     add-competitor form and the "Ask Muse" chips; the sample shop's watchlist always shows its saved
     Nov 3 snapshot).
-  - Pass 11: a live competitor analysis from a seller's own workspace describes the seller's shop
+  - `fce7993` (pass 11): a live competitor analysis from a seller's own workspace describes the seller's shop
     from setup instead of the sample artist; the note under the competitor list fits the workspace.
   - No migrations, env changes or new endpoints.
-- Claude's results are in `docs/launch/CLAUDE_UX_GAP_NOV16.md` (pass 11 row). Run your own gate and both
+- Claude's run on `fce7993`: gate 626 passed, 2 skipped; account audit 27/27; guest audit 20/20; UI
+  contract passed. Run your own gate and both
   audits. Because you wrote `c9efa56`, say so in the handoff: your gate is not independent for that
   merge. Hermes's acceptance is the independent check.
 
