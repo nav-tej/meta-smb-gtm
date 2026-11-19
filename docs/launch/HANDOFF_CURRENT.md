@@ -119,3 +119,22 @@ Next one bounded Hermes action: test EXACT new URL above (27c1f50), follow .task
   - **Protected `GET` Checks (`vercel curl`):** `HTTP 200` on `/api/v1/health` (`{"status":"ok"}`), `/api/v1/readiness`, `/`, `/create`, `/first-ad`, `/today`, `/digest`; `HTTP 307` on `/creator`.
   - **Rollback References:** Preview A `https://meta-smb-osjisaqzy-navtejs-6321s-projects.vercel.app` (`f83125a`); Production unchanged at `https://meta-smb-ey7g1mcto-navtejs-6321s-projects.vercel.app` (`https://meta-smb-gtm.vercel.app`).
 - **Next Hermes Action (Preview B):** Pass `https://meta-smb-4vvk11xja-navtejs-6321s-projects.vercel.app` (`be453db`) to Hermes for Preview B acceptance per `docs/launch/hermes-ux-gap-acceptance.md`.
+
+## Preview C (`0f25fff`, Passes 8–12 + State Copy) — November 19, 2026 (recorded by Antigravity as acting coordinator)
+- **Reviewed Branch & SHA:** `origin/claude/ux-gap-ad-loop-nov17` at `0f25fff` (last runtime commit `8c36279`; verified `git diff --stat 8c36279..0f25fff -- src tests` is empty / docs only). Zero migrations, env changes, or new endpoints.
+- **Superseded Unrecorded Preview:** `https://meta-smb-barim3ugm-navtejs-6321s-projects.vercel.app` (deployed Nov 18 from `7d89572` before passes 10–12 and state-copy merge) is **superseded** and left untouched.
+- **Gate & Audits on `0f25fff` (`DEMO_MODE=true META_MODEL_API_KEY= DEMO_KEY=`):**
+  - *Note on independence:* Antigravity authored `c9efa56` (`gemini/state-copy-nov18`), so this gate is not independent for that merge; Hermes acceptance is the independent check.
+  - `make PY=/Users/nav/meta-smb-gtm/.venv/bin check`: `ruff check .` passed, `ruff format --check .` clean (`258 files already formatted`), `pytest`: **629 passed, 2 skipped, 1 warning in 180.62s (0:03:00)** (2 skips require `BILLING_PGLITE_DIR`).
+  - `tests/launch_account_audit.py` (real Chromium): **27 passed, 0 failed**.
+  - `tests/launch_browser_audit.py` (real Chromium): **20 passed, 0 failed**.
+  - `node tests/account_ui_contract.cjs`: **ACCOUNT UI CONTRACT PASSED**.
+- **Protected Preview C Deployed (from exact SHA `0f25fff`, Deployment Protection ON, Production Unchanged):**
+  - **Preview C URL:** `https://meta-smb-nauuxl0ks-navtejs-6321s-projects.vercel.app` (`Ready in 19s`, Inspect: `https://vercel.com/navtejs-6321s-projects/meta-smb-gtm/9p8Yn54WAVw5f3EXCWGHQE7neABi`)
+  - **Fixed Preview Alias:** `https://muse-preview-nav.vercel.app` (points to Preview C; move this alias to each new preview going forward; Google OAuth callback for Nav to add in Google Cloud Console: `https://muse-preview-nav.vercel.app/api/v1/account/oauth/google/callback`).
+  - **Protection Check on Alias:** Plain `curl -sI https://muse-preview-nav.vercel.app/` returned `HTTP/2 302` redirecting to `https://vercel.com/sso-api?...` (Vercel Authentication confirmed active); `vercel curl https://muse-preview-nav.vercel.app/api/v1/health` returned `HTTP 200` (`{"status":"ok"}`).
+  - **Protected `GET` Checks (`vercel curl` on Preview C):** `HTTP 200` on `/api/v1/health`, `/api/v1/readiness`, `/`, `/create`, `/first-ad`, `/today`, and `/digest`.
+  - **Rollback References:** Preview B `https://meta-smb-4vvk11xja-navtejs-6321s-projects.vercel.app` (`be453db`); Production unchanged at `https://meta-smb-ey7g1mcto-navtejs-6321s-projects.vercel.app` (`https://meta-smb-gtm.vercel.app`).
+- **Read-Only Data Check (Section 4):** **skipped** (no linked Supabase CLI available without reading `.env`; Nav can run the SQL from `docs/launch/codex-preview-c-nov18.md` in the Supabase SQL editor).
+- **Next Hermes Action (Preview C):** Pass Preview C URL `https://meta-smb-nauuxl0ks-navtejs-6321s-projects.vercel.app`, fixed alias `https://muse-preview-nav.vercel.app`, and SHA `0f25fff` to Hermes.
+- Ownership released.
