@@ -1,8 +1,9 @@
-# Assignment for Antigravity (Gemini): `/create` for any business, with no sample leftovers
+# Assignment for Antigravity (Gemini): `/create` and `/first-ad` for any business, with no sample leftovers
 
-Prepared November 18, 2026 by Claude at Nav's request. Status: PROPOSED until Nav relays it. Do this
-after the preview C coordinator task (`docs/launch/codex-preview-c-nov18.md`) is recorded.
-Read `AGENTS.md` (top section and section 12) on this branch first.
+Prepared November 18, 2026 by Claude at Nav's request; widened November 19 to cover `/first-ad`.
+Status: PROPOSED until Nav relays it. Do this after the preview C coordinator task
+(`docs/launch/codex-preview-c-nov18.md`) is recorded. Read `AGENTS.md` (top section and section 12)
+on this branch first.
 
 ## Why
 Nav tested `/create` on production with his own account after setting up nplusalpha.com, a consulting
@@ -15,6 +16,13 @@ business. Seen there (production runs older code, so check each one on your base
    where visitors should go...", the eyebrow "THE WORK COMES FIRST", "Product name" / "Name of the
    product you're promoting", and copy such as "Confirm current price and availability with the
    artist before publishing." A consulting firm promotes a service, an offer or a case study.
+3. `/first-ad` has the same assumption (found by Claude on the branch, November 19):
+   "Bring visitors to your shop" / "Best when you want people to browse an Etsy, Shopify, or studio
+   listing", "Test a direct product offer", "Product or artwork name" with the placeholder "Botanical
+   Linocut Print", destinations "Studio website / product page" and "Etsy shop / listing", "Load shop
+   images", the audience placeholder "handmade botanical prints and home gifts", and prerequisite
+   lines such as "Upload or select a product photo in Step 2". Customer-facing strings in
+   `first-ad.html` and `OUTCOME_INFO` in `first-ad.js` also contain em-dashes.
 
 ## Base and branch
 - Base: the tip of `origin/claude/ux-gap-ad-loop-nov17` when you start (`git fetch origin` first).
@@ -28,41 +36,59 @@ business. Seen there (production runs older code, so check each one on your base
 base. Claude's latest counts are in the last row of the table in `docs/launch/CLAUDE_UX_GAP_NOV16.md`.
 Report your own numbers.
 
-## What to change (exclusive write scope: `creator.js`, `creator.html`, one new test file)
-1. The caption: after an upload, `#productImageCaption` describes the uploaded photo (use
+## What to change
+Exclusive write scope: `creator.js`, `creator.html`, `first-ad.js`, `first-ad.html`, `first-ad.css`
+(all under `src/api/static/`) and one new test file.
+
+1. `/create` caption: after an upload, `#productImageCaption` describes the uploaded photo (use
    `formatImageMetaNote(state.imageMeta)`). In a seller's own workspace no path may leave sample
    wording ("Ek Onkar", "Sarabjit", "SikhiArt", "artwork preview") in the caption, `#productFactNote`
    or the notice.
-2. A seller's own workspace (not the sample shop) gets wording that fits products and services alike.
-   Suggested:
+2. `/create` wording in a seller's own workspace (not the sample shop), for products and services
+   alike. Suggested:
    - Eyebrow "START WITH WHAT YOU OFFER"; intro "Choose a product, service or offer, decide where
      visitors should go, then make one post. No shop login needed."
    - "THE WORK COMES FIRST" becomes "YOUR PHOTO" (or similar plain wording).
    - "Product name" becomes "What are you promoting?" with placeholder "A product, service or offer".
    - "Confirm ... with the artist" becomes "Confirm the price and details before publishing."
-   The sample shop keeps today's artist wording exactly. Switch on `muse:mode-change` the way
-   `updateChoices()` already decides `isArtist` / sample state.
-3. Walk steps 2 to 4 in a seller's own workspace with a services-style item (for example "AI growth
-   audit", no price). Fix static copy that assumes art, prints or products. If generated ideas
-   themselves assume a product seller, do not rewrite the idea logic: report the exact text and where
-   it comes from.
+3. `/first-ad` wording in a seller's own workspace, same idea. Suggested: "Bring visitors to your
+   website" / "Best when people should read a page, see your work or book a call first"; "Test a
+   direct offer"; "What are you promoting?" with a neutral placeholder; destinations "Your website",
+   "Etsy shop or listing", "Shopify store" (keep the existing option values, change labels only);
+   "Load images from your website"; a neutral audience placeholder; prerequisite lines that say
+   "photo" or "image" instead of "product photo". Replace em-dashes in customer-facing strings with
+   plain punctuation in both modes (this is a punctuation fix, not a wording change for the sample).
+   Keep Meta objective names as they are; do not add a new Meta objective (for example lead forms)
+   without a Meta documentation link. If you think one belongs here, propose it in your report.
+4. The sample shop keeps today's artist wording exactly (except the em-dash fix). Switch on
+   `muse:mode-change` the way `updateChoices()` in `creator.js` already decides `isArtist` / sample
+   state; `window.museModes` gives the mode on both pages.
+5. Optional: the seller's setup answer is in the workspace document at `onboarding.business_type`
+   (`"products"`, `"services"`, `"both"` or null; `GET /api/v1/account/workspace`). You may use it to
+   pick the first suggested outcome, but neutral wording must read well without it.
+6. Walk `/create` steps 2 to 4 and the whole `/first-ad` guide in a seller's own workspace with a
+   services-style item (for example "AI growth audit", no price). Fix static copy that assumes art,
+   prints or products. If generated ideas themselves assume a product seller, do not rewrite the idea
+   logic: report the exact text and where it comes from.
 - New test file `tests/test_create_any_business.py`: the caption after an upload in own workspace,
-  the own-workspace wording at 375px and 1440px, and the sample shop's wording unchanged.
+  the own-workspace wording on both pages at 375px and 1440px, and the sample shop's wording
+  unchanged on both pages.
 - Report: `docs/launch/ANTIGRAVITY_CREATE_ANY_BUSINESS_NOV18.md`.
 
 ## Do NOT touch
 Everything outside the scope above, in particular `index.html`, `welcome.js`, `reco-actions.js`,
-`seller-memory.js`, `workspace-modes.js`, `today.js`, `muse-shell.js`, `src/models/directive.py`,
-`src/services/`, `src/api/`, billing, auth, `supabase/`, `AGENTS.md`, and existing tests. Claude is
-working on business type in setup, the "Ask Muse" parser and `/today` at the same time. If an existing
-test fails because it pins old `/create` wording, report the test and the line; do not edit it.
+`seller-memory.js`, `workspace-modes.js`, `today.js`, `digest.js`, `muse-shell.js`, `account.js`,
+`src/models/`, `src/services/`, `src/api/*.py`, billing, auth, `supabase/`, `AGENTS.md`, and existing
+tests. Claude is working on `/today`, home and the digest at the same time. If an existing test fails
+because it pins old wording, report the test and the line; do not edit it.
 
 ## Script versions
-Bump `creator.js?v=` to `20261118-ag2` on every page that loads it. Pass 12 changed the `account.js` version
-on the same line of `creator.html`; keep whatever version your base has there. Claude merges your branch.
+Bump `creator.js?v=` and `first-ad.js?v=` (and `first-ad.css?v=` if you change it) to `20261119-ag2`
+on every page that loads them. Leave every other version on those pages as your base has it. Claude
+merges your branch.
 
 ## Product rules
-- Muse prepares; the seller publishes. Never imply Muse posts or spends for them.
+- Muse prepares; the seller publishes. Never imply Muse posts, runs ads or spends for them.
 - No invented numbers. No em-dashes in customer-facing copy. No horizontal overflow at 375px.
 
 ## Boundaries
@@ -72,7 +98,8 @@ coordination branch for this task. Push only `gemini/create-any-business-nov18`.
 
 ## Verification and report
 - Full offline gate after your change with exact counts, plus the Step 0 line.
-- Real browser at 375px and 1440px: own workspace (signed in, mocked account) and sample shop.
+- Real browser at 375px and 1440px: own workspace (signed in, mocked account) and sample shop, on
+  both pages.
 - Do not remove, skip or weaken an existing test; if one fails, report the failure and its cause.
 - Report: branch, commit, files changed, exact results, what you checked in a browser, what you did
   not verify, and "Ownership released".

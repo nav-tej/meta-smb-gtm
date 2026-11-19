@@ -1,13 +1,18 @@
 # Coordinator task: preview C, a fixed preview alias, and a read-only data check
 
 Prepared November 18, 2026 by Claude at Nav's request. Written for Codex; reassigned the same day to
-Antigravity (Gemini) as acting coordinator for this task only, because Codex is out of usage. Status:
-PROPOSED until Nav relays it.
+Antigravity (Gemini) as acting coordinator for this task only, because Codex is out of usage.
+Retargeted November 19 to the branch tip after pass 12. Status: PROPOSED until Nav relays it.
+
+Already on Vercel, not recorded: Codex deployed `meta-smb-barim3ugm-navtejs-6321s-projects.vercel.app`
+from `7d89572` on November 18 at 10:32 PT and ran out of usage before recording it. It predates
+passes 10 to 12 and the state-copy merge. Do not test, record, delete or alias it; mention it in the
+handoff as superseded.
 
 ## 1. Review and gate
 - Branch `claude/ux-gap-ad-loop-nov17` at the exact SHA in Nav's message. Its last runtime commit is
-  `fce7993` (pass 11); anything after it in that message's SHA is docs only (check with
-  `git diff --stat fce7993..<sha> -- src tests`).
+  `8c36279` (pass 12); anything after it in that message's SHA is docs only (check with
+  `git diff --stat 8c36279..<sha> -- src tests`).
 - Runtime changes since preview B (`be453db`):
   - `0e3ddb7`: home "Ask Muse what to do next" answers in place.
   - `879a87f`: setup step 3 suggests competitors from the seller's own website for 1 run; guests get a
@@ -21,8 +26,13 @@ PROPOSED until Nav relays it.
     Nov 3 snapshot).
   - `fce7993` (pass 11): a live competitor analysis from a seller's own workspace describes the seller's shop
     from setup instead of the sample artist; the note under the competitor list fits the workspace.
+  - `8c36279` (pass 12): "Edit shop setup" in the account dialog reopens `/welcome` with saved
+    answers and saves changes without a run; setup asks "What do you offer?" (products, services or
+    both) and guesses it from the website scan; "Ask Muse" understands questions about leads and
+    clients. `POST /api/v1/onboarding/build` accepts two optional fields, `business_type` and `edit`;
+    the workspace document is JSON, so no migration.
   - No migrations, env changes or new endpoints.
-- Claude's run on `fce7993`: gate 626 passed, 2 skipped; account audit 27/27; guest audit 20/20; UI
+- Claude's run on `8c36279`: gate 629 passed, 2 skipped; account audit 27/27; guest audit 20/20; UI
   contract passed. Run your own gate and both
   audits. Because you wrote `c9efa56`, say so in the handoff: your gate is not independent for that
   merge. Hermes's acceptance is the independent check.
@@ -72,7 +82,9 @@ task.
 Nav approves you editing `docs/launch/HANDOFF_CURRENT.md` on `codex/coordination-nov16` for this task:
 add a "Preview C" section in the same style as the Preview B section, marked "recorded by Antigravity
 as acting coordinator". Docs only, a normal push, no force push, no other files on that branch. Then
-give Hermes the preview URL, the alias and the SHA.
+give Hermes the preview URL, the alias and the SHA. Hermes's earlier report
+(`docs/launch/HERMES_UX_GAP_NOV17.md`, uncommitted in the Mac checkout) stopped because no preview C
+was recorded; leave that file alone.
 
 ## Boundaries
 No runtime code changes, no billing, entitlement or credit-pool changes, no auth or protection setting
