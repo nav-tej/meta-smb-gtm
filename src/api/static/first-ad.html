@@ -13,7 +13,7 @@
   <script src="/static/account.js?v=20261118-uxgap12" defer></script>
   <script src="/static/workspace-modes.js?v=20261117-uxgap6" defer></script>
   <script src="/static/muse-shell.js?v=20261118-ag1" defer></script>
-  <script src="/static/first-ad.js?v=20261117-adloop1" defer></script>
+  <script src="/static/first-ad.js?v=20261119-ag2" defer></script>
 </head>
 <body>
   <header class="fa-topbar">
@@ -43,19 +43,19 @@
     <!-- STEP 1: OUTCOME -->
     <section id="faPanel1" class="fa-panel" data-fa-panel="1">
       <h2>Step 1: What should this first post or ad achieve?</h2>
-      <p class="fa-muted">Choose one clear outcome. Suggestions are starting approaches based on your saved profile — no live ad results are predicted.</p>
+      <p class="fa-muted">Choose one clear outcome. Suggestions are starting approaches based on your saved profile; no live ad results are predicted.</p>
 
       <div class="fa-choice-grid" role="group" aria-label="Campaign outcome">
         <button type="button" class="fa-choice is-selected" data-fa-outcome="inquiries">
           <strong>Start conversations &amp; inquiries</strong>
-          <span>Best when you take custom orders or sell via DMs without online checkout.</span>
+          <span id="faOutcomeInquiriesDesc">Best when you take custom inquiries, book calls, or sell via messages without online checkout.</span>
         </button>
         <button type="button" class="fa-choice" data-fa-outcome="visits">
-          <strong>Bring visitors to your shop</strong>
-          <span>Best when you want people to browse an Etsy, Shopify, or studio listing.</span>
+          <strong id="faOutcomeVisitsTitle">Bring visitors to your website</strong>
+          <span id="faOutcomeVisitsDesc">Best when people should read a page, see your work, or book a call first.</span>
         </button>
         <button type="button" class="fa-choice" data-fa-outcome="sales">
-          <strong>Test a direct product offer</strong>
+          <strong id="faOutcomeSalesTitle">Test a direct offer</strong>
           <span>Requires a working online checkout and Meta Pixel / conversion setup.</span>
         </button>
       </div>
@@ -64,11 +64,11 @@
         <legend>Organic post vs. manual paid test</legend>
         <label class="fa-radio-row">
           <input type="radio" name="faPaidMode" value="organic" checked>
-          <span><strong>Organic post first ($0 spend)</strong> — Test your message on Instagram/Facebook before paying for reach.</span>
+          <span><strong>Organic post first ($0 spend):</strong> Test your message on Instagram/Facebook before paying for reach.</span>
         </label>
         <label class="fa-radio-row">
           <input type="radio" name="faPaidMode" value="paid">
-          <span><strong>Prepare a manual paid test</strong> — Set an unconfirmed audience, budget, and dates to enter manually in Meta Ads Manager.</span>
+          <span><strong>Prepare a manual paid test:</strong> Set an unconfirmed audience, budget, and dates to enter manually in Meta Ads Manager.</span>
         </label>
       </fieldset>
 
@@ -78,12 +78,12 @@
     <!-- STEP 2: CREATIVE & DESTINATION -->
     <section id="faPanel2" class="fa-panel" data-fa-panel="2" hidden>
       <h2>Step 2: Creative &amp; destination</h2>
-      <p class="fa-muted">Reuses your active product photo and draft copy when available, or upload/select an image here.</p>
+      <p id="faStep2Sub" class="fa-muted">Reuses your active photo and draft copy when available, or upload or select an image here.</p>
 
       <div class="fa-two-col">
         <div class="fa-form-col">
-          <label for="faProductName">Product or artwork name</label>
-          <input id="faProductName" type="text" maxlength="120" placeholder="e.g., Botanical Linocut Print">
+          <label id="faProductNameLabel" for="faProductName">What are you promoting?</label>
+          <input id="faProductName" type="text" maxlength="120" placeholder="e.g., AI growth audit, consultation, or featured product">
 
           <label for="faHeadline">Headline</label>
           <input id="faHeadline" type="text" maxlength="120" placeholder="Short clear headline">
@@ -92,19 +92,19 @@
           <textarea id="faCaption" rows="5" maxlength="600" placeholder="What it is, why it matters, and next step"></textarea>
 
           <label for="faCta">Call to action</label>
-          <input id="faCta" type="text" maxlength="60" placeholder="e.g., Shop now, Send message, Learn more">
+          <input id="faCta" type="text" maxlength="60" placeholder="e.g., Learn more, Send message, Book a call">
 
           <label for="faDestinationType">Where should people go?</label>
           <select id="faDestinationType">
-            <option value="website">Studio website / product page</option>
-            <option value="etsy">Etsy shop / listing</option>
-            <option value="shopify">Shopify store</option>
+            <option id="faDestWebsiteOpt" value="website">Your website</option>
+            <option id="faDestEtsyOpt" value="etsy">Etsy shop or listing</option>
+            <option id="faDestShopifyOpt" value="shopify">Shopify store</option>
             <option value="instagram_dm">Instagram DM / inquiry</option>
             <option value="other">Other link</option>
           </select>
 
           <label for="faDestinationUrl">Destination URL (optional for organic / DM)</label>
-          <input id="faDestinationUrl" type="url" maxlength="400" placeholder="https://your-shop.example/product">
+          <input id="faDestinationUrl" type="url" maxlength="400" placeholder="https://your-site.example/offer">
           <p id="faUrlError" class="fa-error" hidden></p>
 
           <div class="fa-image-tools">
@@ -112,8 +112,8 @@
             <input id="faPhotoUpload" type="file" accept="image/jpeg,image/png,image/webp" hidden>
 
             <div class="fa-import-row">
-              <input id="faShopUrl" type="url" placeholder="https://your-shop.example">
-              <button id="faImportBtn" type="button" class="fa-btn fa-btn-secondary">Load shop images</button>
+              <input id="faShopUrl" type="url" placeholder="https://your-site.example">
+              <button id="faImportBtn" type="button" class="fa-btn fa-btn-secondary">Load images from your website</button>
             </div>
             <div id="faCandidatesGrid" class="fa-candidates-grid"></div>
           </div>
@@ -125,7 +125,7 @@
             <canvas id="faPreviewCanvas" width="1080" height="1350" aria-label="Ad image preview"></canvas>
             <p id="faPreviewHeadline" class="fa-preview-headline"></p>
             <p id="faPreviewCaption" class="fa-preview-caption"></p>
-            <p class="fa-muted fa-small">App export preset (1080 × 1350 PNG — not verified Meta policy).</p>
+            <p class="fa-muted fa-small">App export preset (1080 × 1350 PNG; not verified Meta policy).</p>
           </div>
         </div>
       </div>
@@ -137,8 +137,8 @@
       <p class="fa-muted">All suggestions are unconfirmed starting points. Double-check targeting, currency, and dates inside Meta Ads Manager.</p>
 
       <div class="fa-form-col">
-        <label for="faAudience">Suggested starting audience (unconfirmed — edit before using in Ads Manager)</label>
-        <input id="faAudience" type="text" maxlength="220" placeholder="e.g., People looking for handmade botanical prints and home gifts">
+        <label for="faAudience">Suggested starting audience (unconfirmed; edit before using in Ads Manager)</label>
+        <input id="faAudience" type="text" maxlength="220" placeholder="e.g., Small business owners looking for marketing help or local buyers">
 
         <label for="faLocation">Geographic area</label>
         <input id="faLocation" type="text" maxlength="120" placeholder="e.g., United States, Canada, or your city">

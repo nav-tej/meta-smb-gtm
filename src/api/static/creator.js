@@ -658,6 +658,27 @@
       b.classList.toggle('selected', active);
       b.setAttribute('aria-pressed', String(active));
     });
+    syncWorkspaceCopy(isOwn);
+  }
+  function syncWorkspaceCopy(isOwn) {
+    if ($('creatorStep1Eyebrow')) $('creatorStep1Eyebrow').textContent = isOwn ? 'START WITH WHAT YOU OFFER' : 'START WITH WHAT YOU MAKE';
+    if ($('creatorStep1Intro')) {
+      $('creatorStep1Intro').textContent = isOwn
+        ? 'Choose a product, service or offer, decide where visitors should go, then make one post. No shop login needed.'
+        : 'Choose an artwork, decide where visitors should go, then make one post. No shop login needed.';
+    }
+    if ($('productNameLabel')) $('productNameLabel').textContent = isOwn ? 'What are you promoting?' : 'Product name';
+    if ($('productName')) $('productName').placeholder = isOwn ? 'A product, service or offer' : 'Name of the product you’re promoting';
+    if ($('creatorPhotoEyebrow')) $('creatorPhotoEyebrow').textContent = isOwn ? 'YOUR PHOTO' : 'THE WORK COMES FIRST';
+    if (isOwn) {
+      const sampleLeak = /Ek Onkar|Sarabjit|SikhiArt|artwork preview|with the artist/i;
+      if ($('productImageCaption') && sampleLeak.test($('productImageCaption').textContent || '')) {
+        $('productImageCaption').textContent = state.imageMeta ? formatImageMetaNote(state.imageMeta) : 'Your photo will appear here.';
+      }
+      if ($('productFactNote') && sampleLeak.test($('productFactNote').textContent || '')) {
+        $('productFactNote').textContent = state.imageMeta ? formatImageMetaNote(state.imageMeta) : 'Confirm the price and details before publishing.';
+      }
+    }
   }
   function originalLayout() { state.image = state.original; state.imageKind = 'original'; state.provenance = state.custom ? 'Original-photo layout. No personalized image generated.' : state.workspace === 'etsy_ceramics' ? 'Original example layout using a saved AI product image.' : 'Layout using the original artwork preview. No new image generated.'; refreshPreview(); }
   function newProduct() {
@@ -677,10 +698,14 @@
       if (data.length > 1300000) throw new Error('This photo is still too large. Please choose a smaller image.');
       if (!state.custom) newProduct();
       state.original = data;
-      state.imageMeta = { id: 'upload-local', title: file.name || 'Uploaded product photo', sourceUrl: '', width: image.width, height: image.height, isLowRes: Math.min(image.width, image.height) < 600 || Math.max(image.width, image.height) < 800, provenance: 'upload', confirmed: true };
+      state.imageMeta = { id: 'upload-local', title: file.name || 'Uploaded photo', sourceUrl: '', width: image.width, height: image.height, isLowRes: Math.min(image.width, image.height) < 600 || Math.max(image.width, image.height) < 800, provenance: 'upload', confirmed: true };
       state.imageFrame = { fit: 'contain', x: 0, y: 0 };
       syncFrameControls();
-      state.revision += 1; originalLayout(); $('reviewed').checked = false; renderImagePicker(); notify('Photo ready. Add your product details, then choose an idea.');
+      state.revision += 1; originalLayout(); $('reviewed').checked = false; renderImagePicker();
+      const uploadNote = formatImageMetaNote(state.imageMeta);
+      if ($('productImageCaption')) $('productImageCaption').textContent = uploadNote;
+      if ($('productFactNote')) $('productFactNote').textContent = uploadNote;
+      notify('Photo ready. Add your details, then choose an idea.');
     } finally { URL.revokeObjectURL(url); }
   }
   const SAMPLE_IMAGE_ORIGINALS = [
@@ -717,7 +742,7 @@
   function formatImageMetaNote(meta) {
     if (!meta) return '';
     const dims = meta.width && meta.height ? `${meta.width} × ${meta.height} px` : 'Size unknown';
-    if (meta.isLowRes) return `Low-res web preview (${dims}) — suitable for social preview, not a print master.`;
+    if (meta.isLowRes) return `Low-res web preview (${dims}): suitable for social preview, not a print master.`;
     if (meta.provenance === 'sample_original') return `Original artwork preview (${dims}) · Sample studio.`;
     if (meta.provenance === 'sample_generated') return `Saved AI ad example (${dims}) · Staging example.`;
     if (meta.provenance === 'upload') return `Uploaded photo (${dims}) · Kept on this device.`;

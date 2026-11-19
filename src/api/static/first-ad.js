@@ -5,20 +5,34 @@
   const OUTCOME_INFO = {
     inquiries: {
       label: 'Start conversations & inquiries',
-      metaObjective: 'Engagement / Messages (or Traffic to inquiry page) — verify in Ads Manager',
-      note: 'Suggested starting approach: Ideal when you take custom orders or sell via DMs without online checkout.',
+      metaObjective: 'Engagement / Messages (or Traffic to inquiry page); verify in Ads Manager',
+      note: 'Suggested starting approach: Ideal when you take custom inquiries, book calls, or sell via messages without online checkout.',
+      sampleNote: 'Suggested starting approach: Ideal when you take custom orders or sell via DMs without online checkout.',
     },
     visits: {
-      label: 'Bring visitors to your shop',
-      metaObjective: 'Traffic (Link clicks / Landing page views) — verify in Ads Manager',
-      note: 'Suggested starting approach: Sends interested buyers directly to your product or shop listing.',
+      label: 'Bring visitors to your website',
+      sampleLabel: 'Bring visitors to your shop',
+      metaObjective: 'Traffic (Link clicks / Landing page views); verify in Ads Manager',
+      note: 'Suggested starting approach: Sends interested people to read a page, see your work, or book a call.',
+      sampleNote: 'Suggested starting approach: Sends interested buyers directly to your product or shop listing.',
     },
     sales: {
-      label: 'Test a direct product offer',
-      metaObjective: 'Sales (Conversions) — requires verified checkout + Meta Pixel',
-      note: 'Prerequisite check: If your shop does not have verified checkout and Meta Pixel tracking yet, start with "Start conversations" or "Bring visitors to your shop" first.',
+      label: 'Test a direct offer',
+      sampleLabel: 'Test a direct product offer',
+      metaObjective: 'Sales (Conversions); requires verified checkout + Meta Pixel',
+      note: 'Prerequisite check: If your website does not have verified checkout and Meta Pixel tracking yet, start with "Start conversations" or "Bring visitors to your website" first.',
+      sampleNote: 'Prerequisite check: If your shop does not have verified checkout and Meta Pixel tracking yet, start with "Start conversations" or "Bring visitors to your shop" first.',
     },
   };
+
+  function outcomeInfoFor(key, sample) {
+    const raw = OUTCOME_INFO[key] || OUTCOME_INFO.inquiries;
+    return {
+      label: sample && raw.sampleLabel ? raw.sampleLabel : raw.label,
+      metaObjective: raw.metaObjective,
+      note: sample && raw.sampleNote ? raw.sampleNote : raw.note,
+    };
+  }
 
   function defaultDates() {
     const start = new Date(Date.now() + 24 * 60 * 60 * 1000);
@@ -36,7 +50,7 @@
         paidMode: 'paid',
         businessName: 'Art of Sarabjit Singh',
         productName: 'Ek Onkar · 12x12 Print',
-        headline: 'Ek Onkar — Hand-painted Sikh art print',
+        headline: 'Ek Onkar: Hand-painted Sikh art print',
         caption: 'Original calligraphy and spiritual artwork by Sarabjit Singh. View print sizes and framing options in the shop.',
         cta: 'See print sizes',
         destinationType: 'website',
@@ -170,7 +184,7 @@
       return false;
     }
     if (amt > 500 && bHint) {
-      bHint.textContent = 'High test budget (over $500) — double-check before entering this in Meta Ads Manager.';
+      bHint.textContent = 'High test budget (over $500): double-check before entering this in Meta Ads Manager.';
     } else if (bHint) {
       bHint.textContent = `Planned ${state.budgetType} test cap: $${amt.toFixed(2)} USD (entered manually in Meta Ads Manager; Muse spends $0).`;
     }
@@ -195,7 +209,7 @@
   function buildPrerequisites() {
     const items = [];
     const hasImg = Boolean(state.imageDataUrl);
-    items.push({ ok: hasImg, text: hasImg ? 'Product image selected for export.' : 'Missing prerequisite: Upload or select a product photo in Step 2.' });
+    items.push({ ok: hasImg, text: hasImg ? 'Image selected for export.' : 'Missing prerequisite: Upload or select a photo in Step 2.' });
     const hasCopy = Boolean(state.headline.trim() && state.caption.trim());
     items.push({ ok: hasCopy, text: hasCopy ? 'Headline and primary text ready.' : 'Missing prerequisite: Add a headline and primary text in Step 2.' });
 
@@ -229,18 +243,19 @@
         });
       }
     } else {
-      items.push({ ok: true, text: 'Organic post selected ($0 ad spend — no Ads Manager billing required).' });
+      items.push({ ok: true, text: 'Organic post selected ($0 ad spend; no Ads Manager billing required).' });
     }
     return items;
   }
 
   function renderStep1Guidance() {
-    const info = OUTCOME_INFO[state.outcome] || OUTCOME_INFO.inquiries;
+    const sample = isSampleMode();
+    const info = outcomeInfoFor(state.outcome, sample);
     const box = $('faOutcomeGuidance');
     if (!box) return;
     box.replaceChildren();
     const title = document.createElement('strong');
-    title.textContent = `${isSampleMode() ? 'Artist example' : 'Suggested starting approach'} · ${info.label}: `;
+    title.textContent = `${sample ? 'Artist example' : 'Suggested starting approach'} · ${info.label}: `;
     const span = document.createElement('span');
     span.textContent = info.note;
     box.append(title, span);
@@ -274,7 +289,7 @@
         ctx.fillRect(60, 60, width - 120, targetHeight - 280);
         ctx.fillStyle = '#4f6257';
         ctx.font = 'bold 34px -apple-system, BlinkMacSystemFont, sans-serif';
-        ctx.fillText('Upload or select a product photo in Step 2', 140, Math.round(targetHeight * 0.44));
+        ctx.fillText('Upload or select a photo in Step 2', 140, Math.round(targetHeight * 0.44));
         finishText();
         return;
       }
@@ -310,17 +325,18 @@
     const summaryEl = $('faHandoffSummary');
     if (summaryEl) {
       summaryEl.replaceChildren();
-      const info = OUTCOME_INFO[state.outcome] || OUTCOME_INFO.inquiries;
+      const sample = isSampleMode();
+      const info = outcomeInfoFor(state.outcome, sample);
       const rows = [
         ['Publish status', 'Not published (manual Ads Manager entry required)'],
-        ['Provenance', isSampleMode() ? 'Artist example (checked-in sample)' : 'Suggested starting approach'],
+        ['Provenance', sample ? 'Artist example (checked-in sample)' : 'Suggested starting approach'],
         ['Suggested objective', info.metaObjective],
         ['Ad format', state.paidMode === 'paid' ? 'Manual paid test' : 'Organic post ($0 spend)'],
-        ['Product', state.productName || 'Not specified'],
+        [sample ? 'Product' : 'Offer / item', state.productName || 'Not specified'],
         ['Headline', state.headline || 'Not specified'],
         ['Primary text', state.caption || 'Not specified'],
         ['Call to action', state.cta || 'Learn more'],
-        ['Destination', `${state.destinationType}${state.destinationUrl ? ' — ' + state.destinationUrl : ''}`],
+        ['Destination', `${state.destinationType}${state.destinationUrl ? ': ' + state.destinationUrl : ''}`],
         ['Audience (unconfirmed)', state.audience || 'Not specified'],
         ['Location', state.location || 'Not specified'],
         ['Budget', state.paidMode === 'paid' ? `$${state.budgetAmount || '0'} USD (${state.budgetType})` : '$0 (Organic)'],
@@ -339,10 +355,45 @@
     }
   }
 
+  function syncFirstAdCopy(sample) {
+    if ($('faOutcomeInquiriesDesc')) {
+      $('faOutcomeInquiriesDesc').textContent = sample
+        ? 'Best when you take custom orders or sell via DMs without online checkout.'
+        : 'Best when you take custom inquiries, book calls, or sell via messages without online checkout.';
+    }
+    if ($('faOutcomeVisitsTitle')) $('faOutcomeVisitsTitle').textContent = sample ? 'Bring visitors to your shop' : 'Bring visitors to your website';
+    if ($('faOutcomeVisitsDesc')) {
+      $('faOutcomeVisitsDesc').textContent = sample
+        ? 'Best when you want people to browse an Etsy, Shopify, or studio listing.'
+        : 'Best when people should read a page, see your work, or book a call first.';
+    }
+    if ($('faOutcomeSalesTitle')) $('faOutcomeSalesTitle').textContent = sample ? 'Test a direct product offer' : 'Test a direct offer';
+    if ($('faStep2Sub')) {
+      $('faStep2Sub').textContent = sample
+        ? 'Reuses your active product photo and draft copy when available, or upload/select an image here.'
+        : 'Reuses your active photo and draft copy when available, or upload or select an image here.';
+    }
+    if ($('faProductNameLabel')) $('faProductNameLabel').textContent = sample ? 'Product or artwork name' : 'What are you promoting?';
+    if ($('faProductName')) $('faProductName').placeholder = sample ? 'e.g., Botanical Linocut Print' : 'e.g., AI growth audit, consultation, or featured product';
+    if ($('faCta')) $('faCta').placeholder = sample ? 'e.g., Shop now, Send message, Learn more' : 'e.g., Learn more, Send message, Book a call';
+    if ($('faDestWebsiteOpt')) $('faDestWebsiteOpt').textContent = sample ? 'Studio website / product page' : 'Your website';
+    if ($('faDestEtsyOpt')) $('faDestEtsyOpt').textContent = sample ? 'Etsy shop / listing' : 'Etsy shop or listing';
+    if ($('faDestShopifyOpt')) $('faDestShopifyOpt').textContent = 'Shopify store';
+    if ($('faDestinationUrl')) $('faDestinationUrl').placeholder = sample ? 'https://your-shop.example/product' : 'https://your-site.example/offer';
+    if ($('faShopUrl')) $('faShopUrl').placeholder = sample ? 'https://your-shop.example' : 'https://your-site.example';
+    if ($('faImportBtn')) $('faImportBtn').textContent = sample ? 'Load shop images' : 'Load images from your website';
+    if ($('faAudience')) {
+      $('faAudience').placeholder = sample
+        ? 'e.g., People looking for handmade botanical prints and home gifts'
+        : 'e.g., Small business owners looking for marketing help or local buyers';
+    }
+  }
+
   function syncUiFromState() {
     hydrating = true;
     const sample = isSampleMode();
     if ($('faBidAdviceLink')) $('faBidAdviceLink').href = sample ? '/?workspace=sample#tab-bids' : '/#tab-bids';
+    syncFirstAdCopy(sample);
     if ($('faProvenanceBadge')) $('faProvenanceBadge').textContent = sample ? 'Artist example' : 'Suggested starting approach';
     if ($('faContextStatus')) {
       $('faContextStatus').textContent = sample
@@ -426,6 +477,7 @@
 
     const sample = isSampleMode();
     if ($('faBidAdviceLink')) $('faBidAdviceLink').href = sample ? '/?workspace=sample#tab-bids' : '/#tab-bids';
+    syncFirstAdCopy(sample);
     let loaded = null;
     try {
       const raw = localStorage.getItem(storageKey());
@@ -486,7 +538,7 @@
       const data = await resp.json();
       const cands = Array.isArray(data.image_candidates) ? data.image_candidates : [];
       if (!cands.length && data.image_data_url) {
-        cands.push({ id: 'primary', title: data.title || 'Product photo', image_data_url: data.image_data_url });
+        cands.push({ id: 'primary', title: data.title || 'Selected photo', image_data_url: data.image_data_url });
       }
       const grid = $('faCandidatesGrid');
       if (grid) {
@@ -533,7 +585,7 @@
 
   async function exportPng(height) {
     if (!state.imageDataUrl) {
-      notify('Add or select a product photo in Step 2 before exporting.', true);
+      notify('Add or select a photo in Step 2 before exporting.', true);
       return;
     }
     if (!state.reviewed) {
@@ -554,17 +606,18 @@
       notify('Please tick the review checkbox before downloading.', true);
       return;
     }
-    const info = OUTCOME_INFO[state.outcome] || OUTCOME_INFO.inquiries;
+    const sample = isSampleMode();
+    const info = outcomeInfoFor(state.outcome, sample);
     const prereqs = buildPrerequisites().map((p) => `- [${p.ok ? 'READY' : 'MISSING/MANUAL'}] ${p.text}`).join('\n');
     const txt = [
-      'MUSE — RUN YOUR FIRST AD (MANUAL ADS MANAGER HANDOFF)',
-      'STATUS: NOT PUBLISHED (Draft only — Muse did not connect to Meta or spend any money)',
-      `PROVENANCE: ${isSampleMode() ? 'Artist example (checked-in sample)' : 'Suggested starting approach'}`,
+      'MUSE: RUN YOUR FIRST AD (MANUAL ADS MANAGER HANDOFF)',
+      'STATUS: NOT PUBLISHED (Draft only: Muse did not connect to Meta or spend any money)',
+      `PROVENANCE: ${sample ? 'Artist example (checked-in sample)' : 'Suggested starting approach'}`,
       '',
       `Outcome: ${info.label}`,
       `Suggested Meta Objective: ${info.metaObjective}`,
       `Mode: ${state.paidMode === 'paid' ? 'Manual paid test' : 'Organic post ($0)'}`,
-      `Product: ${state.productName || '(not set)'}`,
+      `${sample ? 'Product' : 'Offer / item'}: ${state.productName || '(not set)'}`,
       `Headline: ${state.headline || '(not set)'}`,
       `Primary Text: ${state.caption || '(not set)'}`,
       `Call to Action: ${state.cta || 'Learn more'}`,
