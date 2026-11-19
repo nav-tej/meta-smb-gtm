@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import re
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Literal
 
 from src.models.seller import (
     CompetitorEntry,
@@ -50,6 +50,7 @@ DEMO_VOICE_FIXTURES: dict[str, dict[str, str]] = {
 
 _GIFT_KEYWORDS = ("gift", "print", "card", "mug", "mini", "watercolor", "landscape", "art", "set")
 _COMMISSION_KEYWORDS = ("commission", "custom", "bespoke", "portrait", "made to order")
+BusinessType = Literal["products", "services", "both"]
 _KNOWN_CHANNELS = ("instagram", "facebook", "website", "marketplace", "etsy", "tiktok", "pinterest")
 
 _ROLE_LABELS: dict[CompetitorRole, str] = {
@@ -1190,9 +1191,130 @@ def _build_editor_defaults_for_move(
     }
 
 
+_SERVICES_INQUIRY_WORDS = ("lead", "client", "inquir", "enquir", "call", "book", "consult")
+
+
+def _services_moves(
+    *,
+    business_name: str,
+    subject_label: str,
+    primary_channel: str,
+    allowed_channels: list[str],
+    destination: str,
+    short_price: str,
+    price_comp: CompetitorEntry | None,
+    insp_comp: CompetitorEntry | None,
+    any_comp: CompetitorEntry | None,
+) -> list[dict[str, Any]]:
+    """Moves for a business that sells a service. Same categories, so scoring still applies."""
+    channel_title = primary_channel.title()
+
+    def comp_fields(comp: CompetitorEntry | None) -> dict[str, Any]:
+        return {
+            "competitor_used": _competitor_display(comp) if comp else None,
+            "competitor_role": comp.role if comp else None,
+            "competitor_rationale": (comp.rationale or comp.reason).strip() if comp else "",
+        }
+
+    offer_comp = price_comp or any_comp
+    style_comp = insp_comp or any_comp
+    style_note = (
+        f" (adapted in style from {_competitor_display(style_comp)}, in your own voice)"
+        if style_comp
+        else ""
+    )
+    moves: list[dict[str, Any]] = [
+        {
+            "id": "move-services-offer",
+            "category": "price_reference",
+            "title": f"Say what a first project with {business_name} includes",
+            "action": (
+                f"Publish one {channel_title} post that names {subject_label}, who it is for "
+                "and how to start (a call, a message or a short form), and link to that page."
+            ),
+            "channel": primary_channel,
+            "goal": "visits",
+            "estimated_minutes": 12,
+            "base_score": 58.0,
+            **comp_fields(offer_comp),
+            "price_claim": short_price,
+            "cta": "See the service",
+        },
+        {
+            "id": "move-services-result",
+            "category": "similar_audience",
+            "title": "Share a recent client result, with permission",
+            "action": (
+                f"Post on {channel_title} about one recent project: what the client needed, "
+                "what changed, and only results you can show."
+            ),
+            "channel": primary_channel,
+            "goal": "story",
+            "estimated_minutes": 15,
+            "base_score": 56.0,
+            **comp_fields(any_comp),
+            "price_claim": "",
+            "cta": "Read the project",
+        },
+        {
+            "id": "move-services-process",
+            "category": "inspiration",
+            "title": f"Show how {business_name} works with clients",
+            "action": (
+                f"Post a short {channel_title} note or clip about one step of how you work"
+                f"{style_note}."
+            ),
+            "channel": primary_channel,
+            "goal": "story",
+            "estimated_minutes": 10,
+            "base_score": 55.0,
+            **comp_fields(style_comp),
+            "price_claim": "",
+            "cta": "See how it works",
+        },
+        {
+            "id": "move-services-invite",
+            "category": "commission",
+            "title": f"Answer one question people ask {business_name}",
+            "action": (
+                f"Answer a question prospects often ask, on {channel_title}, then invite them to "
+                "message you or book a call. Do not promise results."
+            ),
+            "channel": primary_channel,
+            "goal": "story",
+            "estimated_minutes": 10,
+            "base_score": 48.0,
+            **comp_fields(any_comp),
+            "price_claim": "",
+            "cta": "Book a call",
+        },
+    ]
+    page_channel = "website" if "website" in allowed_channels else primary_channel
+    moves.append(
+        {
+            "id": "move-services-page",
+            "category": "catalog",
+            "title": f"Tighten the services page on {destination or 'your website'}",
+            "action": (
+                "Rewrite the first lines of your main services page so they say who you help "
+                "and how to start, then check the links from your profiles (about 40 minutes)."
+            ),
+            "channel": page_channel,
+            "goal": "visits",
+            "estimated_minutes": 40,
+            "base_score": 52.0,
+            **comp_fields(None),
+            "price_claim": "",
+            "cta": "Update the services page",
+        }
+    )
+    return moves
+
+
 def rank_seller_recommendations(
     *,
     business_name: str = "Your Studio",
+    business_type: BusinessType | None = None,
     product_name: str | None = None,
     preferences: SellerPreferences | None = None,
     voice_profile: VoiceProfile | None = None,
@@ -1201,7 +1323,12 @@ def rank_seller_recommendations(
     dismiss_signals: list[DismissSignal] | None = None,
     previous_top_id: str | None = None,
 ) -> dict[str, Any]:
-    """Compute context-aware ranked recommendations, clear explanations, and editor defaults."""
+    """Compute context-aware ranked recommendations, clear explanations, and editor defaults.
+
+    A services business (from setup) gets moves about its offer, client results and how to get
+    in touch instead of the shop moves (entry prices, gifts, commissions, listing titles).
+    """
+    services = business_type == "services"
     pref = (preferences or SellerPreferences()).model_copy(deep=True)
     voice = voice_profile or VoiceProfile()
     override = draft_override or {}
@@ -1332,11 +1459,25 @@ def rank_seller_recommendations(
     insp_comp = comp_by_role.get("inspiration")
     any_comp = active_comps[0] if active_comps else None
 
-    subject_label = effective_product or f"{business_name} featured work"
+    subject_label = effective_product or (
+        f"{business_name}'s main service" if services else f"{business_name} featured work"
+    )
 
     # Build role-differentiated candidate moves only when at least one allowed channel remains.
     candidates: list[dict[str, Any]] = []
-    if primary_channel is not None:
+    if primary_channel is not None and services:
+        candidates = _services_moves(
+            business_name=business_name,
+            subject_label=subject_label,
+            primary_channel=primary_channel,
+            allowed_channels=allowed_channels,
+            destination=effective_destination,
+            short_price=short_price,
+            price_comp=price_comp,
+            insp_comp=insp_comp,
+            any_comp=any_comp,
+        )
+    elif primary_channel is not None:
         channel_title = primary_channel.title()
 
         # Move A: Price positioning / Entry offer (rises when competitor role == "price_reference")
@@ -1510,7 +1651,7 @@ def rank_seller_recommendations(
 
         # 2. Price control & price fact grounding
         if cat == "price_reference":
-            if not pref.access.can_change_prices:
+            if not pref.access.can_change_prices and not services:
                 score -= 70.0
                 reasons.append("Lowered because listing prices are fixed")
             elif price_entry is not None:
@@ -1541,8 +1682,10 @@ def rank_seller_recommendations(
         combined_intent = f"{goal_lower} {note_lower}"
         draft_goal_raw = str(override.get("goal") or "").strip()
         override_goal_changed = bool(draft_goal_raw) and draft_goal_raw != (pref.goal or "").strip()
-        if "commission" in combined_intent:
+        if services and any(w in combined_intent for w in _SERVICES_INQUIRY_WORDS):
             intent_cat: str | None = "commission"
+        elif "commission" in combined_intent:
+            intent_cat = "commission"
         elif "story" in combined_intent:
             intent_cat = "inspiration"
         elif "gift" in combined_intent:
@@ -1555,13 +1698,21 @@ def rank_seller_recommendations(
         if intent_cat == cat:
             if cat == "commission":
                 score += 120.0
-                reasons.append("Matches your commission goal")
+                reasons.append(
+                    "Matches your goal of more inquiries"
+                    if services
+                    else "Matches your commission goal"
+                )
             elif cat == "similar_audience":
                 score += 115.0 if override_goal_changed else 32.0
                 reasons.append("Matches your gift-buyer goal")
             elif cat == "inspiration":
                 score += 115.0 if override_goal_changed else 30.0
-                reasons.append("Matches your studio storytelling focus")
+                reasons.append(
+                    "Matches your storytelling focus"
+                    if services
+                    else "Matches your studio storytelling focus"
+                )
             elif cat == "price_reference":
                 score += 115.0 if override_goal_changed else 26.0
 
@@ -1605,7 +1756,11 @@ def rank_seller_recommendations(
                 "Price not set — leave price blank or add your starting price before sharing."
             )
         if not effective_product:
-            missing_facts.append("Product not specified — choose a product or artwork.")
+            missing_facts.append(
+                "Service not named: choose the service or offer to promote."
+                if services
+                else "Product not specified — choose a product or artwork."
+            )
         if any(tok in combined_intent for tok in ("sale", "sales", "buy", "checkout", "order")):
             if not effective_destination:
                 missing_facts.append(

@@ -20,15 +20,26 @@
   const safeURL = value => { try { const u = new URL(value); return ['https:', 'http:'].includes(u.protocol) && !u.username && !u.password ? u.href : ''; } catch { return ''; } };
   const originalSample = '/samples/ek_onkar_original.jpg';
   const sampleProduct = () => ({ title: 'Ek Onkar', description: 'An artwork by Sarabjit Singh exploring connection and equality through color and form.', seller: 'Art of Sarabjit Singh', collection: '', price: '', destination_url: 'https://sarabjit-singh.pixels.com/', destination: 'pixels' });
-  const neutralProduct = (shopName = '', shopUrl = '') => ({
-    title: shopName ? `Featured piece · ${shopName}` : 'My studio item',
-    description: shopName ? `Share one artwork or handcrafted piece from ${shopName} today.` : 'Share something you made this week and invite people to explore your shop.',
-    seller: shopName || 'Your Studio',
-    collection: '',
-    price: '',
-    destination_url: safeURL(shopUrl) || '',
-    destination: 'website',
-  });
+  // What the signed-in seller offers, from setup ("products", "services", "both" or null).
+  let ownBusinessType = null;
+  const offersServices = () => ownBusinessType === 'services';
+  // Until the seller picks an item, the label says so instead of inventing an item name.
+  const neutralProduct = (shopName = '', shopUrl = '') => {
+    const services = offersServices();
+    const pick = services ? 'choose a service or offer' : 'choose an item';
+    return {
+      title: shopName ? `${shopName} · ${pick}` : pick.charAt(0).toUpperCase() + pick.slice(1),
+      description: '',
+      seller: shopName || '',
+      collection: '',
+      price: '',
+      destination_url: safeURL(shopUrl) || '',
+      destination: 'website',
+      placeholder: true,
+    };
+  };
+  // Placeholder titles saved by earlier versions of this page.
+  const legacyPlaceholder = title => title === 'My studio item' || /^Featured piece · /.test(title);
   function readRecommendationHandoff(uid = window.museAccount?.getSnapshot?.()?.user?.id || window.museAccount?.current?.()?.id || null) {
     try {
       const hid = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('sm_handoff') : null;
@@ -102,6 +113,28 @@
   const cloneDraft = value => JSON.parse(JSON.stringify(value));
   const draftStatus = text => { $('draftStatus').textContent = text; };
   const isEffectiveSample = () => (typeof activeSampleMode === 'boolean' ? activeSampleMode : isSampleMode());
+  const shopLabel = key => (key === 'website' && !isEffectiveSample() ? 'My website' : shops[key] || 'Your shop');
+  // The sample artist keeps its wording; a seller's own workspace gets labels that fit what they offer.
+  function applyOfferWording() {
+    const sample = isEffectiveSample();
+    const services = !sample && offersServices();
+    const find = selector => (typeof document.querySelector === 'function' ? document.querySelector(selector) : null);
+    const swap = (el, ownText, attr) => {
+      if (!el || !el.dataset) return;
+      const key = attr ? `sample${attr}` : 'sampleText';
+      if (el.dataset[key] === undefined) el.dataset[key] = attr ? (el.getAttribute?.(attr) || '') : el.textContent;
+      const text = sample ? el.dataset[key] : ownText;
+      if (attr) el.setAttribute?.(attr, text); else el.textContent = text;
+    };
+    swap(find('#noPhoto span'), 'Add a photo to finish this post.');
+    swap(find('#destination option[value="website"]'), 'My website');
+    swap(find('label[for="productLink"]'), 'Link people should visit');
+    swap(find('label[for="sellerName"]'), services ? 'Your name / business' : 'Your name / shop');
+    swap(find('#goal option[value="visits"]'), services ? 'Website visits' : 'Shop visits');
+    swap($('quickFindItems'), services ? 'Find items on my site' : 'Find products');
+    swap($('saveWebsiteOnlyBtn'), 'Save website to my workspace');
+    swap($('productName'), services ? 'Name the service or offer' : 'Name the item you are sharing', 'placeholder');
+  }
   const deviceKey = () => `muse-editor-v1:${draftNamespace}:${isEffectiveSample() ? 'sample' : (draftOwner ? 'account:' + encodeURIComponent(draftOwner) : 'guest')}`;
   function persistDraft() {
     if (!draftReady || applyingDraft) return;
@@ -411,10 +444,11 @@
       if (state.product.seller === 'Art of Sarabjit Singh') state.product.seller = '';
     }
     const existingTitle = String(state.product.title || '').trim();
-    const isGenericTitle = !existingTitle || existingTitle === 'Ek Onkar' || existingTitle === 'Featured Artwork';
+    const isGenericTitle = !existingTitle || existingTitle === 'Ek Onkar' || existingTitle === 'Featured Artwork' || Boolean(state.product.placeholder);
     if (handoff.business_name) state.product.seller = handoff.business_name;
     if (handoff.product_name && (handoff.product_name !== handoff.business_name || isGenericTitle)) {
       state.product.title = handoff.product_name;
+      delete state.product.placeholder;
     }
     if (handoff.price_claim !== undefined && handoff.price_claim !== '') {
       state.product.price = handoff.price_claim;
@@ -426,13 +460,13 @@
       state.channel = String(handoff.channel).toLowerCase();
       state.format = state.channel === 'tiktok' ? 'video' : (state.channel === 'x' ? 'text' : 'image');
     }
-    state.goal = handoff.goal === 'gift' ? 'inquiries' : 'visits';
+    state.goal = handoff.goal === 'gift' || offersServices() ? 'inquiries' : 'visits';
     state.selected = 0;
     state.idea_id = handoff.recommendation_id || handoff.id || null;
     state.why_this = handoff.why_this_fits || '';
     state.cta = handoff.cta || '';
     state.source = 'Selected recommendation';
-    const hook = handoff.title || state.product.title || 'Featured Artwork';
+    const hook = handoff.title || (state.product.placeholder ? '' : state.product.title) || (isSampleMode() ? 'Featured Artwork' : 'Something new to share');
     const caption = handoff.action || state.product.description || 'Share your work directly with buyers.';
     ['image', 'video', 'text'].forEach((fmt) => {
       state.edits[`${state.channel}:0:${fmt}`] = { hook, caption };
@@ -496,11 +530,13 @@
     }
     finally { clearTimeout(timer); }
   }
-  function planPayload(live) { return { product: { title: state.product.title, description: state.product.description, price: state.product.price || undefined, destination_url: safeURL(state.product.destination_url) || undefined, seller: state.product.seller, collection: state.product.collection }, channels: [state.channel], goal: state.goal, sales_goal: state.salesGoal || undefined, performance: state.performance || undefined, use_muse: live }; }
+  function planPayload(live) { return { product: { title: state.product.title, description: state.product.description, price: state.product.price || undefined, destination_url: safeURL(state.product.destination_url) || undefined, seller: state.product.seller, collection: state.product.collection }, channels: [state.channel], goal: state.goal, business_type: isEffectiveSample() ? undefined : (ownBusinessType || 'products'), sales_goal: state.salesGoal || undefined, performance: state.performance || undefined, use_muse: live }; }
   async function buildPlan(live = false, force = false) {
     if (state.busy) return;
     if (live && !liveReady()) return;
     if (!force && !live && currentPlan()) { render(); return; }
+    // No item chosen yet: the local starter plan, never "Meet <placeholder label>" from the server.
+    if (!live && state.product.placeholder) { state.plans[state.channel] = starterPlanForToday(state.product); state.selected = 0; invalidate(); render(); persist(); return; }
     const channel = state.channel; const revision = state.revision;
     const shouldLock = live || force;
     if (shouldLock) lock(true, live ? 'musePlan' : '');
@@ -516,6 +552,7 @@
     finally { if (shouldLock) lock(false); }
   }
   function render() {
+    applyOfferWording();
     const plan = currentPlan(); const post = currentPost(); const copy = formatCopy(post);
     $('itemTitle').textContent = state.product.title; $('itemSource').textContent = state.source;
     $('dailyReason').textContent = state.why_this || `Start with ${state.product.title || 'your item'} on ${names[state.channel]}. Review, take it with you, done.`;
@@ -530,13 +567,14 @@
       tiktok: 'Start with a visual hook. Use vertical video and captions; add suitable audio in TikTok.'
     };
     $('channelTip').textContent = tips[state.channel];
-    $('visualDirection').textContent = post?.visual_direction || 'Show the original artwork clearly, then a detail and your invitation.';
+    const sampleWords = isEffectiveSample();
+    $('visualDirection').textContent = post?.visual_direction || (sampleWords ? 'Show the original artwork clearly, then a detail and your invitation.' : 'Show your photo clearly, then one detail and your invitation.');
     const url = safeURL(state.product.destination_url); $('destinationLink').hidden = !url; if (url) $('destinationLink').href = url;
-    $('destinationLink').textContent = `${shops[state.product.destination] || 'Your shop'} ↗`;
+    $('destinationLink').textContent = `${shopLabel(state.product.destination)} ↗`;
     $('offerNote').textContent = state.product.price ? `${state.product.price} · confirm before posting` : 'No price included';
-    $('imageNote').textContent = state.imageMode === 'live' ? 'Muse scene · compare artwork details' : 'Original image · fitted without cropping';
+    $('imageNote').textContent = state.imageMode === 'live' ? (sampleWords ? 'Muse scene · compare artwork details' : 'Muse scene · compare it with your photo') : 'Original image · fitted without cropping';
     const label = state.format === 'text' ? 'Copy ready-to-post text' : state.format === 'video' ? 'Get short video + caption' : 'Get photo + caption'; $('getPost').textContent = label;
-    $('deliveryNote').textContent = state.format === 'video' ? 'Makes a silent 6-second artwork clip. Add voice or audio in your app. You post it yourself.' : state.format === 'text' ? 'Copies your post. Instagram and TikTok need a visual; use this text with your image or video.' : 'Downloads the image and copies your text. You post from your account.';
+    $('deliveryNote').textContent = state.format === 'video' ? `Makes a silent 6-second ${sampleWords ? 'artwork clip' : 'clip from your image'}. Add voice or audio in your app. You post it yourself.` : state.format === 'text' ? 'Copies your post. Instagram and TikTok need a visual; use this text with your image or video.' : 'Downloads the image and copies your text. You post from your account.';
     $('postedStatus').textContent = state.posted[postIdentity()] ? 'Marked posted on this device' : '';
     $('noPhoto').hidden = !!state.image || state.format === 'text';
     if ($('uploadPhotoText')) $('uploadPhotoText').textContent = state.image ? 'Change photo' : 'Add photo';
@@ -646,7 +684,7 @@
     } catch (error) { notice(error.message, true); } finally { lock(false); }
   }
   function populateSetup() {
-    const p = state.product; $('productName').value = p.title; $('sellerName').value = p.seller || ''; $('productDescription').value = p.description || ''; $('destination').value = p.destination || 'other'; $('price').value = p.price || ''; $('productLink').value = p.destination_url || ''; $('collection').value = p.collection || ''; $('goal').value = state.goal; $('salesGoal').value = state.salesGoal || '';
+    const p = state.product; $('productName').value = p.placeholder ? '' : p.title; $('sellerName').value = p.seller || ''; $('productDescription').value = p.description || ''; $('destination').value = p.destination || 'other'; $('price').value = p.price || ''; $('productLink').value = p.destination_url || ''; $('collection').value = p.collection || ''; $('goal').value = state.goal; $('salesGoal').value = state.salesGoal || '';
   }
   function openSetup() {
     if (state.busy) return;
@@ -665,7 +703,7 @@
   function draftDestination() {
     const old = state.product.destination; state.offers[old] = { price: $('price').value, url: $('productLink').value };
     const next = $('destination').value; const offer = state.offers[next] || { price: '', url: '' }; state.product.destination = next; $('price').value = offer.price; $('productLink').value = offer.url;
-    $('itemHint').textContent = `${shops[next]} keeps its own price and link. Choose a matching listing; other shops may carry different work.`;
+    $('itemHint').textContent = `${shopLabel(next)} keeps its own price and link. Choose a matching listing; other shops may carry different work.`;
   }
   const TODAY_SAMPLE_ORIGINALS = [
     { id: 'sample-orig-ek-onkar', title: 'Ek Onkar — Original artwork', image_data_url: '/samples/ek_onkar_original.jpg', source_url: 'https://www.artofsarabjitsingh.com/guru-nanak-dev-ekonkar.html', source_label: 'Art of Sarabjit Singh · Original artwork', width: 900, height: 900, is_low_res: false, provenance: 'sample_original' },
@@ -920,7 +958,7 @@
       await window.museAccount.saveWorkspace(nextDoc, mode.ownerId);
       if (!guard.isCurrent()) return false;
       state.shopWebsiteUrl = clean;
-      if ($('savedShopWebsiteNote')) $('savedShopWebsiteNote').textContent = `Saved studio website: ${clean}`;
+      if ($('savedShopWebsiteNote')) $('savedShopWebsiteNote').textContent = `Saved website: ${clean}`;
       if ($('quickShopUrl') && !$('quickShopUrl').value) $('quickShopUrl').value = clean;
       notice(`Saved ${clean} as your shop website in My workspace.`);
       return true;
@@ -955,7 +993,7 @@
   function placeholderDraft(shopName = '') {
     if (state.original || state.image || Object.keys(state.edits || {}).length) return false;
     const title = state.product?.title || '';
-    return title === neutralProduct(shopName).title || title === neutralProduct().title;
+    return Boolean(state.product?.placeholder) || legacyPlaceholder(title) || title === neutralProduct(shopName).title || title === neutralProduct().title;
   }
   async function autoImportSavedShop(owner, shopName = '', workspace = null) {
     const modes = window.museModes;
@@ -963,6 +1001,12 @@
     const url = safeURL(state.shopWebsiteUrl);
     // Nothing to bring in, or the seller is already working on something here: do not ask again.
     if (!url || !placeholderDraft(shopName)) { modes.finishAutoImport?.(owner, 'today'); return; }
+    // The scan looks for product listings; a services website has none to find.
+    if (offersServices()) {
+      modes.finishAutoImport?.(owner, 'today');
+      if ($('importStatus')) $('importStatus').textContent = 'Name a service or offer below, or paste a link to one of your pages.';
+      return;
+    }
     // Busy or offline: try again on the next visit.
     if (state.busy || isOfflineNow()) return;
     const epoch = draftEpoch;
@@ -1237,6 +1281,7 @@
   }
 
   function starterPlanForToday(product = state.product) {
+    if (!isEffectiveSample()) return ownStarterPlan(product);
     const title = product.title || 'your piece';
     const shop = product.seller || 'your studio';
     const ch = state.channel || 'instagram';
@@ -1253,15 +1298,55 @@
     };
   }
 
+  // A seller's own starter posts: no art wording, and no made-up item name while nothing is chosen.
+  function ownStarterPlan(product = state.product) {
+    const ch = state.channel || 'instagram';
+    const named = !product.placeholder && !legacyPlaceholder(product.title || '');
+    const title = named ? product.title : '';
+    const shop = product.seller || 'my business';
+    const url = safeURL(product.destination_url);
+    if (offersServices()) {
+      const linkLine = url ? `Learn more or get in touch at ${url}.` : 'Message me to ask how this could work for you.';
+      const lead = named ? `${title}${product.description ? `: ${product.description}` : '.'}` : `A quick note on what ${shop} does and who it is for.`;
+      return {
+        mode: 'starter',
+        insight: { next_action: `Share one post on ${names[ch] || ch}, then note replies, messages or calls booked.` },
+        sources: [],
+        posts: [
+          { day_offset: 0, channel: ch, format: 'image', hook: named ? `Who ${title} is for` : `What ${shop} helps with`, caption: `${lead} ${linkLine}`.trim(), visual_direction: 'Use a clear photo of you, your team or an example of the work. A simple card with your headline works too.', posting_tip: 'Say who it is for in the first line.' },
+          { day_offset: 2, channel: ch, format: 'image', hook: 'A recent project, in plain words', caption: 'How a recent project went: what the client needed, what changed, and what made the difference.', visual_direction: 'Show the work itself, such as a screen, a page or a before and after, with client details removed.', posting_tip: 'Ask the client first. Use only results you can show.' },
+          { day_offset: 5, channel: ch, format: 'video', hook: named ? `How ${title} works` : `How working with ${shop} goes`, caption: `A short look at how working together goes, from the first conversation to the finished work. ${linkLine}`, visual_direction: 'A 6-second clip of your photo with the hook on screen.', posting_tip: 'Use short vertical framing.' },
+        ],
+      };
+    }
+    const linkLine = url ? `See details at ${url}.` : 'Save this post or reply to ask about it.';
+    const thing = named ? title : `what ${shop} makes`;
+    return {
+      mode: 'starter',
+      insight: { next_action: `Share one post on ${names[ch] || ch}, then note visits or replies.` },
+      sources: [],
+      posts: [
+        { day_offset: 0, channel: ch, format: 'image', hook: named ? `Closer look at ${title}` : `New from ${shop}`, caption: `${named ? `Sharing ${title} from ${shop}.` : `Something new from ${shop}.`} ${product.description || ''} ${linkLine}`.replace(/\s+/g, ' ').trim(), visual_direction: 'Lead with your clearest photo of the item, then add one close-up detail.', posting_tip: 'Lead with the item itself.' },
+        { day_offset: 2, channel: ch, format: 'image', hook: named ? `Behind ${title}` : `Behind the scenes at ${shop}`, caption: `People like knowing what goes into ${thing}. Tell them what inspired it and who it is for.`, visual_direction: 'Show materials, a detail, or where the work happens.', posting_tip: 'Add one short story.' },
+        { day_offset: 5, channel: ch, format: 'video', hook: named ? `A quiet look · ${title}` : `A quiet look · ${shop}`, caption: `A calm look at ${thing}. ${linkLine}`, visual_direction: 'Slow 6-second crop reveal from a detail to the whole item.', posting_tip: 'Use short vertical framing.' },
+      ],
+    };
+  }
+
   function resetToNeutralToday(shopName = '', shopUrl = '') {
+    const services = offersServices();
     state.product = neutralProduct(shopName, shopUrl);
     state.original = '';
     state.image = '';
     state.imageMode = 'original';
     state.source = shopName ? `My workspace · ${shopName}` : 'Suggested from my workspace';
-    state.why_this = shopName
-      ? `Start with one piece from ${shopName} or import items from your shop website above.`
-      : 'Add your shop website above, choose an item, or enter details manually.';
+    state.why_this = services
+      ? 'Name one service or offer with “Enter details manually”, or start with the posts below.'
+      : shopName
+        ? `Start with one item from ${shopName}, or bring in items from your website above.`
+        : 'Add your website above, choose an item, or enter details manually.';
+    // People who sell a service usually want a conversation, not a shop visit.
+    if (services && state.goal === 'visits') state.goal = 'inquiries';
     state.offers = {};
     state.plans = { [state.channel]: starterPlanForToday(state.product) };
     state.edits = {};
@@ -1307,6 +1392,7 @@
     const requestedIdea = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('idea') : null;
     const ideaSpec = requestedIdea ? findPreviewSpec(requestedIdea) : null;
 
+    ownBusinessType = null;
     if (s.isSample) {
       // Signed in but setup not finished: say this is demo data and point to the wizard.
       if (s.state === 'account_sample') window.museModes?.checkSetupPending?.(s.ownerId);
@@ -1369,16 +1455,17 @@
         const onb = ws?.document?.onboarding || {};
         const shopUrls = Array.isArray(onb.shop_urls) ? onb.shop_urls.filter(Boolean) : [];
         const shopName = String(onb.business_name || '').trim();
+        ownBusinessType = ['products', 'services', 'both'].includes(onb.business_type) ? onb.business_type : null;
         state.shopWebsiteUrl = shopUrls[0] || '';
         savedShop = { name: shopName, workspace: ws };
         if ($('savedShopWebsiteNote')) {
           $('savedShopWebsiteNote').textContent = state.shopWebsiteUrl
-            ? `Saved studio website: ${state.shopWebsiteUrl}`
-            : 'No shop website saved in My workspace yet.';
+            ? `Saved website: ${state.shopWebsiteUrl}`
+            : 'No website saved in My workspace yet.';
         }
         if ($('quickShopUrl') && !$('quickShopUrl').value && state.shopWebsiteUrl) $('quickShopUrl').value = state.shopWebsiteUrl;
         if ($('shopUrl') && !$('shopUrl').value && state.shopWebsiteUrl) $('shopUrl').value = state.shopWebsiteUrl;
-        if (!recovered && (shopName || state.shopWebsiteUrl)) {
+        if (!recovered && (shopName || state.shopWebsiteUrl || ownBusinessType)) {
           applyingDraft = true;
           try {
             resetToNeutralToday(shopName, state.shopWebsiteUrl);

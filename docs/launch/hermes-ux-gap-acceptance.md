@@ -109,6 +109,16 @@ Account B, setup finished with a saved shop website:
 27. Home "Ask Muse what to do next", account B's own workspace: type "How can I get more leads from
     Clutch or Toptal traffic". The answer reads "Focus: Leads" and offers "Compare how a competitor
     wins clients". No runs used.
+28. Needs a preview with pass 13 (preview D or later; preview C at `0f25fff` does not have it; mark
+    UNVERIFIED there). An account whose setup says "Services", on `/today` with nothing picked: the
+    item reads "<business> · choose a service or offer"; the three posts read "What <business>
+    helps with", "A recent project, in plain words" and "How working with <business> goes"; the
+    goal is "Inquiries". No post, caption or "Image ideas" text mentions artwork, brushwork,
+    collectors or a "Featured piece". Muse does not look for product listings on its website.
+29. Same account: the "Your context · <business>" bar at the top of `/today` suggests a services
+    move (for example "Tighten the services page on your website" or "Say what a first project with
+    <business> includes"), not "Refresh titles & descriptions for up to 5 listings", gifts or
+    commissions. The sample shop (`/today?workspace=sample`) still shows Ek Onkar and its posts.
 
 ## Report
 `docs/launch/HERMES_UX_GAP_NOV18.md` on your own branch: preview URL and SHA, browser and

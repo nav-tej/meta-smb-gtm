@@ -36,6 +36,7 @@
     authenticated: false,
     version: 0,
     businessName: '',
+    businessType: null,
     preferences: {},
     voiceProfile: {},
     memoryEntries: [],
@@ -218,6 +219,7 @@
     state.interpretSeq += 1;
     state.version = 0;
     state.businessName = '';
+    state.businessType = null;
     state.preferences = {};
     state.voiceProfile = {};
     state.memoryEntries = [];
@@ -382,6 +384,7 @@
       if (expectedSample) {
         const sample = loadGuestSampleState();
         state.businessName = sample.businessName;
+        state.businessType = null;
         state.preferences = sample.preferences;
         state.memoryEntries = sample.memoryEntries;
         state.competitorEntries = sample.competitorEntries;
@@ -401,6 +404,7 @@
       state.authenticated = Boolean(res.data.authenticated);
       state.version = Number(res.data.version || 0);
       state.businessName = res.data.business_name || '';
+      state.businessType = ['products', 'services', 'both'].includes(res.data.business_type) ? res.data.business_type : null;
       state.preferences = res.data.preferences || {};
       state.voiceProfile = res.data.voice_profile || {};
       state.memoryEntries = stripSampleContamination(res.data.memory_entries || []);
@@ -721,6 +725,7 @@
       headers: expectedOwner ? { 'X-Muse-Owner': expectedOwner } : {},
       body: JSON.stringify({
         business_name: state.businessName || deriveSignedInBusinessName() || 'Your Studio',
+        business_type: state.businessType || null,
         product_name: state.draftOverride?.product_name || null,
         preferences: activePref,
         voice_profile: state.voiceProfile || {},

@@ -35,6 +35,7 @@ from src.services.accounts import (
 from src.services.competitor_intel import collect_entries
 from src.services.seller_memory import (
     DEMO_VOICE_FIXTURES,
+    BusinessType,
     compute_rescan_diff,
     extract_scan_proposals,
     forget_memory_entry,
@@ -81,6 +82,8 @@ class SaveSellerMemoryRequest(BaseModel):
 
 class RecommendRequest(BaseModel):
     business_name: str = Field(default="Your Studio", max_length=160)
+    # From setup; None keeps the original moves (the sample artist and older clients).
+    business_type: BusinessType | None = None
     product_name: str | None = Field(default=None, max_length=180)
     preferences: SellerPreferences | None = None
     voice_profile: VoiceProfile | None = None
@@ -88,6 +91,18 @@ class RecommendRequest(BaseModel):
     draft_override: dict[str, Any] | None = None
     dismiss_signals: list[DismissSignal] = Field(default_factory=list)
     previous_top_id: str | None = Field(default=None, max_length=120)
+
+
+_BUSINESS_TYPES: dict[str, BusinessType] = {
+    "products": "products",
+    "services": "services",
+    "both": "both",
+}
+
+
+def _business_type(onboarding: object) -> BusinessType | None:
+    value = onboarding.get("business_type") if isinstance(onboarding, dict) else None
+    return _BUSINESS_TYPES.get(value) if isinstance(value, str) else None
 
 
 class SuggestionRespondRequest(BaseModel):
@@ -228,6 +243,7 @@ async def get_seller_memory(
             "owner_id": None,
             "version": 0,
             "business_name": "",
+            "business_type": None,
             "preferences": SellerPreferences().model_dump(mode="json"),
             "voice_profile": VoiceProfile().model_dump(mode="json"),
             "memory_entries": [],
@@ -241,6 +257,7 @@ async def get_seller_memory(
     doc = ws.get("document") or {}
     onb = doc.get("onboarding") if isinstance(doc, dict) else None
     biz_name = str(onb.get("business_name") or "") if isinstance(onb, dict) else ""
+    biz_type = _business_type(onb)
 
     suggestions = suggest_memory_updates(
         preferences=pref, voice_profile=voice, dismiss_signals=signals
@@ -252,6 +269,7 @@ async def get_seller_memory(
         "owner_id": account.user_id,
         "version": int(ws.get("version") or 0),
         "business_name": biz_name,
+        "business_type": biz_type,
         "preferences": pref.model_dump(mode="json"),
         "voice_profile": voice.model_dump(mode="json"),
         "memory_entries": [e.model_dump(mode="json") for e in pref.memory_entries],
@@ -733,6 +751,7 @@ async def recommend_for_context(
     comps = body.competitor_entries
     signals = list(body.dismiss_signals)
     biz_name = body.business_name
+    biz_type = body.business_type
 
     if pref is None or comps is None:
         account = await resolve_account(request, response, require_verified=False)
@@ -757,6 +776,7 @@ async def recommend_for_context(
     return {
         **rank_seller_recommendations(
             business_name=biz_name,
+            business_type=biz_type,
             product_name=body.product_name,
             preferences=pref,
             voice_profile=voice,

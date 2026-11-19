@@ -45,6 +45,8 @@ class ContentPlanRequest(BaseModel):
         default_factory=lambda: ["instagram", "facebook"], min_length=1, max_length=4
     )
     goal: Literal["visits", "inquiries", "sales"] = "visits"
+    # From the seller's setup. None is the sample artist and older drafts.
+    business_type: Literal["products", "services", "both"] | None = None
     sales_goal: int | None = Field(default=None, ge=1, le=1_000_000)
     performance: EnteredPerformance | None = None
     use_muse: bool = False
