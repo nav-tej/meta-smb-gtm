@@ -7,7 +7,6 @@ import shutil
 import socket
 import subprocess
 import sys
-import textwrap
 import threading
 import time
 from typing import Any
@@ -287,7 +286,9 @@ def test_own_workspace_diagnostics_honest_ads_and_business_type_e2e(
 
     base_url, _ = own_services_research_server
 
-    script = textwrap.dedent(
+    from tests.e2e_helpers import with_cpu_throttle
+
+    script = with_cpu_throttle(
         f"""
         import json
         from playwright.sync_api import sync_playwright
@@ -416,8 +417,10 @@ def test_own_workspace_diagnostics_honest_ads_and_business_type_e2e(
                 )
                 pn.goto(f"{{BASE}}/", wait_until="domcontentloaded")
                 pn.wait_for_function(
-                    "() => (document.querySelector('#metaAdsContainer')?.textContent || '')"
-                    ".includes('Not counted yet')"
+                    "() => document.documentElement.dataset.museMode === 'account_own' && "
+                    "(document.querySelector('#metaAdsContainer')?.textContent || '')"
+                    ".includes('Not counted yet')",
+                    timeout=30000,
                 )
                 no_token_txt = pn.locator("#metaAdsContainer").inner_text()
                 for word in ("token", "configured", "API", "server"):
@@ -451,6 +454,6 @@ def test_own_workspace_diagnostics_honest_ads_and_business_type_e2e(
         capture_output=True,
         text=True,
         check=False,
-        timeout=90,
+        timeout=150,
     )
     assert proc.returncode == 0, f"STDOUT:\n{proc.stdout}\nSTDERR:\n{proc.stderr}"

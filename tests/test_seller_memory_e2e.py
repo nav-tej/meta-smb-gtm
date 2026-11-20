@@ -599,7 +599,9 @@ def test_batch1_corrections_security_merge_drafts_and_handoff_e2e(
         },
     }
 
-    script = textwrap.dedent(
+    from tests.e2e_helpers import with_cpu_throttle
+
+    script = with_cpu_throttle(
         f"""
         import base64
         import json
@@ -1098,11 +1100,11 @@ def test_batch1_corrections_security_merge_drafts_and_handoff_e2e(
             capture_output=True,
             text=True,
             check=False,
-            timeout=60,
+            timeout=150,
         )
     except subprocess.TimeoutExpired as exc:
         pytest.fail(
-            f"Playwright subprocess timed out after 60s.\nSTDOUT:\n{exc.stdout}\n"
+            f"Playwright subprocess timed out after 150s.\nSTDOUT:\n{exc.stdout}\n"
             f"STDERR:\n{exc.stderr}"
         )
     assert res.returncode == 0, f"STDOUT:\n{res.stdout}\nSTDERR:\n{res.stderr}"

@@ -12,7 +12,6 @@ import shutil
 import socket
 import subprocess
 import sys
-import textwrap
 import threading
 import time
 from collections.abc import Iterator
@@ -151,7 +150,9 @@ def test_dashboard_before_setup_is_an_explicit_demo_e2e(live_server_url: str) ->
     if not python_bin:
         pytest.skip("Playwright runtime not installed")
 
-    runner_script = textwrap.dedent(
+    from tests.e2e_helpers import with_cpu_throttle
+
+    runner_script = with_cpu_throttle(
         f"""
         import json
         from playwright.sync_api import sync_playwright
@@ -277,8 +278,15 @@ def test_dashboard_before_setup_is_an_explicit_demo_e2e(live_server_url: str) ->
                 no_overflow(page, "demo dashboard " + str(width))
 
                 # A background account refresh does not throw them out of the demo.
-                page.evaluate("window.museAccount.refresh()")
-                page.wait_for_timeout(600)
+                with page.expect_response(
+                    lambda r: r.url.split("?")[0].endswith("/api/v1/account/me")
+                ):
+                    page.evaluate("window.museAccount.refresh()")
+                page.wait_for_function(
+                    "(document.getElementById('museModeBanner') || {{dataset: {{}}}})"
+                    ".dataset.setup === 'pending'",
+                    timeout=15000,
+                )
                 assert path(page) == "/?workspace=sample", path(page)
                 assert page.evaluate(BANNER)["setup"] == "pending"
 
@@ -310,12 +318,19 @@ def test_dashboard_before_setup_is_an_explicit_demo_e2e(live_server_url: str) ->
 
             #    ...and signing in on the dashboard itself.
             ctx, page, session, errors = open_page(browser, signed_in=False)
-            page.goto(BASE + "/", wait_until="networkidle")
+            page.goto(BASE + "/", wait_until="domcontentloaded")
+            page.wait_for_function(
+                "() => document.documentElement.dataset.museMode === 'guest_entry'",
+                timeout=15000,
+            )
             assert mode(page) == "guest_entry"
             assert page.evaluate(BANNER)["hidden"] is True
             session["signed_in"] = True
-            page.evaluate("window.museAccount.refresh()")
-            page.wait_for_url("**/welcome", wait_until="domcontentloaded")
+            with page.expect_response(
+                lambda r: r.url.split("?")[0].endswith("/api/v1/account/me")
+            ):
+                page.evaluate("window.museAccount.refresh()")
+            page.wait_for_url("**/welcome", wait_until="domcontentloaded", timeout=15000)
             ctx.close()
 
             # 4. Setup finished: the seller's own dashboard, with no demo notice.

@@ -7,7 +7,6 @@ import shutil
 import socket
 import subprocess
 import sys
-import textwrap
 import threading
 import time
 from pathlib import Path
@@ -136,7 +135,9 @@ def test_ad_loop_links_375_and_1440_own_and_sample_e2e(ad_loop_server: str) -> N
     if pw_python is None:
         pytest.skip("Playwright Python runtime unavailable")
 
-    script = textwrap.dedent(
+    from tests.e2e_helpers import with_cpu_throttle
+
+    script = with_cpu_throttle(
         f"""
         import json
         from playwright.sync_api import sync_playwright
@@ -152,7 +153,8 @@ def test_ad_loop_links_375_and_1440_own_and_sample_e2e(ad_loop_server: str) -> N
                 ps = ctx_s.new_page()
                 ps.goto(f"{{BASE}}/?workspace=sample", wait_until="domcontentloaded")
                 ps.wait_for_function(
-                    "() => document.body.classList.contains('ms-staged')"
+                    "() => document.body.classList.contains('ms-staged') && "
+                    "window.museModes?.isSampleMode?.() === true"
                 )
                 assert not ps.evaluate("document.documentElement.scrollWidth > window.innerWidth")
 
@@ -214,6 +216,7 @@ def test_ad_loop_links_375_and_1440_own_and_sample_e2e(ad_loop_server: str) -> N
 
                 po.locator('.jr-loop a[href="#loop-create"]').click()
                 create_ad_link = po.locator("#adGallery a", has_text="Prepare your first ad")
+                create_ad_link.wait_for(state="visible", timeout=15000)
                 assert create_ad_link.is_visible(), "create_ad_link not visible"
                 assert create_ad_link.get_attribute("href") == "/first-ad", (
                     create_ad_link.get_attribute("href")
@@ -222,13 +225,14 @@ def test_ad_loop_links_375_and_1440_own_and_sample_e2e(ad_loop_server: str) -> N
                 assert sw <= iw, f"create width={{width}} overflow: {{sw}} > {{iw}}"
 
                 po.locator('.jr-loop a[href="#loop-improve"]').click()
-                po.wait_for_selector("#loop-improve:not([hidden])")
+                po.wait_for_selector("#improveFirstAdLink:visible", timeout=15000)
                 assert po.locator("#improveFirstAdLink").is_visible(), "improveFirstAdLink hidden"
                 assert po.locator("#improveFirstAdLink").get_attribute("href") == "/first-ad"
                 sw = po.evaluate("document.documentElement.scrollWidth")
                 assert sw <= iw, f"improve width={{width}} overflow: {{sw}} > {{iw}}"
 
                 po.locator('.jr-loop a[href="#loop-iterate"]').click()
+                po.wait_for_selector("#iterateFirstAdLink:visible", timeout=15000)
                 assert po.locator("#iterateFirstAdLink").is_visible(), "iterateFirstAdLink hidden"
                 sw = po.evaluate("document.documentElement.scrollWidth")
                 assert sw <= iw, f"iterate width={{width}} overflow: {{sw}} > {{iw}}"
@@ -264,6 +268,6 @@ def test_ad_loop_links_375_and_1440_own_and_sample_e2e(ad_loop_server: str) -> N
         capture_output=True,
         text=True,
         check=False,
-        timeout=90,
+        timeout=150,
     )
     assert proc.returncode == 0, f"STDOUT:\n{proc.stdout}\nSTDERR:\n{proc.stderr}"

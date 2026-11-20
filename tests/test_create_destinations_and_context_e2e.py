@@ -7,7 +7,6 @@ import shutil
 import socket
 import subprocess
 import sys
-import textwrap
 import threading
 import time
 from pathlib import Path
@@ -145,7 +144,9 @@ def test_create_destinations_muse_context_and_legacy_draft_e2e(
 
     photo = str(REPO_ROOT / "tests/fixtures/product_photo.png")
 
-    script = textwrap.dedent(
+    from tests.e2e_helpers import with_cpu_throttle
+
+    script = with_cpu_throttle(
         f"""
         import json
         from playwright.sync_api import sync_playwright
@@ -425,6 +426,6 @@ def test_create_destinations_muse_context_and_legacy_draft_e2e(
         capture_output=True,
         text=True,
         check=False,
-        timeout=120,
+        timeout=150,
     )
     assert proc.returncode == 0, f"STDOUT:\n{proc.stdout}\nSTDERR:\n{proc.stderr}"
