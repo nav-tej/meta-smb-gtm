@@ -572,7 +572,8 @@
   const readActions = () => { try { const v = JSON.parse(store.get(ownerKey(ACTIONS_KEY)) || '{}'); return v && typeof v === 'object' ? v : {}; } catch { return {}; } };
   const writeActions = (v) => store.set(ownerKey(ACTIONS_KEY), JSON.stringify(v));
   const actionId = (text) => { let h = 0; for (const ch of text) h = (h * 31 + ch.charCodeAt(0)) | 0; return `a${(h >>> 0).toString(36)}`; };
-  const TRIAGE_SELECTORS = ['.jr-recos > li', '#insightsContainer > .finding-item', '.try-next li', '#msBrief .ms-move', '.ms-digest-recos > li'];
+  // The brief's focus card takes triage only while it holds a real idea (data-idea), never a setup prompt.
+  const TRIAGE_SELECTORS = ['.jr-recos > li', '#insightsContainer > .finding-item', '.try-next li', '#msBrief .ms-move[data-idea]', '.ms-digest-recos > li'];
 
   async function syncSignalsToServer() {
     try {
@@ -1005,8 +1006,11 @@
     const head = el('div', { class: 'ms-brief-head' });
     const titleBox = el('div');
     titleBox.appendChild(el('p', { class: 'ms-eyebrow' }, `Your daily growth brief · ${today}`));
-    titleBox.appendChild(el('h2', { id: 'msBriefTitle' }, 'What changed at the shops you watch'));
-    titleBox.appendChild(el('p', { class: 'ms-brief-plan' }, 'Built once a day from your watchlist, the competitor monitor and campaign trends. No Muse credit is used to read it.'));
+    const SAMPLE_TITLE = 'What changed at the shops you watch';
+    const SAMPLE_PLAN = 'Built once a day from your watchlist, the competitor monitor and campaign trends. No Muse credit is used to read it.';
+    const titleEl = el('h2', { id: 'msBriefTitle' }, SAMPLE_TITLE);
+    const planEl = el('p', { class: 'ms-brief-plan' }, SAMPLE_PLAN);
+    titleBox.append(titleEl, planEl);
     const meta = el('p', { class: 'ms-brief-meta' });
     meta.appendChild(el('span', { class: 'ms-dot', 'aria-hidden': 'true' }));
     meta.appendChild(document.createTextNode('Checking your workspace…'));
@@ -1043,7 +1047,50 @@
     const moveReason = el('span', { class: 'ms-note' }, '');
     moveText.append(moveChip, moveTitle, moveReason);
     const go = el('a', { class: 'ms-primary ms-small', href: '/create' }, 'Make a post →');
-    move.append(moveText, go);
+    const goAlt = el('a', { class: 'ms-link ms-small ms-move-alt', href: '/today?workspace=sample', hidden: '' }, '');
+    const moveLinks = el('div', { class: 'ms-move-links' });
+    moveLinks.append(go, goAlt);
+    move.append(moveText, moveLinks);
+    // In the empty states the links act on this page: open the sample brief, or jump to the post editor.
+    const linkTo = (a, action, text) => {
+      a.dataset.action = action;
+      a.setAttribute('href', action === 'sample' ? '/today?workspace=sample' : action === 'editor' ? '#todayWebsiteBar' : action);
+      a.textContent = text;
+    };
+    const onMoveLink = (event) => {
+      const action = event.currentTarget.dataset.action;
+      if (action === 'sample' && window.museModes?.enterSampleMode) {
+        event.preventDefault();
+        window.museModes.enterSampleMode({ sample: 'sarabjit_singh' });
+      } else if (action === 'editor') {
+        const target = document.getElementById('todayWebsiteBar') || document.querySelector('.desk');
+        if (!target) return;
+        event.preventDefault();
+        const still = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+        target.scrollIntoView({ behavior: still ? 'auto' : 'smooth', block: 'start' });
+        document.getElementById('quickShopUrl')?.focus({ preventScroll: true });
+      }
+    };
+    go.addEventListener('click', onMoveLink);
+    goAlt.addEventListener('click', onMoveLink);
+    // Accept, Dismiss, Archive and Adjust belong on a real idea only, never on a setup prompt or a
+    // loading line. Each new idea gets its own key, so a choice on one idea never sticks to another.
+    const setMoveIdea = (isIdea) => {
+      move.querySelectorAll('.ms-triage, .ms-adjust, .ms-dismiss-reasons, .ms-adjust-note').forEach((node) => node.remove());
+      delete move.dataset.actionId;
+      move.classList.remove('ms-accepted');
+      move.hidden = false;
+      if (body.nextElementSibling?.classList?.contains('ms-restore')) body.nextElementSibling.remove();
+      if (isIdea) { move.dataset.idea = '1'; addTriage(move); } else delete move.dataset.idea;
+    };
+    // Header, columns and re-check describe a real brief; the empty states show only what applies.
+    const showBriefFrame = (title, plan, full) => {
+      titleEl.textContent = title;
+      planEl.textContent = plan;
+      planEl.hidden = !plan;
+      columns.hidden = !full;
+      recheck.hidden = !full;
+    };
     const safeHref = (href, asSample = false) => {
       if (typeof href !== 'string' || !/^\/(?!\/)/.test(href)) return asSample ? '/create?workspace=sample' : '/create';
       if (asSample && href.startsWith('/create') && !href.includes('workspace=sample')) {
@@ -1072,8 +1119,8 @@
         moveTitle.textContent = String(focus.title);
         moveReason.textContent = String(focus.reason || '');
         const href = safeHref(focus.href, true);
-        go.setAttribute('href', href);
-        go.textContent = goLabel(href);
+        linkTo(go, href, goLabel(href));
+        setMoveIdea(true);
       }
       const actions = Array.isArray(brief.action_items) ? brief.action_items.slice(0, 3) : [];
       card(actionsBox, 'Top 3 actions', actions.map((item, index) => {
@@ -1151,7 +1198,10 @@
       };
       retry.hidden = true;
       weekly.textContent = '';
+      goAlt.hidden = true;
       if (s.isLoading) {
+        showBriefFrame('Today’s brief', '', false);
+        setMoveIdea(false);
         list.replaceChildren();
         card(actionsBox, 'Top 3 actions', [], 'Checking your account…');
         card(overnightBox, 'Overnight changes', [], 'Checking your account…');
@@ -1160,14 +1210,15 @@
         moveChip.textContent = 'Checking account';
         moveTitle.textContent = 'Loading your workspace brief…';
         moveReason.textContent = 'Verifying your account before showing workspace or sample data.';
-        go.setAttribute('href', '/create');
-        go.textContent = 'Open studio →';
+        linkTo(go, '/create', 'Open studio →');
         sourceNote.textContent = '';
         recheck.disabled = true;
         setLoading(true, 'Checking your account…');
         return;
       }
       if (s.isError || s.isExpired) {
+        showBriefFrame('Today’s brief', '', false);
+        setMoveIdea(false);
         list.replaceChildren();
         card(actionsBox, 'Top 3 actions', [], 'Sign in or retry account check first.');
         card(overnightBox, 'Overnight changes', [], 'Unavailable until account check completes.');
@@ -1176,45 +1227,51 @@
         moveChip.textContent = s.isExpired ? 'Session expired' : 'Account check needed';
         moveTitle.textContent = s.isExpired ? 'Sign in again to view your brief' : 'Could not verify your account right now';
         moveReason.textContent = s.authError || 'Sample data stays separate. Retry or sign in above.';
-        go.setAttribute('href', '/create');
-        go.textContent = 'Open studio →';
+        linkTo(go, '/create', 'Open studio →');
         sourceNote.textContent = 'Sample brief stays separate when your account status is uncertain.';
         recheck.disabled = true;
         setLoading(false, '');
         return;
       }
       if (s.isSample) {
+        showBriefFrame(SAMPLE_TITLE, SAMPLE_PLAN, true);
         renderItems(WATCH);
         meta.lastChild.textContent = 'Sample watchlist: 4 competitors · 6 shop pages · last checked Nov 3';
         moveChip.textContent = 'Sample focus · high impact';
         moveTitle.textContent = 'Feature your Empowering Women series';
         moveReason.textContent = 'SikhiArt keeps adding warrior and guru editions but has no group for women’s stories.';
-        go.setAttribute('href', '/create?workspace=sample&idea=idea-1-empowering-women');
-        go.textContent = 'Make this post →';
+        linkTo(go, '/create?workspace=sample&idea=idea-1-empowering-women', 'Make this post →');
+        setMoveIdea(true);
         sourceNote.textContent = 'From saved public snapshots captured Nov 3. Muse checks again when you run a re-check; it does not watch continuously.';
         recheck.disabled = false;
         loadBrief(false);
         loadWeekly();
         return;
       }
+      // Own workspace or signed out. /today builds a brief for the sample shop only, so say so plainly
+      // and point at what works today: the post editor below and the sample brief.
       list.replaceChildren();
-      meta.lastChild.textContent = s.isAuthenticated
-        ? 'My workspace · no competitor checks yet'
-        : 'Set up your own shop or explore the sample shop';
-      moveChip.textContent = s.isAuthenticated ? 'My workspace' : 'Get started';
-      moveTitle.textContent = s.isAuthenticated
-        ? 'Draft your next post from your own shop website'
-        : 'Add your shop website or explore the sample artist brief';
-      moveReason.textContent = s.isAuthenticated
-        ? 'Your brief fills in once Muse has checked the competitors you track. Pick or change them in setup, or start a post from your shop website below.'
-        : 'Your workspace starts empty. Paste your own URL below or open the sample shop separately.';
-      go.setAttribute('href', '/create');
-      go.textContent = 'Create a post →';
-      card(actionsBox, 'Top 3 actions', [], 'Add your storefront & competitors to generate your first personal actions.');
-      card(overnightBox, 'Overnight changes', [], 'No personal competitor changes monitored yet.');
-      card(trendsBox, 'Performance trends', [], 'Log campaign results on Progress to track trends.');
-      sourceNote.textContent = 'Your brief shows only your own workspace data. The sample shop example stays separate.';
-      recheck.disabled = !s.isAuthenticated;
+      setMoveIdea(false);
+      if (s.isAuthenticated) {
+        showBriefFrame('Your shop’s brief is not built yet', 'Today you can make a post from your own website below. The sample shop shows what a full brief looks like.', false);
+        meta.lastChild.textContent = 'My workspace';
+        moveChip.textContent = 'Today';
+        moveTitle.textContent = 'Start today’s post from your website';
+        moveReason.textContent = 'Pick an item or service from your site and Muse drafts the words. Nothing is posted until you post it yourself.';
+        linkTo(go, 'editor', 'Start today’s post ↓');
+        linkTo(goAlt, 'sample', 'See a sample brief');
+      } else {
+        showBriefFrame('See what a daily brief looks like', 'The sample shop’s brief shows what changed at the four shops it watches and three things to do today. Reading a brief never uses a Muse credit.', false);
+        meta.lastChild.textContent = 'Not signed in · your own workspace starts empty';
+        moveChip.textContent = 'Get started';
+        moveTitle.textContent = 'Open the sample brief';
+        moveReason.textContent = 'It is built from saved public snapshots and stays separate from anything you make.';
+        linkTo(go, 'sample', 'Open the sample brief →');
+        linkTo(goAlt, 'editor', 'Or start my own post ↓');
+      }
+      goAlt.hidden = false;
+      sourceNote.textContent = '';
+      recheck.disabled = true;
       setLoading(false, '');
     };
     retry.addEventListener('click', () => { loadBrief(false); loadWeekly(); });

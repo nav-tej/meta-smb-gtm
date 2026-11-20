@@ -2496,7 +2496,7 @@
       badges.appendChild(el('span', { class: 'sm-badge sm-badge-preference' }, `Selected move: ${selectedRec.title}`));
     }
     if (def.minutes_per_week) {
-      badges.appendChild(el('span', { class: 'sm-badge sm-badge-preference' }, `<= ${def.minutes_per_week} min/wk`));
+      badges.appendChild(el('span', { class: 'sm-badge sm-badge-preference' }, `Up to ${def.minutes_per_week} minutes a week`));
     }
     if (def.price_claim) {
       badges.appendChild(el('span', { class: 'sm-badge sm-badge-observation' }, `Observed price: ${def.price_claim}`));

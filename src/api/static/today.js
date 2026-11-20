@@ -132,14 +132,27 @@
     swap(find('label[for="sellerName"]'), services ? 'Your name / business' : 'Your name / shop');
     swap(find('#goal option[value="visits"]'), services ? 'Website visits' : 'Shop visits');
     swap($('quickFindItems'), services ? 'Find items on my site' : 'Find products');
-    swap($('saveWebsiteOnlyBtn'), 'Save website to my workspace');
+    swap($('saveWebsiteOnlyBtn'), 'Save website only');
     swap($('productName'), services ? 'Name the service or offer' : 'Name the item you are sharing', 'placeholder');
   }
   const deviceKey = () => `muse-editor-v1:${draftNamespace}:${isEffectiveSample() ? 'sample' : (draftOwner ? 'account:' + encodeURIComponent(draftOwner) : 'guest')}`;
   function persistDraft() {
     if (!draftReady || applyingDraft) return;
-    try { localStorage.setItem(deviceKey(), JSON.stringify(editorDocument())); draftStatus('Saved on this device. Account saving is manual.'); return true; }
-    catch { draftStatus('Device storage failed or is full. Download a draft backup now, or save to your account before closing.'); return false; }
+    try { localStorage.setItem(deviceKey(), JSON.stringify(editorDocument())); draftStatus(`Saved on this device.${!isEffectiveSample() && draftOwner ? ' Save to account to open it on another device.' : ''}`); return true; }
+    catch { draftStatus('Device storage failed or is full. Download a backup now, or save to your account before closing.'); return false; }
+  }
+  // Once the editor knows its workspace, say where the draft lives instead of leaving a loading line,
+  // offer account saving only where it applies, and offer recovery only when there is something to recover.
+  function settleDraftStatus() {
+    const sample = isEffectiveSample();
+    draftStatus(sample
+      ? 'Sample shop drafts stay on this device and never mix with your own.'
+      : draftOwner
+        ? 'Your draft is kept on this device as you edit. Save to account to open it on another device.'
+        : 'Your draft is kept on this device as you edit. Sign in to save it to an account.');
+    $('saveAccountDraft').hidden = sample;
+    $('loadAccountDraft').hidden = sample;
+    try { $('recoverDraft').hidden = !(recoveryDraft || localStorage.getItem(deviceKey() + ':before-load')); } catch { /* leave the button as it is */ }
   }
   function installDocument(data) {
     const previous = cloneDraft(editorDocument());
@@ -151,6 +164,7 @@
   function recoverDevice() {
     try {
       const requestedIdea = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('idea') : null;
+      settleDraftStatus();
       if (isEffectiveSample() && requestedIdea && findPreviewSpec(requestedIdea)) return false;
       const raw = localStorage.getItem(deviceKey()) || (!isEffectiveSample() && !draftOwner ? localStorage.getItem(storageKey) : null);
       if (raw) { installDocument(JSON.parse(raw)); draftStatus('Recovered this device’s draft. Review before sharing.'); return true; }

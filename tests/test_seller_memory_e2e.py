@@ -444,7 +444,7 @@ def test_seller_memory_full_mobile_multi_browser_workflow(
             page.wait_for_selector("#smStudioContextBar")
             assert_no_overflow(page, "/today")
             today_bar = page.text_content("#smStudioContextBar") or ""
-            assert "Wild Meadow" in today_bar or "15 min/wk" in today_bar
+            assert "Wild Meadow" in today_bar or "15 minutes a week" in today_bar
             assert "sarabjit" not in today_bar.lower()
 
             # Also verify /create renders context bar with zero overflow & zero Sarabjit leak
@@ -452,7 +452,7 @@ def test_seller_memory_full_mobile_multi_browser_workflow(
             page.wait_for_selector("#smStudioContextBar")
             assert_no_overflow(page, "/create")
             create_bar = page.text_content("#smStudioContextBar") or ""
-            assert "Wild Meadow" in create_bar or "15 min/wk" in create_bar
+            assert "Wild Meadow" in create_bar or "15 minutes a week" in create_bar
             assert "sarabjit" not in create_bar.lower()
 
             assert not errors, f"Uncaught page errors: {{errors}}"

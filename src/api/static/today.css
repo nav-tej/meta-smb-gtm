@@ -214,6 +214,11 @@ canvas {
   font-size: 14px;
 }
 
+/* Reposition and crop do nothing until there is a photo. */
+.visual:has(#noPhoto:not([hidden])) #todayFrameControls {
+  display: none;
+}
+
 .notice-action-btn {
   margin-left: 10px;
   padding: 6px 12px;
@@ -515,6 +520,32 @@ input:focus, textarea:focus, select:focus {
   margin-top: 14px;
 }
 
+/* Where the draft lives: a quiet row under the post actions, not a toolbar above the page. */
+.draft-storage {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.draft-storage #draftStatus {
+  margin: 0 0 4px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.draft-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+}
+
+.draft-actions .quiet {
+  min-height: 44px;
+  padding: 6px 4px;
+  font-size: 12.5px;
+}
+
 /* 5. Next Three Posts (Section .week) */
 .week {
   margin-top: 40px;
@@ -707,6 +738,17 @@ footer {
 
   .image-wrap {
     max-width: 280px;
+  }
+
+  /* No photo yet: a short prompt instead of an empty 4:5 frame, so the editor starts higher. */
+  .image-wrap:has(#noPhoto:not([hidden])) canvas {
+    display: none;
+  }
+
+  .image-wrap:has(#noPhoto:not([hidden])) #noPhoto {
+    position: static;
+    padding: 22px 16px;
+    border: 1.5px dashed var(--line);
   }
 
   .editor {

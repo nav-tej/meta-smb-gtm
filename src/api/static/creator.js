@@ -1899,8 +1899,17 @@
             : (shopName ? `Product from ${shopName}` : 'My product');
           initNeutralWorkspace(defaultSeller, defaultItem, true);
         } else {
-          updateChoices();
-          refreshPreview();
+          // Re-render for the business type only. This is not an edit, so it must not save the draft:
+          // refreshPreview() persists, and that wiped the status a Save or Load to account had just
+          // written ("A different account draft exists", "No account draft"), since those actions
+          // refresh the account and so re-run this mode change.
+          applyingDraft = true;
+          try {
+            updateChoices();
+            refreshPreview();
+          } finally {
+            applyingDraft = false;
+          }
         }
         savedShop = { name: shopName, workspace: ws };
       } catch {
