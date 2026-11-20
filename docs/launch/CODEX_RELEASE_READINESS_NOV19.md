@@ -12,9 +12,9 @@ Codex authored neither pass 13 nor the /create merge; the checks below are indep
 - Real Chromium: `DEMO_MODE=true META_MODEL_API_KEY= DEMO_KEY= /usr/bin/python3 tests/launch_account_audit.py --output /tmp/muse-preview-d-account` **27 passed, 0 failed**; same environment with `tests/launch_browser_audit.py --output /tmp/muse-preview-d-guest` **20 passed, 0 failed**. Session 31973 completed; evidence directories contain reports/screenshots.
 - `node tests/account_ui_contract.cjs`: ACCOUNT UI CONTRACT PASSED.
 - `node tests/today_studio_contract.cjs`: DAILY STUDIO CONTRACT PASSED.
-- Protected preview D: https://meta-smb-21zg6y020-navtejs-6321s-projects.vercel.app ; [Inspect](https://vercel.com/navtejs-6321s-projects/meta-smb-gtm/BhvS5EjTLR57S85vMAzn7eW7SpEy). Deploy from clean 29904ce succeeded (CLI exit 0; no --prod or env overrides). Plain health GET returns 302 to vercel.com/sso-api; authenticated `vercel curl` returns 200 for health, readiness, /, /create, /first-ad, /today, /digest; /creator returns 307. No auth bypass links created. Deployment session 74704 and GET session 43515 completed.
+- Protected preview D: https://meta-smb-21zg6y020-navtejs-6321s-projects.vercel.app ; [Inspect](https://vercel.com/navtejs-6321s-projects/meta-smb-gtm/BhvS5EjTLR57S85vMAzn7eW7SpEy). Deployment `dpl_BhvS5EjTLR57S85vMAzn7eW7SpEy`, READY, target preview, protection `vercel_authentication`. Deploy from clean 29904ce succeeded (CLI exit 0; no --prod or env overrides). Plain health GET returns 302 to vercel.com/sso-api; authenticated `vercel curl` returns 200 for health, readiness, /, /create, /first-ad, /today, /digest; /creator returns 307. No auth bypass links created. Deployment session 74704 and GET session 43515 completed.
 - Alias: `muse-preview-nav.vercel.app` remains on preview C until Nav confirms Hermes is idle and explicitly approves moving it.
-- Draft PR: pending publication.
+- Draft PR: https://github.com/nav-tej/meta-smb-gtm/pull/4 (`release/nov19` → `main`, draft, not merged).
 
 ## What sellers get
 
