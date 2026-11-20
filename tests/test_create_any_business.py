@@ -39,12 +39,12 @@ def _find_playwright_python() -> str | None:
 
 
 def test_script_versions_and_zero_em_dashes_in_first_ad() -> None:
-    """Verify ?v=20261119-ag2 bumps and zero em-dashes in first-ad customer strings."""
+    """Verify ?v= cache-busting bumps and zero em-dashes in first-ad customer strings."""
     creator_html = (REPO_ROOT / "src/api/static/creator.html").read_text(encoding="utf-8")
     first_ad_html = (REPO_ROOT / "src/api/static/first-ad.html").read_text(encoding="utf-8")
     first_ad_js = (REPO_ROOT / "src/api/static/first-ad.js").read_text(encoding="utf-8")
 
-    assert "creator.js?v=20261119-ag2" in creator_html
+    assert "creator.js?v=20261119-ag3" in creator_html
     assert "first-ad.js?v=20261119-ag2" in first_ad_html
     assert "—" not in first_ad_html
     assert "—" not in first_ad_js
