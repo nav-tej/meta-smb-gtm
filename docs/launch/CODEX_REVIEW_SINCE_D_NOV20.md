@@ -68,4 +68,40 @@ Verified from source inspection (`src/config.py`, `src/api/main.py`, `src/api/ad
 
 ---
 
-*(Section 4: full gate and both launch audits in progress...)*
+---
+
+## Priority 4: Full Offline Gate and Both Launch Audits (COMPLETE)
+
+### Full Offline Gate
+Command:
+```bash
+DEMO_MODE=true META_MODEL_API_KEY= DEMO_KEY= make PY=/Users/nav/meta-smb-gtm/.venv/bin check
+```
+- **Run 1 (initial gate, under high host load `6.47 8.12 7.05`):**
+  - `ruff check .`: All checks passed!
+  - `ruff format --check .`: `290 files already formatted`
+  - `pytest`: **679 passed, 2 skipped, 1 failed, 1 warning in 242.85s (0:04:02)** — 30s Playwright timeout in `tests/test_competitor_research_any_business.py::test_own_workspace_diagnostics_honest_ads_and_business_type_e2e` (waiting for `'Not counted yet'` in `#metaAdsContainer`).
+- **Isolated rerun of timed-out test (`uptime`: load averages `6.47 8.12 7.05`):**
+  - `pytest tests/test_competitor_research_any_business.py::test_own_workspace_diagnostics_honest_ads_and_business_type_e2e -q`: **1 passed in 6.21s**.
+  - **Low-severity test note (non-blocker, Owner: Antigravity):** `test_own_workspace_diagnostics_honest_ads_and_business_type_e2e` can occasionally hit its 30s `wait_for_function` timeout under heavy parallel host load; worth hardening the wait/setup in a follow-up.
+- **Run 2 (full gate rerun):**
+  - `ruff check .`: All checks passed!
+  - `ruff format --check .`: `290 files already formatted`
+  - `pytest`: **680 passed, 2 skipped, 1 warning in 202.80s (0:03:22)** (677 baseline + 3 new tests in `tests/test_codex_review_flag_off.py`).
+
+### Launch Audits
+- **Account audit (`DEMO_MODE=true META_MODEL_API_KEY= DEMO_KEY= /usr/bin/python3 tests/launch_account_audit.py`):** **27 passed, 0 failed**.
+- **Browser/guest audit (`DEMO_MODE=true META_MODEL_API_KEY= DEMO_KEY= /usr/bin/python3 tests/launch_browser_audit.py`):** **20 passed, 0 failed**.
+
+---
+
+## What Could Not Be Verified
+- Live Vercel build/deployment, live Vercel environment variables (`META_APP_ID` / `META_APP_SECRET` were simulated offline; `.env` and Vercel env were never read), and live serverless `/tmp` behavior on Vercel.
+- Live Supabase Postgres execution of `supabase/migrations/ad_account_connections.sql` (migration is not applied; reviewed statically only).
+- Live calls to Meta OAuth / Graph API, Meta Ad Library API, Muse Spark / Muse Image, Stripe, or Resend (zero live network or paid calls made).
+- Parallel in-flight branches (`gemini/meta-connect-followups-nov20`, `gemini/today-destinations-nov20`, Claude pass 15) — intentionally excluded per scope.
+
+## Preview E Go / No-Go
+**GO for cutting preview E** from `29904ce..f77e147` (with `AD_CONNECT_ENABLED` kept off and once the parallel branches land): zero preview E blockers found across flag-off production safety, Vercel runtime, feature/security review, full offline gate (`680 passed, 2 skipped`), account audit (`27/27`), and guest audit (`20/20`).
+
+Ownership released.
