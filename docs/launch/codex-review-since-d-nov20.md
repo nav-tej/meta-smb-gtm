@@ -6,9 +6,9 @@ preview E, this needs a second pair of eyes that did not write or merge it. Your
 again, so work in the priority order below and push your report after each section.
 
 ## Base and branch
-Review `29904ce..f77e147` on `origin/claude/ux-gap-ad-loop-nov17` (`git fetch origin`; if the tip
+Review `29904ce..2f0903d` on `origin/claude/ux-gap-ad-loop-nov17` (`git fetch origin`; if the tip
 has moved, still review only this range and note the new tip). The range was widened on Nov 20
-before you started, to include today's merges. New isolated worktree, new branch
+before you started, to include today's merges (and again for Argon's follow-ups). New isolated worktree, new branch
 `codex/review-since-d-nov20`. Preview D (`meta-smb-21zg6y020`, alias `muse-preview-nav.vercel.app`)
 and production (`main` `326cc22`) are unchanged.
 
@@ -27,6 +27,8 @@ What landed in that range (41 files, about 6,200 lines):
   Load to account overwrote the account-draft status (4 account-audit cases failed; that merge ran
   only the pytest gate). Review this fix with particular care: it is Claude reviewing Claude.
 - `f77e147` Antigravity's weekly time budget in `rank_seller_recommendations()`
+- `7a3681b` Argon's Meta connect follow-ups (`config_id`, callback errors redirect to `#tab-bids`, plain
+  wording), behind the flag; `2f0903d` Claude's fix so ad account names are not filtered
 
 Running in parallel right now, so do not review or edit their files: Argon on
 `gemini/meta-connect-followups-nov20` (callback errors, `config_id`, `#metaConnectBar` wording),
@@ -67,9 +69,9 @@ Any gap here is a blocker for preview E. Say so first in the report.
   no developer words (token, API, server, configured, endpoint), no invented numbers.
 
 ## Priority 4: the gate
-Full offline gate on `f77e147` with exact counts:
+Full offline gate on `2f0903d` with exact counts:
 `DEMO_MODE=true META_MODEL_API_KEY= DEMO_KEY= make PY=/Users/nav/meta-smb-gtm/.venv/bin check`.
-Claude's run: 677 passed, 2 skipped, 208 s. Also run the audits the gate does not include:
+Claude's run: 677 passed, 2 skipped, 212 s. Also run the audits the gate does not include:
 `DEMO_MODE=true META_MODEL_API_KEY= DEMO_KEY= /usr/bin/python3 tests/launch_account_audit.py` (Claude: 27/27)
 and `.../launch_browser_audit.py` (Claude: 20/20). If a Playwright test times out, check the machine load,
 rerun it alone, then rerun the gate, and report all three results.
