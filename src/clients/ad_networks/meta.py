@@ -1,14 +1,15 @@
-"""Read-only Meta Marketing API (Graph API v21.0) adapter using httpx.
+"""Read-only Meta Marketing API (Graph API) adapter using httpx.
 
 Strictly read-only: lists accessible ad accounts, campaign summaries, and daily ad-set / campaign
-insights with cursor pagination. Contains zero write or mutation methods. Never executes requests
-when `AD_CONNECT_ENABLED` is false.
+insights with cursor pagination, plus OAuth code exchange for read-only (`ads_read`) connections.
+Contains zero write or mutation methods. Never executes requests when `AD_CONNECT_ENABLED` is false.
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import re
 from datetime import date
 from typing import Any, Literal
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
@@ -30,10 +31,58 @@ from src.config import Settings, get_settings
 
 logger = logging.getLogger(__name__)
 
-META_GRAPH_BASE_URL = "https://graph.facebook.com/v21.0"
+_SENSITIVE_QUERY_RE = re.compile(
+    r"((?:access_token|fb_exchange_token|client_secret|code)=)[^&\s\"']+",
+    re.IGNORECASE,
+)
+
+
+class _RedactHttpxSecretsFilter(logging.Filter):
+    """Ensure httpx request logs never print OAuth tokens, codes, or app secrets."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        msg = record.getMessage()
+        if _SENSITIVE_QUERY_RE.search(msg):
+            record.msg = _SENSITIVE_QUERY_RE.sub(r"\1[REDACTED]", msg)
+            record.args = ()
+        return True
+
+
+logging.getLogger("httpx").addFilter(_RedactHttpxSecretsFilter())
+
+META_GRAPH_HOST = "https://graph.facebook.com"
+META_OAUTH_DIALOG_HOST = "https://www.facebook.com"
+DEFAULT_META_GRAPH_API_VERSION = "v27.0"
+META_GRAPH_BASE_URL = f"{META_GRAPH_HOST}/{DEFAULT_META_GRAPH_API_VERSION}"
 ALLOWED_GRAPH_HOSTS = frozenset({"graph.facebook.com"})
 DEFAULT_TIMEOUT = httpx.Timeout(20.0, connect=5.0)
 MAX_PAGINATION_PAGES = 25
+
+
+def normalize_meta_graph_version(version: str | None) -> str:
+    """Validate and normalize a Meta Graph API version tag such as `v27.0` or `v26.0`."""
+    cleaned = (version or DEFAULT_META_GRAPH_API_VERSION).strip().lstrip("/")
+    if not cleaned.startswith("v"):
+        cleaned = f"v{cleaned}"
+    body = cleaned[1:]
+    if not body or not all(part.isdigit() for part in body.split(".")):
+        raise ValueError(f"Invalid Meta Graph API version: {version!r}")
+    return cleaned
+
+
+def meta_graph_base_url(settings: Settings | None = None) -> str:
+    """Build the versioned Graph API base URL from settings (`meta_graph_api_version`)."""
+    cfg = settings or get_settings()
+    version = normalize_meta_graph_version(cfg.meta_graph_api_version)
+    return f"{META_GRAPH_HOST}/{version}"
+
+
+def meta_oauth_dialog_url(settings: Settings | None = None) -> str:
+    """Build the versioned Facebook Login OAuth dialog URL from settings."""
+    cfg = settings or get_settings()
+    version = normalize_meta_graph_version(cfg.meta_graph_api_version)
+    return f"{META_OAUTH_DIALOG_HOST}/{version}/dialog/oauth"
+
 
 # Meta numeric account_status codes (Marketing API AdAccount reference)
 _ACCOUNT_STATUS_MAP: dict[int, str] = {
@@ -193,7 +242,7 @@ class MetaAdsReadClient:
         access_token: str | None = None,
         settings: Settings | None = None,
         http_client: httpx.AsyncClient | None = None,
-        base_url: str = META_GRAPH_BASE_URL,
+        base_url: str | None = None,
         max_pages: int = MAX_PAGINATION_PAGES,
     ) -> None:
         self._settings = settings or get_settings()
@@ -201,7 +250,8 @@ class MetaAdsReadClient:
             access_token if access_token is not None else self._settings.meta_ads_access_token
         )
         self._token = raw_token.strip()
-        self._base_url = base_url.rstrip("/")
+        resolved_base = base_url if base_url is not None else meta_graph_base_url(self._settings)
+        self._base_url = resolved_base.rstrip("/")
         self._max_pages = max(1, max_pages)
         self._owns_client = http_client is None
         self._http_client = http_client or httpx.AsyncClient(timeout=DEFAULT_TIMEOUT)
@@ -459,3 +509,133 @@ class MetaAdsReadClient:
                 )
             )
         return rows
+
+
+async def exchange_meta_oauth_code(
+    code: str,
+    *,
+    redirect_uri: str,
+    settings: Settings | None = None,
+    http_client: httpx.AsyncClient | None = None,
+    base_url: str | None = None,
+) -> tuple[str, int | None]:
+    """Exchange a Meta OAuth authorization `code` for a long-lived read-only user access token.
+
+    Returns `(access_token, expires_in_seconds)`. Never logs or echoes tokens or secrets.
+    """
+    cfg = settings or get_settings()
+    if not cfg.ad_connect_enabled:
+        raise AdNetworkDisabledError(
+            "Ad account connections are disabled (AD_CONNECT_ENABLED=false).",
+            network="meta",
+        )
+    app_id = cfg.meta_app_id.strip()
+    app_secret = cfg.meta_app_secret.strip()
+    if not app_id or not app_secret:
+        raise AdNetworkError(
+            "Meta OAuth app credentials are not configured on this server.",
+            network="meta",
+            status_code=503,
+        )
+    cleaned_code = code.strip()
+    if not cleaned_code:
+        raise AdNetworkAuthError("Meta OAuth authorization code is missing.", network="meta")
+
+    resolved_base = (base_url if base_url is not None else meta_graph_base_url(cfg)).rstrip("/")
+    token_url = f"{resolved_base}/oauth/access_token"
+    owns_client = http_client is None
+    client = http_client or httpx.AsyncClient(timeout=DEFAULT_TIMEOUT)
+    try:
+        try:
+            short_resp = await client.post(
+                token_url,
+                data={
+                    "client_id": app_id,
+                    "redirect_uri": redirect_uri,
+                    "client_secret": app_secret,
+                    "code": cleaned_code,
+                },
+            )
+        except httpx.HTTPError as err:
+            raise AdNetworkError(
+                f"Meta OAuth token exchange failed: {type(err).__name__}",
+                network="meta",
+            ) from err
+
+        if short_resp.status_code != 200:
+            _classify_and_raise(short_resp)
+
+        try:
+            short_payload = short_resp.json()
+        except ValueError as err:
+            raise AdNetworkError(
+                "Meta OAuth token endpoint returned invalid JSON.",
+                network="meta",
+                status_code=short_resp.status_code,
+            ) from err
+
+        if isinstance(short_payload, dict) and isinstance(short_payload.get("error"), dict):
+            _classify_and_raise(short_resp)
+
+        short_token = (
+            str(short_payload.get("access_token") or "").strip()
+            if isinstance(short_payload, dict)
+            else ""
+        )
+        if not short_token:
+            raise AdNetworkAuthError(
+                "Meta OAuth token exchange did not return an access token.",
+                network="meta",
+            )
+        raw_expires = short_payload.get("expires_in") if isinstance(short_payload, dict) else None
+
+        # Exchange the short-lived token for a 60-day long-lived user token.
+        try:
+            long_resp = await client.post(
+                token_url,
+                data={
+                    "grant_type": "fb_exchange_token",
+                    "client_id": app_id,
+                    "client_secret": app_secret,
+                    "fb_exchange_token": short_token,
+                },
+            )
+        except httpx.HTTPError as err:
+            raise AdNetworkError(
+                f"Meta long-lived token exchange failed: {type(err).__name__}",
+                network="meta",
+            ) from err
+
+        if long_resp.status_code != 200:
+            _classify_and_raise(long_resp)
+
+        try:
+            long_payload = long_resp.json()
+        except ValueError as err:
+            raise AdNetworkError(
+                "Meta long-lived token endpoint returned invalid JSON.",
+                network="meta",
+                status_code=long_resp.status_code,
+            ) from err
+
+        if isinstance(long_payload, dict) and isinstance(long_payload.get("error"), dict):
+            _classify_and_raise(long_resp)
+
+        long_token = (
+            str(long_payload.get("access_token") or "").strip()
+            if isinstance(long_payload, dict)
+            else ""
+        )
+        final_token = long_token or short_token
+        final_expires_raw = (
+            long_payload.get("expires_in", raw_expires)
+            if isinstance(long_payload, dict)
+            else raw_expires
+        )
+        expires_in: int | None = None
+        if isinstance(final_expires_raw, (int, float)) and int(final_expires_raw) > 0:
+            expires_in = int(final_expires_raw)
+        return final_token, expires_in
+    finally:
+        if owns_client:
+            await client.aclose()

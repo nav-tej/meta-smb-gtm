@@ -9,3 +9,5 @@ stripe>=8.0
 defusedxml>=0.7
 # Decode and validate shop images before offering previews.
 Pillow>=11.0
+# Envelope encryption (MultiFernet) for connected ad account OAuth tokens at rest.
+cryptography>=43.0
