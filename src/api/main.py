@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 
 from src.api import (
     accounts,
+    ad_accounts,
     analytics,
     bids,
     billing,
@@ -92,6 +93,7 @@ async def readiness() -> dict[str, str | bool | int]:
         "provider_verified": False,
         "accounts_required": settings.accounts_required,
         "accounts_configured": accounts_configured(),
+        "ad_connect_enabled": settings.ad_connect_enabled,
         "trial_runs": settings.trial_runs,
     }
 
@@ -322,9 +324,15 @@ app.include_router(preferences.router, prefix=API_PREFIX)
 app.include_router(outcomes.router, prefix=API_PREFIX)
 app.include_router(seller_memory.router, prefix=API_PREFIX)
 app.include_router(voice.router, prefix=API_PREFIX)
+app.include_router(
+    ad_accounts.router,
+    prefix=API_PREFIX,
+    include_in_schema=get_settings().ad_connect_enabled,
+)
 # Short aliases: /api/credits, /api/monitor, /api/weekly-digest
 app.include_router(credits.router, prefix="/api", include_in_schema=False)
 app.include_router(monitor.router, prefix="/api", include_in_schema=False)
+
 
 if SAMPLES_DIR.is_dir():
     app.mount("/samples", StaticFiles(directory=str(SAMPLES_DIR)), name="samples")

@@ -20,6 +20,10 @@ class Settings(BaseModel):
     meta_ads_access_token: str = ""
     meta_ad_account_id: str = ""
     ad_connect_enabled: bool = False
+    meta_graph_api_version: str = "v27.0"
+    meta_app_id: str = ""
+    meta_app_secret: str = ""
+    ad_token_encryption_key: str = ""
 
     crawler_user_agent: str = "MetaSMBGTM/0.1 (+https://github.com/nav-tej/meta-smb-gtm)"
     crawler_max_urls: int = 5000
