@@ -135,6 +135,59 @@ async def meta_oauth_connect_redirect(
     return redirect
 
 
+ALLOWED_AD_CONNECT_ERROR_CODES = frozenset(
+    {
+        "cancelled",
+        "expired_state",
+        "wrong_account",
+        "invalid_state",
+        "no_ad_accounts",
+        "signin_required",
+        "connect_failed",
+    }
+)
+
+_CALLBACK_ERROR_CODE_MAP: dict[str, str] = {
+    "oauth_denied": "cancelled",
+    "cancelled": "cancelled",
+    "expired_oauth_state": "expired_state",
+    "expired_state": "expired_state",
+    "cross_user_oauth_state": "wrong_account",
+    "wrong_account": "wrong_account",
+    "invalid_oauth_state": "invalid_state",
+    "missing_code": "invalid_state",
+    "invalid_state": "invalid_state",
+    "no_ad_accounts": "no_ad_accounts",
+    "signin_required": "signin_required",
+}
+
+
+def normalize_callback_error_code(raw_code: str | None) -> str:
+    """Map internal callback error identifiers to the fixed public allowlist (never free text)."""
+    mapped = _CALLBACK_ERROR_CODE_MAP.get((raw_code or "").strip(), "connect_failed")
+    return mapped if mapped in ALLOWED_AD_CONNECT_ERROR_CODES else "connect_failed"
+
+
+def _callback_error_redirect(
+    error_code: str,
+    *,
+    probe: Response | None = None,
+) -> RedirectResponse:
+    safe_code = normalize_callback_error_code(error_code)
+    query = urlencode({"ad_connect_error": safe_code})
+    redirect = RedirectResponse(
+        f"/?{query}#tab-bids",
+        status_code=302,
+        headers={"Cache-Control": "no-store"},
+    )
+    if probe is not None:
+        for header, value in probe.raw_headers:
+            if header.lower() == b"set-cookie":
+                redirect.raw_headers.append((header, value))
+    _clear_state_cookie(redirect)
+    return redirect
+
+
 @router.post("/connect")
 async def meta_oauth_connect_url(
     request: Request,
@@ -155,14 +208,26 @@ async def meta_oauth_connect_url(
         raise HTTPException(status_code=err.status_code, detail=err.detail) from err
 
     _set_state_cookie(response, state)
-    return {"provider": "meta", "scope": "ads_read", "url": url}
+    config_id = settings.meta_login_config_id.strip()
+    payload: dict[str, str] = {"provider": "meta", "url": url}
+    if config_id:
+        payload["config_id"] = config_id
+    else:
+        payload["scope"] = "ads_read"
+    return payload
 
 
 @router.get("/callback")
-async def meta_oauth_callback(request: Request) -> Response:
-    """Verify user-bound OAuth state, exchange code for long-lived token, and save ciphertext."""
+async def meta_oauth_callback(request: Request) -> RedirectResponse:
+    """Verify user-bound state, exchange code for long-lived token, or redirect to #tab-bids."""
     probe = Response()
-    account = await require_verified_seller(request, probe)
+    try:
+        account = await resolve_account(request, probe, require_verified=False)
+    except HTTPException:
+        account = None
+    if account is None or not account.email_verified:
+        return _callback_error_redirect("signin_required", probe=probe)
+
     settings = get_settings()
     try:
         target, saved = await complete_meta_oauth_callback(
@@ -175,13 +240,7 @@ async def meta_oauth_callback(request: Request) -> Response:
             settings=settings,
         )
     except AdConnectionError as err:
-        err_resp = JSONResponse(
-            status_code=err.status_code,
-            content={"detail": err.detail, "code": err.code},
-            headers={"Cache-Control": "no-store"},
-        )
-        _clear_state_cookie(err_resp)
-        return err_resp
+        return _callback_error_redirect(err.code, probe=probe)
 
     dest_path, _, dest_hash = target.partition("#")
     base_path = dest_path or "/"
@@ -276,8 +335,7 @@ async def _fetch_connected_insights(
             status_code=401,
             content={
                 "detail": (
-                    "Your Meta Ads token expired. Reconnect Meta Ads to refresh your "
-                    "campaign performance."
+                    "Your Meta Ads connection expired. Reconnect to load your latest results."
                 ),
                 "code": "meta_token_expired",
                 "reconnect_required": True,
@@ -288,25 +346,25 @@ async def _fetch_connected_insights(
     except AdNetworkRateLimitError as err:
         raise HTTPException(
             status_code=429,
-            detail="Meta Marketing API rate limit reached. Please wait a minute and try again.",
+            detail="Meta asked Muse to slow down. Try again in a minute.",
         ) from err
     except AdNetworkPermissionError as err:
         raise HTTPException(
             status_code=403,
             detail=(
-                "Meta Ads permission was denied. Reconnect your account with "
-                "read-only ads_read access."
+                "Meta did not give Muse access to this ad account's results. "
+                "Reconnect and allow access."
             ),
         ) from err
     except AdNetworkError as err:
         raise HTTPException(
             status_code=502,
-            detail="Could not load insights from Meta Marketing API right now. Please try again.",
+            detail="Could not load your ad results from Meta right now. Please try again.",
         ) from err
     except ValueError as err:
         raise HTTPException(
             status_code=422,
-            detail=str(err),
+            detail="No daily ad results were found for this ad account in the selected dates.",
         ) from err
     finally:
         await read_client.aclose()

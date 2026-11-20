@@ -355,7 +355,7 @@ def test_connect_redirects_to_meta_with_ads_read_and_signed_state(
     unauth = client.get("/api/v1/ad-accounts/meta/connect", follow_redirects=False)
     assert unauth.status_code == 401
 
-    # Authenticated verified seller gets 302 redirect to Meta OAuth with ads_read only
+    # Verified seller gets 302 redirect to Meta with ads_read only when config_id is empty
     client.cookies.set("muse_access", SELLER_A_ACCESS)
     resp = client.get("/api/v1/ad-accounts/meta/connect", follow_redirects=False)
     assert resp.status_code == 302
@@ -366,6 +366,7 @@ def test_connect_redirects_to_meta_with_ads_read_and_signed_state(
     assert parsed.path == "/v27.0/dialog/oauth"
     params = parse_qs(parsed.query)
     assert params["scope"] == ["ads_read"]
+    assert "config_id" not in params
     assert params["client_id"] == ["123456789012345"]
     assert params["response_type"] == ["code"]
     assert params["redirect_uri"][0].endswith("/api/v1/ad-accounts/meta/callback")
@@ -373,8 +374,28 @@ def test_connect_redirects_to_meta_with_ads_read_and_signed_state(
     assert "." in state_param
     assert resp.cookies.get(AD_OAUTH_STATE_COOKIE) == state_param
 
+    # When META_LOGIN_CONFIG_ID is set, the dialog URL sends config_id and omits scope
+    monkeypatch.setenv("META_LOGIN_CONFIG_ID", "987654321098765")
+    get_settings.cache_clear()
+    cfg_resp = client.get("/api/v1/ad-accounts/meta/connect", follow_redirects=False)
+    assert cfg_resp.status_code == 302
+    cfg_parsed = urlsplit(cfg_resp.headers["location"])
+    cfg_params = parse_qs(cfg_parsed.query)
+    assert cfg_params["config_id"] == ["987654321098765"]
+    assert "scope" not in cfg_params
+    assert cfg_params["response_type"] == ["code"]
 
-def test_callback_refuses_tampered_expired_or_other_users_state(
+    post_cfg_resp = client.post("/api/v1/ad-accounts/meta/connect")
+    assert post_cfg_resp.status_code == 200
+    post_json = post_cfg_resp.json()
+    assert post_json["config_id"] == "987654321098765"
+    assert "scope" not in post_json
+    post_params = parse_qs(urlsplit(post_json["url"]).query)
+    assert post_params["config_id"] == ["987654321098765"]
+    assert "scope" not in post_params
+
+
+def test_callback_refuses_cancel_tampered_expired_or_other_users_state_with_302_redirect(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     fake_sb = FakeAdConnectionsSupabase()
@@ -384,20 +405,48 @@ def test_callback_refuses_tampered_expired_or_other_users_state(
 
     cfg = get_settings()
     client = TestClient(app)
+
+    def _assert_callback_error_redirect(resp: httpx.Response, expected_code: str) -> None:
+        assert resp.status_code == 302
+        assert "application/json" not in resp.headers.get("content-type", "")
+        assert resp.headers["location"] == f"/?ad_connect_error={expected_code}#tab-bids"
+        set_cookie_headers = [
+            v.decode("latin-1")
+            for k, v in resp.headers.raw
+            if k.lower() == b"set-cookie" and AD_OAUTH_STATE_COOKIE.encode() in v
+        ]
+        assert set_cookie_headers, "Expected state cookie deletion header on callback error"
+        assert any('="";' in hdr or "Max-Age=0" in hdr for hdr in set_cookie_headers)
+
+    # 0. Signed-out visitor arriving at callback is redirected (302), never shown JSON
+    valid_state = sign_meta_oauth_state(SELLER_A_ID, settings=cfg)
+    client.cookies.set(AD_OAUTH_STATE_COOKIE, valid_state)
+    signed_out_resp = client.get(
+        f"/api/v1/ad-accounts/meta/callback?code=auth_code&state={valid_state}",
+        follow_redirects=False,
+    )
+    _assert_callback_error_redirect(signed_out_resp, "signin_required")
+
     client.cookies.set("muse_access", SELLER_A_ACCESS)
 
-    # 1. Tampered state signature
-    valid_state = sign_meta_oauth_state(SELLER_A_ID, settings=cfg)
+    # 1. Seller clicks Cancel on Meta screen (error=access_denied)
+    client.cookies.set(AD_OAUTH_STATE_COOKIE, valid_state)
+    cancel_resp = client.get(
+        f"/api/v1/ad-accounts/meta/callback?error=access_denied&error_reason=user_denied&state={valid_state}",
+        follow_redirects=False,
+    )
+    _assert_callback_error_redirect(cancel_resp, "cancelled")
+
+    # 2. Tampered state signature
     tampered_state = valid_state[:-4] + ("0000" if not valid_state.endswith("0000") else "1111")
     client.cookies.set(AD_OAUTH_STATE_COOKIE, tampered_state)
     tampered_resp = client.get(
         f"/api/v1/ad-accounts/meta/callback?code=auth_code&state={tampered_state}",
         follow_redirects=False,
     )
-    assert tampered_resp.status_code == 400
-    assert tampered_resp.json()["code"] == "invalid_oauth_state"
+    _assert_callback_error_redirect(tampered_resp, "invalid_state")
 
-    # 2. Expired state (issued 601 seconds ago)
+    # 3. Expired state (issued 601 seconds ago)
     expired_state = sign_meta_oauth_state(
         SELLER_A_ID,
         now=int(time.time()) - 601,
@@ -408,18 +457,16 @@ def test_callback_refuses_tampered_expired_or_other_users_state(
         f"/api/v1/ad-accounts/meta/callback?code=auth_code&state={expired_state}",
         follow_redirects=False,
     )
-    assert expired_resp.status_code == 400
-    assert expired_resp.json()["code"] == "expired_oauth_state"
+    _assert_callback_error_redirect(expired_resp, "expired_state")
 
-    # 3. Cross-user state (signed for Seller B, callback invoked by Seller A)
+    # 4. Cross-user state (signed for Seller B, callback invoked by Seller A)
     seller_b_state = sign_meta_oauth_state(SELLER_B_ID, settings=cfg)
     client.cookies.set(AD_OAUTH_STATE_COOKIE, seller_b_state)
     cross_resp = client.get(
         f"/api/v1/ad-accounts/meta/callback?code=auth_code&state={seller_b_state}",
         follow_redirects=False,
     )
-    assert cross_resp.status_code == 403
-    assert cross_resp.json()["code"] == "cross_user_oauth_state"
+    _assert_callback_error_redirect(cross_resp, "wrong_account")
     assert fake_sb.rows == {}
 
 
@@ -578,8 +625,45 @@ def test_insights_maps_to_campaign_performance_and_code_190_marks_expired(
     exp_json = exp_resp.json()
     assert exp_json["code"] == "meta_token_expired"
     assert exp_json["reconnect_required"] is True
-    assert "Reconnect Meta Ads" in exp_json["detail"]
+    assert exp_json["detail"] == (
+        "Your Meta Ads connection expired. Reconnect to load your latest results."
+    )
     assert fake_sb.rows[(SELLER_A_ID, "meta", "act_1092837465")]["status"] == "expired"
+
+    # 3. Rate limit (code 80004), permission (code 200), and empty account use plain seller wording
+    with respx.mock as router:
+        router.get("https://graph.facebook.com/v27.0/act_1092837465/insights").mock(
+            return_value=httpx.Response(
+                429,
+                json={"error": {"message": "Too many calls", "code": 80004}},
+            )
+        )
+        rl_resp = client.get("/api/v1/ad-accounts/meta/insights?account_id=act_1092837465")
+    assert rl_resp.status_code == 429
+    assert rl_resp.json()["detail"] == "Meta asked Muse to slow down. Try again in a minute."
+
+    with respx.mock as router:
+        router.get("https://graph.facebook.com/v27.0/act_1092837465/insights").mock(
+            return_value=httpx.Response(
+                403,
+                json={"error": {"message": "Permissions error", "code": 200}},
+            )
+        )
+        perm_resp = client.get("/api/v1/ad-accounts/meta/insights?account_id=act_1092837465")
+    assert perm_resp.status_code == 403
+    assert perm_resp.json()["detail"] == (
+        "Meta did not give Muse access to this ad account's results. Reconnect and allow access."
+    )
+
+    with respx.mock as router:
+        router.get("https://graph.facebook.com/v27.0/act_1092837465/insights").mock(
+            return_value=httpx.Response(200, json={"data": []})
+        )
+        empty_resp = client.get("/api/v1/ad-accounts/meta/insights?account_id=act_1092837465")
+    assert empty_resp.status_code == 422
+    assert empty_resp.json()["detail"] == (
+        "No daily ad results were found for this ad account in the selected dates."
+    )
 
     all_logs = "\n".join(r.getMessage() for r in caplog.records)
     assert NEVER_LOG_LONG_TOKEN not in all_logs
@@ -697,9 +781,41 @@ def test_tab_bids_browser_375_and_1440_flag_off_and_on(live_server_url: str) -> 
     script = textwrap.dedent(
         f"""
         import json
+        import re
         from playwright.sync_api import sync_playwright
 
         BASE = {live_server_url!r}
+        FORBIDDEN_RE = re.compile(r"token|API|ads_read|server|configured|OAuth|—")
+
+        EXPECTED_ERROR_SENTENCES = {{
+            "cancelled": "You cancelled connecting Meta Ads. Nothing was saved.",
+            "expired_state": "That connection request timed out. Try connecting Meta Ads again.",
+            "wrong_account": (
+                "That Meta Ads connection was started from a different Muse account. "
+                "Try again from this account."
+            ),
+            "invalid_state": (
+                "We could not confirm that Meta Ads connection request. Please try again."
+            ),
+            "no_ad_accounts": "No Meta ad accounts were found on that Facebook profile.",
+            "signin_required": "Sign in and confirm your email to connect Meta Ads.",
+            "connect_failed": (
+                "We could not finish connecting Meta Ads right now. "
+                "Nothing was saved; please try again."
+            ),
+        }}
+
+        def assert_clean_bar(page, width, context_label):
+            bar_text = page.locator("#metaConnectBar").inner_text()
+            match = FORBIDDEN_RE.search(bar_text)
+            assert match is None, (
+                f"Forbidden term {{match.group(0)!r}} in #metaConnectBar ({{context_label}} "
+                f"at {{width}}px): {{bar_text!r}}"
+            )
+            overflow = page.evaluate(
+                "document.documentElement.scrollWidth > window.innerWidth + 1"
+            )
+            assert not overflow, f"Horizontal overflow ({{context_label}} at {{width}}px)"
 
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
@@ -732,6 +848,8 @@ def test_tab_bids_browser_375_and_1440_flag_off_and_on(live_server_url: str) -> 
                     page_on = ctx_on.new_page()
                     errors_on = []
                     page_on.on("pageerror", lambda e: errors_on.append(str(e)))
+
+                    insights_mode = {{"state": "expired"}}
 
                     page_on.route(
                         "**/api/v1/readiness",
@@ -771,22 +889,64 @@ def test_tab_bids_browser_375_and_1440_flag_off_and_on(live_server_url: str) -> 
                             }}),
                         ),
                     )
-                    page_on.route(
-                        "**/api/v1/ad-accounts/meta/insights*",
-                        lambda route: route.fulfill(
-                            status=401,
-                            content_type="application/json",
-                            body=json.dumps({{
-                                "detail": (
-                                    "Your Meta Ads token expired. Reconnect Meta Ads "
-                                    "to refresh your campaign performance."
-                                ),
-                                "code": "meta_token_expired",
-                                "reconnect_required": True,
-                                "account_id": "act_1092837465",
-                            }}),
-                        ),
-                    )
+
+                    def handle_insights(route):
+                        mode = insights_mode["state"]
+                        if mode == "expired":
+                            route.fulfill(
+                                status=401,
+                                content_type="application/json",
+                                body=json.dumps({{
+                                    "detail": (
+                                        "Your Meta Ads connection expired. "
+                                        "Reconnect to load your latest results."
+                                    ),
+                                    "code": "meta_token_expired",
+                                    "reconnect_required": True,
+                                    "account_id": "act_1092837465",
+                                }}),
+                            )
+                        elif mode == "rate_limit":
+                            route.fulfill(
+                                status=429,
+                                content_type="application/json",
+                                body=json.dumps({{
+                                    "detail": "Meta asked Muse to slow down. Try again in a minute."
+                                }}),
+                            )
+                        elif mode == "permission":
+                            route.fulfill(
+                                status=403,
+                                content_type="application/json",
+                                body=json.dumps({{
+                                    "detail": (
+                                        "Meta did not give Muse access to this ad account's "
+                                        "results. Reconnect and allow access."
+                                    )
+                                }}),
+                            )
+                        else:
+                            route.fulfill(
+                                status=200,
+                                content_type="application/json",
+                                body=json.dumps({{
+                                    "account_name": "Sarabjit Singh Studio Ads",
+                                    "currency": "USD",
+                                    "rows": [
+                                        {{
+                                            "day": "2026-11-15",
+                                            "campaign_name": "Heritage Prints",
+                                            "ad_set_name": "Broad US",
+                                            "impressions": 4000,
+                                            "clicks": 80,
+                                            "conversions": 3,
+                                            "spend": 25.0,
+                                        }}
+                                    ],
+                                }}),
+                            )
+
+                    page_on.route("**/api/v1/ad-accounts/meta/insights*", handle_insights)
                     page_on.route(
                         "**/api/v1/ad-accounts/meta/disconnect",
                         lambda route: route.fulfill(
@@ -798,32 +958,106 @@ def test_tab_bids_browser_375_and_1440_flag_off_and_on(live_server_url: str) -> 
                         ),
                     )
 
+                    # 2a. Default connected status sentence
                     page_on.goto(f"{{BASE}}/#tab-bids", wait_until="networkidle")
                     page_on.locator("#metaConnectBar").wait_for(state="visible", timeout=5000)
                     assert page_on.locator("#connectMetaAdsBtn").is_visible()
                     assert page_on.locator("#metaAdAccountSelect").is_visible()
                     assert page_on.locator("#loadMetaInsightsBtn").is_visible()
                     assert page_on.locator("#disconnectMetaAdsBtn").is_visible()
-
-                    overflow_on = page_on.evaluate(
-                        "document.documentElement.scrollWidth > window.innerWidth + 1"
+                    default_status = (
+                        page_on.locator("#metaConnectStatus").text_content() or ""
+                    ).strip()
+                    assert default_status == (
+                        "Read-only: Muse can see your ad results but cannot change anything "
+                        "in your ad account."
                     )
-                    assert not overflow_on, f"Horizontal overflow with flag on at {{width}}px"
+                    assert_clean_bar(page_on, width, "default-status")
 
-                    # Trigger expired token (code 190) response and verify UI prompts to reconnect
+                    # 2b. Expired connection (401)
+                    insights_mode["state"] = "expired"
                     page_on.locator("#loadMetaInsightsBtn").click()
                     page_on.wait_for_function(
                         "document.getElementById('connectMetaAdsBtn')"
                         ".textContent.includes('Reconnect Meta Ads')"
                     )
-                    status_text = page_on.locator("#metaConnectStatus").text_content() or ""
-                    assert "expired" in status_text.lower() and "reconnect" in status_text.lower()
+                    exp_status = (
+                        page_on.locator("#metaConnectStatus").text_content() or ""
+                    ).strip()
+                    assert exp_status == (
+                        "Your Meta Ads connection expired. Reconnect to load your latest results."
+                    )
+                    assert_clean_bar(page_on, width, "expired-status")
 
-                    # Trigger disconnect and verify account picker hides
+                    # 2c. Rate limit (429)
+                    insights_mode["state"] = "rate_limit"
+                    page_on.locator("#loadMetaInsightsBtn").click()
+                    page_on.wait_for_function(
+                        "document.getElementById('metaConnectStatus')"
+                        ".textContent.includes('slow down')"
+                    )
+                    rl_status = (page_on.locator("#metaConnectStatus").text_content() or "").strip()
+                    assert rl_status == "Meta asked Muse to slow down. Try again in a minute."
+                    assert_clean_bar(page_on, width, "rate-limit-status")
+
+                    # 2d. Permission denied (403)
+                    insights_mode["state"] = "permission"
+                    page_on.locator("#loadMetaInsightsBtn").click()
+                    page_on.wait_for_function(
+                        "document.getElementById('metaConnectStatus')"
+                        ".textContent.includes('allow access')"
+                    )
+                    perm_status = (
+                        page_on.locator("#metaConnectStatus").text_content() or ""
+                    ).strip()
+                    assert perm_status == (
+                        "Meta did not give Muse access to this ad account's results. "
+                        "Reconnect and allow access."
+                    )
+                    assert_clean_bar(page_on, width, "permission-status")
+
+                    # 2e. Loaded insights (200) caption has no em-dash
+                    insights_mode["state"] = "ok"
+                    page_on.locator("#loadMetaInsightsBtn").click()
+                    page_on.wait_for_function(
+                        "document.getElementById('metaConnectStatus')"
+                        ".textContent.includes('Loaded read-only results')"
+                    )
+                    caption_txt = page_on.locator("#campaign-table-caption").text_content() or ""
+                    assert "—" not in caption_txt
+                    assert_clean_bar(page_on, width, "loaded-insights")
+
+                    # 2f. Disconnected status
                     page_on.locator("#disconnectMetaAdsBtn").click()
                     page_on.wait_for_function(
                         "document.getElementById('metaAdAccountSelectWrap').hidden === true"
                     )
+                    disc_status = (
+                        page_on.locator("#metaConnectStatus").text_content() or ""
+                    ).strip()
+                    assert disc_status == (
+                        "Disconnected. Muse no longer has access to this ad account."
+                    )
+                    assert_clean_bar(page_on, width, "disconnected-status")
+
+                    # 2g. Verify every callback error code shows its plain sentence and clears URL
+                    for code, expected_sentence in EXPECTED_ERROR_SENTENCES.items():
+                        page_on.goto(
+                            f"{{BASE}}/?ad_connect_error={{code}}#tab-bids",
+                            wait_until="networkidle",
+                        )
+                        page_on.locator("#metaConnectBar").wait_for(state="visible", timeout=5000)
+                        status_txt = (
+                            page_on.locator("#metaConnectStatus").text_content() or ""
+                        ).strip()
+                        assert status_txt == expected_sentence, (
+                            f"Expected {{expected_sentence!r}} for {{code}}, got {{status_txt!r}}"
+                        )
+                        assert "ad_connect_error" not in page_on.url, (
+                            f"ad_connect_error was not removed from URL: {{page_on.url}}"
+                        )
+                        assert_clean_bar(page_on, width, f"error={{code}}")
+
                     assert not errors_on, f"Page errors with flag on at {{width}}px: {{errors_on}}"
                     ctx_on.close()
             finally:

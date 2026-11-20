@@ -106,7 +106,7 @@ def _parse_encryption_keys(settings: Settings | None = None) -> tuple[MultiFerne
     if not raw:
         raise AdConnectionError(
             503,
-            "Ad account token encryption is not configured on this server.",
+            "Meta Ads connection is not available right now. Please try again later.",
             code="encryption_not_configured",
         )
 
@@ -114,7 +114,7 @@ def _parse_encryption_keys(settings: Settings | None = None) -> tuple[MultiFerne
     if not entries:
         raise AdConnectionError(
             503,
-            "Ad account token encryption is not configured on this server.",
+            "Meta Ads connection is not available right now. Please try again later.",
             code="encryption_not_configured",
         )
 
@@ -133,7 +133,7 @@ def _parse_encryption_keys(settings: Settings | None = None) -> tuple[MultiFerne
         except (ValueError, TypeError) as err:
             raise AdConnectionError(
                 503,
-                "Ad account token encryption key is invalid.",
+                "Meta Ads connection is not available right now. Please try again later.",
                 code="encryption_key_invalid",
             ) from err
 
@@ -167,7 +167,7 @@ def decrypt_token(
     if not cleaned:
         raise AdConnectionError(
             401,
-            "Your Meta Ads connection expired. Please reconnect your ad account.",
+            "Your Meta Ads connection expired. Reconnect to load your latest results.",
             code="token_missing",
         )
     multi, _ = _parse_encryption_keys(settings)
@@ -176,7 +176,7 @@ def decrypt_token(
     except (InvalidToken, ValueError) as err:
         raise AdConnectionError(
             401,
-            "Stored Meta Ads credentials could not be verified. Please reconnect your ad account.",
+            "Your Meta Ads connection expired. Reconnect to load your latest results.",
             code="token_decrypt_failed",
         ) from err
     return plaintext_bytes.decode("utf-8")
@@ -197,7 +197,7 @@ def rotate_token_ciphertext(
     except (InvalidToken, ValueError) as err:
         raise AdConnectionError(
             401,
-            "Stored Meta Ads credentials could not be rotated. Please reconnect your ad account.",
+            "Your Meta Ads connection expired. Reconnect to load your latest results.",
             code="token_rotate_failed",
         ) from err
     return rotated_bytes.decode("ascii"), version
@@ -213,7 +213,7 @@ def _state_signing_key(settings: Settings | None = None) -> bytes:
     if not raw_secret:
         raise AdConnectionError(
             503,
-            "Meta Ads connection is not configured on this server yet.",
+            "Meta Ads connection is not available right now. Please try again later.",
             code="oauth_not_configured",
         )
     return hashlib.sha256(f"muse-ad-oauth-state:{raw_secret}".encode()).digest()
@@ -268,7 +268,7 @@ def verify_meta_oauth_state(
     if len(parts) != 2:
         raise AdConnectionError(
             400,
-            "Invalid Meta Ads OAuth state.",
+            "We could not confirm that Meta Ads connection request. Please try again.",
             code="invalid_oauth_state",
         )
     encoded, sig = parts
@@ -280,7 +280,7 @@ def verify_meta_oauth_state(
     if not hmac.compare_digest(sig, expected_sig):
         raise AdConnectionError(
             400,
-            "Invalid Meta Ads OAuth state signature.",
+            "We could not confirm that Meta Ads connection request. Please try again.",
             code="invalid_oauth_state",
         )
     try:
@@ -294,14 +294,17 @@ def verify_meta_oauth_state(
     except (KeyError, ValueError, TypeError) as err:
         raise AdConnectionError(
             400,
-            "Invalid Meta Ads OAuth state payload.",
+            "We could not confirm that Meta Ads connection request. Please try again.",
             code="invalid_oauth_state",
         ) from err
 
     if not hmac.compare_digest(state_uid, expected_uid):
         raise AdConnectionError(
             403,
-            "This Meta Ads authorization was started by a different Muse account.",
+            (
+                "That Meta Ads connection was started from a different Muse account. "
+                "Try again from this account."
+            ),
             code="cross_user_oauth_state",
         )
 
@@ -309,7 +312,7 @@ def verify_meta_oauth_state(
     if current_ts - issued_ts > AD_OAUTH_STATE_TTL_SECONDS or issued_ts - current_ts > 60:
         raise AdConnectionError(
             400,
-            "That Meta Ads connection request expired. Please start again.",
+            "That connection request timed out. Try connecting Meta Ads again.",
             code="expired_oauth_state",
         )
     return safe_ad_return_path(data.get("next"))
@@ -321,7 +324,11 @@ def build_meta_oauth_authorize_url(
     state: str,
     settings: Settings | None = None,
 ) -> str:
-    """Build the Facebook Login OAuth URL requesting read-only `ads_read` permission only."""
+    """Build the Facebook Login for Business dialog URL.
+
+    When `meta_login_config_id` is set, sends `config_id` and omits `scope` as recommended by
+    Meta's Facebook Login for Business documentation. When empty, falls back to `scope=ads_read`.
+    """
     cfg = settings or get_settings()
     if not cfg.ad_connect_enabled:
         raise AdConnectionError(404, "Ad account connections are disabled.", code="disabled")
@@ -330,23 +337,25 @@ def build_meta_oauth_authorize_url(
     if not app_id or not app_secret:
         raise AdConnectionError(
             503,
-            "Meta Ads connection is not configured on this server yet.",
+            "Meta Ads connection is not available right now. Please try again later.",
             code="meta_app_not_configured",
         )
-    # Validate that token encryption is configured before sending the seller to Meta.
+    # Validate that token encryption is ready before sending the seller to Meta.
     _parse_encryption_keys(cfg)
 
     dialog_url = meta_oauth_dialog_url(cfg)
-    query = urlencode(
-        {
-            "client_id": app_id,
-            "redirect_uri": redirect_uri,
-            "response_type": "code",
-            "scope": META_READ_ONLY_SCOPE,
-            "state": state,
-        }
-    )
-    return f"{dialog_url}?{query}"
+    params: dict[str, str] = {
+        "client_id": app_id,
+        "redirect_uri": redirect_uri,
+        "response_type": "code",
+    }
+    config_id = cfg.meta_login_config_id.strip()
+    if config_id:
+        params["config_id"] = config_id
+    else:
+        params["scope"] = META_READ_ONLY_SCOPE
+    params["state"] = state
+    return f"{dialog_url}?{urlencode(params)}"
 
 
 async def _rpc(
@@ -554,7 +563,7 @@ async def complete_meta_oauth_callback(
     if error:
         raise AdConnectionError(
             400,
-            "Meta Ads connection was cancelled or denied.",
+            "You cancelled connecting Meta Ads. Nothing was saved.",
             code="oauth_denied",
         )
     target = verify_meta_oauth_state(
@@ -566,7 +575,7 @@ async def complete_meta_oauth_callback(
     if not code or not code.strip():
         raise AdConnectionError(
             400,
-            "Meta did not return an authorization code. Please try again.",
+            "We could not confirm that Meta Ads connection request. Please try again.",
             code="missing_code",
         )
 
@@ -593,13 +602,16 @@ async def complete_meta_oauth_callback(
     except AdNetworkAuthError as err:
         raise AdConnectionError(
             401,
-            "Meta could not verify that authorization code. Please try connecting again.",
+            (
+                "We could not finish connecting Meta Ads right now. "
+                "Nothing was saved; please try again."
+            ),
             code="meta_oauth_failed",
         ) from err
     except AdNetworkError as err:
         raise AdConnectionError(
             502,
-            "Could not reach Meta Marketing API to list your ad accounts. Please try again.",
+            "Could not reach Meta to list your ad accounts. Please try again.",
             code="meta_upstream_error",
         ) from err
 
