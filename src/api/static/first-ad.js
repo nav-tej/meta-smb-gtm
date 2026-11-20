@@ -467,15 +467,25 @@
     if (doPersist) persistState();
   }
 
-  async function loadAccountAndDrafts() {
+  let lastLoadedContextKey = null;
+
+  async function loadAccountAndDrafts({ initial = false } = {}) {
     try {
-      const snap = await window.museAccount?.refresh?.().catch(() => null);
-      currentOwnerId = snap?.user?.id || window.museAccount?.getSnapshot?.()?.user?.id || null;
+      if (initial && typeof window.museAccount?.ready === 'function') {
+        await window.museAccount.ready().catch(() => null);
+      }
+      const snap = window.museAccount?.getSnapshot?.() || null;
+      currentOwnerId = snap?.user?.id || null;
     } catch (_) {
       currentOwnerId = null;
     }
 
     const sample = isSampleMode();
+    const contextKey = `${sample ? 'sample' : 'own'}:${currentOwnerId || 'anon'}`;
+    if (!initial && contextKey === lastLoadedContextKey) {
+      return;
+    }
+    lastLoadedContextKey = contextKey;
     if ($('faBidAdviceLink')) $('faBidAdviceLink').href = sample ? '/?workspace=sample#tab-bids' : '/#tab-bids';
     syncFirstAdCopy(sample);
     let loaded = null;
@@ -726,6 +736,6 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     bindEvents();
-    loadAccountAndDrafts();
+    loadAccountAndDrafts({ initial: true });
   });
 })();

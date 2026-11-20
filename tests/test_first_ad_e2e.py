@@ -226,13 +226,24 @@ def test_first_ad_4_step_workflow_validation_persistence_and_exports_e2e(
             )
             ctx_a.add_cookies([{{"name": "muse_e2e_user", "value": "user-a", "url": BASE}}])
             pa = ctx_a.new_page()
+            me_requests = []
+            pa.on(
+                "request",
+                lambda req: me_requests.append(req.url)
+                if "/api/v1/account/me" in req.url
+                else None,
+            )
             pa.goto(f"{{BASE}}/first-ad", wait_until="domcontentloaded")
             pa.wait_for_selector("#faProvenanceBadge")
             pa.wait_for_function(
                 "() => Boolean(window.localStorage) && "
                 "document.querySelector('#faNotPublishedBadge') !== null"
             )
-            pa.wait_for_timeout(300)
+            pa.wait_for_timeout(400)
+            assert len(me_requests) == 1, (
+                f"Expected exactly 1 /api/v1/account/me request on /first-ad load, "
+                f"got {{len(me_requests)}}"
+            )
             pw_count = pa.locator('main input[type="password"]').count()
             assert pw_count == 0, f"password count={{pw_count}}"
             prov_txt = pa.locator("#faProvenanceBadge").text_content() or ""
