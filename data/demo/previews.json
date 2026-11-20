@@ -1,0 +1,169 @@
+{
+  "previews": [
+    {
+      "insight_id": "idea-1-empowering-women",
+      "source": "ranked_idea",
+      "placement": "instagram_feed",
+      "headline": "Sikh Women of Strength — Mai Bhago & Kaur Legacy",
+      "caption": "While mainstream Sikh art galleries feature warrior heroes, our Empowering Women series honors the courage, devotion, and leadership of Sikh women across history. Archival museum-grade prints starting at $18. Tap to discover the full collection on Pixels.",
+      "cta": "Explore series",
+      "image_ref": "/samples/naam_japo_restored_gallery_live.webp",
+      "evidence": [
+        {
+          "label": "SikhiArt has warrior and saint groups but none for women",
+          "url": "https://www.sikhiart.com/",
+          "kind": "sample"
+        },
+        {
+          "label": "Sarabjit catalog has dedicated Mai Bhago and Kaur empowerment collection",
+          "url": null,
+          "kind": "sample"
+        }
+      ],
+      "why_this": "SikhiArt has 8 shop collections for warriors and saints, but zero for women. Lead with your unique collection.",
+      "checklist": [
+        "Share Mai Bhago painting with caption on Instagram",
+        "Pin link to Empowering Women Pixels collection in bio",
+        "Offer 10% off for holiday gift sets"
+      ],
+      "competitor_card": {
+        "name": "SikhiArt",
+        "format": "Shop collection",
+        "primary_text": "Sells warrior heroes (Baba Deep Singh, Hari Singh Nalwa) from $59.99 to $2,499. No women collection.",
+        "price_point": "$59.99 - $2,499.99",
+        "url": "https://www.sikhiart.com",
+        "note": "[sample] Based on SikhiArt crawl (Nov 3)"
+      }
+    },
+    {
+      "insight_id": "idea-2-starter-prints",
+      "source": "ranked_idea",
+      "placement": "instagram_feed",
+      "headline": "Timeless Sikh Heritage Art from $14",
+      "caption": "Museum-grade fine art shouldn't require a $100+ commitment. Start your art wall with authentic archival prints on luster paper, beginning at just $14. Handcrafted with reverence.",
+      "cta": "Shop prints from $14",
+      "image_ref": "/samples/ek_onkar_collector_room_live.webp",
+      "evidence": [
+        {
+          "label": "SikhiArt entry price starts at $59.99",
+          "url": "https://www.sikhiart.com/",
+          "kind": "sample"
+        },
+        {
+          "label": "Pixels marketplace prints start at $14–$22",
+          "url": "https://pixels.com/",
+          "kind": "sample"
+        }
+      ],
+      "why_this": "3 of 4 competitors start at $60+. Leading with $14 prints wins gift and first-time buyers.",
+      "checklist": [
+        "Feature $14 print option prominently in caption",
+        "Add direct link to $14 luster print variant",
+        "Highlight free US delivery on orders over $50"
+      ],
+      "competitor_card": {
+        "name": "SikhiArt",
+        "format": "Print catalog",
+        "primary_text": "Cheapest open edition print is $59.99. No starter prints under $50.",
+        "price_point": "From $59.99",
+        "url": "https://www.sikhiart.com",
+        "note": "[sample] SikhiArt catalog analysis"
+      }
+    },
+    {
+      "insight_id": "idea-3-gift-ready",
+      "source": "ranked_idea",
+      "placement": "instagram_feed",
+      "headline": "The Thoughtful Spiritual Gift That Lasts a Lifetime",
+      "caption": "Looking for a meaningful housewarming, wedding, or Gurpurab gift? A fine art print of the Golden Temple brings peace and timeless reflection into any home. Custom gift notes available with every order.",
+      "cta": "Send as a gift",
+      "image_ref": "/samples/golden_temple_holiday_gift_live.webp",
+      "evidence": [
+        {
+          "label": "SikhiArt uses gift wording but has nothing under $59.99",
+          "url": "https://www.sikhiart.com/",
+          "kind": "sample"
+        },
+        {
+          "label": "Desi Canvas Co targets wedding & housewarming gifts at $129",
+          "url": null,
+          "kind": "sample"
+        }
+      ],
+      "why_this": "Competitors use gift seasonal wording but charge $60–$129+. You can offer curated $20–$50 gifts.",
+      "checklist": [
+        "Add gift-note offer to checkout instructions",
+        "Post Golden Temple print mockup in home setting",
+        "Tag as #sikhgift #spiritualdecor"
+      ],
+      "competitor_card": {
+        "name": "Desi Canvas Co",
+        "format": "Meta feed ad",
+        "primary_text": "Transform your living room for Gurpurab & Diwali. Ready-to-hang museum-grade canvas prints starting at $129.",
+        "price_point": "From $129.00",
+        "url": null,
+        "note": "[sample] Meta Ad Library capture"
+      }
+    },
+    {
+      "insight_id": "idea-4-home-titles",
+      "source": "ranked_idea",
+      "placement": "facebook_feed",
+      "headline": "Listing Optimization: 'For Your Home' Decor Titles",
+      "caption": "Search visibility update for your shop: Add 'for your home' to high-intent titles to capture buyers searching for sacred decor rather than generic paintings.",
+      "cta": "Update listings",
+      "image_ref": "/samples/kirat_karo_collector_room_live.webp",
+      "evidence": [
+        {
+          "label": "Almost every SikhiArt product title includes 'for Your Home by Bhagat Singh Bedi'",
+          "url": "https://www.sikhiart.com/",
+          "kind": "sample"
+        }
+      ],
+      "why_this": "SikhiArt adds 'for Your Home' to almost every title to rank in Google & Etsy home decor searches.",
+      "checklist": [
+        "Listing 1: Change 'Ek Onkar Painting' to 'Ek Onkar Sacred Sikh Art Print for Your Home'",
+        "Listing 2: Change 'Golden Temple Watercolor' to 'Harmandir Sahib Golden Temple Fine Art for Your Home'",
+        "Listing 3: Change 'Mai Bhago Artwork' to 'Mai Bhago Warrior Heritage Canvas Print for Your Home'"
+      ],
+      "competitor_card": {
+        "name": "SikhiArt",
+        "format": "SEO / Catalog pattern",
+        "primary_text": "Example: 'Golden Temple in Moonlight Painting for Your Home by Bhagat Singh Bedi'",
+        "price_point": "SEO standard",
+        "url": "https://www.sikhiart.com",
+        "note": "[sample] Product title strategy analysis"
+      }
+    },
+    {
+      "insight_id": "idea-5-painting-story",
+      "source": "ranked_idea",
+      "placement": "instagram_feed",
+      "headline": "The Story Behind Ek Onkar: One Infinite Creator",
+      "caption": "Behind every brushstroke is a meditation on unity. When I painted this Ek Onkar piece, I wanted the sacred symbol to emerge from quiet gold and deep crimson — a daily reminder that the Divine dwells in all creation. What feeling does it bring to your quiet space?",
+      "cta": "Read the story",
+      "image_ref": "/samples/diptych_ek_onkar_kirat_karo_live.webp",
+      "evidence": [
+        {
+          "label": "SikhiArt has only 2 blog pages and no artist stories",
+          "url": "https://www.sikhiart.com/",
+          "kind": "sample"
+        }
+      ],
+      "why_this": "Competitors post impersonal product specs. A five-sentence story behind the art builds true emotional connection.",
+      "checklist": [
+        "Post Ek Onkar painting with personal reflection",
+        "Ask question in caption to drive comments and saves",
+        "Add link to artist statement on website"
+      ],
+      "competitor_card": {
+        "name": "SikhiArt",
+        "format": "Blog & Social",
+        "primary_text": "Only 2 blog pages total. Zero artist process or spiritual storytelling posts.",
+        "price_point": "Content gap",
+        "url": "https://www.sikhiart.com",
+        "note": "[sample] Content cadence audit"
+      }
+    }
+  ]
+}

@@ -161,7 +161,7 @@ async def test_failed_validation_is_never_cached(cache_on: Path) -> None:
     assert not _cached_files(cache_on)
 
 
-async def test_image_sam_and_voice_calls_are_cached(cache_on: Path) -> None:
+async def test_image_and_sam_are_cached_but_voice_transcripts_are_not(cache_on: Path) -> None:
     import io
     import wave
 
@@ -210,7 +210,8 @@ async def test_image_sam_and_voice_calls_are_cached(cache_on: Path) -> None:
             )
             assert (await client.segment(PNG)).startswith(b"\x89PNG")
             assert await client.transcribe_audio(voice) == "hello"
-    assert len(paths) == 5  # second round: every call was a cache hit
+    assert len(paths) == 6  # four image/SAM calls are cached; both voice calls reach the provider
+    assert paths.count("/v1/audio/transcriptions") == 2
 
 
 async def test_cache_hits_and_calls_are_recorded_for_credit_refunds(cache_on: Path) -> None:

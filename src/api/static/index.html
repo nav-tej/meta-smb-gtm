@@ -1,9 +1,27 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-setup-check="page">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Muse Growth Studio — AI Growth Copilot for Makers & Artists</title>
+  <title>Muse Growth Studio | AI marketing help for makers and artists</title>
+  <meta name="description" content="See what competing shops charge and post, get a ranked list of next moves, and make ready-to-post ads for your own shop. Free demo, no account needed." />
+  <link rel="canonical" href="https://meta-smb-gtm.vercel.app/" />
+  <meta name="robots" content="index, follow" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Muse Growth Studio" />
+  <meta property="og:title" content="Muse Growth Studio | AI marketing help for makers and artists" />
+  <meta property="og:description" content="Competitor research, ranked next moves and ready-to-post ads for small shops. Try the free demo." />
+  <meta property="og:url" content="https://meta-smb-gtm.vercel.app/" />
+  <meta property="og:image" content="https://meta-smb-gtm.vercel.app/static/og-cover.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Muse Growth Studio | AI marketing help for makers and artists" />
+  <meta name="twitter:description" content="Competitor research, ranked next moves and ready-to-post ads for small shops. Try the free demo." />
+  <meta name="twitter:image" content="https://meta-smb-gtm.vercel.app/static/og-cover.png" />
+  <script type="application/ld+json">
+  {"@context":"https://schema.org","@type":"SoftwareApplication","name":"Muse Growth Studio","applicationCategory":"BusinessApplication","operatingSystem":"Web","url":"https://meta-smb-gtm.vercel.app/","description":"Competitor research, ranked next moves and ready-to-post ads for makers and fine artists.","publisher":{"@type":"Organization","name":"n Plus Alpha LLC"},"offers":[{"@type":"Offer","name":"Free demo","price":"0","priceCurrency":"USD"},{"@type":"Offer","name":"Starter, monthly","price":"12","priceCurrency":"USD"},{"@type":"Offer","name":"Starter, annual","price":"108","priceCurrency":"USD"}]}
+  </script>
   <style>
     :root {
       --bg: #faf8f5;
@@ -961,15 +979,42 @@
       .finding-head { flex-wrap: wrap; }
       code, .channel-chip, .finding-item a, .journey a { overflow-wrap: anywhere; }
     }
+  /* "Ask Muse what to do next": the answer shows the moves to start with. */
+  .jr-steer-answer { display: grid; gap: 10px; margin-top: 12px; }
+  .jr-steer-answer[hidden] { display: none; }
+  .jr-steer-answer-lead { margin: 0; font-weight: 700; }
+  .jr-steer-move { display: block; padding: 12px 14px; border: 1px solid #d9e4dc; border-radius: 10px; background: #fbfdfb; color: inherit; text-decoration: none; min-width: 0; }
+  .jr-steer-move:hover, .jr-steer-move:focus-visible { border-color: #2f6f4f; }
+  .jr-steer-move-badge { display: block; font-size: 0.72rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: #2f6f4f; }
+  .jr-steer-move strong { display: block; margin: 2px 0; }
+  .jr-steer-move-why { display: block; font-size: 0.9rem; color: #4a5a52; overflow-wrap: anywhere; }
+  .jr-steer-move-cta { display: inline-block; margin-top: 6px; font-weight: 700; color: #1b6e44; }
+  /* "Start here" for a seller who just finished setup (welcome.js, syncFirstMoveCard). */
+  .first-move-card { position: relative; margin: 16px 0; padding: 18px 20px; border: 1px solid #b9d3c3; border-radius: 14px; background: #f3faf5; }
+  .first-move-card[hidden] { display: none; }
+  .first-move-eyebrow { margin: 0 0 4px; font-size: .72rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #2f6f4f; }
+  .first-move-card h2 { margin: 0 64px 12px 0; font-size: 1.2rem; }
+  .first-move-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+  .first-move-option { display: flex; flex-direction: column; gap: 6px; min-width: 0; padding: 14px; border: 1px solid #d9e4dc; border-radius: 10px; background: #fff; }
+  .first-move-option span { font-size: .9rem; color: #4a5a52; overflow-wrap: anywhere; }
+  .first-move-btn { font: inherit; align-self: flex-start; margin-top: auto; padding: 9px 14px; border: 1px solid #1b6e44; border-radius: 8px; background: #fff; color: #1b6e44; font-weight: 700; text-decoration: none; cursor: pointer; }
+  .first-move-btn.primary { background: #1b6e44; color: #fff; }
+  .first-move-hide { font: inherit; position: absolute; top: 14px; right: 16px; border: 0; background: none; color: #4a5a52; font-size: .85rem; text-decoration: underline; cursor: pointer; }
 </style>
   <link rel="stylesheet" href="/static/portal-journey.css?v=20261106-ui2">
+  <link rel="stylesheet" href="/static/reco-actions.css?v=20261112-integrated">
 
   <link rel="stylesheet" href="/static/pricing-modal.css?v=20261109-ux">
-  <link rel="stylesheet" href="/static/account.css?v=20261109-oauth">
-  <link rel="stylesheet" href="/static/muse-shell.css?v=20261109-ux3">
+  <link rel="stylesheet" href="/static/account.css?v=20261112-integrated">
+  <link rel="stylesheet" href="/static/muse-shell.css?v=20261112-integrated">
+  <link rel="stylesheet" href="/static/seller-memory.css?v=20261112-integrated">
   <script src="/static/analytics.js?v=20261109-ux" defer></script>
-  <script src="/static/account.js?v=20261109-oauth" defer></script>
-  <script src="/static/muse-shell.js?v=20261109-hd1" defer></script>
+  <script src="/static/reco-actions.js?v=20261118-uxgap12" defer></script>
+  <script src="/static/account.js?v=20261118-uxgap12" defer></script>
+  <script src="/static/workspace-modes.js?v=20261117-uxgap6" defer></script>
+  <script src="/static/muse-shell.js?v=20261118-ag1" defer></script>
+  <script src="/static/welcome.js?v=20261118-uxgap12" defer></script>
+  <script src="/static/seller-memory.js?v=20261119-uxgap13" defer></script>
 </head>
 <body>
   <!-- Top Bar -->
@@ -985,12 +1030,13 @@
     <div class="topbar-right">
       <nav class="topbar-nav" aria-label="Main">
         <a class="topbar-link" href="/digest">Weekly digest</a>
+        <a class="topbar-link" href="/first-ad" data-mode-link="/first-ad" data-track="nav_first_ad" title="Prepare an ad for Meta Ads Manager. Nothing is published for you.">First ad guide</a>
         <button type="button" class="topbar-link topbar-plans" data-open-pricing data-track="nav_plans">Plans &amp; pricing</button>
         <button type="button" class="topbar-link" id="openLocalEngineBtn" title="Optional local ComfyUI tools">Local tools</button>
       </nav>
-      <button type="button" class="workspace-btn" id="openLoginBtn" title="Switch the demo shop shown on this page">
+      <button type="button" class="workspace-btn" id="openLoginBtn" title="Switch between your shop and the sample shop">
         <span class="avatar" id="activeAvatar">SS</span>
-        <span class="workspace-text"><span class="workspace-kicker">Demo shop</span><span id="activeWorkspaceLabel">Art of Sarabjit Singh</span></span>
+        <span class="workspace-text"><span class="workspace-kicker" id="activeWorkspaceKicker">Sample shop</span><span id="activeWorkspaceLabel">Art of Sarabjit Singh</span></span>
         <span class="workspace-caret" aria-hidden="true">▾</span>
       </button>
     </div>
@@ -1006,7 +1052,7 @@
         </span>
         <span class="monitoring-tag">WATCHLIST</span>
         <span class="monitoring-title">
-          <strong>Watching 4 competitors across 6 shop pages</strong>
+          <strong>Watching 4 competitors (6 catalog &amp; shop pages tracked)</strong>
           <span class="monitoring-details">· SikhiArt.com, Fine Art America, Pixels, Saatchi Art</span>
         </span>
       </div>
@@ -1037,9 +1083,112 @@
       </ol>
     </div>
   </section>
+
+  <!-- Signed in, setup not finished, viewing the demo: welcome.js shows this instead. -->
+  <section class="logged-out-hero setup-hero" id="setupHero" hidden>
+    <div class="logged-out-hero-inner">
+      <div class="logged-out-eyebrow">Your account is ready. Your shop isn't set up yet.</div>
+      <h1 id="setupHeroTitle">Finish setup to see your own shop here.</h1>
+      <p class="hero-subtitle">You're looking at Art of Sarabjit Singh, a sample shop. Add your shop website and the sellers you compare yourself to. Muse then brings in your listings and fills this page with your shop and competitors. Setup is 4 steps and uses none of your runs.</p>
+      <div class="logged-out-hero-ctas">
+        <a href="/welcome" class="hero-btn-primary" id="setupHeroFinishBtn">Finish setup</a>
+        <a class="hero-btn-ghost" href="#journey">Keep exploring the sample</a>
+      </div>
+      <ol class="hero-path">
+        <li><span class="hero-path-step">Now</span><strong>Finish setup</strong><span>4 steps, 0 runs</span></li>
+        <li><span class="hero-path-step">Next</span><strong>Make today's post</strong><span>From your own listings</span></li>
+        <li><span class="hero-path-step">When you're ready</span><strong>Try a live Muse run</strong><span id="setupHeroRuns">Research and ad drafts on your products</span></li>
+      </ol>
+    </div>
+  </section>
   <p class="hero-bridge"><span>↓ Free demo below: one artist’s research → post → next move · Saved Muse outputs, no account needed</span></p>
 
   <main class="shell">
+    <section id="sampleAdFormatsGallery" class="sample-formats-band" aria-labelledby="sampleFormatsTitle">
+      <div class="sample-formats-head">
+        <div>
+          <p class="eyebrow">Sample ad formats gallery</p>
+          <h2 id="sampleFormatsTitle">See every social placement before you sign in</h2>
+          <p class="sample-formats-sub">Illustrative sample creatives built from real artworks by <strong>Art of Sarabjit Singh</strong> (Sample shop). Clearly separated into <em>Original artwork</em> vs. <em>Illustrative saved AI scene</em> — never scraped competitor ads.</p>
+        </div>
+        <a class="sample-format-btn" style="flex:0 0 auto" href="/create?workspace=sample">Open sample studio →</a>
+      </div>
+      <div class="sample-formats-grid" id="sampleFormatsGrid">
+        <article class="sample-format-card" data-placement="instagram_feed" data-artwork="ek_onkar">
+          <div>
+            <div class="sample-format-media">
+              <div class="sample-format-frame is-feed-4x5">
+                <img class="js-sample-format-img" data-format="Feed 4:5 · 1080×1350" data-title="Ek Onkar — Collector room scene" data-artist="Art of Sarabjit Singh" src="/samples/ek_onkar_collector_room_live.webp" alt="Ek Onkar 4:5 Instagram Feed sample creative in a collector room" width="208" height="260" loading="eager">
+              </div>
+            </div>
+            <div class="sample-format-badges">
+              <span class="sample-format-badge">Feed 4:5 · 1080×1350</span>
+              <span class="sample-format-badge kind-ai">Illustrative saved AI scene</span>
+            </div>
+            <h3>Ek Onkar — Collector room scene</h3>
+            <p class="sample-format-meta">Sample artist: Art of Sarabjit Singh</p>
+            <div class="sample-format-orig">
+              <img class="js-sample-format-img" data-format="Original artwork · Source" data-title="Ek Onkar original" data-artist="Art of Sarabjit Singh" src="/samples/ek_onkar_original.jpg" alt="Original Ek Onkar artwork by Sarabjit Singh" width="34" height="34">
+              <span><strong>Original artwork</strong> paired with a 4:5 scene</span>
+            </div>
+            <p class="sample-format-disclaimer">Sample showcase · not a competitor ad</p>
+          </div>
+          <div class="sample-format-actions">
+            <button type="button" class="sample-format-btn js-sample-preview" data-artwork="ek_onkar" data-sample-placement="instagram_feed" data-format-label="Feed 4:5 · 1080×1350" data-source-kind="Illustrative saved AI scene (paired with original artwork)" data-title="Ek Onkar — Collector room scene" data-text="Illustrative Instagram Feed 4:5 (1080×1350) sample showing Ek Onkar original artwork in a warm collector room." data-image="/samples/ek_onkar_collector_room_live.webp">Preview format</button>
+            <a class="sample-format-link" href="/create?workspace=sample&amp;placement=instagram_feed&amp;artwork=ek_onkar">Customize 4:5 →</a>
+          </div>
+        </article>
+        <article class="sample-format-card" data-placement="instagram_story" data-artwork="naam_japo">
+          <div>
+            <div class="sample-format-media">
+              <div class="sample-format-frame is-story-9x16">
+                <img class="js-sample-format-img" data-format="Story 9:16 · 1080×1920" data-title="Naam Japo — Gallery story format" data-artist="Art of Sarabjit Singh" src="/samples/naam_japo_restored_gallery_live.webp" alt="Naam Japo 9:16 Story sample creative" width="146" height="260" loading="eager">
+              </div>
+            </div>
+            <div class="sample-format-badges">
+              <span class="sample-format-badge">Story 9:16 · 1080×1920</span>
+              <span class="sample-format-badge kind-ai">Illustrative saved AI scene</span>
+            </div>
+            <h3>Naam Japo — Gallery story format</h3>
+            <p class="sample-format-meta">Sample artist: Art of Sarabjit Singh</p>
+            <div class="sample-format-orig">
+              <img class="js-sample-format-img" data-format="Original artwork · Source" data-title="Naam Japo original" data-artist="Art of Sarabjit Singh" src="/samples/naam_japo_original.jpg" alt="Original Naam Japo artwork by Sarabjit Singh" width="34" height="34">
+              <span><strong>Original artwork</strong> framed for 9:16 vertical Story</span>
+            </div>
+            <p class="sample-format-disclaimer">Sample showcase · not a competitor ad</p>
+          </div>
+          <div class="sample-format-actions">
+            <button type="button" class="sample-format-btn js-sample-preview" data-artwork="naam_japo" data-sample-placement="instagram_story" data-format-label="Story 9:16 · 1080×1920" data-source-kind="Illustrative saved AI scene (paired with original artwork)" data-title="Naam Japo — Gallery story format" data-text="Illustrative Story 9:16 (1080×1920) sample placing Naam Japo in a vertical gallery story layout." data-image="/samples/naam_japo_restored_gallery_live.webp">Preview format</button>
+            <a class="sample-format-link" href="/create?workspace=sample&amp;placement=instagram_story&amp;artwork=naam_japo">Customize 9:16 →</a>
+          </div>
+        </article>
+        <article class="sample-format-card" data-placement="facebook_feed" data-artwork="kirat_karo">
+          <div>
+            <div class="sample-format-media">
+              <div class="sample-format-frame is-square-1x1">
+                <img class="js-sample-format-img" data-format="Square 1:1 · 1080×1080" data-title="Kirat Karo — Square catalog post" data-artist="Art of Sarabjit Singh" src="/samples/kirat_karo_collector_room_live.webp" alt="Kirat Karo 1:1 Square Facebook feed sample creative" width="240" height="240" loading="eager">
+              </div>
+            </div>
+            <div class="sample-format-badges">
+              <span class="sample-format-badge">Square 1:1 · 1080×1080</span>
+              <span class="sample-format-badge kind-ai">Illustrative saved AI scene</span>
+            </div>
+            <h3>Kirat Karo — Square catalog post</h3>
+            <p class="sample-format-meta">Sample artist: Art of Sarabjit Singh</p>
+            <div class="sample-format-orig">
+              <img class="js-sample-format-img" data-format="Original artwork · Source" data-title="Kirat Karo original" data-artist="Art of Sarabjit Singh" src="/samples/kirat_karo_original.jpg" alt="Original Kirat Karo artwork by Sarabjit Singh" width="34" height="34">
+              <span><strong>Original artwork</strong> framed for 1:1 Square feed</span>
+            </div>
+            <p class="sample-format-disclaimer">Sample showcase · not a competitor ad</p>
+          </div>
+          <div class="sample-format-actions">
+            <button type="button" class="sample-format-btn js-sample-preview" data-artwork="kirat_karo" data-sample-placement="facebook_feed" data-format-label="Square 1:1 · 1080×1080" data-source-kind="Illustrative saved AI scene (paired with original artwork)" data-title="Kirat Karo — Square catalog post" data-text="Illustrative Facebook Square 1:1 (1080×1080) sample framing Kirat Karo for catalog posts." data-image="/samples/kirat_karo_collector_room_live.webp">Preview format</button>
+            <a class="sample-format-link" href="/create?workspace=sample&amp;placement=facebook_feed&amp;artwork=kirat_karo">Customize 1:1 →</a>
+          </div>
+        </article>
+      </div>
+    </section>
+
     <section id="journey" class="journey" aria-label="Your growth loop">
       <div class="jr-hero">
         <div>
@@ -1048,7 +1197,7 @@
 
           <div class="jr-stats" role="list">
             <div role="listitem"><strong>300</strong><span>competitor pages read</span></div>
-            <div role="listitem"><strong>4</strong><span>competitors on your watchlist</span></div>
+            <div role="listitem"><strong>4</strong><span>competitors in sample watchlist</span></div>
             <div role="listitem"><strong>5</strong><span>ranked Muse Spark ideas</span></div>
             <div role="listitem"><strong>4</strong><span>saved Muse Image ads</span></div>
           </div>
@@ -1060,6 +1209,7 @@
         </aside>
       </div>
 
+      <section id="firstMoveCard" class="first-move-card" aria-labelledby="firstMoveTitle" hidden></section>
       <nav class="jr-loop" aria-label="Growth loop stages">
         <ol>
           <li class="c2"><a href="#loop-research"><span>1</span><strong>Research</strong><em>What similar sellers do</em></a></li>
@@ -1096,40 +1246,52 @@
 
           <article class="jr-card c2">
             <header><h3>Competitor watchlist</h3></header>
-            <p class="jr-watch"><span class="jr-dot" aria-hidden="true"></span>4 competitors · 6 shop pages · last checked Nov 3 <button type="button" class="jr-mini" id="recheckBtn" disabled title="Re-checking needs a live server">Re-check now</button></p>
+            <p class="jr-watch"><span class="jr-dot" aria-hidden="true"></span>4 competitors (6 catalog &amp; shop pages tracked) · last checked Nov 3 <button type="button" class="jr-mini" id="recheckBtn" disabled title="Re-checking needs a live server">Re-check now</button></p>
             <ul class="jr-sellers" id="sellerList">
               <li class="jr-seller has-brief">
-                <div><strong>SikhiArt.com</strong><span>Sikh history paintings &amp; prints · 300 pages</span><span class="jr-new">New: 2 listings in the 30 days before Nov 3</span></div>
+                <div>
+                  <strong>SikhiArt.com</strong><span>Sikh history paintings &amp; prints · 300 pages</span><span class="jr-new">New: 2 listings in the 30 days before Nov 3</span>
+                  <a class="jr-meta-ad-link" href="https://www.facebook.com/ads/library/?active_status=active&amp;AdCandidate=&amp;q=SikhiArt&amp;search_type=keyword_unordered&amp;media_type=all" target="_blank" rel="noopener noreferrer">See their ads on Meta ↗</a>
+                </div>
                 <button type="button" class="jr-mini primary" id="journeyLoadBrief">Analyze this seller →</button>
               </li>
               <li class="jr-seller">
-                <div><a href="https://fineartamerica.com/profiles/gurinderpreet-kaur/art/paintings" target="_blank" rel="noopener noreferrer">Gurinderpreet Kaur</a><span>Fine Art America · 70 listings</span></div>
+                <div>
+                  <a href="https://fineartamerica.com/profiles/gurinderpreet-kaur/art/paintings" target="_blank" rel="noopener noreferrer">Gurinderpreet Kaur</a><span>Fine Art America · 70 listings</span>
+                  <a class="jr-meta-ad-link" href="https://www.facebook.com/ads/library/?active_status=active&amp;AdCandidate=&amp;q=Gurinderpreet%20Kaur&amp;search_type=keyword_unordered&amp;media_type=all" target="_blank" rel="noopener noreferrer">See their ads on Meta ↗</a>
+                </div>
                 <button type="button" class="jr-mini js-live-brief" disabled title="Live analysis is off in this demo">Request analysis →</button>
               </li>
               <li class="jr-seller">
-                <div><a href="https://fineartamerica.com/profiles/manjot-singh-sachdeva/art/photographs" target="_blank" rel="noopener noreferrer">Manjot Singh Sachdeva</a><span>Golden Temple photos · FAA / Pixels · 105 listings</span></div>
+                <div>
+                  <a href="https://fineartamerica.com/profiles/manjot-singh-sachdeva/art/photographs" target="_blank" rel="noopener noreferrer">Manjot Singh Sachdeva</a><span>Golden Temple photos · FAA / Pixels · 105 listings</span>
+                  <a class="jr-meta-ad-link" href="https://www.facebook.com/ads/library/?active_status=active&amp;AdCandidate=&amp;q=Manjot%20Singh%20Sachdeva&amp;search_type=keyword_unordered&amp;media_type=all" target="_blank" rel="noopener noreferrer">See their ads on Meta ↗</a>
+                </div>
                 <button type="button" class="jr-mini js-live-brief" disabled title="Live analysis is off in this demo">Request analysis →</button>
               </li>
               <li class="jr-seller">
-                <div><a href="https://www.saatchiart.com/gurdishpannu" target="_blank" rel="noopener noreferrer">Gurdish Pannu</a><span>Punjabi folk &amp; Sikh heritage · Saatchi Art</span></div>
+                <div>
+                  <a href="https://www.saatchiart.com/gurdishpannu" target="_blank" rel="noopener noreferrer">Gurdish Pannu</a><span>Punjabi folk &amp; Sikh heritage · Saatchi Art</span>
+                  <a class="jr-meta-ad-link" href="https://www.facebook.com/ads/library/?active_status=active&amp;AdCandidate=&amp;q=Gurdish%20Pannu&amp;search_type=keyword_unordered&amp;media_type=all" target="_blank" rel="noopener noreferrer">See their ads on Meta ↗</a>
+                </div>
                 <button type="button" class="jr-mini js-live-brief" disabled title="Live analysis is off in this demo">Request analysis →</button>
               </li>
             </ul>
             <form class="jr-add" id="addCompetitorForm" novalidate>
               <label for="addCompetitorInput">Add another competitor to analyze</label>
-              <div><input id="addCompetitorInput" type="url" inputmode="url" placeholder="https://their-shop.com" maxlength="300" aria-describedby="addCompetitorCost"><button type="submit" class="jr-mini primary" id="addCompetitorBtn">Add · 🪙 1 run</button></div>
-              <p class="jr-add-cost" id="addCompetitorCost">Analyzing a new shop uses 1 run. In this saved demo the shop is added to your list and no run is used.</p>
+              <div><input id="addCompetitorInput" type="url" inputmode="url" placeholder="https://their-shop.com" maxlength="300" aria-describedby="addCompetitorCost"><button type="submit" class="jr-mini primary" id="addCompetitorBtn">Add · 🪙 1 run (live) / 0 in demo</button></div>
+              <p class="jr-add-cost" id="addCompetitorCost">Live crawl uses 1 run. In this saved demo the shop is added to your list and no run is used.</p>
             </form>
-            <p class="jr-note">Public snapshots captured Nov 3, 2026. Only SikhiArt.com has a saved Muse Spark brief; new analyses need a live server.</p>
+            <p class="jr-note" id="competitorSnapshotsNote">Saved public snapshots from Nov 3, 2026. Only SikhiArt.com has a saved analysis; new analyses need a live server.</p>
           </article>
 
           <article class="jr-card c2">
             <header><h3>What they charge &amp; advertise</h3></header>
             <ul class="jr-prices" aria-label="Print price ranges, log scale">
-              <li class="you"><span class="jr-price-name">You · Pixels prints</span><span class="jr-price-bar"><i style="--l:5.9%;--w:7.9%"></i></span><span class="jr-price-val">$14–$22</span></li>
+              <li class="you"><span class="jr-price-name">You · Pixels POD prints</span><span class="jr-price-bar"><i style="--l:5.9%;--w:7.9%"></i></span><span class="jr-price-val">$14–$22</span></li>
               <li><span class="jr-price-name">Manjot S. Sachdeva</span><span class="jr-price-bar"><i style="--l:6.0%;--w:9.7%"></i></span><span class="jr-price-val">$14–$24</span></li>
               <li><span class="jr-price-name">Gurinderpreet Kaur</span><span class="jr-price-bar"><i style="--l:5.7%;--w:22.4%"></i></span><span class="jr-price-val">$14–$50</span></li>
-              <li><span class="jr-price-name">SikhiArt.com</span><span class="jr-price-bar"><i style="--l:31.4%;--w:65.4%"></i></span><span class="jr-price-val">$60–$2,500</span></li>
+              <li><span class="jr-price-name">SikhiArt.com (competitor range)</span><span class="jr-price-bar"><i style="--l:31.4%;--w:65.4%"></i></span><span class="jr-price-val">$60–$2,500</span></li>
             </ul>
             <p class="jr-scale" aria-hidden="true"><span style="left:0">$10</span><span style="left:40.4%">$100</span><span style="left:80.7%">$1,000</span></p>
             <dl class="jr-facts">
@@ -1137,6 +1299,41 @@
               <div><dt>Ad spend</dt><dd>Not public. Meta’s Ad Library shows spend only for political and issue ads, so competitor budgets can’t be seen.</dd></div>
             </dl>
             <p class="jr-note">Prices from public listing snapshots (Nov 3): 40 Manjot, 35 Gurinderpreet and 39 SikhiArt prices. Gurdish Pannu sells originals with no USD prices listed.</p>
+          </article>
+
+          <article class="jr-card c2 jr-steer-card" id="jrSteerResearch" style="grid-column:1 / -1;margin-top:0.5rem;">
+            <header>
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <h3>Ask Muse what to do next</h3>
+                <span class="jr-badge-sub" style="font-size:0.75rem;padding:2px 8px;border-radius:6px;background:#eef7f2;color:#2f6f4f;font-weight:700;">Free · no runs</span>
+              </div>
+            </header>
+            <p style="margin:0 0 0.75rem;font-size:0.88rem;color:#555047;">Pick a question or type your own. Muse matches it to the moves on this page and shows where to start. Your words are never sent to the AI model, and asking uses no runs.</p>
+            
+            <form id="jrSteerForm" class="jr-steer-form" novalidate style="display:grid;gap:0.6rem;">
+              <div style="display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center;min-width:0;">
+                <input id="jrSteerInput" type="text" placeholder="e.g. Look at why SikhiArt dropped prints to $45 or find gift ideas under $50" maxlength="300" style="flex:1 1 200px;min-width:0;max-width:100%;min-height:42px;padding:0.5rem 0.8rem;border:1px solid #d5cfc2;border-radius:10px;font:inherit;">
+                <button type="submit" class="jr-mini primary" id="jrSteerSubmitBtn" style="min-height:42px;padding:0.5rem 1rem;">Ask →</button>
+              </div>
+              
+              <div class="jr-steer-chips" id="jrSteerChips" style="display:flex;flex-wrap:wrap;gap:0.4rem;align-items:center;">
+                <span style="font-size:0.75rem;font-weight:700;color:#6b665c;">Suggestions:</span>
+                <button type="button" class="jr-chip-btn" data-directive="Look at why SikhiArt starts at $59.99">Why $59.99 entry</button>
+                <button type="button" class="jr-chip-btn" data-directive="Show me easier moves for solo makers">Easier moves</button>
+                <button type="button" class="jr-chip-btn" data-directive="Gift ideas for upcoming season under $50">Gifts under $50</button>
+                <button type="button" class="jr-chip-btn" data-directive="What should I post on Instagram this week?">Weekly post ideas</button>
+              </div>
+
+              <div id="jrDirectivePreview" class="jr-directive-preview" hidden style="margin-top:0.4rem;padding:0.75rem 1rem;background:#fff;border:1px solid #2f6f4f;border-radius:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
+                <div>
+                  <strong id="jrDirectiveSummary" style="display:block;font-size:0.88rem;color:#1e3a29;"></strong>
+                  <span id="jrDirectiveCost" style="font-size:0.75rem;color:#6b665c;"></span>
+                </div>
+                <button type="button" class="jr-mini" id="jrConfirmDirectiveBtn">Remember this focus</button>
+              </div>
+              <div id="jrSteerAnswer" class="jr-steer-answer" hidden></div>
+              <p id="jrSteerStatus" role="status" aria-live="polite" style="margin:0;font-size:0.82rem;color:#2f6f4f;" hidden></p>
+            </form>
           </article>
         </div>
       </div>
@@ -1165,19 +1362,19 @@
               <span class="jr-impact high">High impact · competitors don’t have this</span>
               <strong>Feature your Empowering Women series</strong>
               <p>SikhiArt.com groups its art by warriors and saints but has no group for women. Post one Empowering Women piece and point people to that series on Pixels.</p>
-              <a href="/create?goal=story">Make this post →</a>
+              <a href="/create?idea=idea-1-empowering-women">Make this post →</a>
             </li>
             <li>
               <span class="jr-impact high">High impact · undercuts a $59.99 entry price</span>
               <strong>Lead with your $14–$22 Pixels prints</strong>
               <p>SikhiArt’s cheapest print is $59.99. Your Pixels prints already start at about $14, so make that the easy first purchase. <em>Adapted from Muse’s Etsy suggestion; Etsy is closed.</em></p>
-              <a href="/create?goal=visit">Make a shop-visit post →</a>
+              <a href="/create?idea=idea-2-starter-prints">Make a shop-visit post →</a>
             </li>
             <li>
               <span class="jr-impact medium">Medium · reaches gift buyers</span>
               <strong>Make a gift-ready post</strong>
               <p>SikhiArt uses gift wording but has nothing under $59.99. Show one print as a thoughtful gift.</p>
-              <a href="/create?goal=gift">Make a gift post →</a>
+              <a href="/create?idea=idea-3-gift-ready">Make a gift post →</a>
             </li>
             <li>
               <span class="jr-impact medium">Medium · improves search visibility</span>
@@ -1189,13 +1386,14 @@
               <span class="jr-impact low">Quick win · stands out from 2 blog pages</span>
               <strong>Tell one painting story</strong>
               <p>SikhiArt has only two blog pages. A five-sentence story about one painting sets you apart. Ek Onkar is ready to go.</p>
-              <a href="/create">Create this post now →</a>
+              <a href="/create?idea=idea-5-painting-story">Create this post now →</a>
             </li>
           </ol>
           <aside class="jr-card c1">
             <header><h3>If you run ads</h3></header>
             <p>Muse Spark reads your campaign numbers and suggests where to move budget, with the metric behind each move.</p>
             <button type="button" class="jr-action" id="journeyBudget">Review budget strategy →</button>
+            <p class="jr-note">No ad running yet? <a id="improveFirstAdLink" href="/first-ad" data-mode-link="/first-ad">Prepare your first ad →</a></p>
             <p class="jr-note">Sample campaign data. Advice only; nothing changes in your ad account.</p>
           </aside>
         </div>
@@ -1210,6 +1408,7 @@
           <a class="jr-next-card" href="#loop-improve"><span class="jr-next-icon c1" aria-hidden="true">↑</span><strong>Try the next idea</strong><span>Pick the next ranked move, such as your Empowering Women series.</span><em>See ranked ideas →</em></a>
           <a class="jr-next-card" href="#loop-research"><span class="jr-next-icon c2" aria-hidden="true">↺</span><strong>Start the next cycle</strong><span>Re-check similar sellers and prices before your next post.</span><em>Back to research →</em></a>
         </div>
+        <p class="jr-note" style="margin-top:12px;">No ad running yet? <a id="iterateFirstAdLink" href="/first-ad" data-mode-link="/first-ad">Prepare your first ad →</a></p>
       </div>
 
 
@@ -1219,10 +1418,11 @@
         <img id="adDialogImg" alt="">
         <div class="jr-dialog-body">
           <p class="jr-label" id="adDialogKind"></p>
+          <p class="jr-note" id="adDialogMeta" style="margin:0 0 6px;font-weight:600;color:#253d34;"></p>
           <h3 id="adDialogTitle"></h3>
           <p id="adDialogText"></p>
-          <p class="jr-note">Saved Muse Image 1.0 output (Nov 3). AI scenes can change artwork details; prices and edition details need the artist’s confirmation.</p>
-          <a class="jr-action solid c4" id="adDialogCreate" href="/create">Customize this ad →</a>
+          <p class="jr-note" id="adDialogDisclaimer">Illustrative sample showcase for Art of Sarabjit Singh (not a scraped competitor ad). AI scenes can change artwork details; prices and edition details stay under your control.</p>
+          <a class="jr-action solid c4" id="adDialogCreate" href="/create?workspace=sample">Customize this ad →</a>
         </div>
       </dialog>
     </section>
@@ -1256,12 +1456,12 @@
         <div class="kpi-box">
           <div class="kpi-label">Catalog Indexed</div>
           <div class="kpi-val" id="kpiArtworks">72 Works</div>
-          <div class="kpi-sub">9 curated series · Triton Museum & UK exhibited</div>
+          <div class="kpi-sub">9 curated series · exhibition claims need artist verification</div>
         </div>
         <div class="kpi-box">
-          <div class="kpi-label">Pricing Arbitrage Gap</div>
+          <div class="kpi-label">Your POD vs. Direct Signed Range</div>
           <div class="kpi-val" style="color:var(--accent);" id="kpiPriceGap">$14 → $75–$900</div>
-          <div class="kpi-sub">Bridge $14 POD prints to $75 signed 18k-gold editions</div>
+          <div class="kpi-sub">Your $14–$22 POD prints vs. $75–$900 direct signed editions (SikhiArt charges $60–$2,500)</div>
         </div>
         <div class="kpi-box">
           <div class="kpi-label">14-Day Ad ROAS (sample data)</div>
@@ -1398,8 +1598,8 @@
           <div class="card">
             <div class="card-header">
               <div>
-                <h2 class="card-title">Illustrative Meta Ad Library Signals</h2>
-                <p class="card-sub">These sample competitor ads illustrate the analysis workflow. Ad longevity alone does not establish profitability.</p>
+                <h2 class="card-title">Meta Ad Library Signals</h2>
+                <p class="card-sub">Sample competitor ads illustrate the analysis workflow for the demo shop. Real accounts show verified live ads or direct public search links.</p>
               </div>
               <span class="badge gold">Instagram + Facebook Feed/Reels</span>
             </div>
@@ -1411,7 +1611,7 @@
           <div class="card">
             <div class="card-header">
               <div>
-                <h2 class="card-title">Actionable Playbook for Sarabjit Singh</h2>
+                <h2 class="card-title" id="actionablePlaybookTitle">Actionable Playbook for Sarabjit Singh</h2>
                 <p class="card-sub">5-to-15 minute high-leverage actions ranked by revenue impact.</p>
               </div>
               <button type="button" class="btn btn-outline" id="runAuditBtn" hidden style="font-size:0.78rem;padding:0.4rem 0.75rem;">
@@ -1488,7 +1688,7 @@
                   <span style="background:rgba(0,0,0,0.55);padding:0.15rem 0.45rem;border-radius:999px;">9:16 Reel</span>
                 </div>
                 <div style="text-align:left;">
-                  <span class="badge gold" style="margin-bottom:0.35rem;">Triton Museum Exhibited</span>
+                  <span class="badge gold" style="margin-bottom:0.35rem;">Sample claim · verify exhibition details</span>
                   <div id="reelHeadline" style="font-weight:700;font-size:0.92rem;line-height:1.25;text-shadow:0 1px 4px rgba(0,0,0,0.8);">
                     Ek Onkar in 18k Gold ✨ Signed Edition of 100
                   </div>
@@ -1536,8 +1736,8 @@
             <label class="field-label" for="briefHeadline">Ad Headline (Editable)</label>
             <input type="text" id="briefHeadline" class="input" style="margin-bottom:0.75rem;" value="Ek Onkar in 18k Gold ✨ Signed Edition of 100" />
 
-            <label class="field-label" for="briefPrimaryText">Primary Ad Copy (Editable)</label>
-            <textarea id="briefPrimaryText" class="textarea" style="margin-bottom:0.75rem;">550 years of Light. One sacred word — Ek Onkar. This 550th Anniversary piece by Bay Area artist Sarabjit Singh is hand-embellished with 18k gold ink, signed & numbered. Exhibited at Triton Museum & Kala Sangam UK. 12x12" $75 / 24x24" $125.</textarea>
+            <label class="field-label" for="briefPrimaryText">Primary Ad Copy (Editable · Verify Exhibition &amp; Anniversary Claims Before Publishing)</label>
+            <textarea id="briefPrimaryText" class="textarea" style="margin-bottom:0.75rem;">One sacred word — Ek Onkar. [Sample copy — artist to verify 550th Anniversary &amp; Triton Museum / Kala Sangam UK exhibition details before publishing.] By Bay Area artist Sarabjit Singh, hand-embellished with 18k gold ink, signed &amp; numbered. 12x12" $75 / 24x24" $125.</textarea>
           </div>
 
           <div>
@@ -1593,6 +1793,7 @@
             </button>
           </div>
         </div>
+        <p class="card-sub" style="margin:0 0 0.75rem 0;">No ad running yet? <a id="bidsFirstAdLink" href="/first-ad" data-mode-link="/first-ad">Prepare your first ad →</a></p>
 
         <p id="bidSummaryBanner" style="font-size:0.9rem;background:var(--surface-subtle);padding:0.85rem 1rem;border-radius:var(--radius-sm);border-left:3px solid var(--success);margin:0 0 1rem 0;"></p>
 
@@ -1654,10 +1855,10 @@
               📋 Copy Embed HTML for Weebly / Shopify
             </button>
           </div>
-          <pre class="code-box" id="weeblyHtmlCode">&lt;!-- Paste into Weebly / Shopify Embed Code Block on artofsarabjitsingh.com/gurus.html --&gt;
+          <pre class="code-box" id="weeblyHtmlCode">&lt;!-- Paste into Weebly / Shopify Embed Code Block on artofsarabjitsingh.com/gurus.html (Verify exhibition &amp; anniversary claims before publishing) --&gt;
 &lt;div style="max-width:460px;border:1px solid #e6e1d6;border-radius:16px;padding:20px;font-family:sans-serif;background:#fff;box-shadow:0 6px 20px rgba(0,0,0,0.06);"&gt;
-  &lt;span style="background:#fbf5e6;color:#7c5412;font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;"&gt;Triton Museum &amp; Kala Sangam UK Exhibited&lt;/span&gt;
-  &lt;h3 style="margin:10px 0 4px;font-size:20px;"&gt;Ek Onkar — 550th Anniversary 18k Gold Signed Edition&lt;/h3&gt;
+  &lt;span style="background:#fbf5e6;color:#7c5412;font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;"&gt;Sample badge — verify exhibition details before publishing&lt;/span&gt;
+  &lt;h3 style="margin:10px 0 4px;font-size:20px;"&gt;Ek Onkar — 18k Gold Signed Edition (verify anniversary subtitle)&lt;/h3&gt;
   &lt;p style="color:#615e57;font-size:14px;margin:0 0 14px;"&gt;Hand-embellished with 18k gold ink, signed &amp; numbered by Sarabjit Singh (Edition of 100). Ships with Certificate of Authenticity.&lt;/p&gt;
   &lt;div style="display:flex;gap:10px;flex-wrap:wrap;"&gt;
     &lt;a href="#stripe-link-75" style="flex:1;text-align:center;background:#b85d19;color:#fff;padding:10px 14px;border-radius:8px;text-decoration:none;font-weight:700;"&gt;Buy 12x12" Signed Print — $75&lt;/a&gt;
@@ -1677,7 +1878,7 @@
             </button>
           </div>
           <pre class="code-box" id="adsCsvPreview">Campaign Name,Ad Set Name,Daily Budget Change,Placement,Headline,Primary Text,Creative Asset,Cited Finding
-Fall Prints,Retargeting - Site Visitors,+$6.15/day (ROAS 9.3x),instagram_feed,"Ek Onkar in 18k Gold ✨ Signed Edition of 100","550 years of Light. Hand-embellished with 18k gold ink, signed & numbered by Sarabjit Singh. 12x12 $75 / 24x24 $125.",samples/ek_onkar_collector_room_live.webp,F1;F3
+Fall Prints,Retargeting - Site Visitors,+$6.15/day (ROAS 9.3x),instagram_feed,"Ek Onkar in 18k Gold ✨ Signed Edition of 100","[Sample copy — verify anniversary/exhibition claims] Hand-embellished with 18k gold ink, signed & numbered by Sarabjit Singh. 12x12 $75 / 24x24 $125.",samples/ek_onkar_collector_room_live.webp,F1;F3
 Gurpurab Gifts,Golden Temple - Gift Buyers,-$2.25/day (Refresh Creative),instagram_story,"Kirat Karo — Sacred Punjabi Heritage for Your Dining Room","Celebrate the dignity of honest work and Punjabi roots. Signed collector edition by Sarabjit Singh.",samples/kirat_karo_collector_room_live.webp,F1;F2</pre>
         </div>
       </div>
@@ -1741,12 +1942,12 @@ Gurpurab Gifts,Golden Temple - Gift Buyers,-$2.25/day (Refresh Creative),instagr
 
       <button type="button" class="workspace-option selected" data-ws="sarabjit_singh">
         <div>
-          <div style="font-weight:700;font-size:0.95rem;">🎨 Art of Sarabjit Singh (Fine Artist · SF Bay Area)</div>
+          <div style="font-weight:700;font-size:0.95rem;">🎨 Sample shop · Art of Sarabjit Singh (Fine Artist · SF Bay Area)</div>
           <div style="font-size:0.8rem;color:var(--text-muted);margin-top:0.2rem;">
             <code>artofsarabjitsingh.com</code> · Pixels · Fine Art America · Saatchi Art · <code>@artofsarabjitsingh</code>
           </div>
         </div>
-        <span class="badge green">Saved Demo Ready</span>
+        <span class="badge green">Sample shop</span>
       </button>
 
 
@@ -2016,24 +2217,59 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
 
       const adsEl = document.getElementById('metaAdsContainer');
       adsEl.innerHTML = '';
-      const themes = (ws.meta_ads_signals && ws.meta_ads_signals.longest_running_Declare) || [
-        "Desi Canvas Co (81d active on IG+FB): 'Golden Temple Sunset Framed Canvas - Ready to Hang' ($129+)",
-        "Punjab Heritage Prints (44d active on IG): '3-Piece Sikh History Collector Set - Save 20%' (room mockup hook)",
-        "Modern South Asian Decor (9d active): 'Housewarming & Wedding Art Gifts Under $95'"
-      ];
-      const hooks = (ws.meta_ads_signals && ws.meta_ads_signals.sample_hooks) || themes;
-      hooks.forEach((hook, idx) => {
-        const div = document.createElement('div');
-        div.className = 'finding-item';
-        div.innerHTML = `
-          <div class="finding-head">
-            <span class="badge gold">Sample Ad #${esc(idx + 1)}</span>
-            <span class="badge gold">Illustrative sample hook</span>
-          </div>
-          <div style="font-size:0.84rem;font-weight:600;">${esc(hook)}</div>
-        `;
-        adsEl.appendChild(div);
-      });
+      const isSample = ws.id === 'sarabjit_singh' || ws.id === 'etsy_pottery' || Boolean(ws.meta_ads_signals?.is_sample);
+      if (isSample) {
+        const hooks = (ws.meta_ads_signals && ws.meta_ads_signals.sample_hooks) || [
+          "[sample] Desi Canvas Co (81d active on IG+FB): 'Golden Temple Sunset Framed Canvas — Ready to Hang' ($129+)",
+          "[sample] Punjab Heritage Prints (44d active on IG): '3-Piece Sikh History Collector Set — Save 20%' (room mockup hook)",
+          "[sample] Modern South Asian Decor (9d active on IG): 'Housewarming & Wedding Art Gifts Under $95'"
+        ];
+        hooks.forEach((hook, idx) => {
+          const div = document.createElement('div');
+          div.className = 'finding-item';
+          const competitorName = hook.split('(')[0].replace(/^\[sample\]\s*/i, '').trim();
+          const adUrl = `https://www.facebook.com/ads/library/?active_status=active&AdCandidate=&q=${encodeURIComponent(competitorName)}&search_type=keyword_unordered&media_type=all`;
+          div.innerHTML = `
+            <div class="finding-head">
+              <span class="badge gold">[sample] Sample Ad #${esc(idx + 1)}</span>
+              <span class="badge gold">Sample hook only</span>
+            </div>
+            <div style="font-size:0.84rem;font-weight:600;">${esc(hook)}</div>
+            <div style="margin-top:6px;"><a class="jr-meta-ad-link" href="${safeUrl(adUrl)}" target="_blank" rel="noopener noreferrer">See their ads on Meta ↗</a></div>
+          `;
+          adsEl.appendChild(div);
+        });
+      } else {
+        const sigs = ws.meta_ads_signals || {};
+        if (sigs.ads && sigs.ads.length > 0) {
+          sigs.ads.forEach((ad, idx) => {
+            const div = document.createElement('div');
+            div.className = 'finding-item';
+            div.innerHTML = `
+              <div class="finding-head">
+                <strong>${esc(ad.page_name || 'Competitor Ad')}</strong>
+                <span class="badge green">Live Ad #${esc(idx + 1)}</span>
+              </div>
+              <div style="font-size:0.84rem;font-weight:600;">${esc(ad.headline || ad.body_excerpt)}</div>
+              <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;">
+                Started: ${esc(ad.start_date || 'Unknown')} · ${esc(ad.days_running || 0)} days active
+                <a class="jr-meta-ad-link" href="${safeUrl(ad.library_url)}" target="_blank" rel="noopener noreferrer" style="margin-left:8px;">View ad in library ↗</a>
+              </div>
+            `;
+            adsEl.appendChild(div);
+          });
+        } else {
+          const div = document.createElement('div');
+          div.className = 'finding-item';
+          const msg = sigs.message || (sigs.status === 'zero' ? 'No ads found via the Meta API.' : 'No live ads retrieved from Meta Ad Library API for this shop.');
+          const pubUrl = sigs.public_library_url || 'https://www.facebook.com/ads/library/';
+          div.innerHTML = `
+            <div style="font-size:0.85rem;color:var(--text-muted);">${esc(msg)}</div>
+            <div style="margin-top:6px;"><a class="jr-meta-ad-link" href="${safeUrl(pubUrl)}" target="_blank" rel="noopener noreferrer">Search public Meta Ad Library ↗</a></div>
+          `;
+          adsEl.appendChild(div);
+        }
+      }
     }
 
     function renderArtworksShowcase(ws) {
@@ -2188,6 +2424,8 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
     };
     const sellerKey = (btn) => {
       const li = btn.closest('.jr-seller');
+      // A shop the seller added keeps its own address; its only link is the Meta Ad Library one.
+      if (li?.dataset?.url) return li.dataset.url;
       const link = li?.querySelector('a');
       const raw = (link?.href || li?.querySelector('strong')?.textContent || '').trim();
       return raw.includes('://') ? raw : `https://${raw}`;
@@ -2222,19 +2460,93 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
         recheck.title = ready ? 'Re-analyze SikhiArt.com · costs 1 run'
           : (serverOn ? 'Sign in to re-check competitors' : 'Re-check from the saved snapshot · costs 1 run');
       }
+      refreshVisitorCopy();
     }
-    async function loadBriefCache() {
-      Object.keys(briefCache).forEach((k) => delete briefCache[k]);
+    function refreshVisitorCopy() {
       const snap = liveSnapshot();
-      if (snap?.configured && snap.user) {
+      const serverOn = !!snap?.configured;
+      const user = snap?.user || null;
+      const ready = liveRunsReady();
+      const addBtn = document.getElementById('addCompetitorBtn');
+      const addCost = document.getElementById('addCompetitorCost');
+      const snapNote = document.getElementById('competitorSnapshotsNote');
+      if (!serverOn) {
+        if (addBtn) addBtn.textContent = 'Add · 🪙 1 run (live) / 0 in demo';
+        if (addCost) addCost.textContent = 'Live crawl uses 1 run. In this saved demo the shop is added to your list and no run is used.';
+        if (snapNote) snapNote.textContent = 'Saved public snapshots from Nov 3, 2026. Only SikhiArt.com has a saved analysis; new analyses need a live server.';
+        return;
+      }
+      if (!user) {
+        if (addBtn) addBtn.textContent = 'Add shop';
+        if (addCost) addCost.textContent = 'Analyzing a shop needs a free account. You get 3 free runs, and each analysis uses 1.';
+        if (snapNote) snapNote.textContent = 'Saved public snapshots from Nov 3, 2026. Create a free account to analyze shops you choose.';
+        return;
+      }
+      if (ready) {
+        if (addBtn) addBtn.textContent = 'Add and analyze · 1 run';
+        if (addCost) addCost.textContent = 'Muse checks the shop and compares it with yours. Uses 1 run.';
+      } else if (!user.email_verified) {
+        if (addBtn) addBtn.textContent = 'Add shop';
+        if (addCost) addCost.textContent = 'Confirm your email address first to analyze a new shop. Check your inbox or resend the link from Account.';
+      } else {
+        if (addBtn) addBtn.textContent = 'Add shop';
+        if (addCost) addCost.textContent = 'No runs remaining on your current plan. Choose a plan in Account to analyze a new shop.';
+      }
+      // A seller's own list holds shops they chose, not the Nov 3 sample snapshots.
+      if (snapNote) snapNote.textContent = window.museModes?.isSampleMode?.()
+        ? 'Saved public snapshots from Nov 3, 2026. New analyses use 1 run.'
+        : 'Analyses you run are saved to your workspace. Viewing one again is free.';
+    }
+    window.addEventListener('muse:mode-change', refreshVisitorCopy);
+    // What Muse is told about the seller when it analyzes a competitor. The sample shop keeps
+    // the artist's context; a seller's own workspace describes their shop from setup.
+    const SAMPLE_SELLER_CONTEXT = 'Fine artist selling Sikh & Punjabi heritage art';
+    let ownOnboarding = null;
+    function sellerContextForAnalysis() {
+      if (!liveSnapshot()?.user || window.museModes?.isSampleMode?.()) return SAMPLE_SELLER_CONTEXT;
+      const o = ownOnboarding || {};
+      const crawl = o.crawl_summary || {};
+      const parts = [];
+      const name = String(o.business_name || crawl.business_name || '').trim();
+      const site = (Array.isArray(o.shop_urls) ? o.shop_urls : []).find(Boolean);
+      const offer = { products: 'sells products', services: 'sells services (not a product shop)', both: 'sells products and services' }[o.business_type] || '';
+      if (name || site) parts.push(`Independent business: ${[name, site].filter(Boolean).join(', ')}${offer ? `; ${offer}` : ''}.`);
+      else if (offer) parts.push(`Independent business that ${offer}.`);
+      const titles = (Array.isArray(crawl.sample_titles) ? crawl.sample_titles : [])
+        .map((t) => String(t).trim()).filter(Boolean).slice(0, 6);
+      if (titles.length) parts.push(`${o.business_type === 'services' ? 'Pages include' : 'Products include'}: ${titles.join('; ')}.`);
+      if (crawl.price_range) parts.push(`Prices: ${String(crawl.price_range)}.`);
+      const focus = String(o.preferences?.research_focus || '').trim();
+      if (focus) parts.push(`Seller's focus: ${focus}.`);
+      return (parts.join(' ') || 'Independent online shop owner.').slice(0, 900);
+    }
+    let briefLoadEpoch = 0;
+    async function loadBriefCache() {
+      const epoch = ++briefLoadEpoch;
+      Object.keys(briefCache).forEach((k) => delete briefCache[k]);
+      ownOnboarding = null;
+      const snap = liveSnapshot();
+      const ownerId = snap?.user?.id || null;
+      if (snap?.configured && ownerId) {
         try {
-          const resp = await fetch('/api/v1/account/workspace', { credentials: 'same-origin' });
-          if (resp.ok) Object.assign(briefCache, ((await resp.json()).document || {}).briefs || {});
+          const resp = await fetch('/api/v1/account/workspace', {
+            credentials: 'same-origin',
+            cache: 'no-store',
+            headers: { 'X-Muse-Owner': ownerId },
+          });
+          if (epoch !== briefLoadEpoch) return;
+          if ((liveSnapshot()?.user?.id || null) !== ownerId) return;
+          if (resp.ok) {
+            const payload = await resp.json();
+            if (epoch !== briefLoadEpoch || (liveSnapshot()?.user?.id || null) !== ownerId) return;
+            Object.assign(briefCache, (payload.document || {}).briefs || {});
+            ownOnboarding = (payload.document || {}).onboarding || null;
+          }
         } catch {}
       } else {
         try { Object.assign(briefCache, JSON.parse(localStorage.getItem(DEMO_BRIEFS_KEY) || '{}')); } catch {}
       }
-      refreshSellerButtons();
+      if (epoch === briefLoadEpoch) refreshSellerButtons();
     }
     async function saveBriefCache() {
       try {
@@ -2274,6 +2586,32 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
         refreshSellerButtons();
       }
     }
+    // On a live server, a guest is asked to create a free account instead of hitting a dead end.
+    // A shop they added themselves comes with them into setup (welcome.js adopts the note).
+    function rememberSignupHandoff(url) {
+      try {
+        const key = 'muse.signup_handoff.v1';
+        const prev = JSON.parse(localStorage.getItem(key) || 'null') || {};
+        const competitors = Array.isArray(prev.competitors) ? prev.competitors : [];
+        if (!competitors.includes(url)) competitors.push(url);
+        localStorage.setItem(key, JSON.stringify({ ...prev, from: prev.from || 'home', competitors: competitors.slice(-6), at: Date.now() }));
+      } catch {}
+    }
+    function promptForLiveRuns(url, btn) {
+      const snap = liveSnapshot();
+      const host = String(url).replace(/^https?:\/\/(www\.)?/, '').split('/')[0];
+      if (!snap?.user) {
+        const added = btn?.closest?.('.jr-seller')?.dataset?.added === '1';
+        if (added) rememberSignupHandoff(url);
+        window.museAccount?.open?.('signup', added
+          ? `Create a free account to analyze ${host}. You get 3 free runs, and each analysis uses 1. ${host} comes with you into setup.`
+          : 'Create a free account to analyze shops you choose. You get 3 free runs, and each analysis uses 1.');
+        return;
+      }
+      if (!snap.user.email_verified) { showToast('Confirm your email first. The link is in your inbox.'); return; }
+      if (snap.usage && snap.usage.remaining === 0) { showToast('Your runs are used. Pick a plan for more.'); return; }
+      showToast('Live analysis is unavailable right now. Saved research still works.');
+    }
     async function requestBrief(url, btn) {
       if (briefCache[url]) {
         renderCompetitorBrief(briefCache[url]);
@@ -2281,8 +2619,8 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
         return;
       }
       if (!liveRunsReady() && !liveSnapshot()?.configured) { await requestDemoBrief(url, btn); return; }
-      if (window.museAccount && !window.museAccount.liveReady()) return;
-      if (!liveRunsReady()) { showToast('Sign in to analyze new sellers.'); return; }
+      if (window.museAccount && !window.museAccount.liveReady()) { promptForLiveRuns(url, btn); return; }
+      if (!liveRunsReady()) { promptForLiveRuns(url, btn); return; }
       setButtonBusy(btn, true);
       btn.textContent = 'Analyzing…';
       try {
@@ -2294,7 +2632,7 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
           body: JSON.stringify({
             competitor_url: url,
             max_urls: 40,
-            seller_context: 'Fine artist selling Sikh & Punjabi heritage art',
+            seller_context: sellerContextForAnalysis(),
           }),
         });
         if (resp.status === 401 || resp.status === 403) {
@@ -2326,6 +2664,7 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
       requestBrief('https://www.sikhiart.com', event.currentTarget);
     });
     window.addEventListener('muse:account-change', loadBriefCache);
+    window.addEventListener('muse:workspace-reset', loadBriefCache);
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', loadBriefCache);
     else loadBriefCache();
     document.getElementById('journeyBudget').addEventListener('click', async () => {
@@ -2344,6 +2683,13 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
       setWorkspaceOpen(open);
       if (open) document.getElementById('workspaceDetail').scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
+    const openTabFromHash = () => {
+      if (window?.location?.hash === '#tab-bids') {
+        openStep('tab-bids', 'tab-bids');
+      }
+    };
+    openTabFromHash();
+    window?.addEventListener?.('hashchange', openTabFromHash);
     document.getElementById('addCompetitorForm').addEventListener('submit', (event) => {
       event.preventDefault();
       const input = document.getElementById('addCompetitorInput');
@@ -2356,15 +2702,25 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
       }
       input.setCustomValidity('');
       const live = liveRunsReady();
+      const onServer = !live && !!liveSnapshot()?.configured;
       const li = document.createElement('li');
       li.className = 'jr-seller added';
       li.dataset.added = '1';
+      li.dataset.url = url.href;
       const info = document.createElement('div');
       const name = document.createElement('strong');
       name.textContent = url.hostname.replace(/^www\./, '');
       const meta = document.createElement('span');
-      meta.textContent = live ? 'Analyzing now · 1 run' : 'Analysis needs a live server';
+      meta.textContent = live ? 'Analyzing now · 1 run'
+        : (onServer ? (liveSnapshot()?.user ? 'Needs 1 run to analyze' : 'Sign in to analyze · 1 run') : 'Analysis needs a live server');
       info.appendChild(name); info.appendChild(meta);
+      const adLink = document.createElement('a');
+      adLink.className = 'jr-meta-ad-link';
+      adLink.target = '_blank';
+      adLink.rel = 'noopener noreferrer';
+      adLink.href = `https://www.facebook.com/ads/library/?active_status=active&AdCandidate=&q=${encodeURIComponent(name.textContent)}&search_type=keyword_unordered&media_type=all`;
+      adLink.textContent = 'See their ads on Meta ↗';
+      info.appendChild(adLink);
       const btn = document.createElement('button');
       btn.type = 'button'; btn.className = 'jr-mini js-live-brief'; btn.disabled = true;
       btn.title = 'Live analysis is off in this demo'; btn.textContent = 'Request analysis →';
@@ -2373,34 +2729,141 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
       input.value = '';
       refreshSellerButtons();
       if (live) requestBrief(sellerKey(btn), btn);
+      else if (onServer) promptForLiveRuns(sellerKey(btn), btn);
       else showToast(`Added ${name.textContent} · analyzing it needs a live server, so no run was used`);
     });
     document.getElementById('addCompetitorInput').addEventListener('input', (event) => event.target.setCustomValidity(''));
 
-    const AD_KIND = { product_visuals: 'Collector room scene', multi_image_combine: 'Two-painting set', restore_enhance: 'Restored scan, framed' };
+    const AD_KIND = { product_visuals: 'Illustrative saved AI scene', multi_image_combine: 'Illustrative saved AI scene (two-painting set)', restore_enhance: 'Illustrative saved AI scene (restored scan)' };
+    const SAMPLE_AD_FALLBACKS = [
+      {
+        id: 'ek_onkar',
+        headline: 'Ek Onkar — Collector room scene',
+        placement: 'instagram_feed',
+        workflow_mode: 'product_visuals',
+        format_label: 'Feed 4:5 · 1080×1350',
+        artist: 'Art of Sarabjit Singh (Sample shop)',
+        primary_text: 'Illustrative Instagram Feed 4:5 (1080×1350) sample showing Ek Onkar original artwork in a warm collector room.',
+        staged_image: '/samples/ek_onkar_collector_room_live.webp',
+        original_image: '/samples/ek_onkar_original.jpg',
+      },
+      {
+        id: 'naam_japo',
+        headline: 'Naam Japo — Gallery story format',
+        placement: 'instagram_story',
+        workflow_mode: 'restore_enhance',
+        format_label: 'Story 9:16 · 1080×1920',
+        artist: 'Art of Sarabjit Singh (Sample shop)',
+        primary_text: 'Illustrative Story 9:16 (1080×1920) sample placing Naam Japo in a vertical gallery story layout.',
+        staged_image: '/samples/naam_japo_restored_gallery_live.webp',
+        original_image: '/samples/naam_japo_original.jpg',
+      },
+      {
+        id: 'kirat_karo',
+        headline: 'Kirat Karo — Square catalog post',
+        placement: 'facebook_feed',
+        workflow_mode: 'product_visuals',
+        format_label: 'Square 1:1 · 1080×1080',
+        artist: 'Art of Sarabjit Singh (Sample shop)',
+        primary_text: 'Illustrative Facebook Square 1:1 (1080×1080) sample framing Kirat Karo for catalog posts.',
+        staged_image: '/samples/kirat_karo_collector_room_live.webp',
+        original_image: '/samples/kirat_karo_original.jpg',
+      },
+    ];
+    function sampleFallbackPosterUrl(title, formatLabel, artist) {
+      const safeTitle = String(title || 'Sample ad preview').replace(/[<>&"]/g, '');
+      const safeFmt = String(formatLabel || 'Feed 4:5 · 1080×1350').replace(/[<>&"]/g, '');
+      const safeArtist = String(artist || 'Art of Sarabjit Singh').replace(/[<>&"]/g, '');
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="540" height="675" viewBox="0 0 540 675"><rect width="540" height="675" fill="#253d34"/><rect x="24" y="24" width="492" height="627" rx="18" fill="#f7f4ec" stroke="#b7c4af" stroke-width="3"/><text x="48" y="88" font-family="Georgia,serif" font-size="22" font-weight="700" fill="#1b6e44">${safeFmt}</text><text x="48" y="140" font-family="Georgia,serif" font-size="28" font-weight="700" fill="#1c2d27">${safeTitle.slice(0, 32)}</text><text x="48" y="185" font-family="sans-serif" font-size="18" fill="#535f59">${safeArtist} · Sample showcase</text><rect x="48" y="220" width="444" height="330" rx="12" fill="#e5eee1"/><text x="270" y="390" text-anchor="middle" font-family="sans-serif" font-size="18" font-weight="700" fill="#253d34">Fallback sample preview</text><text x="48" y="605" font-family="sans-serif" font-size="15" fill="#687167">Sample creative · not a scraped competitor ad</text></svg>`;
+      return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+    }
+    function wireSampleFallback(img, title, formatLabel, artist) {
+      if (!img) return;
+      const applyFallback = () => {
+        if (img.dataset?.fallbackApplied) return;
+        if (img.dataset) img.dataset.fallbackApplied = '1';
+        img.src = sampleFallbackPosterUrl(title, formatLabel, artist);
+      };
+      img.addEventListener?.('error', applyFallback);
+      if (img.complete && img.naturalWidth === 0 && img.getAttribute('src')) applyFallback();
+    }
+    if (typeof document.querySelectorAll === 'function') {
+      document.querySelectorAll('.js-sample-format-img').forEach((img) => {
+        wireSampleFallback(img, img.dataset?.title, img.dataset?.format, img.dataset?.artist);
+      });
+    }
+    function placementAspectClass(placement) {
+      if (placement === 'instagram_story') return 'is-story-9x16';
+      if (placement === 'facebook_feed') return 'is-square-1x1';
+      return 'is-feed-4x5';
+    }
     function openAd(art) {
       const dialog = document.getElementById('adDialog');
+      if (!dialog) return;
       const img = document.getElementById('adDialogImg');
-      img.src = safeUrl(art.staged_image);
-      img.alt = `Saved Muse Image ad: ${art.headline || 'artwork scene'}`;
-      document.getElementById('adDialogKind').textContent = AD_KIND[art.workflow_mode] || 'Muse Image scene';
-      document.getElementById('adDialogTitle').textContent = art.headline || '';
+      const headline = art.headline || art.title || '';
+      const placement = art.placement || 'instagram_feed';
+      const formatLabel = art.format_label || (placement === 'instagram_story' ? 'Story 9:16 · 1080×1920' : placement === 'facebook_feed' ? 'Square 1:1 · 1080×1080' : 'Feed 4:5 · 1080×1350');
+      const kindLabel = art.source_kind || AD_KIND[art.workflow_mode] || (art.staged_image ? 'Illustrative saved AI scene' : 'Original artwork');
+      const artist = art.artist || 'Art of Sarabjit Singh (Sample shop)';
+      if (img) {
+        if (img.dataset) delete img.dataset.fallbackApplied;
+        img.className = placementAspectClass(placement);
+        wireSampleFallback(img, headline, formatLabel, artist);
+        img.src = safeUrl(art.staged_image || art.original_image) || sampleFallbackPosterUrl(headline, formatLabel, artist);
+        img.alt = `Saved Muse Image ad: ${headline || 'artwork scene'}`;
+      }
+      document.getElementById('adDialogKind').textContent = `${formatLabel} · ${kindLabel}`;
+      const metaEl = document.getElementById('adDialogMeta');
+      if (metaEl) metaEl.textContent = `Artist: ${artist}`;
+      document.getElementById('adDialogTitle').textContent = headline;
       document.getElementById('adDialogText').textContent = art.primary_text || '';
-      document.getElementById('adDialogCreate').setAttribute('href', `/create?artwork=${encodeURIComponent(art.id || '')}`);
+      const discEl = document.getElementById('adDialogDisclaimer');
+      if (discEl) discEl.textContent = 'Illustrative sample showcase (not a scraped competitor ad). AI scenes can change artwork details; your workspace stays separate.';
+      const query = new URLSearchParams({ workspace: 'sample', placement });
+      if (art.id) query.set('artwork', art.id);
+      document.getElementById('adDialogCreate').setAttribute('href', `/create?${query.toString()}`);
       if (typeof dialog.showModal === 'function') dialog.showModal(); else dialog.setAttribute('open', '');
     }
-    function renderAdGallery(ws) {
+    if (typeof document.querySelectorAll === 'function') {
+      document.querySelectorAll('.js-sample-preview').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          openAd({
+            id: btn.dataset?.artwork || 'ek_onkar',
+            placement: btn.dataset?.samplePlacement || btn.dataset?.placement || 'instagram_feed',
+            format_label: btn.dataset?.formatLabel || '',
+            source_kind: btn.dataset?.sourceKind || '',
+            headline: btn.dataset?.title || '',
+            primary_text: btn.dataset?.text || '',
+            staged_image: btn.dataset?.image || '',
+            artist: 'Art of Sarabjit Singh (Sample shop)',
+          });
+        });
+      });
+    }
+    function renderAdGallery(ws, fallbackNotice = '') {
       const box = document.getElementById('adGallery');
       if (!box) return;
+      const modeState = window.museModes?.current?.();
+      if (modeState && (modeState.isLoading || modeState.isError || modeState.isExpired || modeState.isOwnWorkspace)) {
+        return;
+      }
       box.textContent = '';
       const arts = (ws.artworks_showcase || []).filter((a) => a && a.staged_image && a.headline).slice(0, 4);
-      if (!arts.length) { const p = document.createElement('p'); p.className = 'jr-note'; p.textContent = 'No saved Muse ads for this workspace.'; box.appendChild(p); return; }
-      for (const art of arts) {
+      const list = arts.length ? arts : SAMPLE_AD_FALLBACKS;
+      if (fallbackNotice || !arts.length) {
+        const p = document.createElement('p');
+        p.className = 'jr-note';
+        p.textContent = fallbackNotice || 'Showing built-in sample creatives.';
+        box.appendChild(p);
+      }
+      for (const art of list) {
         const card = document.createElement('button');
         card.type = 'button'; card.className = 'jr-ad';
         const img = document.createElement('img');
-        img.src = safeUrl(art.staged_image); img.alt = ''; img.loading = 'lazy';
-        const kind = document.createElement('span'); kind.className = 'jr-ad-kind'; kind.textContent = AD_KIND[art.workflow_mode] || 'Muse Image scene';
+        img.src = safeUrl(art.staged_image || art.original_image); img.alt = ''; img.loading = 'lazy';
+        wireSampleFallback(img, art.headline, art.format_label || 'Sample creative', art.artist || 'Art of Sarabjit Singh');
+        const kind = document.createElement('span'); kind.className = 'jr-ad-kind'; kind.textContent = AD_KIND[art.workflow_mode] || 'Illustrative saved AI scene';
         const head = document.createElement('strong'); head.textContent = art.headline;
         const text = document.createElement('span'); text.className = 'jr-ad-text'; text.textContent = art.primary_text || '';
         const more = document.createElement('em'); more.textContent = 'View ad →';
@@ -2412,23 +2875,60 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
     }
     document.getElementById('adDialog').addEventListener('click', (event) => { if (event.target.id === 'adDialog') event.target.close(); });
 
+    function renderLoadedSampleWorkspace(data) {
+      if (!data?.workspaces) return;
+      const ws = data.workspaces[state.activeWorkspace] || data.workspaces.sarabjit_singh;
+      if (!ws) return;
+      renderCompetitorBrief(ws.competitor_brief);
+      renderDiagnosticsAndAds(ws);
+      renderArtworksShowcase(ws);
+      renderBidAdvisor(ws.bid_advice_live);
+      if (typeof window !== 'undefined' && typeof window.__museApplySignedInWorkspace === 'function') {
+        window.__museApplySignedInWorkspace();
+      }
+    }
+
     async function loadPresets() {
+      if (typeof document !== 'undefined' && document.readyState === 'loading' && !window.museModes?.resolve) {
+        await new Promise((resolveDone) => document.addEventListener('DOMContentLoaded', resolveDone, { once: true }));
+      }
+      const initialMode = window.museModes?.resolve ? await window.museModes.resolve() : null;
+      const guard = window.museModes?.bindAsyncGuard?.() || { isCurrent: () => true };
+      const shouldShowSample = (m) => !m || (!m.isLoading && !m.isError && !m.isExpired && !m.isOwnWorkspace);
       let data;
       try {
         const resp = await portalFetch('/api/v1/demo-presets');
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         data = await resp.json();
       } catch (err) {
-        showToast(`Demo could not load: ${err.message}. Reload to retry.`);
-        document.getElementById('compSummaryText').textContent = 'Demo unavailable. Reload the page to retry loading the saved results.';
+        if (!guard.isCurrent()) return;
+        const nowMode = window.museModes?.current?.() || initialMode;
+        if (shouldShowSample(nowMode)) {
+          renderAdGallery({ artworks_showcase: SAMPLE_AD_FALLBACKS }, 'Showing built-in sample creatives (preset server unavailable).');
+          showToast(`Demo could not load: ${err.message}. Built-in sample formats remain available.`);
+          const compEl = document.getElementById('compSummaryText');
+          if (compEl) compEl.textContent = 'Sample presets unavailable right now. Built-in sample creatives remain visible above.';
+        }
         return;
       }
       state.presets = data;
-      const ws = data.workspaces[state.activeWorkspace];
-      renderCompetitorBrief(ws.competitor_brief);
-      renderDiagnosticsAndAds(ws);
-      renderArtworksShowcase(ws);
-      renderBidAdvisor(ws.bid_advice_live);
+      if (window.museModes?.subscribe) {
+        window.museModes.subscribe((m) => {
+          if (state.presets && shouldShowSample(m)) {
+            renderLoadedSampleWorkspace(state.presets);
+          }
+        });
+      }
+      const nowMode = window.museModes?.resolve
+        ? await window.museModes.resolve()
+        : (window.museModes?.current?.() || initialMode);
+      if (!guard.isCurrent() || !shouldShowSample(nowMode)) {
+        if (typeof window !== 'undefined' && typeof window.__museApplySignedInWorkspace === 'function' && nowMode?.isOwnWorkspace) {
+          window.__museApplySignedInWorkspace();
+        }
+        return;
+      }
+      renderLoadedSampleWorkspace(data);
     }
 
     // Live API Button: Step 1 Analyze Competitor
@@ -2790,6 +3290,9 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
       renderDiagnosticsAndAds(ws);
       renderArtworksShowcase(ws);
       renderBidAdvisor(ws.bid_advice_live);
+      if (typeof window !== 'undefined' && typeof window.__museApplySignedInWorkspace === 'function') {
+        window.__museApplySignedInWorkspace();
+      }
     }
 
     // Workspace Switcher inside Login Dialog

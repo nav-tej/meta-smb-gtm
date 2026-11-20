@@ -12,7 +12,10 @@
   const isOfflineNow = () => Boolean(window.museShell?.isOffline?.() || (typeof navigator !== 'undefined' && navigator.onLine === false));
   const safeURL = value => { try { const u = new URL(value); return u.protocol === 'https:' && !u.username && !u.password ? u.href : ''; } catch { return ''; } };
   const node = (tag, text) => { const el = document.createElement(tag); el.textContent = text; return el; };
-  const ownerKey = () => 'muse-research:' + (window.museAccount?.getSnapshot?.().user?.id || 'guest');
+  const ownerKey = () => {
+    if (window.museModes?.isSampleMode?.()) return 'muse-research:sample';
+    return 'muse-research:' + (window.museModes?.current?.()?.ownerId || window.museAccount?.getSnapshot?.().user?.id || 'guest');
+  };
   function remember() { try { localStorage.setItem(ownerKey(), JSON.stringify({ website: $('researchWebsite').value, direction: $('researchDirection').value, result })); } catch {} }
   function restore() {
     result = null; $('researchWebsite').value = ''; $('researchDirection').value = 'Find smaller businesses serving similar customers. Focus on practical content ideas.';
@@ -21,13 +24,12 @@
   }
   async function liveRequest(path, body) {
     if (isOfflineNow()) throw new Error('You appear to be offline. Your saved research is still here — reconnect and try again.');
-    if (readiness?.accounts_required && !window.museAccount?.liveReady?.()) throw new Error('Sign in before running personalized research.');
-    const key = $('unlockKey')?.value.trim();
-    if (!readiness?.accounts_required && !readiness?.live_unlock_configured && readiness?.default_mode !== 'live') throw new Error('Live research is not enabled on this demo. Explore the saved research, or configure the server first.');
-    if (!readiness?.accounts_required && readiness?.default_mode !== 'live' && !key) throw new Error('Open Muse settings below and enter the presenter unlock key to run live research.');
+    if (readiness && readiness.provider_key_configured === false) throw new Error('Live research is currently unavailable on this server. Your previous research is kept.');
+    if (window.museAccount?.liveReady && !window.museAccount.liveReady()) throw new Error('Sign in with a confirmed email and available runs to run live research.');
+    if (!window.museAccount && readiness?.default_mode !== 'live') throw new Error('Sign in before running personalized research.');
     const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), 285000);
     try {
-      const response = await fetch('/api/v1/' + path + '?live=true', { method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json', ...(key ? {'X-Demo-Key':key} : {})}, body:JSON.stringify(body), signal:controller.signal });
+      const response = await fetch('/api/v1/' + path + '?live=true', { method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body), signal:controller.signal });
       let data = {};
       try { data = await response.json(); } catch {}
       if (!response.ok) {
@@ -83,8 +85,20 @@
   $('researchExample').addEventListener('click', loadExample);
   $('researchWebsite').addEventListener('change',()=>{ result=null; render(); $('researchBrief').replaceChildren(); remember(); });
   $('researchDirection').addEventListener('change',remember);
-  let owner=null; window.addEventListener('muse:account-change', event=>{ const next=event.detail?.user?.id || null; if(next!==owner){ owner=next; restore(); } });
-  restore();
+  let activeModeKey = null;
+  const syncResearchMode = (modeState) => {
+    const s = modeState || window.museModes?.current?.();
+    if (s?.isLoading || s?.isError || s?.isExpired) return;
+    const nextKey = ownerKey();
+    if (nextKey !== activeModeKey) {
+      activeModeKey = nextKey;
+      restore();
+    }
+  };
+  window.addEventListener('muse:account-change', () => syncResearchMode());
+  if (window.museModes?.subscribe) window.museModes.subscribe(syncResearchMode);
+  if (window.museModes?.resolve) window.museModes.resolve().then(syncResearchMode);
+  else syncResearchMode();
   if (new URLSearchParams(location.search).get('example') === 'nplusalpha') { $('researchWorkspace').open=true; loadExample(); }
   fetch('/api/v1/readiness').then(r=>r.json()).then(data=>{readiness=data;}).catch(()=>{});
 })();

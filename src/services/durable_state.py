@@ -22,7 +22,13 @@ logger = logging.getLogger(__name__)
 BUCKET = "muse-state"
 PREFIX = "monitor"
 HYDRATE_EVERY_SECONDS = 60
-_last_hydrated = 0.0
+# None means never hydrated. time.monotonic() counts from boot, so a 0.0 start would throttle
+# the first hydrate on a machine up for under a minute (fresh containers, serverless cold starts).
+_last_hydrated: float | None = None
+
+
+def _hydrate_due() -> bool:
+    return _last_hydrated is None or time.monotonic() - _last_hydrated >= HYDRATE_EVERY_SECONDS
 
 
 def enabled() -> bool:
@@ -44,7 +50,7 @@ def _remote_name(path: Path) -> str:
 async def hydrate_monitor(*, force: bool = False) -> bool:
     """Download the stored change log and snapshots into MONITOR_DIR. True if it ran."""
     global _last_hydrated
-    if not enabled() or (not force and time.monotonic() - _last_hydrated < HYDRATE_EVERY_SECONDS):
+    if not enabled() or (not force and not _hydrate_due()):
         return False
     client = get_supabase_client()
     root = competitor_monitor.monitor_dir()
@@ -87,4 +93,4 @@ async def flush_monitor() -> int:
 def reset() -> None:
     """Tests: forget the hydrate timestamp."""
     global _last_hydrated
-    _last_hydrated = 0.0
+    _last_hydrated = None

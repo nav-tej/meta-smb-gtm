@@ -68,14 +68,14 @@ function harness(saved = null) {
   await h.fire(h.channels[3]); assert.equal(h.snapshot().channel, 'tiktok'); assert.equal(h.snapshot().format, 'video');
   assert.equal(h.node('reviewed').checked, false);
 
-  // Failed live calls preserve the existing edited draft and never unlock themselves.
+  // Failed live calls preserve the existing edited draft and never unlock themselves or send X-Demo-Key.
   await h.fire('musePlan'); assert(!h.requests.some(request => request.url.includes('live=true')));
-  h.node('unlockKey').value = 'private-unlock-token'; await h.fire('unlockKey', 'input');
+  assert.equal(h.node('unlockKey').handlers.input, undefined, 'Presenter #unlockKey must not be wired');
   h.node('liveMode').checked = true; await h.fire('liveMode', 'change');
   h.node('postCaption').value = 'Keep this during failure'; await h.fire('postCaption', 'input');
   h.fail(true); await h.fire('musePlan'); assert.equal(h.snapshot().copy.caption, 'Keep this during failure');
   const live = h.requests.find(request => request.url.includes('live=true'));
-  assert.equal(live.payload.use_muse, true); assert.equal(live.options.headers['X-Demo-Key'], 'private-unlock-token');
+  assert.equal(live.payload.use_muse, true); assert.equal(live.options.headers['X-Demo-Key'], undefined);
   assert(![...h.store.values()].join('').includes('private-unlock-token'));
   h.fail(false);
 

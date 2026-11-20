@@ -3,17 +3,29 @@
 import base64
 import binascii
 import json
+import logging
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, Any
 from urllib.parse import urlparse
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, Query, Request, Response
 from pydantic import BaseModel, Field
 
 from src.api.demo import LiveMode, demo_unavailable
-from src.clients.ad_library import load_sample_ad_library_signals
+from src.clients.ad_library import (
+    MetaAdLibraryClient,
+    build_ad_library_search_url,
+    load_sample_ad_library_signals,
+)
 from src.clients.meta import MetaAPIError
-from src.models.intel import CompetitorBrief, CompetitorIntelRequest
+from src.config import Settings, get_settings
+from src.models.intel import (
+    CompetitorAdSignalsResponse,
+    CompetitorBrief,
+    CompetitorIntelRequest,
+    SocialCompetitorSignals,
+)
 from src.models.seller import (
     ScreenshotAnalysis,
     SellerDiagnostics,
@@ -21,13 +33,18 @@ from src.models.seller import (
     SellerProfile,
 )
 from src.services import demo, result_cache
+from src.services.accounts import resolve_account
 from src.services.competitor_intel import CompetitorIntelService, collect_entries
+from src.services.research_cache import NAMESPACE_AD_PREVIEWS, cached_research
 from src.services.seller_audit import (
     analyze_social_screenshots,
     audit_seller_footprint,
     compute_seller_diagnostics,
 )
+from src.services.social_extract import extract_social_handles
 from src.utils.sitemap import SitemapError
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["intel"])
 
@@ -41,7 +58,7 @@ class AuditSellerRequest(BaseModel):
 
 
 class IngestStorefrontRequest(BaseModel):
-    business_name: str = Field(default="Art of Sarabjit Singh", max_length=160)
+    business_name: str = Field(default="Independent Artist Studio", max_length=160)
     website_url: str = Field(default="", max_length=500)
     marketplace_urls: list[str] = Field(default_factory=list, max_length=10)
     social_urls: list[str] = Field(default_factory=list, max_length=10)
@@ -180,22 +197,33 @@ async def ingest_storefront(request: IngestStorefrontRequest) -> dict[str, Any]:
     sample_titles = [item["title"] for item in discovered_items[:10] if item.get("title")]
     channels_str = ", ".join(f"{c['host']} ({c['status']})" for c in channel_results)
     prices_str = (
-        ", ".join(price_hints[:6]) if price_hints else "$14-$22 POD prints; $75-$900 direct"
+        ", ".join(price_hints[:6]) if price_hints else "No public prices detected on crawled pages"
     )
+    scan_date = datetime.now(UTC).date().isoformat()
     seller_context = (
         f"{request.business_name}. Connected channels: {channels_str}. "
-        f"Sample catalog pages/products: {'; '.join(sample_titles[:8])}. "
+        f"Sample catalog pages/products: {'; '.join(sample_titles[:8]) or 'None indexed yet'}. "
         f"Detected price points: {prices_str}."
+    )
+
+    suggested_socials = extract_social_handles(
+        {
+            "social_urls": request.social_urls,
+            "channels": channel_results,
+            "items": discovered_items,
+        }
     )
 
     return {
         "business_name": request.business_name,
+        "scan_date": scan_date,
         "total_channels": len(channel_results),
         "total_pages_crawled": sum(int(c["pages_found"]) for c in channel_results),
         "channels": channel_results,
         "discovered_catalog_items": discovered_items[:24],
         "detected_price_hints": price_hints,
         "seller_context": seller_context,
+        "suggested_socials": suggested_socials,
     }
 
 
@@ -219,6 +247,105 @@ async def audit_screenshot(
         ScreenshotAnalysis,
         lambda: analyze_social_screenshots([img_bytes], context=request.context),
         response,
+    )
+
+
+@router.get("/competitors/ads", response_model=CompetitorAdSignalsResponse)
+async def get_competitor_ads(
+    request: Request,
+    query: str = Query(
+        ..., min_length=1, max_length=100, description="Competitor brand or page name"
+    ),
+    force_refresh: bool = Query(False, description="Bypass research cache"),
+    settings: Annotated[Settings, Depends(get_settings)] = None,
+) -> CompetitorAdSignalsResponse:
+    """Fetch competitor active ads from Meta Ad Library with Track E caching.
+
+    Rules:
+    - If no META_ADS_ACCESS_TOKEN is configured: returns no_token status with
+      link-out only, zero fabricated rows.
+    - If token is configured: queries MetaAdLibraryClient, caches results (Track E),
+      distinguishes API zero from failure.
+    - API zero: returns "No ads found via the Meta API."
+    - API failure: returns graceful error note with link-out.
+    """
+    cfg = settings or get_settings()
+    public_url = build_ad_library_search_url(query)
+    token = cfg.meta_ads_access_token.strip()
+
+    if not token:
+        return CompetitorAdSignalsResponse(
+            query=query,
+            public_library_url=public_url,
+            status="no_token",
+            message="Meta Ad Library access token is not configured on this server.",
+            total_active_ads=0,
+            ads=[],
+            is_cached=False,
+        )
+
+    account = await resolve_account(request, None, require_verified=False)
+    if not account:
+        return CompetitorAdSignalsResponse(
+            query=query,
+            public_library_url=public_url,
+            status="no_token",
+            message="Sign in to query live Meta Ad Library signals. Public link available.",
+            total_active_ads=0,
+            ads=[],
+            is_cached=False,
+        )
+    account_id = account.user_id
+
+    async def _fetch() -> SocialCompetitorSignals:
+        client = MetaAdLibraryClient(settings=cfg)
+        try:
+            return await client.search_active_ads(query)
+        finally:
+            await client.aclose()
+
+    try:
+        signals, is_hit, cache_label = await cached_research(
+            NAMESPACE_AD_PREVIEWS,
+            account_id,
+            query,
+            SocialCompetitorSignals,
+            _fetch,
+            force_refresh=force_refresh,
+        )
+    except Exception as err:
+        logger.warning("Ad Library search failed for '%s': %s", query, err)
+        return CompetitorAdSignalsResponse(
+            query=query,
+            public_library_url=public_url,
+            status="error",
+            message=f"Meta Ad Library request failed: {type(err).__name__}",
+            total_active_ads=0,
+            ads=[],
+            is_cached=False,
+        )
+
+    if signals.total_active_ads == 0:
+        return CompetitorAdSignalsResponse(
+            query=query,
+            public_library_url=public_url,
+            status="zero",
+            message="No ads found via the Meta API.",
+            total_active_ads=0,
+            ads=[],
+            is_cached=is_hit,
+            cache_label=cache_label,
+        )
+
+    return CompetitorAdSignalsResponse(
+        query=query,
+        public_library_url=public_url,
+        status="live",
+        message=f"Found {signals.total_active_ads} active ads via Meta Ad Library API.",
+        total_active_ads=signals.total_active_ads,
+        ads=signals.top_longevity_ads,
+        is_cached=is_hit,
+        cache_label=cache_label,
     )
 
 
@@ -329,6 +456,21 @@ async def get_demo_presets() -> dict[str, Any]:
         if ads_path.is_file()
         else {}
     )
+    ad_signals["is_sample"] = True
+    ad_signals["sample_hooks"] = [
+        (
+            "[sample] Desi Canvas Co (81d active on IG+FB): "
+            "'Golden Temple Sunset Framed Canvas — Ready to Hang' ($129+)"
+        ),
+        (
+            "[sample] Punjab Heritage Prints (44d active on IG): "
+            "'3-Piece Sikh History Collector Set — Save 20%' (room mockup hook)"
+        ),
+        (
+            "[sample] Modern South Asian Decor (9d active on IG): "
+            "'Housewarming & Wedding Art Gifts Under $95'"
+        ),
+    ]
 
     return {
         "active_workspace": "sarabjit_singh",
@@ -583,16 +725,17 @@ async def get_demo_presets() -> dict[str, Any]:
                     ],
                 },
                 "meta_ads_signals": {
+                    "is_sample": True,
                     "sample_hooks": [
                         (
-                            "Artisan Table Co (62d active on IG): "
+                            "[sample] Artisan Table Co (62d active on IG): "
                             "'Hand-Thrown Mug Duo — Free Gift Box'"
                         ),
                         (
-                            "Jaipur Living Decor (39d active on IG+FB): "
+                            "[sample] Jaipur Living Decor (39d active on IG+FB): "
                             "'Block-Printed Table Runners 20% Off'"
                         ),
-                    ]
+                    ],
                 },
                 "bid_advice_live": _read_sample_json("bid_advice_live.json"),
                 "campaign_raw": _read_sample_json("sarabjit_singh_campaign.json"),

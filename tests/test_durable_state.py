@@ -74,6 +74,16 @@ async def test_hydrate_is_throttled_and_storage_failure_is_harmless(bucket: Fake
     assert await durable_state.flush_monitor() == 0
 
 
+@pytest.mark.asyncio
+async def test_first_hydrate_runs_soon_after_boot(
+    bucket: FakeBucket, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # time.monotonic() counts from boot: a fresh container may read only a few seconds.
+    monkeypatch.setattr(durable_state.time, "monotonic", lambda: 5.0)
+    assert await durable_state.hydrate_monitor()
+    assert not await durable_state.hydrate_monitor()
+
+
 def test_only_hosted_deployments_sync(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.undo()  # drop the conftest guard for this check
     monkeypatch.setenv("HOSTED_ENVIRONMENT", "")

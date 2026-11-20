@@ -33,15 +33,16 @@ SELLER_AUDIT_SYSTEM_PROMPT = (
     "Do NOT invent statistics or prices.\n\n"
     "Focus on:\n"
     "1. website_seo_and_conversion_fixes: Concrete fixes for their own website (e.g. turning "
-    "contact-form-only pages into 1-click checkout links, SEO page titles for heritage/series "
+    "contact-form-only pages into 1-click checkout links, SEO page titles for series or collection "
     "pages, collector room-mockup photos).\n"
-    "2. marketplace_and_pricing_fixes: Protecting fine-art brand value across FineArtAmerica, "
-    "Pixels, and Saatchi Art (curating out low-margin novelty merch where appropriate, filling "
-    "missing original prices and series tags, bridging $18 open-edition prints to $75-$150 "
-    "hand-signed 18k-gold giclees).\n"
+    "2. marketplace_and_pricing_fixes: Protecting fine-art brand value across online marketplaces "
+    "(curating out low-margin novelty merch where appropriate, filling missing original prices "
+    "and collection tags, bridging affordable open-edition prints to limited-edition or "
+    "original collector tiers).\n"
     "3. instagram_and_facebook_sales_plays: Concrete Reels/Feed/Carousel ideas for Instagram "
-    "and Facebook grounded in active competitor ad signals and upcoming cultural moments "
-    "(e.g. Gurpurab, Diwali, weddings, museum exhibition credibility)."
+    "and Facebook grounded in active competitor ad signals and upcoming cultural/seasonal moments "
+    "(e.g. seasonal holidays, gift-giving occasions, wedding registries, open studio weekends, "
+    "and collector events relevant to the artist's medium and subjects)."
 )
 
 SCREENSHOT_VISION_SYSTEM_PROMPT = (

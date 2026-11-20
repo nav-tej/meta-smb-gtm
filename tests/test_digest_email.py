@@ -31,6 +31,20 @@ def mail(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
     monkeypatch.setenv("CRON_SECRET", "")
     get_settings.cache_clear()
     monkeypatch.setattr(digest_email, "configured", lambda: True)
+    from src.services.accounts import AccountSession
+
+    user = AccountSession(
+        user_id=SUB,
+        email="ana@example.com",
+        email_verified=True,
+        access_token="tok",
+        session_id=None,
+    )
+
+    async def fake_resolve(*_args: Any, **_kwargs: Any) -> AccountSession:
+        return user
+
+    monkeypatch.setattr("src.api.digest_email.resolve_account", fake_resolve)
     sent: list[dict[str, Any]] = []
 
     async def fake_send(to: str, subject: str, html: str, text: str, **kwargs: Any) -> bool:
@@ -220,7 +234,7 @@ async def test_weekly_run_baselines_then_reports_changes_once_per_shop(
     rpc["replies"]["muse_digest_due"] = {"allowed": True, "subscribers": due}
     week1 = datetime(2026, 11, 9, 15, tzinfo=UTC)
     summary = await digest_email.run_weekly(fetch_entries=fetch, store=store, now=week1)
-    assert summary == {"due": 2, "sent": 2, "failed": 0, "shops": 1}
+    assert summary == {"due": 2, "sent": 2, "paused": 0, "failed": 0, "shops": 1}
     assert crawls == [SHOP]  # shared shop crawled once
     assert "We started watching this shop: 2 public pages" in mail[0]["text"]
     assert mail[0]["headers"]["List-Unsubscribe-Post"] == "List-Unsubscribe=One-Click"

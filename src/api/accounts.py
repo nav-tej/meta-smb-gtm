@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import AsyncIterator
 from typing import Annotated, Any, Literal
 from urllib.parse import urlencode
@@ -13,14 +14,17 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from src.clients.supabase import SupabaseError, get_supabase_client
 from src.config import get_settings
 from src.services.accounts import (
+    bind_signup,
     clear_cookies,
     complete_google_oauth,
     load_workspace,
     resolve_account,
     save_workspace,
     set_cookies,
+    settle_signup_binding,
     snapshot,
     start_google_oauth,
+    throttle_email_send,
     trusted_mutation,
     verify_token,
     verify_workspace_owner,
@@ -35,6 +39,7 @@ async def account_errors() -> AsyncIterator[None]:
         raise HTTPException(err.status_code, err.detail) from err
 
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/account", tags=["accounts"], dependencies=[Depends(account_errors)])
 
 
@@ -97,41 +102,63 @@ async def me(request: Request, response: Response) -> dict[str, Any]:
     return await snapshot(account)
 
 
+CONFIRMATION_SENT = (
+    "Check your inbox for a link to confirm your email, then sign in. "
+    "Already have an account? Sign in or reset your password."
+)
+CONFIRMATION_RESENT = (
+    "If that email is waiting for confirmation, a new link is on its way. "
+    "Check spam too; the link opens Muse signed in."
+)
+
+
 @router.post("/signup")
-async def signup(body: SignupRequest, response: Response, _: Mutation) -> dict[str, Any]:
+async def signup(
+    body: SignupRequest, request: Request, response: Response, _: Mutation
+) -> dict[str, Any]:
+    """Create an unconfirmed account; Supabase emails the confirmation link.
+
+    The reply is the same for new and existing addresses so signup cannot be used to
+    discover who has an account. Nothing here marks an email as confirmed.
+    """
     response.headers["Cache-Control"] = "no-store"
-    payload = body.model_dump()
-    already_exists = False
+    throttle_email_send(request, body.email)
     try:
-        await get_supabase_client().auth(
-            "admin/users",
-            "POST",
-            {"email": body.email, "password": body.password, "email_confirm": True},
-            secret=True,
+        result = await get_supabase_client().auth(
+            "signup?" + callback_query(), "POST", body.model_dump()
         )
     except SupabaseError as err:
-        if err.status_code == 401:
-            already_exists = True
-        else:
-            await get_supabase_client().auth("signup?" + callback_query(), "POST", payload)
-            return {
-                "message": "Check your email to confirm your account, then sign in.",
-                "authenticated": False,
-            }
+        if err.status_code != 401:
+            raise
+        raise HTTPException(
+            422,
+            "We couldn't create that account. Use a longer, less common password, "
+            "or sign in if you already have one.",
+        ) from err
+    if result.get("access_token") and result.get("refresh_token"):
+        # Only happens when the Supabase project has email confirmations turned off.
+        account = await verify_token(result["access_token"])
+        if account.email_verified:
+            logger.warning("Supabase returned a session at signup: email confirmation is off")
+            snap = await snapshot(account)
+            set_cookies(response, result)
+            return snap
+    await bind_signup(response, result, body.email, body.password)
+    return {"message": CONFIRMATION_SENT, "authenticated": False}
 
+
+@router.post("/resend")
+async def resend(body: EmailRequest, request: Request, _: Mutation) -> dict[str, str]:
+    """Send a fresh signup confirmation link, without revealing whether the account exists."""
+    throttle_email_send(request, body.email)
     try:
-        tokens = await get_supabase_client().auth("token?grant_type=password", "POST", payload)
+        await get_supabase_client().auth(
+            "resend?" + callback_query(), "POST", {"type": "signup", "email": body.email}
+        )
     except SupabaseError as err:
-        if already_exists and err.status_code == 401:
-            raise HTTPException(
-                409,
-                "An account with this email already exists. Sign in or reset your password.",
-            ) from err
-        raise
-    account = await verify_token(tokens.get("access_token", ""))
-    result = await snapshot(account)
-    set_cookies(response, tokens)
-    return result
+        if err.status_code != 401:
+            raise
+    return {"message": CONFIRMATION_RESENT}
 
 
 @router.post("/oauth")
@@ -168,9 +195,28 @@ async def oauth_google_callback(request: Request) -> RedirectResponse:
         request.query_params.get("state"),
         request.query_params.get("error"),
     )
-    query = urlencode({"oauth_error": error_msg} if error_msg else {"oauth": "google"})
+    if error_msg:
+        query = urlencode({"oauth_error": error_msg})
+        return RedirectResponse(
+            f"{target}?{query}", status_code=302, headers={"Cache-Control": "no-store"}
+        )
+
+    next_dest = "/"
+    if tokens is not None:
+        try:
+            account = await verify_token(tokens.get("access_token", ""))
+            ws = await load_workspace(account)
+            onb = ws.get("document", {}).get("onboarding") if ws.get("document") else None
+            if not onb or not onb.get("completed_at"):
+                next_dest = target if target not in {"/account", "/"} else "/welcome"
+            else:
+                next_dest = target if target != "/account" else "/"
+        except Exception:
+            next_dest = target if target not in {"/account", "/"} else "/welcome"
+
+    query = urlencode({"oauth": "google"})
     redirect = RedirectResponse(
-        f"{target}?{query}", status_code=302, headers={"Cache-Control": "no-store"}
+        f"{next_dest}?{query}", status_code=302, headers={"Cache-Control": "no-store"}
     )
     redirect.delete_cookie("muse_oauth_state", path="/")
     if tokens is not None:
@@ -178,22 +224,44 @@ async def oauth_google_callback(request: Request) -> RedirectResponse:
     return redirect
 
 
+PASSWORD_RESET_REQUIRED = (
+    "For your security, set a new password to finish creating this account. "
+    "Use \u201cForgot password?\u201d to get a reset link."
+)
+
+
 @router.post("/signin")
-async def signin(body: SigninRequest, response: Response, _: Mutation) -> dict[str, Any]:
+async def signin(
+    body: SigninRequest, request: Request, response: Response, _: Mutation
+) -> dict[str, Any]:
     tokens = await get_supabase_client().auth(
         "token?grant_type=password", "POST", body.model_dump()
     )
-    account = await verify_token(tokens.get("access_token", ""))
+    access = tokens.get("access_token", "")
+    if await settle_signup_binding(request, response, access, from_link=False):
+        raise HTTPException(401, PASSWORD_RESET_REQUIRED)
+    account = await verify_token(access)
     result = await snapshot(account)
     set_cookies(response, tokens)
     response.headers["Cache-Control"] = "no-store"
+    try:
+        ws = await load_workspace(account)
+        onb = ws.get("document", {}).get("onboarding") if ws.get("document") else None
+        result["next_path"] = "/" if onb and onb.get("completed_at") else "/welcome"
+    except Exception:
+        result["next_path"] = "/welcome"
     return result
 
 
 @router.post("/session")
-async def session(body: SessionRequest, response: Response, _: Mutation) -> dict[str, Any]:
+async def session(
+    body: SessionRequest, request: Request, response: Response, _: Mutation
+) -> dict[str, Any]:
     account = await verify_token(body.access_token)
+    reset = await settle_signup_binding(request, response, body.access_token, from_link=True)
     result = await snapshot(account)
+    if reset:
+        result["password_reset_required"] = True
     set_cookies(response, body.model_dump())
     response.headers["Cache-Control"] = "no-store"
     return result
@@ -215,7 +283,8 @@ async def signout(request: Request, response: Response, _: Mutation) -> dict[str
 
 
 @router.post("/recover")
-async def recover(body: EmailRequest, _: Mutation) -> dict[str, str]:
+async def recover(body: EmailRequest, request: Request, _: Mutation) -> dict[str, str]:
+    throttle_email_send(request, body.email)
     try:
         await get_supabase_client().auth("recover?" + callback_query(), "POST", body.model_dump())
     except SupabaseError as err:
@@ -236,13 +305,27 @@ async def password(
     return {"message": "Password updated."}
 
 
+def listing_import_hint(document: Any) -> dict[str, bool]:
+    """Say whether the editors may bring in the seller's listings on a first visit.
+
+    True once the account has a saved shop website. It is derived on every read, so it follows
+    the seller to any device and covers accounts that finished setup before it existed. The
+    editors act only on this explicit signal, never on a saved website alone.
+    """
+    onboarding = document.get("onboarding") if isinstance(document, dict) else None
+    urls = onboarding.get("shop_urls") if isinstance(onboarding, dict) else None
+    saved = isinstance(urls, list) and any(isinstance(url, str) and url.strip() for url in urls)
+    return {"first_visit": saved}
+
+
 @router.get("/workspace")
 async def workspace(request: Request, response: Response) -> dict[str, Any]:
     account = await resolve_account(request, response, require_verified=True)
     assert account is not None
     verify_workspace_owner(account, request.headers.get("x-muse-owner"))
     response.headers["Cache-Control"] = "no-store"
-    return await load_workspace(account)
+    saved = await load_workspace(account)
+    return {**saved, "listing_import": listing_import_hint(saved.get("document"))}
 
 
 @router.put("/workspace")
@@ -258,4 +341,23 @@ async def update_workspace(
         require_binding=True,
     )
     response.headers["Cache-Control"] = "no-store"
-    return await save_workspace(account, body.document, body.expected_version, body.expected_owner)
+    # Authoritative server-owned onboarding record preservation:
+    # A client PUT cannot wipe or forge an existing completed onboarding state.
+    try:
+        existing = await load_workspace(account)
+    except Exception:
+        existing = {"document": {}}
+    existing_doc = existing.get("document") or {}
+    next_doc = dict(body.document)
+    if (
+        "onboarding" in existing_doc
+        and isinstance(existing_doc["onboarding"], dict)
+        and existing_doc["onboarding"].get("completed_at")
+    ):
+        if "onboarding" not in next_doc or not isinstance(next_doc.get("onboarding"), dict):
+            next_doc["onboarding"] = existing_doc["onboarding"]
+        else:
+            next_doc["onboarding"]["completed_at"] = existing_doc["onboarding"]["completed_at"]
+            next_doc["onboarding"]["completed"] = True
+            next_doc["onboarding"]["used_run"] = existing_doc["onboarding"].get("used_run", False)
+    return await save_workspace(account, next_doc, body.expected_version, body.expected_owner)

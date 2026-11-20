@@ -1,0 +1,593 @@
+(() => {
+  const SAMPLE_IDEAS = new Set([
+    'idea-1-empowering-women',
+    'idea-2-starter-prints',
+    'idea-3-gift-ready',
+    'idea-4-home-titles',
+    'idea-5-painting-story',
+    'etsy_ceramics',
+    'gallery_print'
+  ]);
+  const SAMPLE_ARTWORKS = new Set([
+    'ek_onkar',
+    'ek_onkar_collector',
+    'naam_japo',
+    'naam_japo_restored',
+    'kirat_karo',
+    'kirat_karo_collector',
+    'golden_temple',
+    'diptych',
+    'etsy_chai'
+  ]);
+  const ALLOWED_PLACEMENTS = new Set(['instagram_feed', 'instagram_story', 'facebook_feed']);
+  const STORAGE_PREFIX = 'muse-editor-v1';
+
+  let revision = 1;
+  let lastKey = '';
+  let lastOwner = null;
+  let lastAuthStatus = null;
+  const listeners = new Set();
+
+  function cleanParam(value) {
+    return typeof value === 'string' ? value.trim() : '';
+  }
+
+  function isSampleIdea(idea) {
+    const val = cleanParam(idea);
+    if (!val || /^(own|shop|user):/i.test(val)) return false;
+    return SAMPLE_IDEAS.has(val);
+  }
+
+  function isSampleArtwork(artwork) {
+    const val = cleanParam(artwork);
+    if (!val || /^(own|shop|user):/i.test(val)) return false;
+    return SAMPLE_ARTWORKS.has(val);
+  }
+
+  function parseParams(searchOverride) {
+    const rawSearch = typeof searchOverride === 'string'
+      ? searchOverride
+      : (typeof window !== 'undefined' && window.location ? window.location.search : '');
+    const params = new URLSearchParams(rawSearch || '');
+    const workspaceRaw = cleanParam(params.get('workspace')).toLowerCase();
+    const workspace = workspaceRaw === 'sample' || workspaceRaw === 'own' ? workspaceRaw : '';
+    const idea = cleanParam(params.get('idea'));
+    const artwork = cleanParam(params.get('artwork'));
+    const placementRaw = cleanParam(params.get('placement')).toLowerCase();
+    const placement = ALLOWED_PLACEMENTS.has(placementRaw) ? placementRaw : '';
+    return { workspace, idea, artwork, placement };
+  }
+
+  function readAccountSnapshot() {
+    if (typeof window !== 'undefined' && window.museAccount && typeof window.museAccount.getSnapshot === 'function') {
+      return window.museAccount.getSnapshot();
+    }
+    return {
+      configured: false,
+      user: null,
+      usage: null,
+      live_available: false,
+      auth_status: 'signed_out',
+      auth_error: null
+    };
+  }
+
+  function computeState(snapshotOverride, searchOverride) {
+    const snap = snapshotOverride || readAccountSnapshot();
+    const params = parseParams(searchOverride);
+    const explicitOwn = params.workspace === 'own';
+    const requestedSample = !explicitOwn && (
+      params.workspace === 'sample' ||
+      isSampleIdea(params.idea) ||
+      isSampleArtwork(params.artwork)
+    );
+    const authStatus = snap?.auth_status || (snap?.user ? 'authenticated' : 'signed_out');
+    const ownerId = snap?.user && typeof snap.user.id === 'string' ? snap.user.id : null;
+
+    let state = 'guest_entry';
+    let mode = 'own';
+    if (authStatus === 'loading') {
+      state = 'loading';
+      mode = 'loading';
+    } else if (authStatus === 'error') {
+      state = 'error';
+      mode = 'error';
+    } else if (authStatus === 'expired') {
+      state = 'expired';
+      mode = 'expired';
+    } else if (ownerId) {
+      state = requestedSample ? 'account_sample' : 'account_own';
+      mode = requestedSample ? 'sample' : 'own';
+    } else {
+      state = requestedSample ? 'guest_sample' : 'guest_entry';
+      mode = requestedSample ? 'sample' : 'own';
+    }
+
+    const stateKey = `${state}:${ownerId || ''}:${params.workspace}:${params.idea}:${params.artwork}:${params.placement}`;
+    if (stateKey !== lastKey || ownerId !== lastOwner || authStatus !== lastAuthStatus) {
+      revision += 1;
+      lastKey = stateKey;
+      lastOwner = ownerId;
+      lastAuthStatus = authStatus;
+    }
+
+    if (typeof document !== 'undefined' && document.documentElement) {
+      document.documentElement.dataset.museMode = state;
+    }
+
+    return Object.freeze({
+      state,
+      mode,
+      isSample: state === 'account_sample' || state === 'guest_sample',
+      isLoading: state === 'loading',
+      isError: state === 'error',
+      isExpired: state === 'expired',
+      isAuthenticated: Boolean(ownerId) && (state === 'account_own' || state === 'account_sample'),
+      isOwnWorkspace: state === 'account_own',
+      ownerId,
+      user: ownerId ? snap.user : null,
+      authStatus,
+      authError: snap?.auth_error || null,
+      revision,
+      requestedSample,
+      sampleParams: requestedSample
+        ? Object.freeze({
+            workspace: 'sample',
+            idea: isSampleIdea(params.idea) ? params.idea : '',
+            artwork: isSampleArtwork(params.artwork) ? params.artwork : '',
+            placement: params.placement
+          })
+        : Object.freeze({
+            workspace: params.workspace,
+            idea: '',
+            artwork: '',
+            placement: params.placement
+          }),
+      snapshot: snap || null
+    });
+  }
+
+  function current() {
+    return computeState();
+  }
+
+  async function resolve() {
+    if (typeof window !== 'undefined' && window.museAccount && typeof window.museAccount.ready === 'function') {
+      try {
+        await window.museAccount.ready();
+      } catch {
+        // Account failures surface through snapshot.auth_status ('error' | 'expired').
+      }
+    }
+    return computeState();
+  }
+
+  function isSampleMode(stateObj) {
+    const s = stateObj || current();
+    return Boolean(s && s.isSample);
+  }
+
+  function modeStorageKey(namespace, stateObj) {
+    const ns = cleanParam(namespace) || 'studio';
+    const s = stateObj || current();
+    if (s.isSample) return `${STORAGE_PREFIX}:${ns}:sample`;
+    if (s.ownerId) return `${STORAGE_PREFIX}:${ns}:account:${s.ownerId}`;
+    return `${STORAGE_PREFIX}:${ns}:anon`;
+  }
+
+  function buildUrl(path, queryObj) {
+    const base = path || (typeof window !== 'undefined' && window.location ? window.location.pathname : '/');
+    const url = new URL(base, typeof window !== 'undefined' && window.location ? window.location.origin : 'https://muse.local');
+    Object.entries(queryObj || {}).forEach(([k, v]) => {
+      if (v) url.searchParams.set(k, String(v));
+      else url.searchParams.delete(k);
+    });
+    return `${url.pathname}${url.search}${url.hash}`;
+  }
+
+  function sampleHref(path, options = {}) {
+    const query = { workspace: 'sample' };
+    if (options.idea && isSampleIdea(options.idea)) query.idea = options.idea;
+    if (options.artwork && isSampleArtwork(options.artwork)) query.artwork = options.artwork;
+    if (options.placement && ALLOWED_PLACEMENTS.has(options.placement)) query.placement = options.placement;
+    return buildUrl(path, query);
+  }
+
+  function ownHref(path) {
+    return buildUrl(path, {});
+  }
+
+  function updateHistoryQuery(mutator) {
+    if (typeof window === 'undefined' || !window.location || !window.history?.replaceState) return;
+    const url = new URL(window.location.href);
+    mutator(url.searchParams);
+    try {
+      window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+    } catch {
+      // Ignore history mutation errors in restricted sandboxes.
+    }
+  }
+
+  // Cross-page links marked data-mode-link="/path" keep the visitor in the workspace
+  // they are in (sample example vs. their own), so a sample draft never opens as "own".
+  function syncModeLinks() {
+    if (typeof document === 'undefined' || typeof document.querySelectorAll !== 'function') return;
+    try {
+      const sample = isSampleMode();
+      document.querySelectorAll('a[data-mode-link]').forEach((link) => {
+        const path = link.getAttribute('data-mode-link');
+        if (!path || !/^\/(?!\/)/.test(path)) return;
+        link.setAttribute('href', sample ? sampleHref(path) : ownHref(path));
+      });
+    } catch {
+      // Links keep their static href when the DOM is unavailable.
+    }
+  }
+
+  // First-visit import. The account workspace response carries `listing_import.first_visit`
+  // when the seller has a saved shop website; the editors bring in listings only on that
+  // explicit signal. Drafts live per device, so each editor does it once per account on each
+  // device and remembers here that it tried.
+  const AUTO_IMPORT_PAGES = ['today', 'create'];
+  const autoImportKey = (ownerId) => `muse.autoimport.tried.v1:${encodeURIComponent(String(ownerId))}`;
+  function autoImportTried(ownerId) {
+    try {
+      return (localStorage.getItem(autoImportKey(ownerId)) || '').split(',').filter((name) => AUTO_IMPORT_PAGES.includes(name));
+    } catch {
+      // Storage unavailable: nothing could be remembered, so never scan unasked.
+      return AUTO_IMPORT_PAGES.slice();
+    }
+  }
+  function autoImportPending(ownerId, page, workspace) {
+    if (!ownerId || !AUTO_IMPORT_PAGES.includes(page)) return false;
+    if (workspace?.listing_import?.first_visit !== true) return false;
+    return !autoImportTried(ownerId).includes(page);
+  }
+  function finishAutoImport(ownerId, page) {
+    if (!ownerId || !AUTO_IMPORT_PAGES.includes(page)) return;
+    try {
+      const tried = autoImportTried(ownerId);
+      if (!tried.includes(page)) localStorage.setItem(autoImportKey(ownerId), AUTO_IMPORT_PAGES.filter((name) => name === page || tried.includes(name)).join(','));
+    } catch { /* Not remembered: the next visit may look once more. */ }
+  }
+
+  // Setup not finished. A page that has read this account's workspace reports it here; the
+  // sample banner then says the data is a demo, not theirs, and points to the setup wizard.
+  // The home page decides from the workspace it already reads. The editors (/today, /create)
+  // ask through checkSetupPending; they also work before setup, so their notice keeps a way in.
+  let setupPendingOwner = null;
+  let setupPendingEditor = false;
+  function setSetupPending(ownerId, options = {}) {
+    const next = typeof ownerId === 'string' && ownerId ? ownerId : null;
+    const editor = Boolean(next && options.editor);
+    if (next === setupPendingOwner && editor === setupPendingEditor) return;
+    setupPendingOwner = next;
+    setupPendingEditor = editor;
+    renderModeBanners();
+  }
+  let setupCheckedOwner = null;
+  async function checkSetupPending(ownerId) {
+    if (typeof ownerId !== 'string' || !ownerId || setupCheckedOwner === ownerId) return;
+    setupCheckedOwner = ownerId;
+    try {
+      const ws = await window.museAccount?.loadWorkspace?.(ownerId);
+      if (!ws || current().ownerId !== ownerId) return;
+      setSetupPending(ws.document?.onboarding?.completed_at ? null : ownerId, { editor: true });
+    } catch {
+      setupCheckedOwner = null; // Not known: keep the ordinary sample notice, ask again next time.
+    }
+  }
+  // A page that already read this account's workspace reports it instead of reading it again.
+  function noteSetup(ownerId, workspace) {
+    if (typeof ownerId !== 'string' || !ownerId || !workspace || current().ownerId !== ownerId) return;
+    setupCheckedOwner = ownerId;
+    setSetupPending(workspace.document?.onboarding?.completed_at ? null : ownerId, { editor: true });
+  }
+  function isSetupPending(stateObj) {
+    const s = stateObj || current();
+    return Boolean(setupPendingOwner) && s.state === 'account_sample' && s.ownerId === setupPendingOwner;
+  }
+
+  // Every page asks once a signed-in seller is known, in the sample or their own workspace.
+  // <html data-setup-check="page">: the page decides itself from its own read (home, wizard).
+  // <html data-setup-check="editor">: in their own workspace /today and /create report through
+  // noteSetup from the read they already make.
+  function maybeCheckSetup(s) {
+    if (!s.ownerId || (s.state !== 'account_sample' && s.state !== 'account_own')) return;
+    const mark = typeof document !== 'undefined' ? document.documentElement?.dataset?.setupCheck : null;
+    if (mark === 'page' || (mark === 'editor' && s.state === 'account_own')) return;
+    checkSetupPending(s.ownerId);
+  }
+
+  // In their own workspace, a seller who has not finished setup gets a slim notice under the
+  // header. It is separate from the mode banner, which stays hidden in the own workspace.
+  function renderSetupNotice(s) {
+    if (typeof document === 'undefined' || !document.body) return;
+    const show = Boolean(setupPendingOwner) && setupPendingEditor && s.state === 'account_own' && s.ownerId === setupPendingOwner;
+    let notice = document.getElementById('museSetupNotice');
+    if (!show) {
+      if (notice) notice.hidden = true;
+      return;
+    }
+    if (!notice) {
+      notice = document.createElement('div');
+      notice.id = 'museSetupNotice';
+      notice.className = 'muse-mode-banner is-sample';
+      notice.setAttribute('role', 'status');
+      const inner = document.createElement('div');
+      inner.className = 'muse-mode-banner-inner';
+      const textWrap = document.createElement('div');
+      textWrap.className = 'muse-mode-banner-copy';
+      const badge = document.createElement('span');
+      badge.className = 'muse-mode-badge';
+      badge.textContent = 'Setup not finished';
+      const msg = document.createElement('span');
+      msg.className = 'muse-mode-text';
+      msg.textContent = 'Finish setup so Muse can bring in your listings and track the sellers you compare yourself to. It takes 4 steps and uses no runs.';
+      const actions = document.createElement('div');
+      actions.className = 'muse-mode-banner-actions';
+      actions.appendChild(buildButton('Finish setup', 'finish-setup', 'primary'));
+      textWrap.append(badge, msg);
+      inner.append(textWrap, actions);
+      notice.appendChild(inner);
+    }
+    const header = document.querySelector('body > header');
+    if (header && header.parentNode) {
+      if (header.nextSibling !== notice) header.parentNode.insertBefore(notice, header.nextSibling);
+    } else if (document.body.firstChild !== notice) {
+      document.body.insertBefore(notice, document.body.firstChild);
+    }
+    notice.hidden = false;
+  }
+
+  function notify() {
+    const resolved = computeState();
+    maybeCheckSetup(resolved);
+    renderModeBanners();
+    syncModeLinks();
+    listeners.forEach((fn) => {
+      try { fn(resolved); } catch {}
+    });
+    if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function' && typeof CustomEvent === 'function') {
+      window.dispatchEvent(new CustomEvent('muse:mode-change', { detail: resolved }));
+    }
+    return resolved;
+  }
+
+  function enterSampleMode(options = {}) {
+    updateHistoryQuery((params) => {
+      params.set('workspace', 'sample');
+      if (options.idea && isSampleIdea(options.idea)) params.set('idea', options.idea);
+      else if (options.idea === null) params.delete('idea');
+      if (options.artwork && isSampleArtwork(options.artwork)) params.set('artwork', options.artwork);
+      else if (options.artwork === null) params.delete('artwork');
+      if (options.placement && ALLOWED_PLACEMENTS.has(options.placement)) params.set('placement', options.placement);
+    });
+    return notify();
+  }
+
+  function goToOwnWorkspace(options = {}) {
+    if (options.navigateTo && typeof window !== 'undefined' && window.location) {
+      window.location.assign(ownHref(options.navigateTo));
+      return current();
+    }
+    updateHistoryQuery((params) => {
+      params.delete('workspace');
+      params.delete('idea');
+      params.delete('artwork');
+      params.delete('placement');
+    });
+    return notify();
+  }
+
+  function bindAsyncGuard() {
+    const start = current();
+    const controller = typeof AbortController === 'function' ? new AbortController() : null;
+    const isCurrent = () => {
+      const now = current();
+      if (now.isLoading || now.isError || now.isExpired) return false;
+      return (
+        now.revision === start.revision &&
+        now.ownerId === start.ownerId &&
+        now.isSample === start.isSample &&
+        now.state === start.state
+      );
+    };
+    return Object.freeze({
+      revision: start.revision,
+      ownerId: start.ownerId,
+      isSample: start.isSample,
+      state: start.state,
+      signal: controller ? controller.signal : undefined,
+      abort: () => { try { controller?.abort(); } catch {} },
+      isCurrent
+    });
+  }
+
+  function placeBannerDefault(banner) {
+    const host = document.getElementById('museModeBannerHost');
+    if (host) {
+      host.appendChild(banner);
+      return;
+    }
+    const anchor = document.querySelector('main, .shell, .app-shell, .ms-main');
+    if (anchor && anchor.parentNode) {
+      anchor.parentNode.insertBefore(banner, anchor);
+    } else {
+      const header = document.querySelector('header');
+      if (header && header.parentNode) header.parentNode.insertBefore(banner, header.nextSibling);
+      else document.body.insertBefore(banner, document.body.firstChild);
+    }
+  }
+
+  function ensureBannerElement() {
+    if (typeof document === 'undefined' || !document.body) return null;
+    let banner = document.getElementById('museModeBanner');
+    if (banner) return banner;
+    banner = document.createElement('div');
+    banner.id = 'museModeBanner';
+    banner.className = 'muse-mode-banner';
+    banner.hidden = true;
+    placeBannerDefault(banner);
+    return banner;
+  }
+
+  // The demo notice has to be the first thing a seller sees, so it sits directly under the page
+  // header. On the home page the usual spot is below the hero. Every other banner stays put.
+  function placeBanner(banner, underHeader) {
+    const want = underHeader ? 'top' : 'default';
+    if ((banner.dataset.placement || 'default') === want) return;
+    const header = underHeader ? document.querySelector('body > header') : null;
+    if (underHeader && !(header && header.parentNode)) return;
+    if (underHeader) header.parentNode.insertBefore(banner, header.nextSibling);
+    else placeBannerDefault(banner);
+    banner.dataset.placement = want;
+  }
+
+  function buildButton(label, action, variant) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `muse-mode-btn ${variant || 'secondary'}`;
+    btn.setAttribute('data-muse-action', action);
+    btn.textContent = label;
+    btn.addEventListener('click', async () => {
+      if (action === 'retry-auth') {
+        btn.disabled = true;
+        try { await window.museAccount?.refresh?.(); } catch {}
+        finally { btn.disabled = false; notify(); }
+      } else if (action === 'signin') {
+        window.museAccount?.open?.('signin', 'Sign in to load your workspace and keep your edits safe.');
+      } else if (action === 'signup') {
+        window.museAccount?.open?.('signup', 'Create an account to save your own shop workspace.');
+      } else if (action === 'back-to-own') {
+        goToOwnWorkspace();
+      } else if (action === 'finish-setup') {
+        window.location.assign('/welcome');
+      }
+    });
+    return btn;
+  }
+
+  function renderModeBanners(customHost) {
+    if (typeof document === 'undefined') return null;
+    const banner = customHost || ensureBannerElement();
+    if (!banner) return null;
+    const s = computeState();
+    if (!customHost) renderSetupNotice(s);
+    const setupPending = isSetupPending(s);
+    banner.dataset.modeState = s.state;
+    if (setupPending) banner.dataset.setup = 'pending';
+    else delete banner.dataset.setup;
+    if (!customHost) placeBanner(banner, setupPending);
+    banner.textContent = '';
+
+    if (s.state === 'account_own' || s.state === 'guest_entry') {
+      banner.hidden = true;
+      banner.removeAttribute('role');
+      return banner;
+    }
+
+    banner.hidden = false;
+    banner.setAttribute('role', s.isError || s.isExpired ? 'alert' : 'status');
+
+    const inner = document.createElement('div');
+    inner.className = 'muse-mode-banner-inner';
+    const textWrap = document.createElement('div');
+    textWrap.className = 'muse-mode-banner-copy';
+    const badge = document.createElement('span');
+    badge.className = 'muse-mode-badge';
+    const msg = document.createElement('span');
+    msg.className = 'muse-mode-text';
+    const actions = document.createElement('div');
+    actions.className = 'muse-mode-banner-actions';
+
+    if (s.state === 'loading') {
+      banner.className = 'muse-mode-banner is-loading';
+      badge.textContent = 'Checking account';
+      msg.textContent = 'Loading your workspace status…';
+    } else if (s.state === 'error') {
+      banner.className = 'muse-mode-banner is-error';
+      badge.textContent = 'Account check unavailable';
+      msg.textContent = `${s.authError || 'Could not verify your account right now.'} Sample data is kept separate and your device edits stay safe.`;
+      actions.appendChild(buildButton('Retry account check', 'retry-auth', 'primary'));
+      actions.appendChild(buildButton('Sign in', 'signin', 'secondary'));
+    } else if (s.state === 'expired') {
+      banner.className = 'muse-mode-banner is-expired';
+      badge.textContent = 'Session expired';
+      msg.textContent = 'Your session ended. Sign in again to open your workspace; your unsaved device edits are safe.';
+      actions.appendChild(buildButton('Sign in again', 'signin', 'primary'));
+      actions.appendChild(buildButton('Retry', 'retry-auth', 'secondary'));
+    } else if (setupPending) {
+      banner.className = 'muse-mode-banner is-sample';
+      badge.textContent = 'Demo data';
+      if (setupPendingEditor) {
+        msg.textContent = 'This page shows a sample shop, Art of Sarabjit Singh, not yours. Finish setup to bring in your own shop and competitors.';
+        actions.appendChild(buildButton('Finish setup', 'finish-setup', 'primary'));
+        actions.appendChild(buildButton('Open my workspace', 'back-to-own', 'secondary'));
+      } else {
+        msg.textContent = 'This dashboard shows a sample shop, Art of Sarabjit Singh, not yours. Finish setup to see your own shop and competitors here.';
+        actions.appendChild(buildButton('Finish setup', 'finish-setup', 'primary'));
+      }
+    } else if (s.state === 'account_sample') {
+      banner.className = 'muse-mode-banner is-sample';
+      badge.textContent = 'Sample shop';
+      msg.textContent = 'Viewing the Art of Sarabjit Singh example. Changes here stay separate from your own shop.';
+      actions.appendChild(buildButton('Back to my workspace', 'back-to-own', 'primary'));
+    } else if (s.state === 'guest_sample') {
+      banner.className = 'muse-mode-banner is-sample';
+      badge.textContent = 'Sample shop example';
+      msg.textContent = 'Exploring the Art of Sarabjit Singh example. Set up your own shop or sign in anytime.';
+      actions.appendChild(buildButton('Set up your own shop', 'back-to-own', 'secondary'));
+      if (s.snapshot?.configured) actions.appendChild(buildButton('Sign in', 'signin', 'primary'));
+    }
+
+    textWrap.appendChild(badge);
+    textWrap.appendChild(msg);
+    inner.appendChild(textWrap);
+    if (actions.childNodes.length) inner.appendChild(actions);
+    banner.appendChild(inner);
+    return banner;
+  }
+
+  function subscribe(fn) {
+    if (typeof fn !== 'function') return () => {};
+    listeners.add(fn);
+    return () => listeners.delete(fn);
+  }
+
+  if (typeof window !== 'undefined') {
+    window.addEventListener('muse:account-change', () => { notify(); });
+    window.addEventListener('popstate', () => { notify(); });
+    if (typeof document !== 'undefined') {
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => { renderModeBanners(); syncModeLinks(); });
+      } else {
+        renderModeBanners();
+        syncModeLinks();
+      }
+    }
+  }
+
+  window.museModes = Object.freeze({
+    resolve,
+    current,
+    isSampleMode,
+    modeStorageKey,
+    getSampleParams: parseParams,
+    isSampleIdea,
+    isSampleArtwork,
+    enterSampleMode,
+    goToOwnWorkspace,
+    sampleHref,
+    ownHref,
+    bindAsyncGuard,
+    renderModeBanners,
+    subscribe,
+    autoImportPending,
+    finishAutoImport,
+    setSetupPending,
+    checkSetupPending,
+    noteSetup,
+    isSetupPending
+  });
+})();

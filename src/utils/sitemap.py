@@ -693,8 +693,12 @@ def extract_html_metadata(html_text: str) -> tuple[str | None, str | None]:
 
 def extract_page_metadata(html_text: str) -> PageMetadata:
     """Extract title, price hint, and meta description from an HTML `<head>` snippet."""
+    # Strip script and style blocks to prevent injection and script tag leaks
+    clean_html = re.sub(r"<script[\s\S]*?</script>", "", html_text, flags=re.IGNORECASE)
+    clean_html = re.sub(r"<style[\s\S]*?</style>", "", clean_html, flags=re.IGNORECASE)
+
     title: str | None = None
-    title_match = _TITLE_RE.search(html_text)
+    title_match = _TITLE_RE.search(clean_html)
     if title_match:
         collapsed = " ".join(html.unescape(title_match.group(1)).split())
         if collapsed:
@@ -706,7 +710,7 @@ def extract_page_metadata(html_text: str) -> PageMetadata:
     meta_desc: str | None = None
     og_desc: str | None = None
 
-    for tag_match in _META_TAG_RE.finditer(html_text):
+    for tag_match in _META_TAG_RE.finditer(clean_html):
         attrs: dict[str, str] = {}
         for attr_match in _ATTR_RE.finditer(tag_match.group(1)):
             key = attr_match.group(1).lower()

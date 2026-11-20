@@ -7,3 +7,5 @@ python-dotenv>=1.0
 stripe>=8.0
 # Safe XML parsing for untrusted competitor sitemaps (see AGENTS.md, section 10)
 defusedxml>=0.7
+# Decode and validate shop images before offering previews.
+Pillow>=11.0

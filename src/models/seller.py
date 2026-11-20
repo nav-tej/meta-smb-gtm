@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from datetime import date
-from typing import Literal
+from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from src.models.intel import ActionableInsight
 
@@ -98,6 +98,164 @@ class SellerProfile(BaseModel):
         )
 
 
+class AccessPreferences(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    channels: list[str] = Field(default_factory=list)
+    can_change_prices: bool = True
+    ads_budget_band: str | None = None
+    minutes_per_week: int | None = Field(default=None, ge=0)
+
+
+class TastePreferences(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    tone: str | None = None
+    subjects_to_avoid: list[str] = Field(default_factory=list)
+    price_positioning: Literal["budget", "mid", "premium"] | None = None
+
+    @field_validator("subjects_to_avoid", mode="before")
+    @classmethod
+    def _coerce_avoid(cls, v: Any) -> list[str]:
+        if isinstance(v, str):
+            return [part.strip() for part in v.split(",") if part.strip()]
+        if isinstance(v, list):
+            return [str(part).strip() for part in v if str(part).strip()]
+        return []
+
+
+MemoryKind = Literal["observation", "interpretation", "preference", "goal"]
+MemoryScope = Literal["shop_default", "product", "campaign", "draft"]
+CompetitorRole = Literal["similar_audience", "price_reference", "inspiration"]
+MemorySource = Literal[
+    "shop_scan",
+    "user_input",
+    "voice_transcript",
+    "voice_demo_fixture",
+    "onboarding_questions",
+    "feedback_suggestion",
+    "sample_snapshot",
+]
+
+
+class SellerMemoryEntry(BaseModel):
+    """Single inspectable, editable, and removable seller memory item."""
+
+    model_config = ConfigDict(extra="allow")
+
+    id: str = Field(min_length=1, max_length=100)
+    key: str = Field(min_length=1, max_length=80)
+    label: str = Field(min_length=1, max_length=120)
+    value: str = Field(max_length=320)
+    kind: MemoryKind = "preference"
+    scope: MemoryScope = "shop_default"
+    product_key: str | None = Field(default=None, max_length=120)
+    destination: str | None = Field(default=None, max_length=80)
+    source: MemorySource = "user_input"
+    source_url: str | None = Field(default=None, max_length=500)
+    scan_date: str | None = Field(default=None, max_length=40)
+    confidence: Literal["observed", "inferred", "confirmed", "uncertain"] = "confirmed"
+    uncertainty: str = Field(default="", max_length=240)
+    status: Literal["proposed", "accepted", "dismissed"] = "accepted"
+    seller_edited: bool = False
+    updated_at: str | None = Field(default=None, max_length=40)
+
+
+class SellerMemoryDiffItem(BaseModel):
+    """Before/after diff entry produced when re-scanning a storefront."""
+
+    entry_id: str = Field(min_length=1, max_length=100)
+    key: str = Field(min_length=1, max_length=80)
+    label: str = Field(min_length=1, max_length=120)
+    kind: MemoryKind
+    before_value: str | None = None
+    after_value: str | None = None
+    source_url: str | None = None
+    scan_date: str | None = None
+    change_type: Literal["added", "changed", "unchanged", "removed"]
+    preserves_seller_edit: bool = False
+
+
+class CompetitorEntry(BaseModel):
+    """Watched competitor with editable role and rationale separate from seller profile."""
+
+    model_config = ConfigDict(extra="allow")
+
+    name: str = Field(default="", max_length=140)
+    url: str = Field(min_length=1, max_length=500)
+    role: CompetitorRole = "similar_audience"
+    rationale: str = Field(default="", max_length=280)
+    reason: str = Field(default="", max_length=280)
+    selected: bool = True
+
+
+class SuggestedMemoryUpdate(BaseModel):
+    """Pending feedback-derived update requiring explicit seller approval."""
+
+    model_config = ConfigDict(extra="allow")
+
+    id: str = Field(min_length=1, max_length=100)
+    key: str = Field(min_length=1, max_length=80)
+    label: str = Field(min_length=1, max_length=140)
+    proposed_value: str = Field(max_length=240)
+    kind: MemoryKind = "preference"
+    reason_signal: str = Field(max_length=280)
+    source: Literal["feedback_suggestion"] = "feedback_suggestion"
+    patch: dict[str, Any] = Field(default_factory=dict)
+    dismiss_count: int = Field(default=0, ge=0)
+    status: Literal["pending", "approved", "dismissed"] = "pending"
+    created_at: str | None = Field(default=None, max_length=40)
+
+
+class DismissSignal(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    id: str = ""
+    title: str = ""
+    channel: str | None = None
+    reason: Literal[
+        "not_my_style",
+        "too_advanced",
+        "no_access",
+        "already_tried",
+        "too_much_time",
+        "wrong_channel",
+        "",
+    ] = ""
+    at: str | None = None
+
+
+class SellerPreferences(BaseModel):
+    """Seller growth preferences and taste constraints for idea ranking and prompts."""
+
+    model_config = ConfigDict(extra="allow")
+
+    experience: Literal["new", "some", "runs_ads"] = "some"
+    access: AccessPreferences = Field(default_factory=AccessPreferences)
+    taste: TastePreferences = Field(default_factory=TastePreferences)
+    research_focus: str | None = Field(default=None, max_length=300)
+    watch: list[str] = Field(default_factory=list)
+    goal: str | None = Field(default=None, max_length=200)
+    occasion: str | None = Field(default=None, max_length=120)
+    audience: str | None = Field(default=None, max_length=180)
+    context_note: str | None = Field(default=None, max_length=600)
+    memory_entries: list[SellerMemoryEntry] = Field(default_factory=list)
+    competitor_entries: list[CompetitorEntry] = Field(default_factory=list)
+    suggested_updates: list[SuggestedMemoryUpdate] = Field(default_factory=list)
+    last_scan_at: str | None = Field(default=None, max_length=40)
+    version: int = 1
+
+    @field_validator("watch", mode="before")
+    @classmethod
+    def _coerce_watch(cls, v: Any) -> list[str]:
+        if isinstance(v, dict):
+            urls = v.get("competitor_urls") or []
+            return [str(u).strip() for u in urls if str(u).strip()]
+        if isinstance(v, list):
+            return [str(u).strip() for u in v if str(u).strip()]
+        return []
+
+
 class ScreenshotAnalysis(BaseModel):
     """Multimodal Muse Spark Vision findings from IG, FB, Marketplace, or shop screenshots."""
 
@@ -130,6 +288,25 @@ class SellerFootprintAuditLLM(BaseModel):
     website_seo_and_conversion_fixes: list[ActionableInsight] = Field(min_length=1, max_length=6)
     marketplace_and_pricing_fixes: list[ActionableInsight] = Field(min_length=1, max_length=6)
     instagram_and_facebook_sales_plays: list[ActionableInsight] = Field(min_length=1, max_length=6)
+
+
+class PromotionGuidanceSummary(BaseModel):
+    """Additive grounded promotion guidance metadata (no fabricated claims or unverified policy)."""
+
+    model_config = ConfigDict(extra="allow")
+
+    output_provenance: Literal[
+        "artist_example", "suggested_starting_approach", "fresh_analysis"
+    ] = "suggested_starting_approach"
+    output_label: str = "Suggested starting approach"
+    organic_first: bool = True
+    organic_guidance_note: str = "Organic post first — no paid ad spend or ad account required."
+    unconfirmed_audience: str = ""
+    audience_confirmed: bool = False
+    approved_facts: list[dict[str, str]] = Field(default_factory=list)
+    missing_facts: list[str] = Field(default_factory=list)
+    placement: str = "instagram_feed"
+    placement_note: str = "App export preset (not verified Meta policy)"
 
 
 class SellerFootprintAudit(BaseModel):

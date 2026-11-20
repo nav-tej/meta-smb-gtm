@@ -44,7 +44,7 @@ const sandbox = {
     if (options.method === 'POST') requests.push({ url, options });
     return { ok: true, json: async () => url.includes('ingest-storefront')
       ? { discovered_catalog_items: imported, business_name: 'Another Artist', channels: [{ status: 'fetched' }] }
-      : url.includes('readiness') ? { default_mode: 'saved', provider_key_configured: true }
+      : url.includes('readiness') ? { default_mode: 'live', provider_key_configured: true }
       : url.includes('generate-ads') ? { variants: [{ headline: 'A story in color', primary_text: 'My own words about this work.', image_prompt: 'Neutral wall and daylight.' }] }
       : { workspaces: { sarabjit_singh: { competitor_brief: {
         seller_context: 'Sells on Etsy. Marketplace prints $14-$22.',
@@ -150,11 +150,12 @@ async function destination(value) { node('promotionDestination').value = value; 
   assert.equal(requests.length, 1, 'Only mocked shop import may POST; no Muse request');
 
   await fire('artistExample');
-  node('unlockKey').value = 'test-unlock'; await fire('unlockKey', 'input');
+  assert.equal(node('unlockKey').handlers.input, undefined, 'Presenter #unlockKey must not be wired');
   node('liveMode').checked = true; await fire('liveMode', 'change');
   await fire('draftButton');
   const liveDraft = requests.find(request => request.url.includes('generate-ads'));
   assert.ok(liveDraft, 'Explicitly enabled draft should use only the mocked endpoint');
+  assert.equal(liveDraft.options.headers['X-Demo-Key'], undefined, 'Customer requests must never send X-Demo-Key');
   const livePayload = JSON.parse(liveDraft.options.body);
   assert.match(livePayload.product.brand_notes, /Etsy is closed/i);
   assert.match(livePayload.competitor_brief.seller_context, /Etsy is closed/i);

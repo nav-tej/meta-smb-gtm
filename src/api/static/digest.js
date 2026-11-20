@@ -1,159 +1,312 @@
-'use strict';
-// Weekly Market Digest: renders the weekly digest, monitor log and daily brief that muse-shell.js
-// loads once per page. Every value is written with textContent; nothing here calls a model.
 (() => {
-  const $ = (id) => document.getElementById(id);
-  const el = (tag, className = '', text = null) => {
+  const el = (tag, attrs = {}, ...children) => {
     const node = document.createElement(tag);
-    if (className) node.className = className;
-    if (text !== null && text !== undefined) node.textContent = String(text);
+    for (const [k, v] of Object.entries(attrs)) {
+      if (v === false || v === null || v === undefined) continue;
+      if (k === 'class') node.className = v;
+      else if (k === 'dataset') Object.assign(node.dataset, v);
+      else node.setAttribute(k, v === true ? '' : String(v));
+    }
+    for (const child of children) {
+      if (child !== null && child !== undefined) {
+        node.appendChild(typeof child === 'string' ? document.createTextNode(child) : child);
+      }
+    }
     return node;
   };
-  const safeHref = (href, fallback) => (typeof href === 'string' && /^\/(?!\/)/.test(href) ? href : fallback);
-  const fmtDay = (iso) => {
-    const d = new Date(`${String(iso || '').slice(0, 10)}T12:00:00Z`);
+  const write = (id, text) => {
+    const node = document.getElementById(id);
+    if (node) node.textContent = text;
+  };
+  const shortDate = (iso) => {
+    const d = new Date(iso);
     return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   };
-  const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+  const safeHref = (href, asSample = false) => {
+    if (typeof href !== 'string' || !/^\/(?!\/)/.test(href)) {
+      return asSample ? '/create?workspace=sample' : '/create';
+    }
+    if (asSample && href.startsWith('/create') && !href.includes('workspace=sample')) {
+      return href.includes('?') ? `${href}&workspace=sample` : `${href}?workspace=sample`;
+    }
+    return href;
+  };
 
   async function loadDirect() {
-    const get = async (url) => { try { const r = await fetch(url, { credentials: 'same-origin' }); return r.ok ? await r.json() : null; } catch { return null; } };
-    const [log, digest, brief] = await Promise.all([get('/api/v1/monitor?limit=1'), get('/api/v1/weekly-digest'), get('/api/v1/daily-brief')]);
-    return { run: log?.runs?.[0] || null, log, digest, brief };
+    const get = async (url) => {
+      try {
+        const r = await fetch(url, { credentials: 'same-origin' });
+        return r.ok ? await r.json() : null;
+      } catch {
+        return null;
+      }
+    };
+    const [log, digest, brief] = await Promise.all([
+      get('/api/v1/monitor?limit=1'),
+      get('/api/v1/weekly-digest'),
+      get('/api/v1/daily-brief'),
+    ]);
+    return { run: Array.isArray(log?.runs) ? log.runs[0] || null : null, log, digest, brief };
   }
 
-  function renderHero(digest, brief) {
-    const link = $('dgHeroLink');
-    const checks = Number(digest?.checks) || 0;
-    const top = Array.isArray(digest?.highlights) ? digest.highlights[0] : '';
+  function renderSampleHero(digest, brief) {
+    const week = shortDate(digest?.week_end);
+    write('digestWeek', week ? `Sample digest · week of ${week}` : 'Sample digest · This week');
     const focus = brief?.focus || brief?.move;
-    link.hidden = true;
-    if (top) {
-      $('dgHeroTitle').textContent = top;
-      $('dgHeroBody').textContent = digest.highlights[1] ? `Also this week: ${digest.highlights[1]}.` : 'See what else changed below.';
-      $('dgHeroSource').textContent = `From ${plural(checks, 'competitor check')} this week.`;
-      link.href = '/portal#loop-research';
-      link.textContent = 'See your watchlist →';
-      link.hidden = false;
-    } else if (focus?.title) {
-      $('dgHeroTitle').textContent = String(focus.title);
-      $('dgHeroBody').textContent = String(focus.reason || '');
-      $('dgHeroSource').textContent = checks
-        ? 'No competitor changes were logged this week, so this is the top-ranked move from your daily brief.'
-        : 'No competitor checks ran this week, so this is the top-ranked move from your daily brief.';
-      const href = safeHref(focus.href, '/create');
-      link.href = href;
-      link.textContent = href.startsWith('/create') ? 'Make this post →' : 'Open →';
-      link.hidden = false;
+    const total = Number(digest?.total_changes) || 0;
+    const checks = Number(digest?.checks) || 0;
+    if (checks && total) {
+      write('dgHeroTitle', `${total} competitor ${total === 1 ? 'change' : 'changes'} logged across ${checks} ${checks === 1 ? 'check' : 'checks'}.`);
     } else {
-      $('dgHeroTitle').textContent = 'No insight available yet';
-      $('dgHeroBody').textContent = 'Run a competitor check from the portal to start this week’s change log.';
-      $('dgHeroSource').textContent = '';
+      write('dgHeroTitle', focus?.title || 'Sample seller digest (Art of Sarabjit Singh example)');
     }
+    const body = [];
+    if (Array.isArray(digest?.highlights) && digest.highlights.length) body.push(`Highlights: ${digest.highlights.join('. ')}.`);
+    if (focus?.reason) body.push(`Suggested sample move: ${focus.reason}`);
+    if (!body.length && digest?.note) body.push(digest.note);
+    write('dgHeroBody', body.join(' ') || 'Illustrative digest from saved competitor snapshots captured Nov 3.');
+    const link = document.getElementById('dgHeroLink');
+    if (link) {
+      link.setAttribute('href', safeHref(focus?.href || '/create?idea=idea-1-empowering-women', true));
+      link.textContent = focus?.title ? `Make “${focus.title}” →` : 'Make this sample post →';
+      link.hidden = false;
+    }
+    write('dgHeroSource', digest?.source || 'Sample digest · Art of Sarabjit Singh (saved Nov 3 snapshot)');
   }
 
   function renderStats(digest) {
-    const kinds = digest?.by_kind || {};
-    const rows = [
-      [Number(digest?.checks) || 0, 'competitor checks'],
-      [Number(digest?.total_changes) || 0, 'changes found'],
-      [Number(kinds.new_listing) || 0, 'new listings'],
-      [Number(kinds.price_change) || 0, 'price changes'],
+    const box = document.getElementById('dgStats');
+    if (!box) return;
+    box.replaceChildren();
+    const checks = Number(digest?.checks) || 0;
+    const total = Number(digest?.total_changes) || 0;
+    const cards = [
+      [checks ? String(checks) : '1', checks ? 'monitor checks this week' : 'saved snapshot on file'],
+      [String(total), `competitor ${total === 1 ? 'change' : 'changes'} found`],
+      ['0 runs', 'used to read this sample digest'],
     ];
-    $('dgStats').replaceChildren(...rows.map(([value, label]) => {
-      const li = el('li');
-      li.append(el('strong', '', value), el('span', '', label));
-      return li;
-    }));
+    for (const [value, label] of cards) {
+      box.appendChild(el('li', { class: 'dg-stat' }, el('strong', {}, value), el('span', {}, label)));
+    }
   }
 
-  function renderCompetitors(shell, digest) {
-    const watch = Array.isArray(shell?.watchlist) ? shell.watchlist : [];
-    const fromDigest = Array.isArray(digest?.competitors) ? digest.competitors : [];
-    const names = [...new Set([...watch.map((w) => w.name), ...fromDigest.map((c) => c.name)])];
-    const paused = shell?.pausedCompetitors ? shell.pausedCompetitors() : {};
-    const checks = Number(digest?.checks) || 0;
-    const grid = $('dgCompetitors');
+  function renderSampleCompetitors(shell, digest) {
+    const grid = document.getElementById('dgCompetitors');
+    if (!grid) return;
     grid.replaceChildren();
-    for (const name of names) {
-      const saved = watch.find((w) => w.name === name);
-      const week = fromDigest.find((c) => c.name === name);
-      let badges;
-      let lines;
-      let source;
-      if (week && week.changes > 0) {
-        badges = shell?.changeBadges ? shell.changeBadges(week.counts) : [['new', plural(week.changes, 'change')]];
-        lines = week.highlights || [];
-        source = 'From this week’s competitor checks';
-      } else if (checks) {
-        badges = [['none', 'No changes this week']];
-        lines = [];
-        source = `Compared in ${plural(checks, 'check')} this week`;
-      } else {
-        badges = saved ? [[saved.status === 'new' ? 'new' : 'first', saved.badge]] : [];
-        lines = saved?.note ? [saved.note] : [];
-        source = 'From the saved Nov 3 snapshot';
-      }
-      if (paused[name]) badges = [...badges, ['paused', 'Alerts paused']];
-      const card = el('article', `dg-card${paused[name] ? ' paused' : ''}`);
-      const head = el('div', 'dg-card-head');
-      const badgeBox = el('span', 'dg-badges');
-      badges.forEach(([tone, label]) => badgeBox.appendChild(el('span', `ms-badge ${tone}`, label)));
-      head.append(el('h3', '', name), badgeBox);
+    const list = Array.isArray(shell?.watchlist) ? shell.watchlist : [
+      { name: 'SikhiArt.com', where: 'Own shop · 300 pages', note: 'New editions of Mai Bhago ji and Hari Singh Nalwa (Nov 3 sample).' },
+      { name: 'Gurinderpreet Kaur', where: 'Fine Art America · 70 listings', note: 'Baseline $14–$50 prints.' },
+      { name: 'Manjot Singh Sachdeva', where: 'Fine Art America / Pixels · 105 listings', note: 'Golden Temple series $14–$24.' },
+      { name: 'Gurdish Pannu', where: 'Saatchi Art · originals', note: 'Original canvas works.' },
+    ];
+    const counts = digest?.by_competitor || {};
+    const statusOf = shell?.competitorStatus || ((name) => ({ badges: [['first', 'Sample snapshot']], detail: list.find((w) => w.name === name)?.note || '', when: 'Nov 3' }));
+    for (const w of list) {
+      const card = el('article', { class: 'dg-card' });
+      const head = el('div', { class: 'dg-card-head' }, el('h3', {}, w.name));
+      const weekCount = Number(counts[w.name]) || 0;
+      const status = statusOf(w.name, null);
+      const badges = weekCount > 0 ? [['new', `${weekCount} this week`]] : status.badges;
+      const chipRow = el('div', { class: 'dg-chips' });
+      for (const [tone, label] of badges) chipRow.appendChild(el('span', { class: `ms-chip ${tone}` }, label));
+      head.appendChild(chipRow);
       card.appendChild(head);
-      if (saved?.where) card.appendChild(el('p', 'dg-where', saved.where));
-      if (lines.length) {
-        const ul = el('ul', 'dg-lines');
-        lines.slice(0, 3).forEach((line) => ul.appendChild(el('li', '', line)));
-        card.appendChild(ul);
-      }
-      card.appendChild(el('p', 'dg-source', source));
+      card.appendChild(el('p', { class: 'dg-where' }, w.where));
+      card.appendChild(el('p', { class: 'dg-detail' }, status.detail));
+      card.appendChild(el('p', { class: 'dg-when' }, `Sample snapshot: ${status.when || 'Nov 3'}`));
       grid.appendChild(card);
     }
-    if (!names.length) grid.appendChild(el('p', 'dg-note', 'No competitors on your watchlist yet.'));
   }
 
-  function renderRecos(brief) {
-    const list = $('dgRecos');
+  function renderSampleRecos(brief) {
+    const list = document.getElementById('dgRecos');
+    if (!list) return;
     list.replaceChildren();
-    const moves = Array.isArray(brief?.action_items) ? brief.action_items.slice(0, 3) : [];
-    if (!moves.length) {
-      list.hidden = true;
-      $('dgRecoSource').textContent = 'Today’s ideas could not be loaded. The ranked ideas in your portal still work.';
+    const items = Array.isArray(brief?.action_items) ? brief.action_items.slice(0, 3) : [];
+    if (!items.length) {
+      list.appendChild(el('li', {}, el('p', { class: 'ms-muted' }, 'No sample recommendations available right now.')));
       return;
     }
-    list.hidden = false;
-    for (const move of moves) {
-      const li = el('li', `dg-reco ${move.impact || ''}`);
-      li.appendChild(el('span', `ms-chip ${move.impact === 'high' ? 'high' : ''}`, `${move.impact || 'medium'} impact`));
-      li.appendChild(el('strong', '', move.title));
-      if (move.reason) li.appendChild(el('p', '', move.reason));
-      const href = safeHref(move.href, '/create');
-      const go = el('a', 'dg-reco-go', href.startsWith('/create') ? 'Make this post →' : 'Open →');
-      go.href = href;
-      li.appendChild(go);
-      if (move.source) li.appendChild(el('span', 'dg-reco-source', move.source));
+    for (const item of items) {
+      const li = el('li', { class: `dg-reco ${item.impact || ''}` });
+      li.appendChild(el('span', { class: `ms-chip ${item.impact || 'medium'}` }, `${item.impact || 'medium'} impact`));
+      li.appendChild(el('strong', {}, String(item.title || '')));
+      li.appendChild(el('p', {}, String(item.reason || '')));
+      li.appendChild(el('a', { href: safeHref(item.href, true) }, 'Make this post in Sample shop →'));
       list.appendChild(li);
     }
-    $('dgRecoSource').textContent = String(brief.source || '');
-    // Lets muse-shell add Accept / Dismiss / Archive / Adjust to each idea.
-    window.dispatchEvent(new CustomEvent('muse:brief-ready'));
+    write('dgRecoSource', 'Recommendations from the Art of Sarabjit Singh sample shop · Reading never uses a run.');
+  }
+
+  function clearBody(heroTitle, heroBody, statusText) {
+    write('digestWeek', 'Account check');
+    write('digestStatus', statusText);
+    write('dgHeroTitle', heroTitle);
+    write('dgHeroBody', heroBody);
+    write('dgHeroSource', '');
+    write('dgRecoSource', '');
+    const link = document.getElementById('dgHeroLink');
+    if (link) link.hidden = true;
+    document.getElementById('dgStats')?.replaceChildren();
+    document.getElementById('dgCompetitors')?.replaceChildren();
+    document.getElementById('dgRecos')?.replaceChildren();
+  }
+
+  function renderOwnWorkspaceDigest(wsDoc) {
+    const onboarding = wsDoc?.onboarding || {};
+    const competitors = Array.isArray(onboarding.competitors) ? onboarding.competitors : [];
+    const shopUrls = Array.isArray(onboarding.shop_urls) ? onboarding.shop_urls : [];
+    const shopName = onboarding.business_name || (shopUrls[0] ? shopUrls[0] : 'My workspace');
+
+    write('digestWeek', `My workspace · ${shopName}`);
+    const status = document.getElementById('digestStatus');
+    if (status) {
+      status.textContent = competitors.length
+        ? `Showing your personal watchlist for ${shopName}.`
+        : `Personal digest for ${shopName} starts once you add your shop website or watched competitors.`;
+      status.hidden = false;
+    }
+
+    if (competitors.length) {
+      write('dgHeroTitle', `Watching ${competitors.length} ${competitors.length === 1 ? 'competitor' : 'competitors'} for ${shopName}`);
+      write('dgHeroBody', 'Your personal automated digest runs on your chosen schedule below and emails you changes in your own market. Sample artist data is kept separate.');
+      const link = document.getElementById('dgHeroLink');
+      if (link) {
+        link.setAttribute('href', '/create');
+        link.textContent = 'Open My workspace in Studio →';
+        link.hidden = false;
+      }
+      write('dgHeroSource', 'Personal workspace · 0 runs used to inspect');
+    } else {
+      write('dgHeroTitle', 'Your personal digest starts empty until you add competitors');
+      write('dgHeroBody', 'Connect your shop website and pick up to 3 competitors to track price changes, new listings, and personalized next moves — or view the sample digest.');
+      const link = document.getElementById('dgHeroLink');
+      if (link) {
+        link.setAttribute('href', '/welcome?step=3');
+        link.textContent = 'Add competitors in setup →';
+        link.hidden = false;
+      }
+      write('dgHeroSource', 'My workspace · Sample artist examples stay separate');
+    }
+
+    const stats = document.getElementById('dgStats');
+    if (stats) {
+      stats.replaceChildren(
+        el('li', { class: 'dg-stat' }, el('strong', {}, String(competitors.length)), el('span', {}, 'personal competitors watched')),
+        el('li', { class: 'dg-stat' }, el('strong', {}, shopUrls.length ? 'Connected' : 'Not added'), el('span', {}, 'your shop website')),
+        el('li', { class: 'dg-stat' }, el('strong', {}, '0 runs'), el('span', {}, 'used to view your digest'))
+      );
+    }
+
+    const grid = document.getElementById('dgCompetitors');
+    if (grid) {
+      grid.replaceChildren();
+      if (competitors.length) {
+        for (const comp of competitors) {
+          const name = typeof comp === 'string' ? comp : (comp.name || comp.url || 'Competitor');
+          const url = typeof comp === 'string' ? comp : (comp.url || '');
+          const card = el('article', { class: 'dg-card' });
+          const head = el('div', { class: 'dg-card-head' }, el('h3', {}, String(name)));
+          head.appendChild(el('div', { class: 'dg-chips' }, el('span', { class: 'ms-chip first' }, 'My watchlist')));
+          card.appendChild(head);
+          card.appendChild(el('p', { class: 'dg-where' }, url ? String(url) : 'Configured in setup'));
+          card.appendChild(el('p', { class: 'dg-detail' }, 'Queued for your scheduled digest updates.'));
+          grid.appendChild(card);
+        }
+      } else {
+        const emptyCard = el('article', { class: 'dg-card' });
+        emptyCard.appendChild(el('h3', {}, 'No personal competitors watched yet'));
+        emptyCard.appendChild(el('p', { class: 'dg-detail' }, 'Add competitors you want to track, or open the Sample shop digest to see how weekly summaries look.'));
+        emptyCard.appendChild(el('p', { class: 'dg-when' }, el('a', { href: '/digest?workspace=sample' }, 'View Sample shop digest →')));
+        grid.appendChild(emptyCard);
+      }
+    }
+
+    const recos = document.getElementById('dgRecos');
+    if (recos) {
+      recos.replaceChildren();
+      const li = el('li', { class: 'dg-reco high' });
+      li.appendChild(el('span', { class: 'ms-chip high' }, 'My workspace'));
+      li.appendChild(el('strong', {}, shopUrls.length ? 'Draft a post from your shop website' : 'Add your shop website in My workspace'));
+      li.appendChild(el('p', {}, shopUrls.length
+        ? 'Jump straight to Studio to create an ad or social post using your own products and photos.'
+        : 'Paste your shop URL or product photo in Studio to generate custom creatives for your own store.'));
+      li.appendChild(el('a', { href: '/create' }, 'Open Studio in My workspace →'));
+      const sampleLi = el('li', { class: 'dg-reco medium' });
+      sampleLi.appendChild(el('span', { class: 'ms-chip first' }, 'Sample example'));
+      sampleLi.appendChild(el('strong', {}, 'See how a filled sample digest looks'));
+      sampleLi.appendChild(el('p', {}, 'Browse the Sample shop weekly digest separately without mixing it into your account.'));
+      sampleLi.appendChild(el('a', { href: '/digest?workspace=sample' }, 'Open Sample shop digest →'));
+      recos.appendChild(li);
+      recos.appendChild(sampleLi);
+    }
+    write('dgRecoSource', 'Personal recommendations never mix with Sample shop data.');
+  }
+
+  async function applyMode(modeState) {
+    const s = modeState || (await window.museModes?.resolve?.()) || {
+      state: 'guest_entry',
+      isSample: true,
+      isLoading: false,
+      isError: false,
+      isExpired: false,
+    };
+
+    if (s.isLoading) {
+      clearBody('Checking your account…', 'Verifying your workspace before showing your digest.', 'Checking your account…');
+      return;
+    }
+    if (s.isError || s.isExpired) {
+      clearBody(
+        s.isExpired ? 'Session expired' : 'Account check unavailable',
+        s.authError || 'Could not verify your account right now. Sample digest stays separate until your account loads.',
+        s.isExpired ? 'Sign in again to load your personal digest.' : 'Retry checking your account above.'
+      );
+      return;
+    }
+
+    if (s.state === 'account_own') {
+      const guard = window.museModes?.bindAsyncGuard?.() || { isCurrent: () => true };
+      write('digestStatus', 'Loading your personal workspace…');
+      let wsDoc = {};
+      try {
+        if (window.museAccount && typeof window.museAccount.loadWorkspace === 'function') {
+          const loaded = await window.museAccount.loadWorkspace(s.ownerId);
+          if (!guard.isCurrent()) return;
+          wsDoc = loaded?.document || {};
+        }
+      } catch {
+        if (!guard.isCurrent()) return;
+        wsDoc = {};
+      }
+      renderOwnWorkspaceDigest(wsDoc);
+      return;
+    }
+
+    // Guest or explicit Sample shop view -> render clearly labeled Sample digest
+    const guard = window.museModes?.bindAsyncGuard?.() || { isCurrent: () => true };
+    const status = document.getElementById('digestStatus');
+    const shell = window.museShell;
+    const loaded = shell?.signals ? await shell.signals() : await loadDirect();
+    if (!guard.isCurrent()) return;
+    if (status) {
+      status.textContent = loaded?.digest
+        ? 'Showing the Sample shop weekly digest (Art of Sarabjit Singh example).'
+        : 'Showing the saved Sample shop digest (Art of Sarabjit Singh example).';
+    }
+    renderSampleHero(loaded?.digest || {}, loaded?.brief || {});
+    renderStats(loaded?.digest || {});
+    renderSampleCompetitors(shell, loaded?.digest || {});
+    renderSampleRecos(loaded?.brief || {});
   }
 
   async function start() {
-    const shell = window.museShell;
-    const status = $('digestStatus');
-    const loaded = shell?.signals ? await shell.signals() : await loadDirect();
-    const { digest, brief, log } = loaded;
-    if (digest?.week_start && digest?.week_end) $('digestWeek').textContent = `Week of ${fmtDay(digest.week_start)} – ${fmtDay(digest.week_end)}`;
-    renderHero(digest, brief);
-    renderStats(digest);
-    renderCompetitors(shell, digest);
-    renderRecos(brief);
-    $('dgNote').textContent = [digest?.note, log?.note].filter(Boolean).join(' ');
-    if (!digest && !brief) status.textContent = 'Couldn’t reach the server, so this shows the saved Nov 3 snapshot. Reload to try again.';
-    else status.hidden = true;
+    if (window.museModes?.subscribe) window.museModes.subscribe(applyMode);
+    if (window.museModes?.resolve) await applyMode(await window.museModes.resolve());
+    else await applyMode();
   }
 
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
 })();

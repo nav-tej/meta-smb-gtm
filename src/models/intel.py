@@ -7,6 +7,8 @@ from typing import Literal
 
 from pydantic import AliasChoices, BaseModel, Field, model_validator
 
+from src.models.directive import ResearchDirective
+
 UrlBucket = Literal[
     "products",
     "listings",
@@ -39,6 +41,21 @@ class SocialAdSummary(BaseModel):
     days_running: int = Field(default=0, ge=0)
     headline: str = ""
     body_excerpt: str = ""
+    start_date: str | None = None
+    library_url: str = ""
+
+
+class CompetitorAdSignalsResponse(BaseModel):
+    """Server-side response for competitor Meta Ad Library queries."""
+
+    query: str
+    public_library_url: str
+    status: Literal["live", "zero", "no_token", "error"]
+    message: str
+    total_active_ads: int = 0
+    ads: list[SocialAdSummary] = Field(default_factory=list)
+    is_cached: bool = False
+    cache_label: str | None = None
 
 
 class SocialCompetitorSignals(BaseModel):
@@ -228,6 +245,7 @@ class CompetitorIntelRequest(BaseModel):
     max_batches: int = Field(default=5, ge=1, le=20)
     max_urls: int | None = Field(default=None, ge=1, le=10_000)
     fetch_titles: bool = True
+    directive: ResearchDirective | None = None
 
     @model_validator(mode="after")
     def _require_a_source(self) -> CompetitorIntelRequest:

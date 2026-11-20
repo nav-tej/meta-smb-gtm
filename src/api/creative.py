@@ -2,6 +2,8 @@
 
 import base64
 import binascii
+import json
+from pathlib import Path
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
@@ -23,6 +25,7 @@ class VoiceNoteRequest(BaseModel):
         min_length=4, description="Base64-encoded WAV/MP3/WebM audio bytes from seller voice note."
     )
     filename: str = Field(default="voice_note.wav", max_length=120)
+    consent_confirmed: bool | None = None
 
 
 def get_ad_creative_service() -> AdCreativeService:
@@ -60,9 +63,29 @@ async def list_creative_models() -> dict[str, Any]:
     }
 
 
+PREVIEWS_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "demo" / "previews.json"
+
+
+def _read_previews_json() -> dict[str, Any]:
+    if not PREVIEWS_PATH.is_file():
+        return {"previews": []}
+    return dict(json.loads(PREVIEWS_PATH.read_text(encoding="utf-8")))
+
+
+@router.get("/previews")
+async def get_insight_previews() -> dict[str, Any]:
+    """Track B: return 1:1 demo previews for research insights and ranked moves."""
+    return _read_previews_json()
+
+
 @router.post("/transcribe-voice")
 async def transcribe_voice(request: VoiceNoteRequest, live: LiveMode) -> dict[str, str]:
     """Transcribe a seller's spoken voice note into text via `muse-voice-transcribe-1.0`."""
+    if request.consent_confirmed is False:
+        raise HTTPException(
+            400,
+            "Explicit consent is required before sending your voice recording for transcription.",
+        )
     if not live:
         raise demo_unavailable("Voice transcription")
     raw = request.audio_base64.strip()

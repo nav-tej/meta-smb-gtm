@@ -366,22 +366,26 @@ async function trigger(id, eventName = 'click') {
 
   console.log('--- TEST 3: Saved Examples vs Live Generation Safeguards ---');
   // Verify default mode badge
-  assert.equal(getNode('modeBadge').textContent, 'Saved example · no API cost');
+  assert.equal(getNode('modeBadge').textContent, 'Draft & manual mode · 0 runs used');
   assert.equal(getNode('generateButton').textContent, 'Preview a room scene');
+  assert.equal(getNode('unlockKey').handlers.input, undefined, 'Presenter #unlockKey must not be wired');
 
-  // Attempt to enable live mode without unlock key
+  // Attempt to enable live mode without verified customer eligibility
   getNode('liveMode').checked = true;
   await trigger('liveMode', 'change');
-  assert.equal(getNode('liveMode').checked, false, 'Live mode without key must auto-uncheck');
-  assert.match(getNode('notice').textContent, /Enter the configured demo unlock key first/);
+  assert.equal(getNode('liveMode').checked, false, 'Live mode without customer eligibility must auto-uncheck');
+  assert.match(getNode('notice').textContent, /Sign in with a verified email/);
 
-  // Enter unlock key and enable live mode
-  getNode('unlockKey').value = 'test-demo-unlock-key';
-  await trigger('unlockKey', 'input');
+  // Grant verified customer eligibility and enable live mode (no unlock key needed)
+  sandbox.window.museAccount = {
+    liveReady: () => true,
+    getSnapshot: () => ({ user: { id: 'u1', email: 'artist@example.com', email_verified: true }, live_available: true, runs_remaining: 3 }),
+    syncCredits() {}
+  };
   getNode('liveMode').checked = true;
   await trigger('liveMode', 'change');
-  assert.equal(getNode('modeBadge').textContent, 'Live requests selected · billed Muse calls');
-  assert.equal(getNode('generateButton').textContent, 'Create my image');
+  assert.equal(getNode('modeBadge').textContent, 'Live Muse AI · 1 run per generation');
+  assert.equal(getNode('generateButton').textContent, 'Create my image (1 run)');
 
   console.log('--- TEST 4: Failed Requests Preserve Edits and Reset Busy State ---');
   // Configure simulated 500 error
@@ -426,7 +430,7 @@ async function trigger(id, eventName = 'click') {
   await trigger('generateButton');
   assert.equal(postCalls.length, 1, 'Only one paid request may be in flight');
   assert(postCalls[0].url.endsWith('?live=true'));
-  assert.equal(postCalls[0].options.headers['X-Demo-Key'], 'test-demo-unlock-key');
+  assert.equal(postCalls[0].options.headers['X-Demo-Key'], undefined, 'Customer requests must never send X-Demo-Key');
   release(); await firstDraft; postGate = null;
   assert.equal(getNode('generateButton').disabled, false);
 
@@ -494,9 +498,7 @@ async function trigger(id, eventName = 'click') {
     }]
   };
 
-  // Ensure unlock key and live mode are enabled
-  getNode('unlockKey').value = 'test-demo-unlock-key';
-  await trigger('unlockKey', 'input');
+  // Ensure live mode is enabled via verified customer account
   getNode('liveMode').checked = true;
   await trigger('liveMode', 'change');
 

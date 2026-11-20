@@ -6,8 +6,10 @@ import base64
 import hashlib
 import hmac
 import json
+import logging
 import secrets
 import time
+from collections import deque
 from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlencode, urlsplit
@@ -19,7 +21,16 @@ from fastapi import HTTPException, Request, Response
 from src.clients.supabase import SupabaseError, configured, get_supabase_client
 from src.config import get_settings
 
-SAFE_NEXT_PATHS = {"/", "/account", "/today", "/create", "/digest", "/portal"}
+SAFE_NEXT_PATHS = {"/", "/account", "/today", "/create", "/digest", "/portal", "/welcome"}
+logger = logging.getLogger(__name__)
+
+# Signup, resend and reset all reach Supabase from this server's IP, so Supabase's own
+# per-IP limits behave like one shared bucket. This per-instance limiter stops one client
+# from draining that bucket; it is best effort on serverless (each instance counts alone).
+EMAIL_SEND_WINDOW_SECONDS = 15 * 60
+EMAIL_SENDS_PER_IP = 8
+EMAIL_SENDS_PER_ADDRESS = 3
+_email_sends: dict[str, deque[float]] = {}
 
 
 @dataclass(frozen=True)
@@ -98,6 +109,119 @@ def trusted_mutation(request: Request) -> None:
         raise HTTPException(415, "Send account requests as JSON.")
 
 
+def _hashed(value: str) -> str:
+    return hashlib.sha256(value.encode()).hexdigest()
+
+
+def throttle_email_send(request: Request, email: str, now: float | None = None) -> None:
+    """Refuse a confirmation/reset email when this network or address asked too often."""
+    now = time.monotonic() if now is None else now
+    forwarded = request.headers.get("x-forwarded-for", "")
+    ip = forwarded.split(",", 1)[0].strip() or (request.client.host if request.client else "")
+    buckets = (
+        ("ip:" + _hashed(ip), EMAIL_SENDS_PER_IP),
+        ("email:" + _hashed(email.strip().lower()), EMAIL_SENDS_PER_ADDRESS),
+    )
+    cutoff = now - EMAIL_SEND_WINDOW_SECONDS
+    for key in [key for key, times in _email_sends.items() if not times or times[-1] < cutoff]:
+        del _email_sends[key]
+    for key, limit in buckets:
+        times = _email_sends.get(key, deque())
+        while times and times[0] < cutoff:
+            times.popleft()
+        if len(times) >= limit:
+            raise HTTPException(
+                429, "Too many email requests. Wait a few minutes, then check your inbox."
+            )
+    for key, _ in buckets:
+        _email_sends.setdefault(key, deque()).append(now)
+
+
+def reset_email_throttle() -> None:
+    """Forget recorded sends (tests and process restarts)."""
+    _email_sends.clear()
+
+
+# Signup binding. Supabase keeps the FIRST password when an unconfirmed address is signed up
+# again, so whoever registered an address first could sign in once its owner clicks the
+# confirmation link. Each signup therefore stores the new password with a hash of a random
+# nonce (admin-only app_metadata) and gives that nonce to the signing-up browser. The password
+# survives confirmation only when the emailed link lands in the browser holding the latest
+# nonce; anywhere else it is replaced and the owner sets a new one (see settle_signup_binding).
+SIGNUP_COOKIE = "muse_signup"
+SIGNUP_COOKIE_PATH = "/api/v1/account"
+SIGNUP_COOKIE_SECONDS = 2 * 86400
+SIGNUP_BINDING_KEY = "muse_signup_binding"
+
+
+async def bind_signup(response: Response, reply: dict[str, Any], email: str, password: str) -> None:
+    """Tie the password just chosen at signup to this browser (see SIGNUP_BINDING_KEY)."""
+    try:
+        user_id = str(UUID(str(reply.get("id"))))
+    except ValueError:
+        return
+    client = get_supabase_client()
+    try:
+        user = await client.auth(f"admin/users/{user_id}", "GET", secret=True)
+    except SupabaseError as err:
+        if err.status_code == 404:  # Supabase answers a confirmed address with a random id.
+            return
+        raise
+    if user.get("email_confirmed_at") or str(user.get("email", "")).lower() != email.lower():
+        return
+    nonce = secrets.token_urlsafe(32)
+    await client.auth(
+        f"admin/users/{user_id}",
+        "PUT",
+        {"password": password, "app_metadata": {SIGNUP_BINDING_KEY: _hashed(nonce)}},
+        secret=True,
+    )
+    response.set_cookie(
+        SIGNUP_COOKIE,
+        nonce,
+        max_age=SIGNUP_COOKIE_SECONDS,
+        secure=getattr(get_settings(), "account_cookie_secure", True),
+        httponly=True,
+        samesite="lax",
+        path=SIGNUP_COOKIE_PATH,
+    )
+
+
+async def settle_signup_binding(
+    request: Request, response: Response, access_token: str, *, from_link: bool
+) -> bool:
+    """Resolve a pending signup binding for a confirmed account. True if the password was reset.
+
+    Only the confirmation-link landing (from_link=True) in the browser holding the latest nonce
+    keeps the signup password. Anywhere else the password is replaced: a landing elsewhere keeps
+    its own session and revokes the others; a password sign-in while the binding is pending
+    means the account was confirmed without a landing (mail scanner, failed landing, or a race),
+    so that password is unproven and every session is revoked.
+    """
+    client = get_supabase_client()
+    user = await client.auth("user", access_token=access_token)
+    pending = (user.get("app_metadata") or {}).get(SIGNUP_BINDING_KEY)
+    if not pending or not user.get("email_confirmed_at"):
+        return False
+    try:
+        user_id = str(UUID(str(user.get("id"))))
+    except ValueError as err:
+        raise SupabaseError(503, "Account service returned an invalid user.") from err
+    nonce = request.cookies.get(SIGNUP_COOKIE, "")
+    matches = from_link and bool(nonce) and hmac.compare_digest(_hashed(nonce), str(pending))
+    update: dict[str, Any] = {"app_metadata": {SIGNUP_BINDING_KEY: None}}
+    if not matches:
+        update["password"] = secrets.token_urlsafe(48)
+    await client.auth(f"admin/users/{user_id}", "PUT", update, secret=True)
+    response.delete_cookie(SIGNUP_COOKIE, path=SIGNUP_COOKIE_PATH)
+    if matches:
+        return False
+    scope = "others" if from_link else "global"
+    await client.auth(f"logout?scope={scope}", "POST", access_token=access_token)
+    logger.info("Replaced a signup password that was not confirmed in the signup browser")
+    return True
+
+
 def clear_cookies(response: Response) -> None:
     """Remove the two HttpOnly session cookies."""
     for name in ("muse_access", "muse_refresh"):
@@ -154,9 +278,9 @@ async def verify_token(access_token: str) -> AccountSession:
         session_id = str(UUID(claims["session_id"]))
     except (IndexError, KeyError, ValueError, TypeError):
         pass
-    verified = bool(
-        user.get("email_confirmed_at") or (user.get("user_metadata") or {}).get("email_verified")
-    )
+    # Only the Auth server sets email_confirmed_at. user_metadata is writable by the user,
+    # so a self-declared "email_verified" there proves nothing.
+    verified = bool(user.get("email_confirmed_at"))
     return AccountSession(user_id, email, verified, access_token, session_id)
 
 
@@ -378,6 +502,30 @@ async def start_google_oauth(
     )
 
 
+async def _revoke_unproven_password(link: dict[str, Any]) -> None:
+    """Close the pre-registration hijack before Google sign-in confirms an existing account.
+
+    Someone can sign up with another person's address and never confirm it. If that person
+    later signs in with Google, verifying the link would confirm the account and the
+    squatter's password would start working. Replace that unproven password first; if the
+    replacement fails, the error stops sign-in before the email is confirmed. An account that
+    is confirmed but still has a pending signup binding (see bind_signup) is treated the same.
+    """
+    confirmed = link.get("email_confirmed_at") or link.get("confirmed_at")
+    pending = (link.get("app_metadata") or {}).get(SIGNUP_BINDING_KEY)
+    if confirmed and not pending:
+        return
+    try:
+        user_id = str(UUID(str(link.get("id"))))
+    except ValueError:
+        return
+    update: dict[str, Any] = {"password": secrets.token_urlsafe(48)}
+    if pending:
+        update["app_metadata"] = {SIGNUP_BINDING_KEY: None}
+    await get_supabase_client().auth(f"admin/users/{user_id}", "PUT", update, secret=True)
+    logger.info("Replaced an unproven account password during Google sign-in")
+
+
 async def complete_google_oauth(
     request: Request, code: str | None, state: str | None, error: str | None
 ) -> tuple[str, dict[str, Any] | None, str | None]:
@@ -438,6 +586,7 @@ async def complete_google_oauth(
         hashed_token = link.get("hashed_token")
         if not isinstance(hashed_token, str) or not hashed_token:
             return target, None, "Could not create your Muse session. Please try again."
+        await _revoke_unproven_password(link)
         tokens = await get_supabase_client().auth(
             "verify",
             "POST",

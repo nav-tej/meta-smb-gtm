@@ -17,7 +17,7 @@ router = APIRouter(tags=["bids"])
 class CsvBidAdviceRequest(BaseModel):
     csv_text: str = Field(min_length=10, description="Raw Meta Ads Manager CSV export text.")
     competitor_brief: CompetitorBrief | None = None
-    account_name: str = Field(default="Art of Sarabjit Singh", max_length=120)
+    account_name: str = Field(default="Independent Artist Studio", max_length=120)
     currency: str = Field(default="USD", min_length=3, max_length=3)
     seller_goal: str = Field(default="More sales without raising total spend.", max_length=500)
     deterministic_only: bool = Field(

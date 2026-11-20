@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import base64
 import binascii
-import hashlib
 import io
 import json
 import logging
@@ -796,10 +795,6 @@ class MetaClient:
         _require_metered_model(model, "muse-voice-transcribe-1.0")
         if _metering_enabled():
             _validate_bounded_voice(audio_bytes)
-        cache_payload = {"model": model, "audio_sha256": hashlib.sha256(audio_bytes).hexdigest()}
-        hit = _call_cache_get("audio-transcriptions", cache_payload)
-        if isinstance(hit, dict) and isinstance(hit.get("text"), str):
-            return hit["text"]
         await _reserve_provider("voice", model, VOICE_RESERVATION_MICROS)
         _note_provider_call("voice")
         try:
@@ -819,7 +814,6 @@ class MetaClient:
         text = body.get("text") if isinstance(body, dict) else None
         if not isinstance(text, str):
             raise MetaAPIError("Muse Voice Transcribe response missing 'text'.")
-        _call_cache_put("audio-transcriptions", cache_payload, {"text": text.strip()})
         return text.strip()
 
     async def _extract_image_bytes(self, body: Any) -> bytes:

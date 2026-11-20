@@ -24,6 +24,13 @@ class AccountAudit(Audit):
         self.race = None
         super().run(name, width, callback, configured)
 
+    def seller_business_name(self, owner: str | None) -> str:
+        if owner == "qa-a":
+            return "Qa A Studio"
+        if owner == "qa-b":
+            return "Qa B Ceramics"
+        return f"{owner} Studio" if owner else ""
+
     def route(self, route: object) -> None:
         req = route.request
         url = urlsplit(req.url)
@@ -31,7 +38,13 @@ class AccountAudit(Audit):
             f"{url.scheme}://{url.netloc}" != self.origin
             or url.query
             or url.path
-            not in ("/api/v1/account/me", "/api/v1/account/workspace", "/api/v1/account/signout")
+            not in (
+                "/api/v1/account/me",
+                "/api/v1/account/workspace",
+                "/api/v1/account/signout",
+                "/api/v1/seller-memory",
+                "/api/v1/seller-memory/recommend",
+            )
         ):
             super().route(route)
             return
@@ -79,6 +92,82 @@ class AccountAudit(Audit):
                 )
                 record["status"] = 200
                 route.fulfill(json=deepcopy(workspace))
+        elif url.path == "/api/v1/seller-memory" and req.method == "GET":
+            header_owner = req.headers.get("x-muse-owner")
+            if self.owner and header_owner and header_owner != self.owner:
+                record["status"] = 409
+                route.fulfill(status=409, json={"detail": "Workspace owner mismatch"})
+                return
+            if not self.owner:
+                record["status"] = 200
+                route.fulfill(
+                    json={
+                        "authenticated": False,
+                        "owner_id": None,
+                        "version": 0,
+                        "business_name": "",
+                        "preferences": {"memory_entries": [], "suggested_updates": []},
+                        "voice_profile": {},
+                        "memory_entries": [],
+                        "competitor_entries": [],
+                        "suggested_updates": [],
+                        "dismiss_signals": [],
+                    }
+                )
+                return
+            workspace = self.workspaces.get(self.owner, {"version": 0, "document": {}})
+            biz_name = self.seller_business_name(self.owner)
+            entry = {
+                "id": f"mem-{self.owner}",
+                "category": "goal",
+                "summary": f"{biz_name} seasonal launch focus",
+                "source": "fixture",
+            }
+            record["status"] = 200
+            route.fulfill(
+                json={
+                    "authenticated": True,
+                    "owner_id": self.owner,
+                    "version": int(workspace.get("version") or 0),
+                    "business_name": biz_name,
+                    "preferences": {"memory_entries": [entry], "suggested_updates": []},
+                    "voice_profile": {"owner_id": self.owner, "tone": f"{self.owner}-voice"},
+                    "memory_entries": [entry],
+                    "competitor_entries": [],
+                    "suggested_updates": [],
+                    "dismiss_signals": [],
+                }
+            )
+        elif url.path == "/api/v1/seller-memory/recommend" and req.method == "POST":
+            header_owner = req.headers.get("x-muse-owner")
+            if self.owner and header_owner and header_owner != self.owner:
+                record["status"] = 409
+                route.fulfill(status=409, json={"detail": "Workspace owner mismatch"})
+                return
+            payload = req.post_data_json or {}
+            biz_name = (
+                self.seller_business_name(self.owner)
+                if self.owner
+                else str(payload.get("business_name") or "Your Studio")
+            )
+            record["status"] = 200
+            route.fulfill(
+                json={
+                    "owner_id": self.owner,
+                    "business_name": biz_name,
+                    "recommendations": [
+                        {
+                            "id": f"rec-{self.owner or 'guest'}-1",
+                            "impact": "high",
+                            "title": f"Next post for {biz_name}",
+                            "reason": "Owner-scoped fixture recommendation.",
+                            "goal": "story",
+                        }
+                    ],
+                    "generated_at": "2026-11-16T12:00:00+00:00",
+                    "runs_used": 0,
+                }
+            )
         else:
             record["blocked"] = "unexpected account operation"
             route.abort("blockedbyclient")
@@ -154,6 +243,46 @@ class AccountAudit(Audit):
             ".some(k=>(localStorage.getItem(k)||'').includes('QA 742'))"
         ), "Private draft leaked to guest storage"
         self.switch_owner(page, "qa-b")
+        # Owner-scoped seller-memory fixture discrimination & mismatch rejection
+        mem_probe = page.evaluate(
+            """async () => {
+                const okGet = await fetch('/api/v1/seller-memory', {
+                    headers: { 'X-Muse-Owner': 'qa-b' }
+                });
+                const okBody = await okGet.json();
+                const badGet = await fetch('/api/v1/seller-memory', {
+                    headers: { 'X-Muse-Owner': 'qa-a' }
+                });
+                const okRec = await fetch('/api/v1/seller-memory/recommend', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Muse-Owner': 'qa-b' },
+                    body: JSON.stringify({ business_name: 'Qa B Ceramics' })
+                });
+                const okRecBody = await okRec.json();
+                const badRec = await fetch('/api/v1/seller-memory/recommend', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Muse-Owner': 'qa-a' },
+                    body: JSON.stringify({ business_name: 'Qa A Studio' })
+                });
+                return {
+                    okGetStatus: okGet.status,
+                    okBody,
+                    badGetStatus: badGet.status,
+                    okRecStatus: okRec.status,
+                    okRecBody,
+                    badRecStatus: badRec.status
+                };
+            }"""
+        )
+        assert mem_probe["okGetStatus"] == 200
+        assert mem_probe["okBody"]["owner_id"] == "qa-b"
+        assert mem_probe["okBody"]["business_name"] == "Qa B Ceramics"
+        assert "Qa A" not in json.dumps(mem_probe["okBody"])
+        assert "Sarabjit" not in json.dumps(mem_probe["okBody"])
+        assert mem_probe["badGetStatus"] == 409
+        assert mem_probe["okRecStatus"] == 200
+        assert mem_probe["okRecBody"]["owner_id"] == "qa-b"
+        assert mem_probe["badRecStatus"] == 409
         expect(page.locator(self.hook(path))).not_to_have_value(HOOK)
         page.locator("#loadAccountDraft").click()
         self.status(page, "No account draft")

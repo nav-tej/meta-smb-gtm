@@ -21,7 +21,7 @@ function harness(hash = '') {
   const header = new Element('header'), body = new Element('body');
   const anonymous = () => ({ configured: true, user: null, usage: null, live_available: false });
   const signed = id => ({ configured: true, user: { id, email: `${id}@example.test`, email_verified: true }, usage: { plan: 'trial', used: 0, limit: 3, remaining: 3, resets_at: null }, live_available: true });
-  let account = anonymous(), version = 7, workspace = { caption: 'Previous saved draft' }, failSignin = false, deferLoad = null;
+  let account = anonymous(), version = 7, workspace = { caption: 'Previous saved draft' }, failSignin = false, failSignup = false, deferLoad = null;
   const response = (data, status = 200) => ({ ok: status >= 200 && status < 300, status, json: async () => data });
   const context = {
     console, URLSearchParams, AbortController, setTimeout: () => 1, clearTimeout() {},
@@ -33,12 +33,18 @@ function harness(hash = '') {
       order.push(url); calls.push({ url, options, payload: options.body ? JSON.parse(options.body) : null });
       const suffix = url.replace('/api/v1/account', '');
       if (suffix === '/me') return response(account);
-      if (suffix === '/signup') return response({ message: 'Check your email to confirm your account.', authenticated: false });
+      if (suffix === '/signup') { if (failSignup) return response({ detail: 'Could not create a new account with those details.' }, 409); return response({ message: 'Check your email to confirm your account.', authenticated: false }); }
       if (suffix === '/oauth') return response({ provider: 'google', url: 'https://auth.example.test/oauth/google' });
       if (suffix === '/signin') { if (failSignin) return response({ detail: 'Invalid credentials.' }, 401); account = signed('user-a'); return response(account); }
       if (suffix === '/signout') { account = anonymous(); return response({ message: 'Signed out.' }); }
-      if (suffix === '/session') { account = signed('confirmed'); return response(account); }
+      if (suffix === '/session') {
+        account = signed('confirmed');
+        // A link opened outside the signup browser: the server replaced the signup password.
+        const reset = JSON.parse(options.body).access_token === 'other-device-access';
+        return response(reset ? { ...account, password_reset_required: true } : account);
+      }
       if (suffix === '/recover') return response({ message: 'If an account exists, a reset link is on its way.' });
+      if (suffix === '/resend') return response({ message: 'If that email is waiting for confirmation, a new link is on its way.' });
       if (suffix === '/password') return response({ message: 'Password updated.' });
       if (suffix === '/workspace' && options.method === 'GET') {
         if (deferLoad) return new Promise(resolve => { deferLoad(resolve); });
@@ -58,7 +64,7 @@ function harness(hash = '') {
   return { context, calls, events, order, nodes, ids, button, fire, api: context.window.museAccount,
     form: () => nodes.find(element => element.tagName === 'form'), dialog: () => nodes.find(element => element.tagName === 'dialog'),
     setAccount: value => { account = value; }, signed, response,
-    failSignin: value => { failSignin = value; }, deferLoad: fn => { deferLoad = fn; } };
+    failSignin: value => { failSignin = value; }, failSignup: value => { failSignup = value; }, deferLoad: fn => { deferLoad = fn; } };
 }
 
 (async () => {
@@ -148,5 +154,74 @@ function harness(hash = '') {
   assert.equal(googleCb.order[0], 'clear-hash');
   assert.equal(googleCb.calls[0].url, '/api/v1/account/session');
   assert(googleCb.nodes.some(element => element.textContent.includes('Signed in with Google')));
+
+  // Signup validation, 409 conflict auto-switch to sign-in + Forgot password?, and retry feedback.
+  const retry = harness(); await retry.api.ready();
+  retry.api.open('signup');
+  assert.equal(retry.button('Forgot password?').hidden, false);
+  retry.ids.get('ma-email').value = 'repeat@example.test';
+  retry.ids.get('ma-password').value = 'short';
+  await retry.fire(retry.form(), 'submit');
+  assert(retry.nodes.some(element => element.textContent.includes('at least 12 characters')));
+  assert.equal(retry.ids.get('ma-email').value, 'repeat@example.test');
+
+  retry.failSignup(true);
+  retry.ids.get('ma-password').value = 'valid-long-passphrase-12';
+  await retry.fire(retry.form(), 'submit');
+  assert.equal(retry.ids.get('ma-title').textContent, 'Welcome back.');
+  assert.equal(retry.ids.get('ma-email').value, 'repeat@example.test');
+  assert.equal(retry.button('Forgot password?').hidden, false);
+  assert(retry.nodes.some(element => element.className === 'ma-message ma-error'));
+  assert(retry.nodes.some(element => element.textContent.includes('Attempt 2')));
+
+  retry.failSignin(true);
+  retry.ids.get('ma-password').value = 'another-wrong-passphrase';
+  await retry.fire(retry.form(), 'submit');
+  assert(retry.nodes.some(element => element.textContent.includes('Attempt 3')));
+
+  // Already signed-in open('signup') opens account mode instead of duplicate signup form.
+  retry.failSignin(false);
+  retry.ids.get('ma-password').value = 'correct-passphrase-12';
+  await retry.fire(retry.form(), 'submit');
+  assert(retry.api.getSnapshot().user);
+  retry.api.open('signup');
+  assert.equal(retry.ids.get('ma-title').textContent, 'Your Muse account');
+  assert(retry.button('Sign out') && !retry.button('Sign out').hidden);
+
+  // Signup leaves the address in the form and offers a resend link; resend sends email only.
+  const onboard = harness(); await onboard.api.ready(); onboard.api.open('signup');
+  onboard.ids.get('ma-email').value = 'waiting@example.test'; onboard.ids.get('ma-password').value = 'long-password-value';
+  await onboard.fire(onboard.form(), 'submit');
+  assert.equal(onboard.calls.at(-1).url, '/api/v1/account/signup'); assert.equal(onboard.api.getSnapshot().user, null);
+  const resendButton = onboard.button('Resend confirmation email'); assert(resendButton && !resendButton.hidden);
+  await onboard.fire(resendButton);
+  assert.equal(onboard.ids.get('ma-title').textContent, 'Confirm your email.');
+  assert.equal(onboard.ids.get('ma-password').hidden, true); assert.equal(onboard.ids.get('ma-password').required, false);
+  assert.equal(onboard.button('Continue with Google').hidden, true);
+  assert.equal(onboard.ids.get('ma-email').value, 'waiting@example.test');
+  await onboard.fire(onboard.form(), 'submit');
+  assert.equal(onboard.calls.at(-1).url, '/api/v1/account/resend');
+  assert.deepEqual(onboard.calls.at(-1).payload, { email: 'waiting@example.test' });
+  assert.equal(onboard.ids.get('ma-title').textContent, 'Welcome back.');
+  assert(onboard.nodes.some(element => element.textContent.includes('new link is on its way')));
+  onboard.api.open('signup'); assert.equal(onboard.button('Resend confirmation email').hidden, true);
+
+  // The emailed confirmation link lands with tokens in the hash: cleared first, then a session.
+  const confirmLink = harness('#access_token=confirm-access&refresh_token=confirm-refresh&type=signup');
+  await confirmLink.api.ready();
+  assert.equal(confirmLink.order[0], 'clear-hash'); assert.equal(confirmLink.calls[0].url, '/api/v1/account/session');
+  assert(confirmLink.nodes.some(element => element.textContent.includes('Email confirmed')));
+  assert.notEqual(confirmLink.ids.get('ma-title').textContent, ''); assert(!confirmLink.nodes.some(element => element.textContent.includes('choose a new password')));
+  // Opened on another device: signed in, then asked to choose a password before anything else.
+  const otherDevice = harness('#access_token=other-device-access&refresh_token=other-device-refresh&type=signup');
+  await otherDevice.api.ready();
+  assert.equal(otherDevice.order[0], 'clear-hash');
+  assert(otherDevice.nodes.some(element => element.textContent.includes('choose a new password')));
+  assert(otherDevice.nodes.some(element => element.tagName === 'button' && element.textContent === 'Update password'));
+  assert.equal(otherDevice.dialog().open, true);
+  // An expired confirmation link points to both recovery paths.
+  const expired = harness('#error=access_denied&error_description=Email+link+is+invalid+or+has+expired');
+  await expired.api.ready();
+  assert(expired.nodes.some(element => element.textContent.includes('Resend confirmation email') && element.tagName === 'p'));
   console.log('ACCOUNT UI CONTRACT PASSED');
 })().catch(error => { console.error(error); process.exitCode = 1; });

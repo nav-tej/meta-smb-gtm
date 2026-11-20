@@ -20,6 +20,8 @@
   // Server accounts (Supabase + runs quota) replace browser-local demo credits when on.
   const serverSnapshot = () => window.museAccount?.getSnapshot?.() || null;
   const serverMode = () => serverSnapshot()?.configured === true;
+  const ownerId = () => serverSnapshot()?.user?.id || null;
+  const ownerKey = (base) => { const uid = ownerId(); return uid ? `${base}.${uid}` : base; };
   function removeGates() {
     document.body.classList.remove('ms-logged-out');
     document.querySelectorAll('.ms-gate').forEach((gate) => gate.remove());
@@ -546,15 +548,46 @@
     if (pill?.parentNode) pill.insertAdjacentElement('afterend', accountSlot); else header.appendChild(accountSlot);
     renderAccount();
     syncServerSession();
-    window.addEventListener('muse:account-change', () => { syncServerSession(); renderAccount(); });
+    const syncAccountUi = () => {
+      syncServerSession();
+      renderAccount();
+      actionsChanged();
+      if (myActionsBox) myActionsBox.open = Object.values(readActions()).some((a) => a.status === 'accepted');
+      renderMemory();
+      if (!ownerId()) {
+        try { if (actionsDialog?.open) actionsDialog.close(); } catch {}
+        toggleNotifications(false);
+        const banner = document.getElementById('focusBanner');
+        if (banner) banner.hidden = true;
+        document.querySelectorAll('.ms-match-tag').forEach((t) => t.remove());
+        document.querySelectorAll('.ms-match').forEach((m) => m.classList.remove('ms-match'));
+      }
+    };
+    window.addEventListener('muse:account-change', syncAccountUi);
+    window.addEventListener('muse:workspace-reset', syncAccountUi);
   }
 
   // ---------- Recommendation triage: accept, dismiss, archive ----------
   const ACTIONS_KEY = 'muse.actions';
-  const readActions = () => { try { const v = JSON.parse(store.get(ACTIONS_KEY) || '{}'); return v && typeof v === 'object' ? v : {}; } catch { return {}; } };
-  const writeActions = (v) => store.set(ACTIONS_KEY, JSON.stringify(v));
+  const readActions = () => { try { const v = JSON.parse(store.get(ownerKey(ACTIONS_KEY)) || '{}'); return v && typeof v === 'object' ? v : {}; } catch { return {}; } };
+  const writeActions = (v) => store.set(ownerKey(ACTIONS_KEY), JSON.stringify(v));
   const actionId = (text) => { let h = 0; for (const ch of text) h = (h * 31 + ch.charCodeAt(0)) | 0; return `a${(h >>> 0).toString(36)}`; };
   const TRIAGE_SELECTORS = ['.jr-recos > li', '#insightsContainer > .finding-item', '.try-next li', '#msBrief .ms-move', '.ms-digest-recos > li'];
+
+  async function syncSignalsToServer() {
+    try {
+      const owner = ownerId();
+      if (!owner) return;
+      const acts = readActions();
+      const sigs = JSON.parse(localStorage.getItem(ownerKey('muse.dismiss_signals')) || '[]');
+      fetch('/api/v1/preferences/signals', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-Muse-Owner': owner },
+        body: JSON.stringify({ actions: acts, dismiss_signals: sigs })
+      }).catch(() => {});
+    } catch (_) {}
+  }
   function itemTitle(item) {
     const head = item.querySelector('strong:not(.ms-match-tag)');
     return (head?.textContent || item.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 120);
@@ -565,22 +598,48 @@
   }
   // Relative app links and https only; anything else (javascript:, data:, //host) is dropped.
   const safeHref = (href, fallback = '') => (typeof href === 'string' && /^(\/(?!\/)|https:\/\/)/.test(href) ? href : fallback);
-  function setStatus(item, status, { note, silent = false } = {}) {
+  function setStatus(item, status, { note, silent = false, reason = '' } = {}) {
     const id = item.dataset.actionId;
     const all = readActions();
     const previous = all[id] ? { ...all[id] } : null;
     if (status) {
       all[id] = { ...(previous || {}), status, title: itemTitle(item), href: itemLink(item), page: location.pathname, at: new Date().toISOString() };
       if (note !== undefined) all[id].note = note;
+      if (reason) all[id].dismiss_reason = reason;
     } else delete all[id];
     writeActions(all);
     actionsChanged();
+    const emitSignalsUpdated = () => {
+      if (
+        typeof window !== 'undefined' &&
+        typeof window.dispatchEvent === 'function' &&
+        typeof CustomEvent === 'function'
+      ) {
+        window.dispatchEvent(
+          new CustomEvent('muse:signals-updated', { detail: { id, reason: reason || '', status } })
+        );
+      }
+    };
+    if (status === 'accepted') window.museTrack?.('idea_accepted', { action_id: id, page: location.pathname, has_note: Boolean(note) });
+    else if (status === 'dismissed') {
+      window.museTrack?.('idea_dismissed', { action_id: id, page: location.pathname, has_note: Boolean(note), reason: reason || 'unspecified' });
+      if (reason) {
+        try {
+          const sigKey = ownerKey('muse.dismiss_signals');
+          const signals = JSON.parse(localStorage.getItem(sigKey) || '[]');
+          signals.push({ id, reason, at: new Date().toISOString() });
+          localStorage.setItem(sigKey, JSON.stringify(signals));
+        } catch (_) {}
+      }
+    }
+    else if (status === 'archived') window.museTrack?.('idea_archived', { action_id: id, page: location.pathname, has_note: Boolean(note) });
+    Promise.resolve(syncSignalsToServer()).then(emitSignalsUpdated).catch(emitSignalsUpdated);
     if (!status || silent) return;
     const labels = { accepted: 'Added to My actions', dismissed: 'Dismissed', archived: 'Archived' };
     const undo = status === 'dismissed' || status === 'archived'
       ? { label: 'Undo', onClick: () => { const v = readActions(); if (previous) v[id] = previous; else delete v[id]; writeActions(v); actionsChanged(); } }
       : null;
-    toast(`${labels[status]} · ${itemTitle(item).slice(0, 48)}`, '', undo);
+    toast(`${labels[status]}${reason ? ` (${reason.replace(/_/g, ' ')})` : ''} · ${itemTitle(item).slice(0, 48)}`, '', undo);
   }
   function applyStatus(item) {
     const entry = readActions()[item.dataset.actionId];
@@ -618,6 +677,7 @@
       const note = input.value.trim().replace(/\s+/g, ' ').slice(0, 140);
       if (!note) { input.focus(); return; }
       setStatus(item, 'accepted', { note, silent: true });
+      window.museTrack?.('idea_adjusted', { action_id: item.dataset.actionId, page: location.pathname, has_note: true });
       close();
       toast('Tweak saved · added to My actions');
     });
@@ -625,16 +685,58 @@
     button.setAttribute('aria-expanded', 'true');
     input.focus();
   }
+  // Dismiss with reason: one-tap signals (not my style, too advanced, no access, already tried).
+  function toggleDismiss(item, button) {
+    const open = item.querySelector('.ms-dismiss-reasons');
+    if (open) { open.remove(); button.setAttribute('aria-expanded', 'false'); return; }
+    const row = el('div', { class: 'ms-dismiss-reasons' });
+    row.appendChild(el('span', {}, 'Why dismiss? (helps Muse refine recommendations)'));
+    const btns = el('div', { class: 'ms-dismiss-row' });
+    const reasons = [
+      { key: 'not_my_style', label: 'Not my style' },
+      { key: 'too_much_time', label: 'Too much time' },
+      { key: 'too_advanced', label: 'Too advanced' },
+      { key: 'no_access', label: 'No access' },
+      { key: 'wrong_channel', label: 'Wrong channel' },
+      { key: 'already_tried', label: 'Already tried' }
+    ];
+    reasons.forEach(r => {
+      const btn = el('button', { type: 'button', class: 'ms-dismiss-chip', 'data-reason': r.key }, r.label);
+      btn.addEventListener('click', () => {
+        row.remove();
+        button.setAttribute('aria-expanded', 'false');
+        setStatus(item, 'dismissed', { reason: r.key });
+      });
+      btns.appendChild(btn);
+    });
+    const skip = el('button', { type: 'button', class: 'ms-dismiss-chip', style: 'opacity:0.8' }, 'Skip reason');
+    skip.addEventListener('click', () => {
+      row.remove();
+      button.setAttribute('aria-expanded', 'false');
+      setStatus(item, 'dismissed', { reason: '' });
+    });
+    btns.appendChild(skip);
+    const cancel = el('button', { type: 'button', class: 'ms-dismiss-cancel' }, 'Cancel');
+    cancel.addEventListener('click', () => {
+      row.remove();
+      button.setAttribute('aria-expanded', 'false');
+      button.focus();
+    });
+    btns.appendChild(cancel);
+    row.appendChild(btns);
+    item.querySelector('.ms-triage')?.insertAdjacentElement('afterend', row);
+    button.setAttribute('aria-expanded', 'true');
+  }
   function addTriage(item) {
     if (item.querySelector('.ms-triage')) return;
     item.dataset.actionId = actionId(itemTitle(item));
     const bar = el('div', { class: 'ms-triage', role: 'group', 'aria-label': 'Recommendation actions' });
     const accept = el('button', { type: 'button', class: 'ms-triage-accept' }, '✓ Accept');
-    const dismiss = el('button', { type: 'button', class: 'ms-triage-dismiss' }, '✕ Dismiss');
+    const dismiss = el('button', { type: 'button', class: 'ms-triage-dismiss', 'aria-expanded': 'false' }, '✕ Dismiss');
     const archive = el('button', { type: 'button', class: 'ms-triage-archive' }, '⤓ Archive');
     const adjust = el('button', { type: 'button', class: 'ms-triage-adjust', 'aria-expanded': 'false' }, '✎ Adjust');
     accept.addEventListener('click', () => setStatus(item, readActions()[item.dataset.actionId]?.status === 'accepted' ? '' : 'accepted'));
-    dismiss.addEventListener('click', () => setStatus(item, 'dismissed'));
+    dismiss.addEventListener('click', () => toggleDismiss(item, dismiss));
     archive.addEventListener('click', () => setStatus(item, 'archived'));
     adjust.addEventListener('click', () => toggleAdjust(item, adjust));
     bar.append(accept, dismiss, archive, adjust);
@@ -692,7 +794,15 @@
     }
     const next = { accepted: ['Mark done', 'done'], done: ['Reopen', 'accepted'], archived: ['Restore', 'accepted'] }[status];
     const move = el('button', { type: 'button', class: 'ms-link' }, next[0]);
-    move.addEventListener('click', () => { const v = readActions(); if (v[id]) v[id] = { ...v[id], status: next[1] }; writeActions(v); actionsChanged(); });
+    move.addEventListener('click', () => {
+      const v = readActions();
+      if (v[id]) {
+        v[id] = { ...v[id], status: next[1] };
+        if (next[1] === 'done') window.museTrack?.('idea_done', { action_id: id });
+      }
+      writeActions(v);
+      actionsChanged();
+    });
     const remove = el('button', { type: 'button', class: 'ms-link ms-remove' }, 'Remove');
     remove.addEventListener('click', () => { const v = readActions(); delete v[id]; writeActions(v); actionsChanged(); });
     row.append(move, remove);
@@ -874,6 +984,18 @@
     { name: 'Manjot Singh Sachdeva', where: 'Fine Art America / Pixels · 105 listings', status: 'first', badge: 'First check', note: 'Prints $14–$24. First check, so nothing to compare yet' },
     { name: 'Gurdish Pannu', where: 'Saatchi Art · originals', status: 'first', badge: 'First check', note: 'Originals, no USD prices listed. First check' },
   ];
+  const isSampleShopMode = () => {
+    try {
+      if (typeof window !== 'undefined' && window.museModes && typeof window.museModes.isSampleMode === 'function') {
+        return window.museModes.isSampleMode();
+      }
+      if (typeof location === 'undefined') return false;
+      const params = new URLSearchParams(location.search);
+      if (params.get('workspace') === 'own') return false;
+      return params.get('workspace') === 'sample' || Boolean(params.get('idea') || params.get('artwork'));
+    } catch (_) { return false; }
+  };
+
   function mountBrief() {
     if (!location.pathname.startsWith('/today')) return;
     const main = document.querySelector('main');
@@ -887,7 +1009,7 @@
     titleBox.appendChild(el('p', { class: 'ms-brief-plan' }, 'Built once a day from your watchlist, the competitor monitor and campaign trends. No Muse credit is used to read it.'));
     const meta = el('p', { class: 'ms-brief-meta' });
     meta.appendChild(el('span', { class: 'ms-dot', 'aria-hidden': 'true' }));
-    meta.appendChild(document.createTextNode('Watchlist: 4 competitors · 6 shop pages · last checked Nov 3 · social accounts not checked yet'));
+    meta.appendChild(document.createTextNode('Checking your workspace…'));
     titleBox.appendChild(meta);
     const recheck = el('button', { type: 'button', class: 'ms-secondary ms-small', title: 'Check competitors’ public pages and rebuild today’s brief · 1 run' }, 'Re-check now');
     const toggle = el('button', { type: 'button', class: 'ms-link ms-brief-toggle', 'aria-expanded': 'true', 'aria-controls': 'msBriefBody' }, 'Hide');
@@ -909,22 +1031,26 @@
         list.appendChild(li);
       }
     };
-    renderItems(WATCH);
-    const statusLine = el('p', { class: 'ms-brief-status', role: 'status', 'aria-live': 'polite' }, 'Loading today’s brief…');
+    const statusLine = el('p', { class: 'ms-brief-status', role: 'status', 'aria-live': 'polite' }, 'Checking your account…');
     const retry = el('button', { type: 'button', class: 'ms-link ms-brief-retry', hidden: '' }, 'Try again');
     const statusRow = el('div', { class: 'ms-brief-statusrow' });
     statusRow.append(statusLine, retry);
-    const sourceNote = el('p', { class: 'ms-muted ms-brief-source' }, 'From saved public snapshots captured Nov 3. Muse checks again when you run a re-check; it does not watch continuously.');
-    // Focus of the day (server-ranked; the saved snapshot move is shown until the brief loads).
+    const sourceNote = el('p', { class: 'ms-muted ms-brief-source' }, '');
     const move = el('div', { class: 'ms-move' });
     const moveText = el('div');
-    const moveChip = el('span', { class: 'ms-chip high' }, 'Focus of the day · high impact');
-    const moveTitle = el('strong', {}, 'Feature your Empowering Women series');
-    const moveReason = el('span', { class: 'ms-note' }, 'SikhiArt keeps adding warrior and guru editions but has no group for women’s stories.');
+    const moveChip = el('span', { class: 'ms-chip high' }, 'Workspace focus');
+    const moveTitle = el('strong', {}, 'Preparing your daily workspace');
+    const moveReason = el('span', { class: 'ms-note' }, '');
     moveText.append(moveChip, moveTitle, moveReason);
-    const go = el('a', { class: 'ms-primary ms-small', href: '/create?goal=story' }, 'Make this post →');
+    const go = el('a', { class: 'ms-primary ms-small', href: '/create' }, 'Make a post →');
     move.append(moveText, go);
-    const safeHref = (href) => (typeof href === 'string' && /^\/(?!\/)/.test(href) ? href : '/create');
+    const safeHref = (href, asSample = false) => {
+      if (typeof href !== 'string' || !/^\/(?!\/)/.test(href)) return asSample ? '/create?workspace=sample' : '/create';
+      if (asSample && href.startsWith('/create') && !href.includes('workspace=sample')) {
+        return href.includes('?') ? `${href}&workspace=sample` : `${href}?workspace=sample`;
+      }
+      return href;
+    };
     const goLabel = (href) => (href.startsWith('/create') ? 'Make this post →' : 'Open →');
     const columns = el('div', { class: 'ms-brief-columns' });
     const overnightBox = el('section', { class: 'ms-brief-card', 'aria-label': 'Overnight competitor changes' });
@@ -945,14 +1071,14 @@
         moveChip.textContent = `Focus of the day · ${focus.impact || 'high'} impact`;
         moveTitle.textContent = String(focus.title);
         moveReason.textContent = String(focus.reason || '');
-        const href = safeHref(focus.href);
+        const href = safeHref(focus.href, true);
         go.setAttribute('href', href);
         go.textContent = goLabel(href);
       }
       const actions = Array.isArray(brief.action_items) ? brief.action_items.slice(0, 3) : [];
       card(actionsBox, 'Top 3 actions', actions.map((item, index) => {
         const li = el('li', { class: `ms-action ${item.impact || ''}` });
-        const link = el('a', { href: safeHref(item.href) }, `${index + 1}. ${String(item.title || '')}`);
+        const link = el('a', { href: safeHref(item.href, true) }, `${index + 1}. ${String(item.title || '')}`);
         li.append(link, el('span', { class: 'ms-note' }, String(item.reason || '')));
         if (item.source) li.appendChild(el('span', { class: 'ms-where' }, String(item.source)));
         return li;
@@ -983,31 +1109,120 @@
       statusLine.hidden = !message;
     };
     const loadBrief = async (refresh = false) => {
-      setLoading(true, refresh ? 'Rebuilding today’s brief…' : 'Loading today’s brief…');
+      if (!isSampleShopMode()) return false;
+      const guard = window.museModes?.bindAsyncGuard?.() || { isCurrent: () => true };
+      setLoading(true, refresh ? 'Rebuilding sample brief…' : 'Loading sample brief…');
       retry.hidden = true;
       try {
         const response = await museFetch(`/api/v1/daily-brief${refresh ? '?refresh=true' : ''}`, {}, { retries: 2, timeoutMs: 15000 });
-        if (!response.ok) throw new Error(await errorMessage(response, 'Could not load today’s brief.'));
-        renderBrief(await response.json());
+        if (!guard.isCurrent()) return false;
+        if (!response.ok) throw new Error(await errorMessage(response, 'Could not load sample brief.'));
+        const data = await response.json();
+        if (!guard.isCurrent()) return false;
+        renderBrief(data);
         setLoading(false);
         return true;
       } catch (error) {
-        setLoading(false, `${error.message || 'Could not load today’s brief.'} Showing the saved brief.`);
+        if (!guard.isCurrent()) return false;
+        setLoading(false, `${error.message || 'Could not load today’s brief.'} Showing the saved sample brief.`);
         retry.hidden = false;
         return false;
       }
     };
     const loadWeekly = async () => {
+      if (!isSampleShopMode()) return;
+      const guard = window.museModes?.bindAsyncGuard?.() || { isCurrent: () => true };
       try {
         const response = await museFetch('/api/v1/weekly-digest', {}, { retries: 1, timeoutMs: 10000 });
-        if (!response.ok) return;
+        if (!response.ok || !guard.isCurrent()) return;
         const digest = await response.json();
+        if (!guard.isCurrent()) return;
         const first = Array.isArray(digest.highlights) && digest.highlights[0] ? ` Biggest: ${digest.highlights[0]}.` : '';
         weekly.textContent = digest.checks ? `This week: ${digest.total_changes} competitor change(s) across ${digest.checks} check(s).${first}` : String(digest.note || '');
       } catch { /* the weekly line is optional */ }
     };
+    const applyModeState = (modeState) => {
+      const s = modeState || window.museModes?.current?.() || {
+        state: isSampleShopMode() ? 'guest_sample' : 'guest_entry',
+        isSample: isSampleShopMode(),
+        isLoading: false,
+        isError: false,
+        isExpired: false
+      };
+      retry.hidden = true;
+      weekly.textContent = '';
+      if (s.isLoading) {
+        list.replaceChildren();
+        card(actionsBox, 'Top 3 actions', [], 'Checking your account…');
+        card(overnightBox, 'Overnight changes', [], 'Checking your account…');
+        card(trendsBox, 'Performance trends', [], 'Checking your account…');
+        meta.lastChild.textContent = 'Checking account status…';
+        moveChip.textContent = 'Checking account';
+        moveTitle.textContent = 'Loading your workspace brief…';
+        moveReason.textContent = 'Verifying your account before showing workspace or sample data.';
+        go.setAttribute('href', '/create');
+        go.textContent = 'Open studio →';
+        sourceNote.textContent = '';
+        recheck.disabled = true;
+        setLoading(true, 'Checking your account…');
+        return;
+      }
+      if (s.isError || s.isExpired) {
+        list.replaceChildren();
+        card(actionsBox, 'Top 3 actions', [], 'Sign in or retry account check first.');
+        card(overnightBox, 'Overnight changes', [], 'Unavailable until account check completes.');
+        card(trendsBox, 'Performance trends', [], 'Unavailable until account check completes.');
+        meta.lastChild.textContent = s.isExpired ? 'Session expired' : 'Account check unavailable';
+        moveChip.textContent = s.isExpired ? 'Session expired' : 'Account check needed';
+        moveTitle.textContent = s.isExpired ? 'Sign in again to view your brief' : 'Could not verify your account right now';
+        moveReason.textContent = s.authError || 'Sample data stays separate. Retry or sign in above.';
+        go.setAttribute('href', '/create');
+        go.textContent = 'Open studio →';
+        sourceNote.textContent = 'Sample brief stays separate when your account status is uncertain.';
+        recheck.disabled = true;
+        setLoading(false, '');
+        return;
+      }
+      if (s.isSample) {
+        renderItems(WATCH);
+        meta.lastChild.textContent = 'Sample watchlist: 4 competitors · 6 shop pages · last checked Nov 3';
+        moveChip.textContent = 'Sample focus · high impact';
+        moveTitle.textContent = 'Feature your Empowering Women series';
+        moveReason.textContent = 'SikhiArt keeps adding warrior and guru editions but has no group for women’s stories.';
+        go.setAttribute('href', '/create?workspace=sample&idea=idea-1-empowering-women');
+        go.textContent = 'Make this post →';
+        sourceNote.textContent = 'From saved public snapshots captured Nov 3. Muse checks again when you run a re-check; it does not watch continuously.';
+        recheck.disabled = false;
+        loadBrief(false);
+        loadWeekly();
+        return;
+      }
+      list.replaceChildren();
+      meta.lastChild.textContent = s.isAuthenticated
+        ? 'My workspace · no competitor checks yet'
+        : 'Set up your own shop or explore the sample shop';
+      moveChip.textContent = s.isAuthenticated ? 'My workspace' : 'Get started';
+      moveTitle.textContent = s.isAuthenticated
+        ? 'Draft your next post from your own shop website'
+        : 'Add your shop website or explore the sample artist brief';
+      moveReason.textContent = s.isAuthenticated
+        ? 'Your brief fills in once Muse has checked the competitors you track. Pick or change them in setup, or start a post from your shop website below.'
+        : 'Your workspace starts empty. Paste your own URL below or open the sample shop separately.';
+      go.setAttribute('href', '/create');
+      go.textContent = 'Create a post →';
+      card(actionsBox, 'Top 3 actions', [], 'Add your storefront & competitors to generate your first personal actions.');
+      card(overnightBox, 'Overnight changes', [], 'No personal competitor changes monitored yet.');
+      card(trendsBox, 'Performance trends', [], 'Log campaign results on Progress to track trends.');
+      sourceNote.textContent = 'Your brief shows only your own workspace data. The sample shop example stays separate.';
+      recheck.disabled = !s.isAuthenticated;
+      setLoading(false, '');
+    };
     retry.addEventListener('click', () => { loadBrief(false); loadWeekly(); });
     recheck.addEventListener('click', async () => {
+      if (!isSampleShopMode()) {
+        toast('Add your shop competitors in onboarding first to run a personal brief check.');
+        return;
+      }
       if (!requireRun('Brief re-check')) return;
       recheck.disabled = true;
       recheck.textContent = 'Checking…';
@@ -1026,8 +1241,9 @@
       recheck.textContent = 'Re-check now';
       toast(ok ? (monitorNote || 'Brief rebuilt with the latest competitor check') : 'Could not rebuild the brief; showing the saved one.', ok && !monitorNote ? '' : 'warn');
     });
-    loadBrief(false);
-    loadWeekly();
+    if (window.museModes?.subscribe) window.museModes.subscribe(applyModeState);
+    if (window.museModes?.resolve) window.museModes.resolve().then(applyModeState);
+    else applyModeState();
     body.append(statusRow, move, columns, list, weekly);
     body.appendChild(sourceNote);
     section.append(head, body);
@@ -1068,8 +1284,10 @@
       .map(([kind, n]) => [KIND_BADGE[kind][0], plural(Number(n), KIND_BADGE[kind][1])]);
   }
   // One watched shop: the latest monitor check when there is one, else the saved Nov 3 snapshot.
+  // In the sample shop, always show the saved Nov 3 snapshot so stale monitor errors never leak into sample mode.
   function competitorStatus(name, run) {
-    const check = Array.isArray(run?.competitors) ? run.competitors.find((c) => c?.name === name) : null;
+    const inSample = !!window.museModes?.isSampleMode?.();
+    const check = !inSample && Array.isArray(run?.competitors) ? run.competitors.find((c) => c?.name === name) : null;
     if (check) {
       const badges = check.status === 'error' ? [['error', 'Couldn’t check']] : changeBadges(check.counts);
       if (!badges.length) badges.push(['none', 'No changes']);
@@ -1084,8 +1302,8 @@
   // ---------- Portal watchlist: alerts toggle, last checked, change badges ----------
   // Pausing is a per-device alert preference; the scheduled monitor still checks every shop.
   const PAUSE_KEY = 'muse.watchPaused';
-  const readPaused = () => { try { const v = JSON.parse(store.get(PAUSE_KEY) || '{}'); return v && typeof v === 'object' ? v : {}; } catch { return {}; } };
-  function setPaused(name, paused) { const v = readPaused(); if (paused) v[name] = true; else delete v[name]; store.set(PAUSE_KEY, JSON.stringify(v)); }
+  const readPaused = () => { try { const v = JSON.parse(store.get(ownerKey(PAUSE_KEY)) || '{}'); return v && typeof v === 'object' ? v : {}; } catch { return {}; } };
+  function setPaused(name, paused) { const v = readPaused(); if (paused) v[name] = true; else delete v[name]; store.set(ownerKey(PAUSE_KEY), JSON.stringify(v)); }
   const sellerPainters = new Map();
   function decorateSeller(li) {
     if (li.querySelector('.ms-watchmeta')) return;
@@ -1131,11 +1349,14 @@
       signals = loaded;
       sellerPainters.forEach((paint) => paint());
       const line = document.querySelector('.jr-watch');
-      if (loaded.run && line) {
+      if (loaded.run && line && !window.museModes?.isSampleMode?.()) {
         for (const node of line.childNodes) {
           if (node.nodeType === 3 && /last checked/.test(node.textContent)) node.textContent = node.textContent.replace(/last checked .*$/, `last checked ${fmtWhen(loaded.run.checked_at)} `);
         }
       }
+    });
+    window.addEventListener?.('muse:mode-change', () => {
+      sellerPainters.forEach((paint) => paint());
     });
   }
 
@@ -1196,14 +1417,14 @@
     document.addEventListener('click', (event) => { if (!header.contains(event.target)) closeMobileNav(); });
     document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && header.classList.contains('ms-nav-open')) { setOpen(false); button.focus(); } });
     // Choosing something in the menu closes it (dialogs and links take over from there).
-    header.addEventListener('click', (event) => { if (event.target.closest('.topbar-link, #openLocalEngineBtn, .workspace-btn, .ma-account-button')) closeMobileNav(); });
+    header.addEventListener('click', (event) => { if (event.target.closest('.topbar-link, #openLocalEngineBtn, .workspace-btn, .ma-account-button, .ma-signup-button, .ma-signout')) closeMobileNav(); });
     window.matchMedia?.('(min-width: 641px)').addEventListener?.('change', (event) => { if (event.matches) closeMobileNav(); });
   }
 
   // ---------- Notifications: competitor changes, new ideas, weekly digest ----------
   const READ_KEY = 'muse.notifRead';
-  const readSeen = () => { try { const v = JSON.parse(store.get(READ_KEY) || '[]'); return new Set(Array.isArray(v) ? v.filter((x) => typeof x === 'string') : []); } catch { return new Set(); } };
-  const writeSeen = (seen) => store.set(READ_KEY, JSON.stringify([...seen].slice(-200)));
+  const readSeen = () => { try { const v = JSON.parse(store.get(ownerKey(READ_KEY)) || '[]'); return new Set(Array.isArray(v) ? v.filter((x) => typeof x === 'string') : []); } catch { return new Set(); } };
+  const writeSeen = (seen) => store.set(ownerKey(READ_KEY), JSON.stringify([...seen].slice(-200)));
   // Monday of the digest's week, so "digest ready" is one notification per week, not per day.
   const weekOf = (isoDate) => {
     const d = new Date(`${String(isoDate).slice(0, 10)}T00:00:00Z`);
@@ -1242,7 +1463,10 @@
     return items;
   }
   let bell = null;
-  const currentNotifications = () => notificationItems(signals || {}, { paused: readPaused(), actions: readActions() });
+  const currentNotifications = () => {
+    if (!isSampleShopMode()) return [];
+    return notificationItems(signals || {}, { paused: readPaused(), actions: readActions() });
+  };
   function toggleNotifications(force) {
     if (!bell) return;
     const open = typeof force === 'boolean' ? force : bell.menu.hidden;
@@ -1301,17 +1525,33 @@
     document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !menu.hidden) { toggleNotifications(false); button.focus(); } });
     if (pill?.parentNode) pill.insertAdjacentElement('afterend', wrap);
     else { const anchor = header.querySelector('.status-pill, .topbar-nav'); if (anchor) anchor.insertAdjacentElement('afterend', wrap); else header.appendChild(wrap); }
-    loadSignals().then((loaded) => { signals = loaded; renderNotifications(); });
+    const syncSignals = async (modeState) => {
+      const s = modeState || window.museModes?.current?.() || { isSample: isSampleShopMode(), isLoading: false };
+      if (s.isLoading) return;
+      if (!s.isSample) {
+        signals = {};
+        renderNotifications();
+        return;
+      }
+      const guard = window.museModes?.bindAsyncGuard?.() || { isCurrent: () => true };
+      const loaded = await loadSignals();
+      if (!guard.isCurrent()) return;
+      signals = loaded;
+      renderNotifications();
+    };
+    if (window.museModes?.subscribe) window.museModes.subscribe(syncSignals);
+    if (window.museModes?.resolve) window.museModes.resolve().then(syncSignals);
+    else syncSignals();
   }
 
   // ---------- Portal workspace: every item gets a next step ----------
   const PIXELS_SHOP = 'https://sarabjit-singh.pixels.com/';
   const ROUTES = [
     { test: /checkout|contact form|1-click/i, label: 'Get the checkout template →', to: 'tab:tab-export' },
-    { test: /starter|cheap|under \$25|\$1\d/i, label: 'Promote your prints →', to: '/create?goal=visit' },
-    { test: /women|goddess|empower|mai bhago|mata gujri|shop group/i, label: 'Feature it in a post →', to: '/create?goal=story' },
-    { test: /gift|holiday|housewarming|wedding/i, label: 'Make a gift post →', to: '/create?goal=gift' },
-    { test: /story|blog|meaning|village/i, label: 'Make a story post →', to: '/create?goal=story' },
+    { test: /starter|cheap|under \$25|\$1\d/i, label: 'Promote your prints →', to: '/create?workspace=sample&idea=idea-2-starter-prints' },
+    { test: /women|goddess|empower|mai bhago|mata gujri|shop group/i, label: 'Feature it in a post →', to: '/create?workspace=sample&idea=idea-1-empowering-women' },
+    { test: /gift|holiday|housewarming|wedding/i, label: 'Make a gift post →', to: '/create?workspace=sample&idea=idea-3-gift-ready' },
+    { test: /story|blog|meaning|village/i, label: 'Make a story post →', to: '/create?workspace=sample&idea=idea-5-painting-story' },
     { test: /home|title|seo|metadata|series tag|omit|listing/i, label: 'Open your Pixels shop ↗', to: PIXELS_SHOP },
   ];
   const CONTAINER_DEFAULTS = {
@@ -1322,8 +1562,9 @@
   function routeFor(containerId, text) {
     const fixed = CONTAINER_DEFAULTS[containerId];
     if (fixed?.first) return fixed;
+    if (!isSampleShopMode()) return { label: 'Create a post for this →', to: '/create' };
     const title = text.split('\n').map((t) => t.trim()).find(Boolean) || '';
-    return ROUTES.find((r) => r.test.test(title)) || ROUTES.find((r) => r.test.test(text)) || { label: 'Create a post for this →', to: '/create' };
+    return ROUTES.find((r) => r.test.test(title)) || ROUTES.find((r) => r.test.test(text)) || { label: 'Create a post for this →', to: '/create?workspace=sample' };
   }
   function go(to) {
     if (to.startsWith('tab:')) {
@@ -1372,7 +1613,7 @@
     gift: ['gift', 'holiday', 'housewarming', 'wedding'], instagram: ['instagram', 'social', 'post', 'story', 'reel', 'facebook'],
     women: ['women', 'goddess', 'empower', 'mai bhago', 'mata gujri'], story: ['story', 'blog', 'meaning'], home: ['home', 'title'],
   };
-  const readMemory = () => { try { return JSON.parse(store.get(MEMORY_KEY) || '[]').filter((x) => typeof x === 'string').slice(0, 5); } catch { return []; } };
+  const readMemory = () => { try { return JSON.parse(store.get(ownerKey(MEMORY_KEY)) || '[]').filter((x) => typeof x === 'string').slice(0, 5); } catch { return []; } };
   function termsFor(text) {
     const words = text.toLowerCase().match(/[a-z$]+/g) || [];
     const terms = new Set();
@@ -1417,7 +1658,7 @@
     strip.appendChild(el('span', { class: 'ms-memory-badge' }, '🧠 Remembered'));
     for (const item of memory) strip.appendChild(el('span', { class: 'ms-memory-item' }, item));
     const forget = el('button', { type: 'button', class: 'ms-link ms-forget' }, 'Forget');
-    forget.addEventListener('click', () => { store.set(MEMORY_KEY, '[]'); renderMemory(); document.getElementById('focusBanner').hidden = true; document.querySelectorAll('.ms-match-tag').forEach((t) => t.remove()); document.querySelectorAll('.ms-match').forEach((m) => m.classList.remove('ms-match')); toast('Preferences forgotten.'); });
+    forget.addEventListener('click', () => { store.set(ownerKey(MEMORY_KEY), '[]'); renderMemory(); document.getElementById('focusBanner').hidden = true; document.querySelectorAll('.ms-match-tag').forEach((t) => t.remove()); document.querySelectorAll('.ms-match').forEach((m) => m.classList.remove('ms-match')); toast('Preferences forgotten.'); });
     strip.appendChild(forget);
   }
   function mountRefine() {
@@ -1432,7 +1673,7 @@
       if (!requireRun('Refined analysis')) return;
       await progress('Refining your seller audit', ['Saving your preference to memory', 'Re-ranking the saved findings', 'Highlighting what matches']);
       const memory = [text, ...readMemory().filter((m) => m.toLowerCase() !== text.toLowerCase())].slice(0, 5);
-      store.set(MEMORY_KEY, JSON.stringify(memory));
+      store.set(ownerKey(MEMORY_KEY), JSON.stringify(memory));
       renderMemory();
       applyFocus(text);
       toast('Your preferences saved');
@@ -1592,6 +1833,6 @@
     mountTriage();
   }
 
-  window.museShell = { spend, spendLive, canRun, requireRun, syncCredits, fetch: museFetch, errorMessage, friendlyError, isOffline, setOfflineState, hasAccount: hasSession, progress, toast, openGift, openPricing, openSignup, openActions, openTour, showStage, watchlist: WATCH, signals: loadSignals, competitorStatus, changeBadges, notificationItems, pausedCompetitors: readPaused, toggleNotifications, markRead };
+  window.museShell = { spend, spendLive, canRun, requireRun, syncCredits, fetch: museFetch, errorMessage, friendlyError, isOffline, setOfflineState, hasAccount: hasSession, progress, toast, openGift, openPricing, openSignup, openActions, openTour, showStage, refreshTriage, actionsChanged, watchlist: WATCH, signals: loadSignals, competitorStatus, changeBadges, notificationItems, pausedCompetitors: readPaused, toggleNotifications, markRead };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();

@@ -6,7 +6,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from src.api import (
@@ -19,11 +19,17 @@ from src.api import (
     credits,
     daily_brief,
     digest_email,
+    directives,
     intel,
     media,
     monitor,
+    onboarding,
+    outcomes,
+    preferences,
     product_reference,
     research_targets,
+    seller_memory,
+    voice,
 )
 from src.clients.comfyui import ComfyUIError
 from src.clients.meta import MetaAPIError
@@ -46,6 +52,7 @@ API_PREFIX = "/api/v1"
 # Pages must revalidate on every visit; otherwise browsers can keep old HTML that points at
 # old script versions after a deploy. Static assets are versioned with ?v= instead.
 PAGE_HEADERS = {"Cache-Control": "no-cache"}
+NOINDEX_PAGE_HEADERS = {"Cache-Control": "no-cache", "X-Robots-Tag": "noindex, nofollow"}
 REPO_ROOT = Path(__file__).resolve().parents[2]
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 SAMPLES_DIR = REPO_ROOT / "data" / "samples"
@@ -95,6 +102,19 @@ async def creator_studio() -> FileResponse:
     return FileResponse(STATIC_DIR / "creator.html", headers=PAGE_HEADERS)
 
 
+@app.get("/creator", include_in_schema=False)
+async def creator_alias(request: Request) -> RedirectResponse:
+    """Send the commonly mistyped /creator to /create, keeping workspace/idea params."""
+    query = request.url.query
+    return RedirectResponse(f"/create?{query}" if query else "/create", status_code=307)
+
+
+@app.get("/first-ad", include_in_schema=False)
+async def first_ad_workflow() -> FileResponse:
+    """Serve the bounded 4-step 'Run your first ad' guided workflow."""
+    return FileResponse(STATIC_DIR / "first-ad.html", headers=NOINDEX_PAGE_HEADERS)
+
+
 @app.get("/today", include_in_schema=False)
 async def daily_studio() -> FileResponse:
     """Serve the compact item-to-post daily workspace."""
@@ -107,6 +127,12 @@ async def weekly_digest_page() -> FileResponse:
     return FileResponse(STATIC_DIR / "digest.html", headers=PAGE_HEADERS)
 
 
+@app.get("/welcome", include_in_schema=False)
+async def welcome_onboarding_page() -> FileResponse:
+    """Serve the 4-step signed-in shop onboarding flow."""
+    return FileResponse(STATIC_DIR / "welcome.html", headers=NOINDEX_PAGE_HEADERS)
+
+
 @app.get("/", include_in_schema=False)
 @app.get("/portal", include_in_schema=False)
 async def customer_portal() -> FileResponse:
@@ -117,7 +143,33 @@ async def customer_portal() -> FileResponse:
 @app.get("/account", include_in_schema=False)
 async def account_landing() -> FileResponse:
     """Land email-confirmation links; the account dialog completes sign-in."""
-    return FileResponse(STATIC_DIR / "index.html", headers=PAGE_HEADERS)
+    return FileResponse(STATIC_DIR / "index.html", headers=NOINDEX_PAGE_HEADERS)
+
+
+@app.get("/robots.txt", include_in_schema=False)
+async def robots_txt() -> FileResponse:
+    """Serve robots.txt search directives."""
+    return FileResponse(STATIC_DIR / "robots.txt", media_type="text/plain", headers=PAGE_HEADERS)
+
+
+@app.get("/sitemap.xml", include_in_schema=False)
+async def sitemap_xml() -> FileResponse:
+    """Serve sitemap.xml search index."""
+    return FileResponse(
+        STATIC_DIR / "sitemap.xml", media_type="application/xml", headers=PAGE_HEADERS
+    )
+
+
+@app.get("/llms.txt", include_in_schema=False)
+async def llms_txt() -> FileResponse:
+    """Serve llms.txt plain-text documentation for LLMs."""
+    return FileResponse(STATIC_DIR / "llms.txt", media_type="text/plain", headers=PAGE_HEADERS)
+
+
+@app.get("/progress", include_in_schema=False)
+async def progress_page() -> FileResponse:
+    """Serve the Track F/K progress, move tracking, and ROI timeline page."""
+    return FileResponse(STATIC_DIR / "progress.html", headers=NOINDEX_PAGE_HEADERS)
 
 
 MUSE_UNAVAILABLE = (
@@ -264,6 +316,12 @@ app.include_router(daily_brief.router, prefix=API_PREFIX)
 app.include_router(credits.router, prefix=API_PREFIX)
 app.include_router(monitor.router, prefix=API_PREFIX)
 app.include_router(digest_email.router, prefix=API_PREFIX)
+app.include_router(directives.router, prefix=API_PREFIX)
+app.include_router(onboarding.router, prefix=API_PREFIX)
+app.include_router(preferences.router, prefix=API_PREFIX)
+app.include_router(outcomes.router, prefix=API_PREFIX)
+app.include_router(seller_memory.router, prefix=API_PREFIX)
+app.include_router(voice.router, prefix=API_PREFIX)
 # Short aliases: /api/credits, /api/monitor, /api/weekly-digest
 app.include_router(credits.router, prefix="/api", include_in_schema=False)
 app.include_router(monitor.router, prefix="/api", include_in_schema=False)

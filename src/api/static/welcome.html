@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en" data-setup-check="page">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Set Up Your Shop — Muse Growth Studio</title>
+  <meta name="robots" content="noindex" />
+  <link rel="stylesheet" href="/static/welcome.css?v=20261118-uxgap12" />
+  <link rel="stylesheet" href="/static/account.css?v=20261112-integrated" />
+  <link rel="stylesheet" href="/static/seller-memory.css?v=20261112-integrated" />
+  <script src="/static/analytics.js?v=20261109-ux" defer></script>
+  <script src="/static/account.js?v=20261118-uxgap12" defer></script>
+  <script src="/static/workspace-modes.js?v=20261117-uxgap6" defer></script>
+  <script src="/static/welcome.js?v=20261118-uxgap12" defer></script>
+  <script src="/static/seller-memory.js?v=20261119-uxgap13" defer></script>
+</head>
+<body class="wk-body">
+  <header class="wk-topbar">
+    <a class="wk-brand" href="/">
+      <span class="wk-brand-logo" aria-hidden="true">M</span>
+      <span>
+        <span class="wk-brand-title">Muse Growth Studio</span><br />
+        <span class="wk-brand-sub">Signed-in shop setup · 4 quick steps</span>
+      </span>
+    </a>
+    <div class="wk-topbar-actions">
+      <span class="wk-runs-pill" id="wkRunsPill" aria-live="polite">Checking runs…</span>
+      <a class="wk-sample-link" href="/?workspace=sample" id="wkViewSampleShopLink">Explore Sample shop instead →</a>
+    </div>
+  </header>
+
+  <main class="wk-main" id="wkMain">
+    <ol class="wk-stepper" aria-label="Onboarding steps">
+      <li class="wk-step-indicator is-active" data-step-ind="1">
+        <span class="wk-step-num">1</span>
+        <span>Your shop</span>
+      </li>
+      <li class="wk-step-indicator" data-step-ind="2">
+        <span class="wk-step-num">2</span>
+        <span>Your socials</span>
+      </li>
+      <li class="wk-step-indicator" data-step-ind="3">
+        <span class="wk-step-num">3</span>
+        <span>Competitors</span>
+      </li>
+      <li class="wk-step-indicator" data-step-ind="4">
+        <span class="wk-step-num">4</span>
+        <span>How you work</span>
+      </li>
+    </ol>
+
+    <!-- STEP 1: YOUR SHOP -->
+    <section class="wk-card" id="wkStep1" aria-labelledby="wkStep1Title">
+      <span class="wk-eyebrow">Step 1 of 4 · Free crawl (0 runs)</span>
+      <h1 class="wk-title" id="wkStep1Title">Your shop</h1>
+      <p class="wk-subtitle">Enter your website or marketplace shop URL. You can type a bare domain like <code>myshop.com</code>. Muse scans allowed public pages without spending a run.</p>
+
+      <div class="wk-field">
+        <label class="wk-label" for="wkShopUrl">Website or primary marketplace shop URL</label>
+        <input class="wk-input" id="wkShopUrl" type="text" inputmode="url" placeholder="e.g. mountainpottery.com or https://your-shop.com" maxlength="300" />
+        <span class="wk-hint">Accepts a bare domain or full <code>https://</code> link.</span>
+      </div>
+
+      <div class="wk-field">
+        <label class="wk-label" for="wkBusinessName">Business, shop or artist name (optional; Muse uses your domain if you leave it blank)</label>
+        <input class="wk-input" id="wkBusinessName" type="text" placeholder="e.g. Mountain Pottery Studio" maxlength="140" />
+      </div>
+
+      <fieldset class="wk-field wk-offer" id="wkOfferField">
+        <legend class="wk-label">What do you offer?</legend>
+        <div class="wk-offer-options">
+          <label class="wk-offer-option"><input type="radio" name="wkOffer" value="products" checked> Products</label>
+          <label class="wk-offer-option"><input type="radio" name="wkOffer" value="services"> Services</label>
+          <label class="wk-offer-option"><input type="radio" name="wkOffer" value="both"> Both</label>
+        </div>
+        <span class="wk-hint" id="wkOfferHint">Muse words its research and post ideas for what you offer. You can change this later in Edit shop setup.</span>
+      </fieldset>
+
+      <div class="wk-field">
+        <label class="wk-label" for="wkMoreShopUrls">Additional marketplace shop pages (optional, comma-separated)</label>
+        <input class="wk-input" id="wkMoreShopUrls" type="text" placeholder="e.g. fineartamerica.com/profiles/your-shop, saatchiart.com/your-shop" maxlength="500" />
+      </div>
+
+      <div>
+        <button type="button" class="wk-btn wk-btn-gold" id="wkScanShopBtn">Scan my shop (free · 0 runs)</button>
+      </div>
+
+      <p class="wk-error" id="wkStep1Error" role="alert" hidden></p>
+
+      <div class="wk-proof-box" id="wkShopProof" role="status" aria-live="polite" hidden></div>
+
+      <div class="wk-actions">
+        <button type="button" class="wk-btn wk-btn-ghost" id="wkStep1SkipBtn">Skip this step →</button>
+        <div class="wk-actions-right">
+          <button type="button" class="wk-btn wk-btn-primary" id="wkStep1NextBtn">Continue to socials →</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- STEP 2: YOUR SOCIALS -->
+    <section class="wk-card" id="wkStep2" aria-labelledby="wkStep2Title" hidden>
+      <span class="wk-eyebrow">Step 2 of 4 · Free detection (0 runs)</span>
+      <h1 class="wk-title" id="wkStep2Title">Your socials</h1>
+      <p class="wk-subtitle">Confirm social handles found on your shop pages, edit them, or add yours below. Muse never guesses a handle that wasn’t linked on your pages.</p>
+
+      <div id="wkSocialEmptyNotice" class="wk-proof-box is-warn" hidden>
+        No social links were found on your crawled pages. Add your handles below if you promote on social media.
+      </div>
+
+      <div class="wk-chip-list" id="wkSocialChips" aria-live="polite"></div>
+
+      <div class="wk-field" style="margin-top:18px;">
+        <label class="wk-label" for="wkSocialHandleInput">Add a social page or handle</label>
+        <div class="wk-row-inline">
+          <select class="wk-select" id="wkSocialPlatform" aria-label="Social platform" style="max-width:170px;">
+            <option value="instagram">Instagram</option>
+            <option value="facebook">Facebook</option>
+            <option value="pinterest">Pinterest</option>
+            <option value="tiktok">TikTok</option>
+          </select>
+          <input class="wk-input" id="wkSocialHandleInput" type="text" placeholder="@yourhandle or https://instagram.com/yourhandle" maxlength="200" />
+          <button type="button" class="wk-btn wk-btn-outline" id="wkAddSocialBtn">Add handle</button>
+        </div>
+      </div>
+
+      <p class="wk-error" id="wkStep2Error" role="alert" hidden></p>
+
+      <div class="wk-actions">
+        <button type="button" class="wk-btn wk-btn-outline" id="wkStep2BackBtn">← Back</button>
+        <div class="wk-actions-right">
+          <button type="button" class="wk-btn wk-btn-ghost" id="wkStep2SkipBtn">Skip this step →</button>
+          <button type="button" class="wk-btn wk-btn-primary" id="wkStep2NextBtn">Continue to competitors →</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- STEP 3: YOUR COMPETITORS -->
+    <section class="wk-card" id="wkStep3" aria-labelledby="wkStep3Title" hidden>
+      <span class="wk-eyebrow">Step 3 of 4 · Competitor watchlist</span>
+      <h1 class="wk-title" id="wkStep3Title">Your competitors</h1>
+      <p class="wk-subtitle">Choose 1 to 6 similar shops to watch for price changes and new listings. Adding shops by hand is free. Muse can also suggest some from your website for 1 run.</p>
+
+      <div class="wk-proof-box" id="wkCompCostBanner">
+        <strong id="wkCompCostTitle">Let Muse suggest similar shops</strong>
+        <span id="wkCompCostDetail">Muse reads your shop website and suggests up to 4 shops that sell to the same buyers. Suggestions are unverified, so tick only the ones you want to watch.</span>
+        <div style="margin-top:10px;">
+          <button type="button" class="wk-btn wk-btn-gold" id="wkDiscoverCompBtn">Suggest similar shops (1 run)</button>
+        </div>
+        <p id="wkSuggestNote" role="status" style="margin:8px 0 0;font-size:0.85rem;" hidden></p>
+      </div>
+
+      <ul class="wk-comp-list" id="wkCompList" aria-live="polite"></ul>
+
+      <div class="wk-field" style="margin-top:18px;">
+        <label class="wk-label" for="wkManualCompUrl">Add a competitor shop by hand (free)</label>
+        <div class="wk-row-inline">
+          <input class="wk-input" id="wkManualCompUrl" type="text" inputmode="url" placeholder="e.g. rivalpottery.com or https://their-shop.com" maxlength="300" />
+          <input class="wk-input" id="wkManualCompReason" type="text" placeholder="Why watch them? (optional)" maxlength="140" />
+          <button type="button" class="wk-btn wk-btn-outline" id="wkAddCompBtn">Add competitor</button>
+        </div>
+      </div>
+
+      <p class="wk-error" id="wkStep3Error" role="alert" hidden></p>
+
+      <div class="wk-actions">
+        <button type="button" class="wk-btn wk-btn-outline" id="wkStep3BackBtn">← Back</button>
+        <div class="wk-actions-right">
+          <button type="button" class="wk-btn wk-btn-ghost" id="wkStep3SkipBtn">Skip this step →</button>
+          <button type="button" class="wk-btn wk-btn-primary" id="wkStep3NextBtn">Continue to preferences →</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- STEP 4: HOW YOU WORK -->
+    <section class="wk-card" id="wkStep4" aria-labelledby="wkStep4Title" hidden>
+      <span class="wk-eyebrow">Step 4 of 4 · How you work (free · 0 runs)</span>
+      <h1 class="wk-title" id="wkStep4Title">How you work</h1>
+      <p class="wk-subtitle">Tell Muse about your experience, channel access, and taste so recommendations fit how you actually sell.</p>
+
+      <div class="wk-grid-2">
+        <div class="wk-field">
+          <label class="wk-label" for="wkPrefExperience">1. Marketing &amp; ads experience</label>
+          <select class="wk-select" id="wkPrefExperience">
+            <option value="new">New to marketing (keep steps simple, no ad budget math first)</option>
+            <option value="some" selected>Some experience (organic posts &amp; marketplace listings)</option>
+            <option value="runs_ads">Already running Meta Ads (include budget &amp; ROAS moves)</option>
+          </select>
+        </div>
+
+        <div class="wk-field">
+          <label class="wk-label" for="wkPrefPriceControl">2. Can you change prices on your main shop?</label>
+          <select class="wk-select" id="wkPrefPriceControl">
+            <option value="yes" selected>Yes — I control my listing prices</option>
+            <option value="no">No — fixed marketplace or gallery pricing</option>
+          </select>
+        </div>
+
+        <div class="wk-field">
+          <label class="wk-label" for="wkPrefMinutes">3. Time available per week</label>
+          <select class="wk-select" id="wkPrefMinutes">
+            <option value="15">~15 minutes / week (1 quick move)</option>
+            <option value="30" selected>~30 minutes / week (2–3 moves)</option>
+            <option value="60">~1 hour / week</option>
+            <option value="120">2+ hours / week</option>
+          </select>
+        </div>
+
+        <div class="wk-field">
+          <label class="wk-label" for="wkPrefBudget">4. Monthly ad budget band</label>
+          <select class="wk-select" id="wkPrefBudget">
+            <option value="none" selected>$0 — organic posts &amp; listings only</option>
+            <option value="under_100">Under $100 / month</option>
+            <option value="100_to_500">$100–$500 / month</option>
+            <option value="500_plus">$500+ / month</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="wk-field">
+        <span class="wk-label">Channels you can edit right now</span>
+        <div class="wk-check-pills" id="wkPrefChannels">
+          <label class="wk-check-pill"><input type="checkbox" value="website" checked /> Own website</label>
+          <label class="wk-check-pill"><input type="checkbox" value="marketplace" checked /> Marketplace shop</label>
+          <label class="wk-check-pill"><input type="checkbox" value="instagram" checked /> Instagram</label>
+          <label class="wk-check-pill"><input type="checkbox" value="facebook" /> Facebook</label>
+        </div>
+      </div>
+
+      <div class="wk-grid-2">
+        <div class="wk-field">
+          <label class="wk-label" for="wkPrefTone">Brand tone</label>
+          <select class="wk-select" id="wkPrefTone">
+            <option value="warm_story" selected>Warm &amp; story-led</option>
+            <option value="collector_gallery">Gallery &amp; collector-focused</option>
+            <option value="direct_gift">Direct &amp; gift-ready</option>
+          </select>
+        </div>
+        <div class="wk-field">
+          <label class="wk-label" for="wkPrefAvoid">Subjects or channels to avoid (optional)</label>
+          <input class="wk-input" id="wkPrefAvoid" type="text" placeholder="e.g. No discount codes, no Etsy" maxlength="160" />
+        </div>
+      </div>
+
+      <div class="wk-field">
+        <label class="wk-label" for="wkPrefFocus">What should Muse focus on first? (max 300 chars)</label>
+        <textarea class="wk-textarea" id="wkPrefFocus" maxlength="300" placeholder="e.g. Focus on gift buyers and entry-priced prints under $50."></textarea>
+      </div>
+
+      <div class="wk-proof-box is-warn" id="wkRunDisclosureBox">
+        <strong id="wkRunDisclosureTitle">Building your workspace is free (0 runs used).</strong>
+        <p id="wkRunDisclosureDetail" style="margin:4px 0 0;font-size:0.86rem;">This uses 0 runs. Muse will save your shop details and competitor watchlist so your workspace is ready.</p>
+      </div>
+
+      <p class="wk-error-text" id="wkStep4Error" role="alert" style="color:#b3261e;font-size:0.9rem;margin-top:10px;" hidden></p>
+
+      <div class="wk-actions">
+        <button type="button" class="wk-btn wk-btn-outline" id="wkStep4BackBtn">← Back</button>
+        <div class="wk-actions-right">
+          <button type="button" class="wk-btn wk-btn-ghost" id="wkStep4SkipBtn">Skip &amp; build workspace (0 runs) →</button>
+          <button type="button" class="wk-btn wk-btn-primary" id="wkStep4FinishBtn">Build my workspace (free · 0 runs)</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- BUILDING / COMPLETION SCREEN -->
+    <section class="wk-card" id="wkStepDone" aria-labelledby="wkDoneTitle" hidden>
+      <span class="wk-eyebrow">Workspace ready</span>
+      <h1 class="wk-title" id="wkDoneTitle">Building your workspace…</h1>
+      <p class="wk-subtitle" id="wkDoneSubtitle">Here is what Muse built from your setup:</p>
+
+      <div class="wk-explainer-box" id="wkExplainerBox">
+        <ul class="wk-progress-list" id="wkSummaryList"></ul>
+      </div>
+
+      <div class="wk-digest-offer" id="wkDigestOfferBox">
+        <h2 style="margin:0 0 6px;font-size:1.05rem;">Get your Monday competitor &amp; post digest</h2>
+        <p style="margin:0 0 12px;font-size:0.86rem;color:#5c3d09;" id="wkDigestWatchDesc">We’ll watch your chosen competitors and send one ready-to-post idea every Monday.</p>
+        <div class="wk-row-inline">
+          <input class="wk-input" id="wkDigestEmail" type="email" placeholder="you@your-shop.com" aria-label="Email for weekly digest" maxlength="254" />
+          <button type="button" class="wk-btn wk-btn-primary" id="wkDigestSubscribeBtn">Send me the Monday digest</button>
+        </div>
+        <p id="wkDigestStatus" role="status" aria-live="polite" style="margin:8px 0 0;font-size:0.82rem;font-weight:600;" hidden></p>
+      </div>
+
+      <div class="wk-actions">
+        <a class="wk-btn wk-btn-outline" href="/?workspace=sample">View Sample shop</a>
+        <div class="wk-actions-right">
+          <a class="wk-btn wk-btn-primary" href="/" id="wkOpenWorkspaceBtn">Open my workspace →</a>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
