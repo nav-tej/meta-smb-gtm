@@ -3440,6 +3440,65 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
 
     // Step 3 Read-Only Meta Ads Connection (shown only when server reports ad_connect_enabled=true)
     const metaConnectState = { enabled: false, accounts: [] };
+    const META_CONNECT_STATUS_TEXT = 'Read-only: Muse can see your ad results but cannot change anything in your ad account.';
+    const META_CONNECT_EXPIRED_TEXT = 'Your Meta Ads connection expired. Reconnect to load your latest results.';
+    const META_CONNECT_DISCONNECTED_TEXT = 'Disconnected. Muse no longer has access to this ad account.';
+    const META_CONNECT_RATE_LIMIT_TEXT = 'Meta asked Muse to slow down. Try again in a minute.';
+    const META_CONNECT_PERMISSION_TEXT = "Meta did not give Muse access to this ad account's results. Reconnect and allow access.";
+    const META_CONNECT_SIGNIN_TEXT = 'Sign in and confirm your email to connect Meta Ads.';
+    const META_CONNECT_ERROR_MESSAGES = {
+      cancelled: 'You cancelled connecting Meta Ads. Nothing was saved.',
+      expired_state: 'That connection request timed out. Try connecting Meta Ads again.',
+      wrong_account: 'That Meta Ads connection was started from a different Muse account. Try again from this account.',
+      invalid_state: 'We could not confirm that Meta Ads connection request. Please try again.',
+      no_ad_accounts: 'No Meta ad accounts were found on that Facebook profile.',
+      signin_required: META_CONNECT_SIGNIN_TEXT,
+      connect_failed: 'We could not finish connecting Meta Ads right now. Nothing was saved; please try again.',
+    };
+    const META_FORBIDDEN_WORD_RE = /token|API|ads_read|server|configured|OAuth|—/i;
+    function plainMetaSellerText(candidate, fallback) {
+      const text = String(candidate || '').replace(/—/g, '·').trim();
+      if (!text || META_FORBIDDEN_WORD_RE.test(text)) return fallback;
+      return text;
+    }
+    function setMetaStatusText(text, { sticky = false, fromCallback = false } = {}) {
+      const statusEl = document.getElementById('metaConnectStatus');
+      if (!statusEl) return;
+      statusEl.textContent = plainMetaSellerText(text, META_CONNECT_STATUS_TEXT);
+      if (statusEl.dataset) {
+        if (sticky) statusEl.dataset.sticky = '1';
+        else delete statusEl.dataset.sticky;
+        if (fromCallback) statusEl.dataset.fromCallback = '1';
+        else delete statusEl.dataset.fromCallback;
+      }
+    }
+    function consumeMetaConnectQueryParams() {
+      if (typeof window === 'undefined' || !window.location) return false;
+      let params;
+      try {
+        params = new URLSearchParams(window.location.search || '');
+      } catch (_) {
+        return false;
+      }
+      const errCode = params.get('ad_connect_error');
+      const connected = params.get('ad_connect');
+      if (!errCode && !connected) return false;
+      if (errCode) {
+        const msg = META_CONNECT_ERROR_MESSAGES[errCode] || META_CONNECT_ERROR_MESSAGES.connect_failed;
+        setMetaStatusText(msg, { sticky: true, fromCallback: true });
+      } else if (connected === 'meta') {
+        setMetaStatusText(META_CONNECT_STATUS_TEXT, { sticky: false });
+      }
+      params.delete('ad_connect_error');
+      params.delete('ad_connect');
+      params.delete('accounts');
+      if (typeof window.history?.replaceState === 'function') {
+        const nextQuery = params.toString();
+        const nextUrl = `${window.location.pathname || '/'}${nextQuery ? `?${nextQuery}` : ''}${window.location.hash || '#tab-bids'}`;
+        window.history.replaceState(null, '', nextUrl);
+      }
+      return true;
+    }
     function setMetaElementVisible(el, visible, displayStyle = 'inline-flex') {
       if (!el) return;
       if (visible) {
@@ -3472,16 +3531,17 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
         setMetaElementVisible(loadBtn, false);
         setMetaElementVisible(disconnectBtn, false);
         if (statusEl && !statusEl.dataset?.sticky) {
-          statusEl.textContent = 'Read-only access (ads_read). Muse never changes your live ad account.';
+          setMetaStatusText(META_CONNECT_STATUS_TEXT);
         }
         return;
       }
       const prevVal = selectEl ? selectEl.value : '';
       if (selectEl) {
         selectEl.innerHTML = accounts.map((acc) => {
-          const id = esc(acc.external_account_id || '');
-          const name = esc(acc.account_name || acc.external_account_id || 'Ad Account');
-          const cur = esc(acc.currency || 'USD');
+          const id = esc(String(acc.external_account_id || '').replace(/—/g, '-'));
+          const rawName = String(acc.account_name || acc.external_account_id || 'Ad Account').replace(/—/g, '·');
+          const name = esc(plainMetaSellerText(rawName, 'Ad Account'));
+          const cur = esc(String(acc.currency || 'USD').replace(/—/g, ''));
           const expiredTag = acc.status === 'expired' ? ' · Expired' : '';
           return `<option value="${id}">${name} (${id} · ${cur}${expiredTag})</option>`;
         }).join('');
@@ -3494,13 +3554,13 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
       const currentAcc = accounts.find((a) => a.external_account_id === (selectEl && selectEl.value)) || accounts[0];
       if (currentAcc && currentAcc.status === 'expired') {
         if (connectBtn) connectBtn.textContent = 'Reconnect Meta Ads (read-only)';
-        if (statusEl) {
-          statusEl.textContent = 'Your Meta Ads token expired. Reconnect Meta Ads to refresh your campaign data.';
+        if (statusEl && !statusEl.dataset?.fromCallback) {
+          setMetaStatusText(META_CONNECT_EXPIRED_TEXT, { sticky: true });
         }
       } else {
         if (connectBtn) connectBtn.textContent = 'Connect Meta Ads (read-only)';
         if (statusEl && !statusEl.dataset?.sticky) {
-          statusEl.textContent = `Connected in read-only mode (${accounts.length} account${accounts.length === 1 ? '' : 's'}).`;
+          setMetaStatusText(META_CONNECT_STATUS_TEXT);
         }
       }
     }
@@ -3516,8 +3576,8 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
         }
         if (resp.status === 401 || resp.status === 403) {
           metaConnectState.accounts = [];
-          if (statusEl) {
-            statusEl.textContent = 'Sign in with a verified account to connect Meta Ads in read-only mode.';
+          if (!statusEl?.dataset?.fromCallback) {
+            setMetaStatusText(META_CONNECT_SIGNIN_TEXT, { sticky: true });
           }
           syncMetaConnectUi();
           return;
@@ -3530,6 +3590,7 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
     }
     async function initMetaConnectTabBids() {
       if (typeof window === 'undefined' || !window.location || typeof fetch !== 'function') return;
+      consumeMetaConnectQueryParams();
       try {
         const resp = await fetch('/api/v1/readiness', { credentials: 'same-origin' });
         if (!resp.ok) return;
@@ -3545,12 +3606,14 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
     }
     document.getElementById('metaAdAccountSelect')?.addEventListener?.('change', () => {
       const statusEl = document.getElementById('metaConnectStatus');
-      if (statusEl && statusEl.dataset) delete statusEl.dataset.sticky;
+      if (statusEl && statusEl.dataset) {
+        delete statusEl.dataset.sticky;
+        delete statusEl.dataset.fromCallback;
+      }
       syncMetaConnectUi();
     });
     document.getElementById('connectMetaAdsBtn')?.addEventListener?.('click', async () => {
       const btn = document.getElementById('connectMetaAdsBtn');
-      const statusEl = document.getElementById('metaConnectStatus');
       setButtonBusy(btn, true);
       try {
         const resp = await fetch('/api/v1/ad-accounts/meta/connect?next=%2F%23tab-bids', {
@@ -3559,19 +3622,19 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
         });
         const data = await resp.json().catch(() => ({}));
         if (!resp.ok || !data.url) {
-          const msg = data.detail || 'Sign in with a verified account to connect Meta Ads.';
-          if (statusEl) {
-            if (statusEl.dataset) statusEl.dataset.sticky = '1';
-            statusEl.textContent = msg;
-          }
+          const fallback = (resp.status === 401 || resp.status === 403)
+            ? META_CONNECT_SIGNIN_TEXT
+            : META_CONNECT_ERROR_MESSAGES.connect_failed;
+          const msg = plainMetaSellerText(data.detail, fallback);
+          setMetaStatusText(msg, { sticky: true });
           showToast(msg);
           return;
         }
         if (typeof window !== 'undefined' && window.location) {
           window.location.assign(data.url);
         }
-      } catch (err) {
-        if (statusEl) statusEl.textContent = `Could not start Meta Ads connection: ${err.message}`;
+      } catch (_) {
+        setMetaStatusText(META_CONNECT_ERROR_MESSAGES.connect_failed, { sticky: true });
       } finally {
         setButtonBusy(btn, false);
       }
@@ -3579,7 +3642,6 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
     document.getElementById('loadMetaInsightsBtn')?.addEventListener?.('click', async () => {
       const btn = document.getElementById('loadMetaInsightsBtn');
       const selectEl = document.getElementById('metaAdAccountSelect');
-      const statusEl = document.getElementById('metaConnectStatus');
       const connectBtn = document.getElementById('connectMetaAdsBtn');
       const accountId = selectEl ? selectEl.value : '';
       if (!accountId) return;
@@ -3594,38 +3656,48 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
           const acc = metaConnectState.accounts.find((a) => a.external_account_id === accountId);
           if (acc) acc.status = 'expired';
           if (connectBtn) connectBtn.textContent = 'Reconnect Meta Ads (read-only)';
-          const msg = payload.detail || 'Your Meta Ads token expired. Reconnect Meta Ads to refresh your campaign performance.';
-          if (statusEl) {
-            if (statusEl.dataset) statusEl.dataset.sticky = '1';
-            statusEl.textContent = msg;
-          }
+          const msg = plainMetaSellerText(payload.detail, META_CONNECT_EXPIRED_TEXT);
+          setMetaStatusText(msg, { sticky: true });
+          showToast(msg);
+          return;
+        }
+        if (resp.status === 429) {
+          const msg = plainMetaSellerText(payload.detail, META_CONNECT_RATE_LIMIT_TEXT);
+          setMetaStatusText(msg, { sticky: true });
+          showToast(msg);
+          return;
+        }
+        if (resp.status === 403) {
+          const msg = plainMetaSellerText(payload.detail, META_CONNECT_PERMISSION_TEXT);
+          setMetaStatusText(msg, { sticky: true });
           showToast(msg);
           return;
         }
         if (!resp.ok) {
-          const msg = payload.detail || `Could not load Meta insights (HTTP ${resp.status}).`;
-          if (statusEl) {
-            if (statusEl.dataset) statusEl.dataset.sticky = '1';
-            statusEl.textContent = msg;
-          }
+          const msg = plainMetaSellerText(
+            payload.detail,
+            'Could not load your ad results from Meta right now. Please try again.'
+          );
+          setMetaStatusText(msg, { sticky: true });
           showToast(msg);
           return;
         }
         const rows = Array.isArray(payload.rows) ? payload.rows : [];
         const totalSpend = rows.reduce((acc, r) => acc + Number(r.spend || 0), 0);
         const totalSales = rows.reduce((acc, r) => acc + Number(r.conversions || 0), 0);
+        const cleanAccountName = String(payload.account_name || accountId).replace(/—/g, '·');
         const caption = document.getElementById('campaign-table-caption');
         if (caption) {
-          caption.textContent = `Connected Meta Ads — ${payload.account_name || accountId} ($${totalSpend.toFixed(2)} Spend · ${totalSales} Sales)`;
+          caption.textContent = `Connected Meta Ads: ${cleanAccountName} ($${totalSpend.toFixed(2)} Spend · ${totalSales} Sales)`;
         }
-        const msg = `Loaded read-only insights for ${payload.account_name || accountId} (${rows.length} daily row${rows.length === 1 ? '' : 's'}).`;
-        if (statusEl) {
-          if (statusEl.dataset) statusEl.dataset.sticky = '1';
-          statusEl.textContent = msg;
-        }
+        const msg = plainMetaSellerText(
+          `Loaded read-only results for ${cleanAccountName} (${rows.length} daily row${rows.length === 1 ? '' : 's'}).`,
+          META_CONNECT_STATUS_TEXT
+        );
+        setMetaStatusText(msg, { sticky: true });
         showToast(msg);
-      } catch (err) {
-        if (statusEl) statusEl.textContent = `Could not load Meta insights: ${err.message}`;
+      } catch (_) {
+        setMetaStatusText('Could not load your ad results from Meta right now. Please try again.', { sticky: true });
       } finally {
         setButtonBusy(btn, false);
       }
@@ -3633,7 +3705,6 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
     document.getElementById('disconnectMetaAdsBtn')?.addEventListener?.('click', async () => {
       const btn = document.getElementById('disconnectMetaAdsBtn');
       const selectEl = document.getElementById('metaAdAccountSelect');
-      const statusEl = document.getElementById('metaConnectStatus');
       const accountId = selectEl ? selectEl.value : '';
       if (!accountId) return;
       setButtonBusy(btn, true);
@@ -3646,35 +3717,42 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
         });
         const data = await resp.json().catch(() => ({}));
         if (!resp.ok) {
-          const msg = data.detail || 'Could not disconnect that Meta ad account.';
-          if (statusEl) statusEl.textContent = msg;
+          const msg = plainMetaSellerText(data.detail, 'Could not disconnect that Meta ad account.');
+          setMetaStatusText(msg, { sticky: true });
           showToast(msg);
           return;
         }
         metaConnectState.accounts = metaConnectState.accounts.filter(
           (a) => a.external_account_id !== accountId
         );
-        if (statusEl) {
-          if (statusEl.dataset) statusEl.dataset.sticky = '1';
-          statusEl.textContent = `Disconnected ${accountId}. Stored token removed.`;
-        }
+        setMetaStatusText(META_CONNECT_DISCONNECTED_TEXT, { sticky: true });
         syncMetaConnectUi();
-        showToast(`Disconnected ${accountId}`);
-      } catch (err) {
-        if (statusEl) statusEl.textContent = `Disconnect error: ${err.message}`;
+        showToast(META_CONNECT_DISCONNECTED_TEXT);
+      } catch (_) {
+        setMetaStatusText('Could not disconnect that Meta ad account.', { sticky: true });
       } finally {
         setButtonBusy(btn, false);
       }
     });
     let metaConnectChecked = false;
     function ensureMetaConnectTabBids() {
-      if (metaConnectChecked) return;
+      if (metaConnectChecked) {
+        consumeMetaConnectQueryParams();
+        return;
+      }
       metaConnectChecked = true;
       initMetaConnectTabBids();
     }
     document.querySelector('.step-tab[data-tab="tab-bids"]')?.addEventListener?.('click', ensureMetaConnectTabBids);
     document.getElementById('journeyBudget')?.addEventListener?.('click', ensureMetaConnectTabBids);
-    if (typeof window !== 'undefined' && window.location?.hash === '#tab-bids') {
+    if (
+      typeof window !== 'undefined' &&
+      (window.location?.hash === '#tab-bids' ||
+        (window.location?.search && (window.location.search.includes('ad_connect_error=') || window.location.search.includes('ad_connect='))))
+    ) {
+      if (window.location?.hash !== '#tab-bids' && typeof openStep === 'function') {
+        openStep('tab-bids', 'tab-bids');
+      }
       ensureMetaConnectTabBids();
     }
     window?.addEventListener?.('hashchange', () => {

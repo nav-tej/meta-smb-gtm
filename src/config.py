@@ -23,6 +23,7 @@ class Settings(BaseModel):
     meta_graph_api_version: str = "v27.0"
     meta_app_id: str = ""
     meta_app_secret: str = ""
+    meta_login_config_id: str = ""
     ad_token_encryption_key: str = ""
 
     crawler_user_agent: str = "MetaSMBGTM/0.1 (+https://github.com/nav-tej/meta-smb-gtm)"

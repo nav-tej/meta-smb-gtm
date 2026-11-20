@@ -65,22 +65,18 @@ Directly opened the live vendor version and sunset documentation pages on 2026-1
 
 ## 4. What Nav Must Do Before Anyone Can Connect a Real Account
 
-1. **Create the Meta Developer App (`https://developers.facebook.com/apps`):**
-   - Create a Business-type App (*Muse Growth Studio*), link it to your Meta Business Portfolio, and add the **Marketing API** and **Facebook Login for Business** products.
-2. **Register OAuth Redirect URIs:**
-   - Under **Facebook Login for Business → Settings → Valid OAuth Redirect URIs**, add:
-     - `https://meta-smb-gtm.vercel.app/api/v1/ad-accounts/meta/callback` (production)
-     - `https://muse-preview-nav.vercel.app/api/v1/ad-accounts/meta/callback` (protected preview)
-     - `http://localhost:8000/api/v1/ad-accounts/meta/callback` (optional local testing)
+> **Updated 2026-11-20:** Meta App **"Muse Growth Studio"** (App ID `1113987174851049`, development mode, use case *"Measure ad performance data with Marketing API"*, Facebook Login for Business added) already exists, Valid OAuth Redirect URIs are registered for production (`https://meta-smb-gtm.vercel.app/api/v1/ad-accounts/meta/callback`) and preview (`https://muse-preview-nav.vercel.app/api/v1/ad-accounts/meta/callback`) with Strict Mode on, and `META_APP_ID` / `META_APP_SECRET` are already set in Vercel (Production and Preview). No business portfolio is connected.
+
+1. **Create the Facebook Login for Business Configuration (`config_id`):**
+   - In the Meta App Dashboard for App `1113987174851049` (*Muse Growth Studio*), open **Facebook Login for Business → Configurations** and click **+ Create configuration**.
+   - Choose **User access token** (personal Facebook login; no business portfolio required), request **Ad Accounts** (if prompted for assets), select the **`ads_read` permission only**, and create the configuration to obtain its Configuration ID.
+2. **Set `META_LOGIN_CONFIG_ID` and `AD_TOKEN_ENCRYPTION_KEY` in Vercel:**
+   - Set `META_LOGIN_CONFIG_ID` to the Configuration ID from step 1.
+   - Generate a Fernet key (`python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`) and set `AD_TOKEN_ENCRYPTION_KEY`.
 3. **Apply the Database Migration in Supabase:**
    - Execute `supabase/migrations/ad_account_connections.sql` in the Supabase SQL Editor (rollback is `supabase/migrations/ad_account_connections_rollback.sql`).
-4. **Set Environment Variables in Vercel:**
-   - Generate a Fernet key (`python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`) and set `AD_TOKEN_ENCRYPTION_KEY`.
-   - Set `META_APP_ID`, `META_APP_SECRET`, and `META_GRAPH_API_VERSION=v27.0`.
-   - Flip `AD_CONNECT_ENABLED=true` on the preview or production deployment when ready to expose the routes and button.
-5. **Business Verification & App Review (for external sellers):**
-   - Admin/developer accounts with a role on the Meta App (and Sandbox Ad Accounts created under *Marketing API → Tools → Sandbox Ad Account Management*) work immediately with Standard Access to `ads_read`.
-   - For external sellers, complete Meta Business Verification in Business Suite Security Center and submit App Review for **Advanced Access** to `ads_read`.
+4. **Enable `AD_CONNECT_ENABLED=true` on Preview First:**
+   - Set `AD_CONNECT_ENABLED=true` on Preview (`https://muse-preview-nav.vercel.app`) first and verify the read-only connection on an account with a role on App `1113987174851049` before enabling in Production.
 
 ---
 
