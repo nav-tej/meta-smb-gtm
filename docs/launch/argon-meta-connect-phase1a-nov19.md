@@ -12,6 +12,20 @@ and the "Ad account connections" bullet) on this branch first.
 Tip of `origin/claude/ux-gap-ad-loop-nov17` when you start (`git fetch origin`; record the SHA; it is
 `1cfc4a8` or later). New isolated worktree, new branch `gemini/meta-connect-nov19`.
 
+## The Meta app already exists (created November 19 at Nav's request)
+- Name "Muse Growth Studio", App ID `1113987174851049` (not secret; use it in `.env.example` comments
+  and the spec, never the App Secret). Development mode, so only people with a role on the app can
+  connect until App Review.
+- Use case: "Measure ad performance data with Marketing API" (read-only). Facebook Login for Business
+  was added with it, so build the connect step against the Facebook Login for Business dialog and check
+  on the live docs whether it needs a `config_id` (a Login Configuration) instead of a `scope` list;
+  say which in your report. Do not create the configuration yourself.
+- Valid OAuth Redirect URIs already registered, Strict Mode on:
+  `https://meta-smb-gtm.vercel.app/api/v1/ad-accounts/meta/callback` and
+  `https://muse-preview-nav.vercel.app/api/v1/ad-accounts/meta/callback`. Keep that exact path.
+- No business portfolio is connected. Never connect, name or reference any other business portfolio
+  on Nav's account.
+
 ## Step 0: correct the API versions (found by Claude in review)
 The spec and `src/clients/ad_networks/meta.py` use Graph/Marketing API `v21.0` and Google Ads REST
 `v18`, both marked "accessed 2026-11-19". They are out of date: Meta's v21.0 Marketing API changelog
@@ -48,7 +62,8 @@ Google carry more than 90% of consumer small-business ad spend.
    (`#tab-bids` in `index.html`, that tab's markup and script only), shown only when the server says
    the feature is on. When it is off, the tab looks exactly as today; test that.
 6. `.env.example` gets the new names with empty values and a comment; `docs/launch/AD_NETWORKS_SPEC.md`
-   gets the redirect URIs Nav must register (production and `https://muse-preview-nav.vercel.app`).
+   records the app above and the two redirect URIs already registered (replace the spec's Track 1
+   steps 1 and 4, which describe the old "Other → Business" app type and a localhost URI).
 
 ## Tests (respx, recorded fixtures shaped from Meta's documented examples, no live calls)
 Flag off means no routes; connect redirects to Meta with `ads_read` and a signed state; callback with
