@@ -62,6 +62,18 @@
     }
     if (!isDraftObject(state.imageFrame)) state.imageFrame = { fit: 'contain', x: 0, y: 0 };
     offers = cloneDraft(data.offers || {}); state.revision += 1;
+    const rawDest = state.product.destination || 'other';
+    const normalizedDest = normalizeDestination(rawDest);
+    if (normalizedDest !== rawDest) {
+      const legacyOffer = offers[rawDest] || {};
+      if (!state.product.link && legacyOffer.link) state.product.link = legacyOffer.link;
+      if (!state.product.price && legacyOffer.price) state.product.price = legacyOffer.price;
+      state.product.destination = normalizedDest;
+      offers[normalizedDest] = { price: state.product.price || '', link: state.product.link || '' };
+    } else {
+      state.product.destination = normalizedDest;
+    }
+    syncDestinationOptions();
     setProductFields(); $('promotionDestination').value = state.product.destination || 'other';
     $('headline').value = state.headline; $('caption').value = state.caption; $('scene').value = state.scene;
     $('postInstagram').checked = data.channels?.includes('instagram'); $('postFacebook').checked = data.channels?.includes('facebook');
@@ -209,7 +221,40 @@
     window.addEventListener?.('pageshow', event => { if (event.persisted) window.location?.reload(); });
   }
   const fields = { productName: 'name', productPrice: 'price', sellerName: 'seller', productDescription: 'description', productLink: 'link', productCollection: 'collection' };
-  const destinations = { pixels: 'Pixels', fineartamerica: 'Fine Art America', saatchi: 'Saatchi Art', website: 'Artist website', other: 'My shop / inquiry page' };
+  const SAMPLE_DESTINATIONS = { pixels: 'Pixels', fineartamerica: 'Fine Art America', saatchi: 'Saatchi Art', website: 'Artist website', other: 'My shop / inquiry page' };
+  const OWN_DESTINATIONS = { website: 'My website', booking: 'Booking or contact page', etsy: 'Etsy shop or listing', shopify: 'Shopify store', other: 'Other link' };
+  let ownBusinessType = null;
+  let ownBusinessName = '';
+  const isSampleArtist = () => !state.custom && state.workspace === 'sarabjit_singh';
+  const useSampleDestinations = () => !state.custom && (state.workspace === 'sarabjit_singh' || isEffectiveSample());
+  const isServices = () => !useSampleDestinations() && ownBusinessType === 'services';
+  const activeDestinations = () => (useSampleDestinations() ? SAMPLE_DESTINATIONS : OWN_DESTINATIONS);
+  function destinationLabel(key) {
+    const map = activeDestinations();
+    return map[key] || OWN_DESTINATIONS[key] || SAMPLE_DESTINATIONS[key] || map.other || 'Other link';
+  }
+  function normalizeDestination(key) {
+    const map = activeDestinations();
+    return Object.hasOwn(map, key) ? key : 'other';
+  }
+  function syncDestinationOptions() {
+    const select = $('promotionDestination');
+    if (!select) return;
+    const map = activeDestinations();
+    if (typeof select.replaceChildren === 'function' && typeof document.createElement === 'function') {
+      select.replaceChildren();
+      for (const [val, label] of Object.entries(map)) {
+        const opt = document.createElement('option');
+        opt.value = val;
+        opt.textContent = label;
+        if (typeof select.append === 'function') select.append(opt);
+        else if (typeof select.appendChild === 'function') select.appendChild(opt);
+      }
+    }
+    const normalized = normalizeDestination(state.product.destination || (useSampleDestinations() ? 'pixels' : 'website'));
+    state.product.destination = normalized;
+    select.value = normalized;
+  }
   let offers = {};
   function postingChannels() { return [['postInstagram', 'instagram'], ['postFacebook', 'facebook']].filter(([id]) => $(id).checked).map(([, name]) => name); }
   const isSampleProductUrl = (url) => /sarabjit|fineartamerica\.com\/profiles\/sarabjit|saatchiart\.com\/sarabjit/i.test(String(url || ''));
@@ -226,8 +271,8 @@
       saatchi: { link: 'https://www.saatchiart.com/sarabjitsingh', price: '' },
       website: { link: 'https://www.artofsarabjitsingh.com/guru-nanak-dev-ekonkar.html', price: '$75' }
     } : {};
-    state.product.destination = artist ? 'pixels' : 'other';
-    $('promotionDestination').value = state.product.destination;
+    state.product.destination = artist ? 'pixels' : 'website';
+    syncDestinationOptions();
     $('postInstagram').checked = true; $('postFacebook').checked = true;
     $('artistChannels').hidden = !artist;
     if (artist) Object.assign(state.product, offers.pixels);
@@ -236,28 +281,55 @@
     if (state.busy) return;
     sync(); offers[state.product.destination] = { price: state.product.price, link: state.product.link };
     const next = $('promotionDestination').value;
-    if (!Object.hasOwn(destinations, next)) return;
+    const map = activeDestinations();
+    if (!Object.hasOwn(map, next)) return;
     state.product.destination = next;
     Object.assign(state.product, offers[next] || { price: '', link: '' });
     setProductFields(); changed();
-    notify(`Destination changed to ${destinations[next]}. Its price and link are separate. Check that this artwork is listed there and review any prices or promises in your caption.`);
+    const checkCopy = useSampleDestinations()
+      ? 'Check that this artwork is listed there and review any prices or promises in your caption.'
+      : isServices()
+        ? 'Check that this service or offer is described there and review any prices or promises in your caption.'
+        : 'Check that this product is listed there and review any prices or promises in your caption.';
+    notify(`Destination changed to ${destinationLabel(next)}. Its price and link are separate. ${checkCopy}`);
   }
   function destinationNote() {
     const destination = state.product.destination;
-    if (!state.custom && state.workspace === 'sarabjit_singh') {
+    if (isSampleArtist()) {
       if (destination === 'website') return 'The saved artist website offer lists $75 for a signed 12×12-inch print. Confirm current price and availability. This offer does not apply to other shops.';
       if (destination === 'saatchi') return 'You use Saatchi for a different, more abstract selection. Choose a matching artwork and its exact listing. No price is copied from Pixels or Fine Art America.';
       if (destination === 'pixels' || destination === 'fineartamerica') return 'This is your shop link, unless you replace it with an exact artwork listing. Confirm the artwork, size and price there. Pixels and Fine Art America are related storefronts; this app does not sync their offers.';
     }
+    if (isServices()) {
+      return 'Paste the matching website, booking or contact page. Price is optional and belongs only to this destination. Your other destinations keep their own details in this tab.';
+    }
     return 'Paste the matching product or inquiry page. Price is optional and belongs only to this destination. Your other destinations keep their own details in this tab.';
   }
   function postingChecklist() {
-    const channels = postingChannels(); const label = destinations[state.product.destination]; const link = safeLink(state.product.link);
+    const channels = postingChannels(); const label = destinationLabel(state.product.destination); const link = safeLink(state.product.link);
+    if (useSampleDestinations()) {
+      return [
+        `Review the original artwork, caption, availability and ${label} offer. A series label here does not change your shop collections.`,
+        ...(channels.includes('instagram') ? ['Instagram: upload the feed image and paste your caption. Add the destination to your profile or a Story link sticker; a URL in a feed caption is not a clickable product link.'] : []),
+        ...(channels.includes('facebook') ? ['Facebook: upload the image to your page and paste your caption with the destination link. If Instagram shares to your linked page, check that post before posting again.'] : []),
+        link ? `Destination (${label}): ${link}. Open it and check it leads to the intended artwork or shop before sharing.` : 'No destination link added. Add one if you want people to visit your shop, or invite an inquiry without promising checkout.',
+        'Download saves files to your device. You publish from your own account; this app has not connected to Instagram or Facebook.'
+      ];
+    }
+    if (isServices()) {
+      return [
+        `Review your photo, caption, availability and ${label} details.`,
+        ...(channels.includes('instagram') ? ['Instagram: upload the feed image and paste your caption. Add the destination to your profile or a Story link sticker; a URL in a feed caption is not a clickable link.'] : []),
+        ...(channels.includes('facebook') ? ['Facebook: upload the image to your page and paste your caption with the destination link. If Instagram shares to your linked page, check that post before posting again.'] : []),
+        link ? `Destination (${label}): ${link}. Open it and check it leads to the right page before sharing.` : 'No destination link added. Add one if you want people to visit your website or booking page, or invite a direct inquiry.',
+        'Download saves files to your device. You publish from your own account; this app has not connected to Instagram or Facebook.'
+      ];
+    }
     return [
-      `Review the original artwork, caption, availability and ${label} offer. A series label here does not change your shop collections.`,
+      `Review your photo, caption, availability and ${label} offer. A series label here does not change your shop collections.`,
       ...(channels.includes('instagram') ? ['Instagram: upload the feed image and paste your caption. Add the destination to your profile or a Story link sticker; a URL in a feed caption is not a clickable product link.'] : []),
       ...(channels.includes('facebook') ? ['Facebook: upload the image to your page and paste your caption with the destination link. If Instagram shares to your linked page, check that post before posting again.'] : []),
-      link ? `Destination (${label}): ${link}. Open it and check it leads to the intended artwork or shop before sharing.` : 'No destination link added. Add one if you want people to visit your shop, or invite an inquiry without promising checkout.',
+      link ? `Destination (${label}): ${link}. Open it and check it leads to the intended product or page before sharing.` : 'No destination link added. Add one if you want people to visit your shop, or invite an inquiry without promising checkout.',
       'Download saves files to your device. You publish from your own account; this app has not connected to Instagram or Facebook.'
     ];
   }
@@ -266,6 +338,15 @@
     gift: ['A thoughtful gift, with a story', 'Show the product clearly and explain the care or meaning behind it. Let the recipient decide whether it feels right for them.'],
     visit: ['Make the next step easy', 'Keep the image simple, explain what is available, and point people to your existing product or inquiry page.']
   };
+  const serviceGoals = {
+    story: ['Share what you do', 'Pair a clear photo with a short introduction to your service or offer and who it helps.'],
+    gift: ['Highlight a client outcome', 'Explain the problem your service solves and what working with you looks like.'],
+    visit: ['Make the next step easy', 'Keep the image simple, explain what is included, and point people to your website or booking page.']
+  };
+  function goalInfo(key) {
+    const map = isServices() ? serviceGoals : goals;
+    return map[key] || goals.story;
+  }
   const safeLink = (value) => { try { const u = new URL(value); return ['https:', 'http:'].includes(u.protocol) ? u.href : ''; } catch { return ''; } };
   const samplePath = (value) => typeof value === 'string' && /^\/samples\/[a-zA-Z0-9_.-]+$/.test(value) ? value : '';
   const mediaAssetPath = (value) => typeof value === 'string' && /^\/api\/v1\/account\/media\/[0-9a-f]{32}\.(png|jpg|webp)$/.test(value) ? value : '';
@@ -547,8 +628,9 @@
       state.product.price = handoff.price_claim || '';
     }
     if (handoff.destination) {
-      const destKey = Object.hasOwn(destinations, handoff.destination) ? handoff.destination : 'other';
+      const destKey = normalizeDestination(handoff.destination);
       state.product.destination = destKey;
+      syncDestinationOptions();
       $('promotionDestination').value = destKey;
     }
     const mappedGoal = Object.hasOwn(goals, handoff.goal) ? handoff.goal : 'story';
@@ -574,7 +656,7 @@
     state.caption = handoff.action || `Share ${state.product.name || 'your work'} with buyers.`;
     state.copyEdited = true;
     state.sceneEdited = true;
-    state.provenance = state.original ? 'Original-photo layout. Using your selected recommendation.' : 'Original-photo layout. Add your product photo if not attached yet.';
+    state.provenance = state.original ? 'Original-photo layout. Using your selected recommendation.' : 'Original-photo layout. Add a photo if not attached yet.';
     state.revision += 1;
     setProductFields();
     $('headline').value = state.headline;
@@ -583,7 +665,7 @@
     if ($('ideaReason')) $('ideaReason').textContent = handoff.why_this_fits || '';
     $('productImageCaption').textContent = state.original
       ? `${state.product.name || state.headline} · your photo kept with selected move.`
-      : 'Your product photo will appear here.';
+      : 'Your photo will appear here.';
     $('reviewed').checked = false;
     updateChoices();
     renderHandoffGuidance();
@@ -611,13 +693,15 @@
     refreshPreview();
   }
   function starter() {
-    const name = state.product.name || 'My product';
+    const name = state.product.name || (isServices() ? 'My service or offer' : 'My product');
     state.headline = name;
-    state.caption = state.custom ? `Meet ${name}. ${state.product.description || 'Made with care, ready to share.'}` : state.workspace === 'sarabjit_singh' ? (state.artwork ? `${state.artwork.name} by Sarabjit Singh${state.artwork.series ? `, from her ${state.artwork.series} work` : ''}.` : 'Ek Onkar by Sarabjit Singh explores connection and equality through color and form.') + ' A print for a space that matters to you. Ask the artist about available editions.' : 'A moment for your daily chai ritual. Explore this stoneware and brass set from our illustrative shop collection.';
-    if (state.goal === 'gift') state.caption += ' A thoughtful gift starts with a story.';
-    if (state.goal === 'visit') state.caption += ' Visit the product page to learn more.';
+    state.caption = state.custom
+      ? (isServices() ? `${name}. ${state.product.description || 'Clear details, ready to share.'}` : `Meet ${name}. ${state.product.description || 'Made with care, ready to share.'}`)
+      : state.workspace === 'sarabjit_singh' ? (state.artwork ? `${state.artwork.name} by Sarabjit Singh${state.artwork.series ? `, from her ${state.artwork.series} work` : ''}.` : 'Ek Onkar by Sarabjit Singh explores connection and equality through color and form.') + ' A print for a space that matters to you. Ask the artist about available editions.' : 'A moment for your daily chai ritual. Explore this stoneware and brass set from our illustrative shop collection.';
+    if (state.goal === 'gift') state.caption += isServices() ? ' Share how this helps your clients.' : ' A thoughtful gift starts with a story.';
+    if (state.goal === 'visit') state.caption += isServices() ? ' Visit the link to learn more or get in touch.' : ' Visit the product page to learn more.';
     state.caption = state.caption.slice(0, 600);
-    if (!state.sceneEdited) state.scene = 'Warm neutral room, simple light oak console, soft daylight, clean wall and a restrained frame. Describe only the surroundings; do not change the product.';
+    if (!state.sceneEdited) state.scene = isServices() ? 'Clean, bright workspace with soft natural daylight and simple modern styling. Describe only the surroundings; keep the main subject clear.' : 'Warm neutral room, simple light oak console, soft daylight, clean wall and a restrained frame. Describe only the surroundings; do not change the product.';
     $('headline').value = state.headline; $('caption').value = state.caption; $('scene').value = state.scene;
   }
   function setProductFields() { for (const [id, key] of Object.entries(fields)) $(id).value = state.product[key] || ''; }
@@ -661,15 +745,73 @@
     syncWorkspaceCopy(isOwn);
   }
   function syncWorkspaceCopy(isOwn) {
+    const svc = isOwn && isServices();
+    syncDestinationOptions();
     if ($('creatorStep1Eyebrow')) $('creatorStep1Eyebrow').textContent = isOwn ? 'START WITH WHAT YOU OFFER' : 'START WITH WHAT YOU MAKE';
     if ($('creatorStep1Intro')) {
       $('creatorStep1Intro').textContent = isOwn
-        ? 'Choose a product, service or offer, decide where visitors should go, then make one post. No shop login needed.'
+        ? (svc
+          ? 'Choose a service or offer, decide where visitors should go, then make one post. No login to your website needed.'
+          : 'Choose a product, service or offer, decide where visitors should go, then make one post. No shop login needed.')
         : 'Choose an artwork, decide where visitors should go, then make one post. No shop login needed.';
     }
     if ($('productNameLabel')) $('productNameLabel').textContent = isOwn ? 'What are you promoting?' : 'Product name';
     if ($('productName')) $('productName').placeholder = isOwn ? 'A product, service or offer' : 'Name of the product you’re promoting';
     if ($('creatorPhotoEyebrow')) $('creatorPhotoEyebrow').textContent = isOwn ? 'YOUR PHOTO' : 'THE WORK COMES FIRST';
+    if ($('importProducts')) $('importProducts').textContent = svc ? 'Scan website' : 'Find products';
+    if ($('importHint') && !autoImportRunning) {
+      $('importHint').textContent = isOwn
+        ? (svc
+          ? 'Enter your website to scan for public pages, or enter your service or offer details below and upload a photo.'
+          : 'We’ll read public listing titles and links. You’ll choose the photo. Some marketplaces limit automatic reading; you can always enter details manually and upload a photo yourself.')
+        : 'We’ll read public listing titles and links. You’ll choose the photo. Pixels, Fine Art America and Saatchi may limit automatic reading. You can always enter details manually and upload a photo yourself.';
+    }
+    if ($('collectionHint')) {
+      $('collectionHint').textContent = isOwn
+        ? 'Use an existing label or type your own. This labels this promotion only.'
+        : 'Use an existing series or type your own. This labels this promotion only; it does not move artwork in your shops.';
+    }
+    if ($('sellerName')) $('sellerName').placeholder = svc ? 'Your business name' : 'Your shop';
+    if ($('productLink')) $('productLink').placeholder = svc ? 'https://your-website.com/book' : 'https://your-shop.com/product';
+    if ($('productDescription')) {
+      $('productDescription').placeholder = svc
+        ? 'What this service or offer includes, who it helps, and how to get started.'
+        : 'What it is, how it’s made, or what it means to you.';
+    }
+    if ($('reviewedLabelText')) {
+      $('reviewedLabelText').textContent = svc
+        ? 'I’ve compared the image with the original and checked the selected destination, details and wording.'
+        : 'I’ve compared the image with the original and checked the selected shop, price and wording.';
+    }
+    if ($('postingPlanNote')) {
+      $('postingPlanNote').textContent = isOwn
+        ? (svc
+          ? 'You can finish with one post. Details are not synced automatically with your website; inquiries and reach are not measured here.'
+          : 'You can finish with one post. Prices and inventory are not synced between shops; sales and reach are not measured here.')
+        : 'You can finish with one post. Other artwork can stay outside a series. Prices and inventory are not synced between shops; sales and reach are not measured here.';
+    }
+    const step0Btn = document.querySelector?.('[data-step="0"]');
+    if (step0Btn && typeof step0Btn.replaceChildren === 'function' && typeof document.createElement === 'function' && typeof document.createTextNode === 'function') {
+      const badge = document.createElement('span');
+      badge.textContent = '1';
+      step0Btn.replaceChildren(badge, document.createTextNode(svc ? ' Your offer' : ' Your product'));
+    }
+    const visitGoalBtn = document.querySelector?.('[data-goal="visit"]');
+    if (visitGoalBtn?.querySelector) {
+      const strongEl = visitGoalBtn.querySelector('strong');
+      const pEl = visitGoalBtn.querySelector('p');
+      if (strongEl) strongEl.textContent = svc ? 'Bring people to my website' : 'Bring people to my shop';
+      if (pEl) pEl.textContent = svc ? 'Show the service or offer and give people a clear next step.' : 'Show the product and give people a clear next step.';
+    }
+    const shareMissingSpan = $('shareMissingPhoto')?.querySelector?.('span');
+    if (shareMissingSpan) {
+      shareMissingSpan.textContent = svc ? 'Add a photo first to export images.' : 'Add a product photo first to export images.';
+    }
+    if (!state.idea?.headline && !state.handoffActive) {
+      const [gTitle, gReason] = goalInfo(state.goal);
+      if ($('ideaTitle')) $('ideaTitle').textContent = gTitle;
+      if ($('ideaReason')) $('ideaReason').textContent = gReason;
+    }
     if (isOwn) {
       const sampleLeak = /Ek Onkar|Sarabjit|SikhiArt|artwork preview|with the artist/i;
       if ($('productImageCaption') && sampleLeak.test($('productImageCaption').textContent || '')) {
@@ -683,8 +825,8 @@
   function originalLayout() { state.image = state.original; state.imageKind = 'original'; state.provenance = state.custom ? 'Original-photo layout. No personalized image generated.' : state.workspace === 'etsy_ceramics' ? 'Original example layout using a saved AI product image.' : 'Layout using the original artwork preview. No new image generated.'; refreshPreview(); }
   function newProduct() {
     if (state.busy) return;
-    state.custom = true; state.copyEdited = false; state.sceneEdited = false; state.revision += 1; state.product = { name: '', price: '', seller: '', description: '', link: '', collection: '' }; resetOffers(false); state.original = ''; state.image = ''; state.sampleImage = ''; state.provenance = 'Add a photo to create your own product layout.';
-    setProductFields(); starter(); updateChoices(); $('reviewed').checked = false; clearNotice(); $('productFactNote').textContent = 'Your photo is saved on this device when storage is available. A live request sends it to Muse only when you choose to generate.'; $('productImageCaption').textContent = 'Your product photo will appear here.'; $('moreDetails').open = true; refreshPreview(); $('productName').focus();
+    state.custom = true; state.copyEdited = false; state.sceneEdited = false; state.revision += 1; state.product = { name: '', price: '', seller: ownBusinessName || '', description: '', link: '', collection: '' }; resetOffers(false); state.original = ''; state.image = ''; state.sampleImage = ''; state.provenance = 'Add a photo to create your own layout.';
+    setProductFields(); starter(); updateChoices(); $('reviewed').checked = false; clearNotice(); $('productFactNote').textContent = 'Your photo is saved on this device when storage is available. A live request sends it to Muse only when you choose to generate.'; $('productImageCaption').textContent = 'Your photo will appear here.'; $('moreDetails').open = true; refreshPreview(); $('productName').focus();
   }
   function imageElement(src) { return new Promise((resolve, reject) => { const image = new Image(); image.onload = () => resolve(image); image.onerror = () => reject(new Error('We could not open that image. Try a JPEG, PNG or WebP photo.')); image.src = src; }); }
   async function upload(file) {
@@ -804,7 +946,7 @@
     if (item.is_low_res) {
       const warn = document.createElement('span');
       warn.className = 'muse-image-warn';
-      warn.textContent = `Low-resolution web preview (${dims}) — not a print master.`;
+      warn.textContent = `Low-resolution web preview (${dims}), not a print master.`;
       card.append(warn);
     }
 
@@ -962,7 +1104,7 @@
     if (state.busy) return;
     const url = safeLink($('shopUrl').value.trim());
     if (!url) { notify('Enter your shop website starting with https://.', 'error'); $('shopUrl').focus(); return; }
-    if (isOfflineNow()) { notify('You appear to be offline. Your work is saved on this device — reconnect and try again.', 'error'); return; }
+    if (isOfflineNow()) { notify('You appear to be offline. Your work is saved on this device. Reconnect and try again.', 'error'); return; }
     setBusy(true, 'importProducts'); $('importResults').hidden = true; notify('Looking for public product listings… This can take a little while.', 'busy');
     const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), 45000);
     try {
@@ -999,6 +1141,7 @@
   // seller picks a listing. The scan is a public crawl: no Muse run is used.
   let autoImportRunning = false;
   async function autoImportSavedShop(owner, shopName = '', workspace = null) {
+    if (ownBusinessType === 'services') return;
     const modes = window.museModes;
     if (autoImportRunning || !owner || !modes?.autoImportPending?.(owner, 'create', workspace)) return;
     const url = safeLink(state.shopWebsiteUrl);
@@ -1040,7 +1183,14 @@
       if (hint.textContent === looking) hint.textContent = hintBefore;
     }
   }
-  function validateProduct() { sync(); if (!state.product.name) { notify('Give your product a name first.', 'error'); $('productName').focus(); return false; } if (!state.original) { if ($('moreDetails')) $('moreDetails').open = true; notify('Add a product photo first to preview or export your image.', 'error', { text: 'Add photo', onClick: promptPhotoUpload }); return false; } if (state.product.link && !safeLink(state.product.link)) { $('moreDetails').open = true; notify('Use a complete http:// or https:// product link, or leave it empty.', 'error'); $('productLink').focus(); return false; } return true; }
+  function validateProduct() {
+    sync();
+    const svc = isServices();
+    if (!state.product.name) { notify(svc ? 'Give your service or offer a name first.' : 'Give your product a name first.', 'error'); $('productName').focus(); return false; }
+    if (!state.original) { if ($('moreDetails')) $('moreDetails').open = true; notify(svc ? 'Add a photo first to preview or export your image.' : 'Add a product photo first to preview or export your image.', 'error', { text: 'Add photo', onClick: promptPhotoUpload }); return false; }
+    if (state.product.link && !safeLink(state.product.link)) { $('moreDetails').open = true; notify(svc ? 'Use a complete http:// or https:// link, or leave it empty.' : 'Use a complete http:// or https:// product link, or leave it empty.', 'error'); $('productLink').focus(); return false; }
+    return true;
+  }
   function go(step) {
     if (state.busy || (step > 0 && !validateProduct())) return;
     if (step === 3 && !postingChannels().length) { notify('Choose Instagram or Facebook for this post before sharing.', 'error'); go(0); return; }
@@ -1058,15 +1208,16 @@
     if ($('shareMissingPhoto')) $('shareMissingPhoto').hidden = !!state.original;
     if (state.image) { $('sceneCompare').src = state.image; $('sceneCompare').hidden = false; } else { $('sceneCompare').removeAttribute('src'); $('sceneCompare').hidden = true; }
     $('sceneLabel').textContent = state.imageKind === 'original' ? 'Original-photo layout' : state.imageKind === 'saved' ? 'Saved AI scene' : 'New AI scene';
-    $('previewShop').textContent = state.product.seller || 'Your shop'; $('previewHeadline').textContent = state.headline; $('previewCaption').textContent = state.caption; $('imageProvenance').textContent = state.provenance; $('shareTitle').textContent = state.product.name || 'Your product'; $('shareProvenance').textContent = state.provenance;
+    $('previewShop').textContent = state.product.seller || (isServices() ? 'Your business' : 'Your shop'); $('previewHeadline').textContent = state.headline; $('previewCaption').textContent = state.caption; $('imageProvenance').textContent = state.provenance; $('shareTitle').textContent = state.product.name || (isServices() ? 'Your offer' : 'Your product'); $('shareProvenance').textContent = state.provenance;
     if (state.idea?.why_this && $('ideaReason')) $('ideaReason').textContent = state.idea.why_this;
     if (state.idea?.headline && $('ideaTitle')) $('ideaTitle').textContent = state.idea.headline;
     const link = safeLink(state.product.link); $('listingLink').hidden = !link; if (link) $('listingLink').href = link;
+    const destLabel = destinationLabel(state.product.destination);
     $('destinationNote').textContent = destinationNote();
-    $('productPrice').placeholder = `Optional ${destinations[state.product.destination]} price`;
-    $('postingSummary').textContent = `${postingChannels().map((c) => c === 'instagram' ? 'Instagram' : 'Facebook').join(' + ') || 'Choose a posting channel'} → ${destinations[state.product.destination]}${state.product.collection ? ` · ${state.product.collection}` : ''}. ${state.product.price ? `Selected offer: ${state.product.price}.` : 'No price included.'}`;
+    $('productPrice').placeholder = `Optional ${destLabel} price`;
+    $('postingSummary').textContent = `${postingChannels().map((c) => c === 'instagram' ? 'Instagram' : 'Facebook').join(' + ') || 'Choose a posting channel'} → ${destLabel}${state.product.collection ? ` · ${state.product.collection}` : ''}. ${state.product.price ? `Selected offer: ${state.product.price}.` : 'No price included.'}`;
     $('postingSteps').replaceChildren(); for (const line of postingChecklist()) { const li = document.createElement('li'); li.textContent = line; $('postingSteps').append(li); }
-    $('listingLink').textContent = `Check ${destinations[state.product.destination]} destination ↗`;
+    $('listingLink').textContent = `Check ${destLabel} destination ↗`;
     const activePl = activePlacement();
     const feedText = activePl === 'facebook_feed' ? 'Download Facebook feed image ' : 'Download feed image ';
     const sizeText = activePl === 'facebook_feed' ? '1080 × 1080 PNG' : '1080 × 1350 PNG';
@@ -1151,7 +1302,7 @@
     }
   }
   async function request(payload) {
-    if (isOfflineNow()) throw new Error('You appear to be offline. Your edits are saved on this device — reconnect and try again.');
+    if (isOfflineNow()) throw new Error('You appear to be offline. Your edits are saved on this device. Reconnect and try again.');
     const encoded = JSON.stringify(payload); if (new TextEncoder().encode(encoded).length > 3500000) throw new Error('This photo and text are too large together. Choose a smaller image.');
     // Account mode: live runs come from the signed-in account's plan; liveReady() shows sign-in/quota prompts.
     if (state.live && state.accountLive && window.museAccount?.liveReady && !window.museAccount.liveReady()) throw new Error('Sign in with a confirmed email and runs left to create with Muse.');
@@ -1173,32 +1324,73 @@
           throw new Error(detail || 'Your session expired before Muse started, so no run was used. Sign in again; your edits are still here.');
         }
         if (response.status === 402 || response.status === 429) {
-          throw new Error(detail || 'You have reached your current run allowance. Check your plan or wait a moment — your edits are still here.');
+          throw new Error(detail || 'You have reached your current run allowance. Check your plan or wait a moment. Your edits are still here.');
         }
         if (response.status >= 500) {
-          throw new Error(detail || 'Muse is temporarily unavailable right now. No run was used and your edits are still here — please try again shortly.');
+          throw new Error(detail || 'Muse is temporarily unavailable right now. No run was used and your edits are still here. Please try again shortly.');
         }
         throw new Error(detail || 'Muse could not complete this request right now. Your edits are still here.');
       }
       return await response.json();
     } catch (error) {
       if (error.name === 'AbortError') throw new Error('This request timed out. It may still be processing and may be billed. Your edits are safe; check completion before generating again.');
-      if (isOfflineNow() || /failed to fetch|networkerror/i.test(error?.message || '')) throw new Error('You appear to be offline or the server could not be reached. Your edits are safe on this device — reconnect and try again.');
+      if (isOfflineNow() || /failed to fetch|networkerror/i.test(error?.message || '')) throw new Error('You appear to be offline or the server could not be reached. Your edits are safe on this device. Reconnect and try again.');
       throw error;
     } finally { clearTimeout(timer); }
   }
   async function sourceData() { if (validInline(state.original)) return state.original; const response = await fetch(state.original); if (!response.ok) throw new Error('Could not load the original photo.'); const blob = await response.blob(); return await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(blob); }); }
-  function productPayload() { return { title: state.product.name, description: state.product.description, price: state.product.price || undefined, brand_notes: `Seller: ${state.product.seller}. Goal: ${goals[state.goal][0]}. Destination: ${destinations[state.product.destination]}. Series: ${state.product.collection || 'Not assigned'}. Only use supplied product facts. Never assume the same artwork or price exists in another shop. Never invent scarcity, materials or reviews. For this artist, Etsy is closed. Do not recommend Etsy or state a price unless it is supplied for the selected destination.` }; }
+  function businessOfferLabel() {
+    if (ownBusinessType === 'services') return 'Services';
+    if (ownBusinessType === 'products') return 'Products';
+    if (ownBusinessType === 'both') return 'Products and services';
+    return '';
+  }
+  function productPayload() {
+    const destLabel = destinationLabel(state.product.destination);
+    if (isSampleArtist()) {
+      return {
+        title: state.product.name,
+        description: state.product.description,
+        price: state.product.price || undefined,
+        brand_notes: `Seller: ${state.product.seller}. Goal: ${goals[state.goal][0]}. Destination: ${destLabel}. Series: ${state.product.collection || 'Not assigned'}. Only use supplied product facts. Never assume the same artwork or price exists in another shop. Never invent scarcity, materials or reviews. For this artist, Etsy is closed. Do not recommend Etsy or state a price unless it is supplied for the selected destination.`
+      };
+    }
+    const businessName = (state.product.seller || ownBusinessName || '').trim();
+    const offerType = businessOfferLabel();
+    const parts = [];
+    if (businessName) parts.push(`Business: ${businessName}.`);
+    if (offerType) parts.push(`Offers: ${offerType}.`);
+    parts.push(`Goal: ${goalInfo(state.goal)[0]}.`);
+    parts.push(`Destination: ${destLabel}.`);
+    if (state.product.collection) parts.push(`Series: ${state.product.collection}.`);
+    parts.push('Only use supplied facts. Never invent scarcity, materials, reviews, prices or results. Do not state a price unless it is supplied for the selected destination.');
+    return {
+      title: state.product.name,
+      description: state.product.description,
+      price: state.product.price || undefined,
+      brand_notes: parts.join(' ')
+    };
+  }
   function researchContext() {
-    // User uploads must never inherit an unrelated example shop's competitor claims.
-    if (!state.custom) return state.presets?.workspaces?.[state.workspace]?.competitor_brief;
-    return { competitor_url: '', competitor_domain: 'not-researched',
-      seller_context: state.product.description, summary: 'No competitor research was performed. Use only seller-supplied facts.',
-      new_product_frequency: 'Unknown', signals: { competitor_domain: 'not-researched', total_urls: 0 } };
+    // User uploads and own workspaces must never inherit an unrelated example shop's competitor claims.
+    if (isSampleArtist() || (!state.custom && isEffectiveSample())) {
+      return state.presets?.workspaces?.[state.workspace]?.competitor_brief;
+    }
+    const businessName = (state.product.seller || ownBusinessName || '').trim();
+    const offerType = businessOfferLabel();
+    const sellerContext = [businessName, offerType ? `Offers: ${offerType}` : '', state.product.description].filter(Boolean).join('. ') || 'Seller-supplied details only.';
+    return {
+      competitor_url: '',
+      competitor_domain: 'not-researched',
+      seller_context: sellerContext,
+      summary: 'No competitor research was performed. Use only seller-supplied facts.',
+      new_product_frequency: 'Unknown',
+      signals: { competitor_domain: 'not-researched', total_urls: 0 }
+    };
   }
   function promotionResearchContext() {
     const context = researchContext();
-    if (state.custom || state.workspace !== 'sarabjit_singh' || !context || typeof context !== 'object') return context;
+    if (!isSampleArtist() || !context || typeof context !== 'object') return context;
     const safe = JSON.parse(JSON.stringify(context));
     safe.seller_context = 'Artist-reported channels: Pixels, Fine Art America, Saatchi Art, artist website, Instagram and linked Facebook page. Etsy is closed.';
     safe.summary = 'Use competitor content and category patterns only as inspiration for a respectful story-led post. Do not recommend a marketplace or state prices, discounts, scarcity, materials, or product claims.';
@@ -1230,7 +1422,7 @@
       const product = { ...productPayload(), image_base64: await sourceData() };
       if (ownerEpoch !== draftEpoch) return;
       const placement = activePlacement();
-      const result = await request({ product, draft: false, placements: [placement], variants_per_placement: 1, use_comfyui: false, muse_workflow_mode: 'product_visuals', brief: { product_title: state.product.name, positioning_hook: goals[state.goal][0], preserve_product_note: 'Compare generated product details against the original before publishing.', estimated_paid_calls: 1, variants: [{ variant_id: 'v1', include: true, placement: placement, headline: state.headline, primary_text: state.caption, image_prompt: state.scene, target_audience: 'People interested in this product and the maker’s story', angle_rationale: 'Seller-selected promotion goal' }] } });
+      const result = await request({ product, draft: false, placements: [placement], variants_per_placement: 1, use_comfyui: false, muse_workflow_mode: 'product_visuals', brief: { product_title: state.product.name, positioning_hook: goalInfo(state.goal)[0], preserve_product_note: isSampleArtist() ? 'Compare generated product details against the original before publishing.' : 'Compare generated details against the original photo before publishing.', estimated_paid_calls: 1, variants: [{ variant_id: 'v1', include: true, placement: placement, headline: state.headline, primary_text: state.caption, image_prompt: state.scene, target_audience: isSampleArtist() ? 'People interested in this product and the maker’s story' : 'People interested in this offer', angle_rationale: 'Seller-selected promotion goal' }] } });
       const creative = result.creatives?.[0]; if (!creative) throw new Error('Muse returned no image. Your original-photo layout is still available.');
       if (String(creative.produced_by).startsWith('demo-cache')) throw new Error('The server returned a saved example, not a new image. Live mode was not confirmed. Your original is still available.');
       const assetUrl = mediaAssetPath(creative.media_asset_url);
@@ -1249,7 +1441,7 @@
         }
       }
       if (ownerEpoch !== draftEpoch) return;
-      state.image = chosenImage; state.imageKind = 'live'; state.provenance = `Generated with ${creative.produced_by || 'Muse'}. Review the artwork against the original. Product details can change; room and frame are staging only.`; $('reviewed').checked = false; refreshPreview(); spendLive('Live Muse scene'); notify('Your new scene is ready. Compare details with the original, or choose “Use original photo”. Check the draft storage status before closing this tab.');
+      state.image = chosenImage; state.imageKind = 'live'; state.provenance = isSampleArtist() ? `Generated with ${creative.produced_by || 'Muse'}. Review the artwork against the original. Product details can change; room and frame are staging only.` : `Generated with ${creative.produced_by || 'Muse'}. Compare the generated image with your original photo before sharing. Details can change; background elements are staging only.`; $('reviewed').checked = false; refreshPreview(); spendLive('Live Muse scene'); notify('Your new scene is ready. Compare details with the original, or choose “Use original photo”. Check the draft storage status before closing this tab.');
     } catch (error) { try { window.museAccount?.refresh?.().catch(() => {}); } catch {} notify(error.message, 'error'); } finally { setBusy(false); }
   }
   function saveBlob(blob, suffix) { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `${(state.product.name || 'promotion').replace(/[^a-z0-9]+/gi, '-').slice(0, 60)}-${suffix}`; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
@@ -1340,8 +1532,9 @@
         b.classList.toggle('selected', active);
         b.setAttribute('aria-pressed', String(active));
       });
-      $('ideaTitle').textContent = goals[state.goal][0];
-      $('ideaReason').textContent = goals[state.goal][1];
+      const [gTitle, gReason] = goalInfo(state.goal);
+      $('ideaTitle').textContent = gTitle;
+      $('ideaReason').textContent = gReason;
       if (!state.copyEdited) starter();
       sync();
       refreshPreview();
@@ -1494,7 +1687,7 @@
     notify(`Loaded sample artwork: ${name}. Choose “Preview a room scene” in step 3 to use its saved sample scene.`);
   }
 
-  function initNeutralWorkspace(sellerLabel = 'Your Studio', productLabel = 'My studio product', preserveShopInput = false) {
+  function initNeutralWorkspace(sellerLabel = 'Your business', productLabel = 'My offer', preserveShopInput = false) {
     state.custom = true;
     state.workspace = 'own';
     state.artwork = null;
@@ -1502,12 +1695,15 @@
     state.handoffActive = false;
     state.handoffContext = null;
     state.handoffId = null;
+    const svc = isServices();
     state.product = {
       name: productLabel,
       seller: sellerLabel,
       series: '',
       price: '',
-      description: `Original piece from ${sellerLabel}. Add your own details or paste your shop URL above.`,
+      description: svc
+        ? `Details about this service or offer from ${sellerLabel}. Add your own details or paste your website URL above.`
+        : `Details about this product from ${sellerLabel}. Add your own details or paste your website URL above.`,
       link: '',
       destination: 'website',
     };
@@ -1516,8 +1712,9 @@
     state.sampleImage = '';
     if (!preserveShopInput && $('shopUrl') && state.shopWebsiteUrl) $('shopUrl').value = state.shopWebsiteUrl;
     $('productFactNote').textContent = 'Your photo and edits stay on this device until you save or request live Muse AI.';
-    $('productImageCaption').textContent = 'Your product photo will appear here.';
+    $('productImageCaption').textContent = 'Your photo will appear here.';
     originalLayout();
+    syncDestinationOptions();
     setProductFields();
     starter();
     updateChoices();
@@ -1615,6 +1812,8 @@
     const requestedArt = params?.get('artwork') || s.sampleParams?.artwork || '';
 
     if (s.isSample) {
+      ownBusinessType = null;
+      ownBusinessName = '';
       // Signed in but setup not finished: say this is demo data and point to the wizard.
       if (s.state === 'account_sample') window.museModes?.checkSetupPending?.(s.ownerId);
       let restored = false;
@@ -1649,12 +1848,15 @@
     }
 
     // account_own or guest_entry
+    ownBusinessType = null;
+    ownBusinessName = '';
     let recovered = false;
     applyingDraft = true;
     try {
       recovered = recoverDevice();
       if (!recovered) {
-        initNeutralWorkspace('Your Studio', 'My studio artwork');
+        if (s.state === 'guest_entry') initNeutralWorkspace('Your Studio', 'My studio artwork');
+        else initNeutralWorkspace('Your business', 'My offer');
       }
       if (placement) {
         applyPlacementChoice(placement);
@@ -1679,22 +1881,31 @@
         const onb = ws?.document?.onboarding || {};
         const shopUrls = Array.isArray(onb.shop_urls) ? onb.shop_urls.filter(Boolean) : [];
         const shopName = String(onb.business_name || '').trim();
+        ownBusinessType = ['products', 'services', 'both'].includes(onb.business_type) ? onb.business_type : null;
+        ownBusinessName = shopName;
         state.shopWebsiteUrl = shopUrls[0] || '';
         if ($('savedShopWebsiteNote')) {
           $('savedShopWebsiteNote').textContent = state.shopWebsiteUrl
-            ? `Saved studio website: ${state.shopWebsiteUrl}`
-            : 'No shop website saved in My workspace yet.';
+            ? `Saved website: ${state.shopWebsiteUrl}`
+            : 'No website saved in My workspace yet.';
         }
         if ($('shopUrl') && !$('shopUrl').value && state.shopWebsiteUrl) {
           $('shopUrl').value = state.shopWebsiteUrl;
         }
-        if (!recovered && shopName) {
-          initNeutralWorkspace(shopName, `Product from ${shopName}`, true);
+        if (!recovered && (shopName || ownBusinessType)) {
+          const defaultSeller = shopName || (ownBusinessType === 'services' ? 'Your business' : 'Your shop');
+          const defaultItem = ownBusinessType === 'services'
+            ? (shopName ? `Offer from ${shopName}` : 'My service or offer')
+            : (shopName ? `Product from ${shopName}` : 'My product');
+          initNeutralWorkspace(defaultSeller, defaultItem, true);
+        } else {
+          updateChoices();
+          refreshPreview();
         }
         savedShop = { name: shopName, workspace: ws };
       } catch {
         if (seq !== creatorModeSeq) return;
-        if ($('savedShopWebsiteNote')) $('savedShopWebsiteNote').textContent = 'Add a shop website above to import your products.';
+        if ($('savedShopWebsiteNote')) $('savedShopWebsiteNote').textContent = 'Add a website above to scan for public pages or listings.';
       }
     }
     // Only after this account's workspace loaded, and never over a recommendation handoff.
