@@ -300,7 +300,7 @@ class PromotionGuidanceSummary(BaseModel):
     ] = "suggested_starting_approach"
     output_label: str = "Suggested starting approach"
     organic_first: bool = True
-    organic_guidance_note: str = "Organic post first — no paid ad spend or ad account required."
+    organic_guidance_note: str = "Organic post first: no paid ad spend or ad account required."
     unconfirmed_audience: str = ""
     audience_confirmed: bool = False
     approved_facts: list[dict[str, str]] = Field(default_factory=list)

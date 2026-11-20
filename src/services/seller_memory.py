@@ -316,7 +316,7 @@ def extract_scan_proposals(
                 scan_date=when,
                 confidence="inferred",
                 uncertainty=(
-                    "Interpretation from scanned titles only — confirm who actually buys from you."
+                    "Interpretation from scanned titles only. Confirm who actually buys from you."
                 ),
                 status="proposed",
             )
@@ -335,8 +335,8 @@ def extract_scan_proposals(
                 scan_date=when,
                 confidence="inferred",
                 uncertainty=(
-                    "Inferred from scanned page titles — "
-                    "edit or dismiss if your main focus differs."
+                    "Inferred from scanned page titles. "
+                    "Edit or dismiss it if your main focus differs."
                 ),
                 status="proposed",
             )
@@ -1178,10 +1178,10 @@ def _build_editor_defaults_for_move(
         "organic_first": move.get("organic_first", True) if move else True,
         "organic_guidance_note": move.get(
             "organic_guidance_note",
-            "Organic post first — no paid ad spend or ad account required.",
+            "Organic post first: no paid ad spend or ad account required.",
         )
         if move
-        else "Organic post first — no paid ad spend or ad account required.",
+        else "Organic post first: no paid ad spend or ad account required.",
         "unconfirmed_audience": move.get("unconfirmed_audience", "") if move else "",
         "audience_confirmed": False,
         "approved_facts": list(move.get("approved_facts", [])) if move else [],
@@ -1641,7 +1641,7 @@ def rank_seller_recommendations(
                     {
                         "id": f"comp:{c_name}",
                         "label": f"Competitor · {role_label}",
-                        "value": f"{c_name}" + (f" — {why_text}" if why_text else ""),
+                        "value": f"{c_name}" + (f": {why_text}" if why_text else ""),
                         "source": "competitor_watchlist",
                         "scope": "shop_default",
                     }
@@ -1746,34 +1746,34 @@ def rank_seller_recommendations(
             "; ".join(reasons)
             if reasons
             else (
-                f"Matches {business_name}'s available {str(move['channel']).title()} channel "
-                "(no fresh research ran)."
+                f"Uses {business_name}'s {str(move['channel']).title()} channel. "
+                "Based on your setup, not new research."
                 if move.get("channel")
-                else f"Prepared from {business_name}'s saved profile (no fresh research ran)."
+                else f"Based on {business_name}'s saved setup, not new research."
             )
         )
         # Explicit missing-fact prompts (never fabricate price, audience, or checkout readiness)
         missing_facts: list[str] = []
         if not short_price:
             missing_facts.append(
-                "Price not set — leave price blank or add your starting price before sharing."
+                "Price not set. Leave it blank or add your starting price before sharing."
             )
         if not effective_product:
             missing_facts.append(
                 "Service not named: choose the service or offer to promote."
                 if services
-                else "Product not specified — choose a product or artwork."
+                else "Product not specified. Choose a product or artwork."
             )
         if any(tok in combined_intent for tok in ("sale", "sales", "buy", "checkout", "order")):
             if not effective_destination:
                 missing_facts.append(
-                    "Sales goal selected without a verified checkout destination — "
-                    "start with shop visits or buyer inquiries."
+                    "Sales goal selected without a verified checkout destination. "
+                    "Start with shop visits or buyer inquiries."
                 )
             else:
                 missing_facts.append(
-                    "Checkout and conversion tracking are not verified — "
-                    "start with organic reach or shop visits."
+                    "Checkout and conversion tracking are not verified. "
+                    "Start with organic reach or shop visits."
                 )
         audience_entry = _first_entry("audience")
         raw_audience = (
@@ -1781,7 +1781,7 @@ def rank_seller_recommendations(
         ).strip()
         if not raw_audience:
             missing_facts.append(
-                "Audience not confirmed — review and edit the starting audience hypothesis."
+                "Audience not confirmed. Review and edit the starting audience hypothesis."
             )
             unconfirmed_audience = (
                 f"Unconfirmed starting hypothesis (edit before sharing): "
@@ -1793,7 +1793,7 @@ def rank_seller_recommendations(
             )
         if not active_comps:
             missing_facts.append(
-                "No watched competitor yet — ranked from your saved shop profile only."
+                "No watched competitor yet. Ranked from your saved shop profile only."
             )
 
         approved_facts: list[dict[str, str]] = [
@@ -1853,12 +1853,15 @@ def rank_seller_recommendations(
                 "score": round(score, 1),
                 "priority": "high" if score >= 85 else ("medium" if score >= 55 else "low"),
                 "why_this_fits": why_this_fits,
+                # True when the move takes longer than this week's minutes (it can only lead the
+                # list when nothing fits), so the page can say so instead of "Why this fits".
+                "over_budget": est_mins > effective_minutes,
                 "used_entries": dedup_entries,
                 "output_provenance": "suggested_starting_approach",
                 "output_label": "Suggested starting approach",
                 "organic_first": True,
                 "organic_guidance_note": (
-                    "Organic post first — no paid ad spend or ad account required."
+                    "Organic post first: no paid ad spend or ad account required."
                 ),
                 "unconfirmed_audience": unconfirmed_audience,
                 "audience_confirmed": False,

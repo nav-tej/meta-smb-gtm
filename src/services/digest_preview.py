@@ -563,13 +563,19 @@ async def build_personal_digest_preview(
             top = items[0]
             minutes = int(pref.access.minutes_per_week or 30)
             goal = str(pref.goal or "").strip()
-            fit_parts = [f"Sized for ~{minutes} min/week"]
+            # Say whether the top move fits this week's minutes; when none fits, it is the shortest.
+            move_minutes = int(top.get("estimated_minutes") or 0)
+            fit_parts = [
+                f"Takes about {move_minutes} minutes, more than your {minutes} minutes a week"
+                if move_minutes > minutes
+                else f"Fits your {minutes} minutes a week"
+            ]
             if goal:
                 fit_parts.append(f"Goal: {goal}")
             recommendation = {
                 "id": str(top.get("id") or ""),
                 "title": str(top.get("title") or "Share a grounded shop update"),
-                "reason": str(top.get("reason") or ""),
+                "reason": str(top.get("why_this_fits") or top.get("reason") or ""),
                 "fit_note": " · ".join(fit_parts),
                 "workspace_href": "/portal",
             }

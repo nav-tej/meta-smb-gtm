@@ -1959,12 +1959,12 @@
       el('div', { class: 'sm-card-header' },
         el('div', {},
           el('span', { class: 'sm-badge sm-badge-goal' }, 'Top next move right now'),
-          el('div', { style: 'font-weight:700;margin-top:4px;' }, `${top.title} · ~${top.estimated_minutes || 15} min`)
+          el('div', { style: 'font-weight:700;margin-top:4px;' }, `${top.title} · about ${top.estimated_minutes || 15} minutes`)
         ),
         openImproveBtn
       ),
       el('div', { style: 'font-size:0.88rem;margin-bottom:6px;' }, top.action || ''),
-      el('div', { class: 'sm-why-line' }, `Why this fits: ${top.why_this_fits || ''}`)
+      el('div', { class: 'sm-why-line' }, `${whyLabel(top)}: ${top.why_this_fits || ''}`)
     );
 
     if (!listEl) return;
@@ -2033,7 +2033,7 @@
             'data-sm-provenance': isSampleMode() ? 'artist_example' : (rec.output_provenance || 'suggested_starting_approach'),
           }, provenanceLabel)
         ),
-        el('div', { class: 'sm-why-line' }, `Why this fits: ${rec.why_this_fits || ''}`),
+        el('div', { class: 'sm-why-line' }, `${whyLabel(rec)}: ${rec.why_this_fits || ''}`),
         organicNote ? el('div', { class: 'sm-why-line' }, organicNote) : null,
         missingFacts.length ? el('div', { class: 'sm-why-line', 'data-sm-missing-facts': 'true' }, `Missing facts: ${missingFacts.join(' · ')}`) : null,
         usedChips
@@ -2059,7 +2059,7 @@
       draftPostLink.addEventListener('click', refreshHandoffHref);
 
       const li = el('li', { 'data-sm-reco-id': rec.id },
-        el('div', { style: 'font-weight:700;' }, `${rec.title} · ~${rec.estimated_minutes || 15} min`),
+        el('div', { style: 'font-weight:700;' }, `${rec.title} · about ${rec.estimated_minutes || 15} minutes`),
         el('div', { style: 'margin-top:4px;font-size:0.9rem;' }, rec.action || ''),
         el('div', { class: 'sm-btn-row', style: 'margin-top:6px;' }, makeAdLink, draftPostLink),
         metaBox
@@ -2422,13 +2422,13 @@
         el('div', { class: 'sm-conflict-col' },
           el('strong', {}, 'Your unsaved edits'),
           el('div', {}, `Goal: ${localGoal}`),
-          el('div', {}, `Time/week: ${localMins} min`),
+          el('div', {}, `Time each week: ${localMins} minutes`),
           el('div', {}, `Items: ${(c.local.memoryEntries || []).length}`)
         ),
         el('div', { class: 'sm-conflict-col' },
           el('strong', {}, 'Saved in other session'),
           el('div', {}, `Goal: ${srvGoal}`),
-          el('div', {}, `Time/week: ${srvMins} min`),
+          el('div', {}, `Time each week: ${srvMins} minutes`),
           el('div', {}, `Items: ${(c.server.memoryEntries || []).length}`)
         )
       ),
@@ -2522,7 +2522,7 @@
       el('div', { class: 'sm-card-header' },
         el('div', {},
           el('strong', {}, def.business_name ? `Your context · ${def.business_name}` : 'Your context'),
-          subtitleWhy ? el('div', { class: 'sm-sub', style: 'margin:2px 0 0;' }, `Why this fits: ${subtitleWhy}`) : null
+          subtitleWhy ? el('div', { class: 'sm-sub', style: 'margin:2px 0 0;' }, `${whyLabel(selectedRec)}: ${subtitleWhy}`) : null
         ),
         el('div', { class: 'sm-btn-row' }, memBtn, applyBtn)
       ),
@@ -2626,6 +2626,10 @@
       }
     });
   }
+
+  // A move longer than this week's minutes leads only when nothing fits (the ranker sets
+  // over_budget), so its reason is a heads-up, not "Why this fits".
+  function whyLabel(rec) { return rec && rec.over_budget ? 'Heads up' : 'Why this fits'; }
 
   function start() {
     initOnboardingHooks();

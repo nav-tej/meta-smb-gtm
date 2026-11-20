@@ -327,8 +327,8 @@ async def test_preview_topic_filtering_distinct_sellers_xss_and_zero_cost_spies(
 
     # Distinct recommendations & fit notes
     assert p1["recommendation"]["fit_note"] != p2["recommendation"]["fit_note"]
-    assert "15 min/week" in p1["recommendation"]["fit_note"]
-    assert "120 min/week" in p2["recommendation"]["fit_note"]
+    assert "15 minutes a week" in p1["recommendation"]["fit_note"]
+    assert "120 minutes a week" in p2["recommendation"]["fit_note"]
 
     # Topic filtering: only pricing change included (new_listing excluded)
     assert len(p1["changes"]) == 1
