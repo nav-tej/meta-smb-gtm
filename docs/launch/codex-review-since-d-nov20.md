@@ -6,8 +6,9 @@ preview E, this needs a second pair of eyes that did not write or merge it. Your
 again, so work in the priority order below and push your report after each section.
 
 ## Base and branch
-Review `29904ce..f35431e` on `origin/claude/ux-gap-ad-loop-nov17` (`git fetch origin`; if the tip
-has moved, still review only this range and note the new tip). New isolated worktree, new branch
+Review `29904ce..f77e147` on `origin/claude/ux-gap-ad-loop-nov17` (`git fetch origin`; if the tip
+has moved, still review only this range and note the new tip). The range was widened on Nov 20
+before you started, to include today's merges. New isolated worktree, new branch
 `codex/review-since-d-nov20`. Preview D (`meta-smb-21zg6y020`, alias `muse-preview-nav.vercel.app`)
 and production (`main` `326cc22`) are unchanged.
 
@@ -20,12 +21,17 @@ What landed in that range (41 files, about 6,200 lines):
   and caching is skipped when no directory is writable
 - `2a272dc` Argon's Meta read-only connect Phase 1a (token vault, signed state, service-role RPCs,
   migration `ad_account_connections.sql` not applied), behind the same flag
-- `f35431e` briefs and AGENTS.md notes only
+- `f35431e`, `fdd17a2` briefs and AGENTS.md notes only
+- `371b085` Claude's pass 14: `/today` daily brief per state, focus-card triage keyed to the idea on
+  screen, draft row in the editor; and a `/create` fix: since `830f4e8`, a re-render after Save or
+  Load to account overwrote the account-draft status (4 account-audit cases failed; that merge ran
+  only the pytest gate). Review this fix with particular care: it is Claude reviewing Claude.
+- `f77e147` Antigravity's weekly time budget in `rank_seller_recommendations()`
 
 Running in parallel right now, so do not review or edit their files: Argon on
 `gemini/meta-connect-followups-nov20` (callback errors, `config_id`, `#metaConnectBar` wording),
-Antigravity on `gemini/time-budget-nov20` (`seller_memory.py` ranking), Claude on `/today`
-(`today.*`, `muse-shell.js`). Report findings in those areas; do not fix them.
+Antigravity on `gemini/today-destinations-nov20` (`today.*`: item dialog, caption, scene text),
+Claude on pass 15 (`muse-shell.js`, `seller-memory.js`, `seller_memory.py`, `digest_preview.py`). Report findings in those areas; do not fix them.
 
 ## Priority 1: production stays exactly as it is with the flag off
 `META_APP_ID` and `META_APP_SECRET` are now set in Vercel for Production and Preview (Nav set the
@@ -61,9 +67,11 @@ Any gap here is a blocker for preview E. Say so first in the report.
   no developer words (token, API, server, configured, endpoint), no invented numbers.
 
 ## Priority 4: the gate
-Full offline gate on `f35431e` with exact counts:
+Full offline gate on `f77e147` with exact counts:
 `DEMO_MODE=true META_MODEL_API_KEY= DEMO_KEY= make PY=/Users/nav/meta-smb-gtm/.venv/bin check`.
-Claude's run: 663 passed, 2 skipped, 190 s. If a Playwright test times out, check the machine load,
+Claude's run: 677 passed, 2 skipped, 208 s. Also run the audits the gate does not include:
+`DEMO_MODE=true META_MODEL_API_KEY= DEMO_KEY= /usr/bin/python3 tests/launch_account_audit.py` (Claude: 27/27)
+and `.../launch_browser_audit.py` (Claude: 20/20). If a Playwright test times out, check the machine load,
 rerun it alone, then rerun the gate, and report all three results.
 
 ## Exclusive write scope
