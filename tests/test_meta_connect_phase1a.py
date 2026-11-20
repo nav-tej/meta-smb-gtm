@@ -880,7 +880,7 @@ def test_tab_bids_browser_375_and_1440_flag_off_and_on(live_server_url: str) -> 
                                     {{
                                         "external_account_id": "act_1092837465",
                                         "network": "meta",
-                                        "account_name": "Sarabjit Singh Studio Ads",
+                                        "account_name": "Rapid Repairs Studio Ads",
                                         "currency": "USD",
                                         "timezone_name": "America/Los_Angeles",
                                         "status": "active",
@@ -930,7 +930,7 @@ def test_tab_bids_browser_375_and_1440_flag_off_and_on(live_server_url: str) -> 
                                 status=200,
                                 content_type="application/json",
                                 body=json.dumps({{
-                                    "account_name": "Sarabjit Singh Studio Ads",
+                                    "account_name": "Rapid Repairs Studio Ads",
                                     "currency": "USD",
                                     "rows": [
                                         {{
@@ -1025,6 +1025,14 @@ def test_tab_bids_browser_375_and_1440_flag_off_and_on(live_server_url: str) -> 
                     )
                     caption_txt = page_on.locator("#campaign-table-caption").text_content() or ""
                     assert "—" not in caption_txt
+                    # The seller's own account name is shown as is; the word filter is for server
+                    # messages and ignores case, so it used to turn "Rapid" (api) into "Ad Account".
+                    loaded_txt = page_on.locator("#metaConnectStatus").text_content() or ""
+                    assert "Rapid Repairs Studio Ads (1 day)" in loaded_txt, loaded_txt
+                    assert "Rapid Repairs Studio Ads" in caption_txt, caption_txt
+                    assert "Rapid Repairs Studio Ads" in (
+                        page_on.locator("#metaAdAccountSelect").inner_text() or ""
+                    )
                     assert_clean_bar(page_on, width, "loaded-insights")
 
                     # 2f. Disconnected status

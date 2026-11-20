@@ -3461,10 +3461,13 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
       if (!text || META_FORBIDDEN_WORD_RE.test(text)) return fallback;
       return text;
     }
-    function setMetaStatusText(text, { sticky = false, fromCallback = false } = {}) {
+    // ownText: a sentence Muse wrote around the seller's own account name. The word filter is for
+    // server messages only; it ignores case, so it would turn "Capital Therapy" or "Rapid Repairs"
+    // (they contain "api") into the fallback.
+    function setMetaStatusText(text, { sticky = false, fromCallback = false, ownText = false } = {}) {
       const statusEl = document.getElementById('metaConnectStatus');
       if (!statusEl) return;
-      statusEl.textContent = plainMetaSellerText(text, META_CONNECT_STATUS_TEXT);
+      statusEl.textContent = ownText ? String(text) : plainMetaSellerText(text, META_CONNECT_STATUS_TEXT);
       if (statusEl.dataset) {
         if (sticky) statusEl.dataset.sticky = '1';
         else delete statusEl.dataset.sticky;
@@ -3540,7 +3543,7 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
         selectEl.innerHTML = accounts.map((acc) => {
           const id = esc(String(acc.external_account_id || '').replace(/—/g, '-'));
           const rawName = String(acc.account_name || acc.external_account_id || 'Ad Account').replace(/—/g, '·');
-          const name = esc(plainMetaSellerText(rawName, 'Ad Account'));
+          const name = esc(rawName);
           const cur = esc(String(acc.currency || 'USD').replace(/—/g, ''));
           const expiredTag = acc.status === 'expired' ? ' · Expired' : '';
           return `<option value="${id}">${name} (${id} · ${cur}${expiredTag})</option>`;
@@ -3690,11 +3693,8 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
         if (caption) {
           caption.textContent = `Connected Meta Ads: ${cleanAccountName} ($${totalSpend.toFixed(2)} Spend · ${totalSales} Sales)`;
         }
-        const msg = plainMetaSellerText(
-          `Loaded read-only results for ${cleanAccountName} (${rows.length} daily row${rows.length === 1 ? '' : 's'}).`,
-          META_CONNECT_STATUS_TEXT
-        );
-        setMetaStatusText(msg, { sticky: true });
+        const msg = `Loaded read-only results for ${cleanAccountName} (${rows.length} day${rows.length === 1 ? '' : 's'}).`;
+        setMetaStatusText(msg, { sticky: true, ownText: true });
         showToast(msg);
       } catch (_) {
         setMetaStatusText('Could not load your ad results from Meta right now. Please try again.', { sticky: true });
