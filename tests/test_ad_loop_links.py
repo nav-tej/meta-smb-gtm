@@ -122,7 +122,7 @@ def test_ad_loop_copy_and_script_version_contracts() -> None:
 
     assert "welcome.js?v=20261118-uxgap12" in index_html
     assert "welcome.js?v=20261118-uxgap12" in welcome_html
-    assert "first-ad.js?v=20261119-ag2" in first_ad_html
+    assert "first-ad.js?v=20261120-vu1" in first_ad_html
     for link_id in ("improveFirstAdLink", "iterateFirstAdLink", "bidsFirstAdLink"):
         assert link_id in index_html
     assert "faBidAdviceLink" in first_ad_html

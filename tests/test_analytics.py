@@ -185,25 +185,31 @@ def test_pages_always_revalidate() -> None:
 
 
 def test_static_and_sample_assets_carry_cdn_cache_headers() -> None:
+    """Versioned assets stay on the CDN for a day; unversioned ones for five minutes, since a
+    deploy may not clear the CDN cache. The app is the only place that sets this policy."""
     client = TestClient(app)
-    expected = "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800"
+    versioned = "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800"
+    unversioned = "public, max-age=0, s-maxage=300, stale-while-revalidate=60"
     for asset_path in (
         "/static/account.js",
         "/static/first-ad.js",
         "/static/muse-shell.css",
         "/samples/ek_onkar_original.jpg",
     ):
-        resp = client.get(asset_path)
-        assert resp.status_code == 200, asset_path
-        assert resp.headers.get("cache-control") == expected, asset_path
+        plain = client.get(asset_path)
+        assert plain.status_code == 200, asset_path
+        assert plain.headers.get("cache-control") == unversioned, asset_path
+        tagged = client.get(f"{asset_path}?v=20261120-vu1")
+        assert tagged.status_code == 200, asset_path
+        assert tagged.headers.get("cache-control") == versioned, asset_path
 
     vercel_cfg = json.loads((ROOT / "vercel.json").read_text(encoding="utf-8"))
-    header_rules = vercel_cfg.get("headers") or []
-    assert any(
-        rule.get("source") == "/(static|samples)/(.*)"
-        and any(
-            h.get("key") == "Cache-Control" and "s-maxage=86400" in h.get("value", "")
-            for h in (rule.get("headers") or [])
-        )
-        for rule in header_rules
-    )
+    assert not vercel_cfg.get("headers"), "cache policy lives in src/api/main.py only"
+
+    # Every script and stylesheet a page loads from /static carries a version.
+    import re
+
+    for page in ("today", "index", "creator", "first-ad", "welcome", "progress", "digest"):
+        html = (ROOT / "src" / "api" / "static" / f"{page}.html").read_text(encoding="utf-8")
+        for ref in re.findall(r'src="(/static/[^"]+\.js[^"]*)"', html):
+            assert "?v=" in ref, (page, ref)

@@ -77,3 +77,54 @@ def test_route_caches_the_brief_for_the_day(cache_on: Path) -> None:
     assert refreshed.headers["x-muse-cache"] == "hit"
     assert refreshed.headers["x-muse-brief"] == "unchanged"
     assert first.json()["generated_at"] == second.json()["generated_at"]
+
+
+def test_signed_in_seller_gets_the_sample_brief_unless_they_ask_for_their_own(
+    cache_on: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A seller with a finished setup who opens the sample on /today must see the sample brief.
+
+    The route used to pass every signed-in account to the brief, which then built the account
+    stub (their competitors marked "monitored", "Feature a collection from <shop>") and /today
+    showed it inside the sample's frame.
+    """
+    from src.api import daily_brief as daily_brief_api
+    from src.services import daily_brief as daily_brief_service
+    from src.services.accounts import AccountSession
+
+    session = AccountSession(
+        user_id="u-brief",
+        email="owner@northstar.example",
+        email_verified=True,
+        access_token="offline",
+        session_id=None,
+    )
+
+    async def signed_in(*args: object, **kwargs: object) -> AccountSession:
+        return session
+
+    async def workspace(*args: object, **kwargs: object) -> dict[str, object]:
+        onboarding = {
+            "business_name": "North Star Advisory",
+            "competitors": [{"name": "Rival Advisory", "url": "https://rival.example/"}],
+        }
+        return {"document": {"onboarding": onboarding}}
+
+    monkeypatch.setattr(daily_brief_api, "resolve_account", signed_in)
+    monkeypatch.setattr(daily_brief_service, "load_workspace", workspace)
+    client = TestClient(app)
+
+    sample = client.get("/api/v1/daily-brief").json()
+    assert not sample["inputs"].startswith("account:"), sample["inputs"]
+    text = json.dumps(sample)
+    assert "North Star Advisory" not in text and "Rival Advisory" not in text
+
+    # The own-workspace brief is a stub that nothing calls yet (and it fails to build when the
+    # seller watches competitors: WatchItem needs status and note). Only check it is reachable.
+    async def no_competitors(*args: object, **kwargs: object) -> dict[str, object]:
+        return {"document": {"onboarding": {"business_name": "North Star Advisory"}}}
+
+    monkeypatch.setattr(daily_brief_service, "load_workspace", no_competitors)
+    own = client.get("/api/v1/daily-brief?workspace=own").json()
+    assert own["inputs"] == "account:North Star Advisory"
+    assert client.get("/api/v1/daily-brief?workspace=other").status_code == 422

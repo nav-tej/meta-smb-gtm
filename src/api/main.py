@@ -55,16 +55,24 @@ API_PREFIX = "/api/v1"
 # old script versions after a deploy. Static assets are versioned with ?v= instead.
 PAGE_HEADERS = {"Cache-Control": "no-cache"}
 NOINDEX_PAGE_HEADERS = {"Cache-Control": "no-cache", "X-Robots-Tag": "noindex, nofollow"}
+# Versioned URLs (?v=..., bumped whenever a file changes) may stay on Vercel's CDN for a day.
+# Anything requested without a version (some CSS, legal pages, sample images) gets five minutes,
+# because Vercel's docs do not promise that a new deployment clears the CDN cache.
 STATIC_CACHE_CONTROL = "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800"
+UNVERSIONED_STATIC_CACHE_CONTROL = "public, max-age=0, s-maxage=300, stale-while-revalidate=60"
 
 
 class CachedStaticFiles(StaticFiles):
-    """Serve static and sample assets with Vercel Edge CDN (s-maxage) cache headers."""
+    """Serve static and sample assets with Vercel CDN (s-maxage) cache headers."""
 
     async def get_response(self, path: str, scope: Any) -> Response:
         response = await super().get_response(path, scope)
         if response.status_code in (200, 304) and "cache-control" not in response.headers:
-            response.headers["Cache-Control"] = STATIC_CACHE_CONTROL
+            query = scope.get("query_string", b"").decode("latin-1")
+            versioned = any(part.startswith("v=") for part in query.split("&"))
+            response.headers["Cache-Control"] = (
+                STATIC_CACHE_CONTROL if versioned else UNVERSIONED_STATIC_CACHE_CONTROL
+            )
         return response
 
 
