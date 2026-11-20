@@ -237,8 +237,11 @@ def test_four_visitor_states_and_sample_freshness_e2e(state_copy_server: str) ->
                 pr = cr.new_page()
                 pr.goto(f"{{BASE}}/", wait_until="domcontentloaded")
                 pr.wait_for_function(
-                    "() => (document.querySelector('#addCompetitorBtn') || {{}})"
-                    ".textContent.includes('Add and analyze')"
+                    "() => document.documentElement.dataset.museMode === 'account_own' && "
+                    "(document.querySelector('#addCompetitorBtn') || {{}})"
+                    ".textContent.includes('Add and analyze') && "
+                    "[...document.querySelectorAll('#jrSteerChips .jr-chip-btn')]"
+                    ".some((b) => b.textContent.includes('How do my prices compare?'))"
                 )
                 assert "Uses 1 run." in pr.locator("#addCompetitorCost").inner_text()
                 snap_note_r = pr.locator("#competitorSnapshotsNote").inner_text()
@@ -269,9 +272,16 @@ def test_four_visitor_states_and_sample_freshness_e2e(state_copy_server: str) ->
                     )
 
                 pr.route("**/api/v1/monitor**", fake_monitor)
-                pr.goto(f"{{BASE}}/?workspace=sample", wait_until="domcontentloaded")
+                with pr.expect_response("**/api/v1/monitor**"):
+                    pr.goto(f"{{BASE}}/?workspace=sample", wait_until="domcontentloaded")
                 pr.wait_for_selector(".ms-watch-time")
-                pr.wait_for_timeout(300)
+                pr.wait_for_function(
+                    "() => window.museModes?.isSampleMode?.() === true && "
+                    "(document.querySelector('#competitorSnapshotsNote')?.textContent || '')"
+                    ".includes('New analyses use 1 run.') && "
+                    "[...document.querySelectorAll('#jrSteerChips .jr-chip-btn')]"
+                    ".some((b) => b.textContent.includes('Why $59.99 entry'))"
+                )
                 watch_txt = pr.locator("#sellerList").inner_text()
                 assert "Couldn’t check" not in watch_txt, watch_txt
                 assert "Saved snapshot · Nov 3" in watch_txt, watch_txt

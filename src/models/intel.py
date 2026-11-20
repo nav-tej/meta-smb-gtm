@@ -13,10 +13,14 @@ UrlBucket = Literal[
     "products",
     "listings",
     "collections",
+    "services",
+    "case_studies",
     "blogs",
     "pages",
     "other",
 ]
+
+BusinessType = Literal["products", "services", "both"]
 
 
 class SitemapEntry(BaseModel):
@@ -236,6 +240,7 @@ class CompetitorIntelRequest(BaseModel):
 
     competitor_url: str | None = Field(default=None, min_length=1)
     seller_context: str = ""
+    business_type: BusinessType | None = None
     pasted_urls: list[str] = Field(
         default_factory=list,
         max_length=500,
