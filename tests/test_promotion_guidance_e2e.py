@@ -29,10 +29,6 @@ from src.services.product_reference import (
     ProductReference,
 )
 
-ARTIFACT_SCRATCH_DIR = Path(
-    "/Users/nav/.gemini/antigravity/brain/45550847-bc70-4498-b227-06554decc39e/scratch"
-)
-
 
 def _find_playwright_python() -> str | None:
     for candidate in (sys.executable, "/usr/bin/python3", shutil.which("python3") or ""):
