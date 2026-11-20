@@ -66,3 +66,8 @@ The hosted Meta round trip, `config_id` with a real configuration, the hosted bu
 `cryptography`, Vercel usage figures, and hosted email and Google sign-in (Nav's checks for PR #4).
 
 Ownership released.
+
+## Update after Codex's reports (Nov 20)
+
+Codex had in fact finished `CODEX_REVIEW_SINCE_D_NOV20.md` (GO, merged as `a66b22a`) and an earlier pinned review, `CODEX_PREVIEW_E_REVIEW_NOV20.md` on `codex/coordination-nov16`. That one found two things this review missed, both now fixed in `891ba0f` with tests that fail on the old code:
+cached competitor ad counts read as current, and the Meta client returned part of a list at its page cap without saying so. Codex's 4 full-gate failures at `66db2bf` (a 21-minute run under load) did not recur in any later full run: 677, 678, 684 and 693 passed.
