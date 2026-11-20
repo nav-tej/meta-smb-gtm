@@ -14,6 +14,8 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
+import tempfile
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -39,13 +41,29 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 _custom_cache_dir: Path | None = None
 
 
-def get_research_cache_dir() -> Path:
-    """Return the filesystem directory used for local durable research cache entries."""
+def _default_cache_dir() -> Path:
+    # Serverless filesystems (Vercel) are read-only outside /tmp, as in src/config.py; the cache
+    # then lasts per function instance, not across instances or deploys.
+    if os.environ.get("VERCEL"):
+        return Path(tempfile.gettempdir()) / "muse-research-cache"
+    return REPO_ROOT / "data" / "research" / "cache"
+
+
+def get_research_cache_dir() -> Path | None:
+    """Return a writable directory for research cache entries, or None when there is none.
+
+    Caching is an optimisation: a missing or read-only directory must never fail the request.
+    """
     if _custom_cache_dir is not None:
         return _custom_cache_dir
-    d = REPO_ROOT / "data" / "research" / "cache"
-    d.mkdir(parents=True, exist_ok=True)
-    return d
+    candidates = [_default_cache_dir(), Path(tempfile.gettempdir()) / "muse-research-cache"]
+    for d in dict.fromkeys(candidates):
+        try:
+            d.mkdir(parents=True, exist_ok=True)
+            return d
+        except OSError as err:
+            logger.warning("Research cache directory %s is not writable: %s", d, err)
+    return None
 
 
 def set_research_cache_dir(path: Path | None) -> None:
@@ -114,8 +132,11 @@ class ResearchCacheEntry(BaseModel):
 
 
 def get_cached_entry(cache_key: str, now: datetime | None = None) -> ResearchCacheEntry | None:
-    """Read entry from cache. Returns None if missing or expired."""
-    path = get_research_cache_dir() / f"{cache_key}.json"
+    """Read entry from cache. Returns None if missing, expired or the cache is unavailable."""
+    cache_dir = get_research_cache_dir()
+    if cache_dir is None:
+        return None
+    path = cache_dir / f"{cache_key}.json"
     if not path.is_file():
         return None
     try:
@@ -130,8 +151,11 @@ def get_cached_entry(cache_key: str, now: datetime | None = None) -> ResearchCac
 
 
 def put_cached_entry(entry: ResearchCacheEntry) -> None:
-    """Persist entry to durable cache."""
-    path = get_research_cache_dir() / f"{entry.cache_key}.json"
+    """Persist entry to the cache; skipped (logged) when no writable directory exists."""
+    cache_dir = get_research_cache_dir()
+    if cache_dir is None:
+        return
+    path = cache_dir / f"{entry.cache_key}.json"
     try:
         path.write_text(entry.model_dump_json(indent=2), encoding="utf-8")
     except Exception as err:

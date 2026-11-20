@@ -412,3 +412,62 @@ def test_per_account_cache_separation(monkeypatch: pytest.MonkeyPatch, client: T
         assert mock_get.call_count == 2
 
     app.dependency_overrides.clear()
+
+
+# ---------------------------------------------------------------------------
+# Hosted filesystem: the bundle is read-only outside /tmp (Vercel)
+# ---------------------------------------------------------------------------
+
+
+async def test_unwritable_cache_never_fails_research(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """With no writable directory, research still returns fresh results, just uncached."""
+    import src.services.research_cache as rc
+
+    set_research_cache_dir(None)
+    monkeypatch.delenv("VERCEL", raising=False)
+    monkeypatch.setattr(rc, "REPO_ROOT", tmp_path / "bundle")
+    monkeypatch.setattr(rc.tempfile, "gettempdir", lambda: str(tmp_path / "tmp"))
+
+    def read_only_mkdir(self: Path, *args: object, **kwargs: object) -> None:
+        raise OSError(30, "Read-only file system", str(self))
+
+    monkeypatch.setattr(Path, "mkdir", read_only_mkdir)
+    calls = 0
+
+    async def produce() -> MockResult:
+        nonlocal calls
+        calls += 1
+        return MockResult(summary="fresh", items=["a"])
+
+    for _ in range(2):
+        res, hit, _label = await cached_research(
+            NAMESPACE_AD_PREVIEWS, "user_1", "Cedar & Loom", MockResult, produce
+        )
+        assert res.summary == "fresh"
+        assert hit is False
+    assert calls == 2
+    assert rc.get_research_cache_dir() is None
+
+
+async def test_vercel_caches_under_tmp(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """On Vercel the cache lives under the temp directory, never inside the read-only bundle."""
+    import src.services.research_cache as rc
+
+    set_research_cache_dir(None)
+    monkeypatch.setenv("VERCEL", "1")
+    monkeypatch.setattr(rc, "REPO_ROOT", tmp_path / "bundle")
+    monkeypatch.setattr(rc.tempfile, "gettempdir", lambda: str(tmp_path / "tmp"))
+    calls = 0
+
+    async def produce() -> MockResult:
+        nonlocal calls
+        calls += 1
+        return MockResult(summary="fresh", items=["a"])
+
+    _, hit1, _ = await cached_research(NAMESPACE_AD_PREVIEWS, "user_1", "q", MockResult, produce)
+    _, hit2, _ = await cached_research(NAMESPACE_AD_PREVIEWS, "user_1", "q", MockResult, produce)
+    assert (hit1, hit2, calls) == (False, True, 1)
+    assert rc.get_research_cache_dir() == tmp_path / "tmp" / "muse-research-cache"
+    assert not (tmp_path / "bundle").exists()

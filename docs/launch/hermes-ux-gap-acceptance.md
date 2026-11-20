@@ -6,8 +6,8 @@ Read-only browser acceptance. No code edits.
 ## Target
 - Preview D only (updated November 19): the protected preview the coordinator deployed from
   `claude/ux-gap-ad-loop-nov17` and recorded in the handoff
-  (`git show origin/codex/coordination-nov16:docs/launch/HANDOFF_CURRENT.md`). It contains every item
-  below. If the handoff has no preview D yet, or the SHA there differs from the one in Nav's message,
+  (`git show origin/codex/coordination-nov16:docs/launch/HANDOFF_CURRENT.md`). Codex deployed it from
+  `29904ce` (`meta-smb-21zg6y020`) and moved the alias to it. It contains items 1 to 32. If the handoff has no preview D yet, or the SHA there differs from the one in Nav's message,
   stop and report. Previews A (`f83125a`), B (`be453db`) and C (`0f25fff`) are superseded; if you
   already have results from preview C, list them separately and retest on D.
 - Use the fixed alias `https://muse-preview-nav.vercel.app` for anything that needs Google sign-in;
@@ -136,7 +136,8 @@ Account B, setup finished with a saved shop website:
     a Muse account (Nav's or one he supplies; never create a new account): "Continue with Google"
     reaches Google's account chooser with no `redirect_uri_mismatch`, and after choosing the account you
     land back on the alias signed in. If you have no such account, mark UNVERIFIED.
-33. Needs preview D with the November 19 merges. Account B's own workspace on `/`, research area: the
+33. NOT IN PREVIEW D: Codex built D from `29904ce`, before the November 19 merges, so mark this item
+    "N/A on D" and do not test it there. It is kept for the next preview. Account B's own workspace on `/`, research area: the
     "Meta Ad Library Signals" card explains that Muse can only count ads that reached the EU and shows
     each watched shop with "Search public Meta Ad Library" and a status such as "Not counted yet". Nothing in
     that card or in the watched shops list mentions a token, an API, a server or "configured". The diagnostics card is titled
