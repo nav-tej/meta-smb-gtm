@@ -17,7 +17,10 @@ branch and your report.
 ## Part 1: preview D
 1. `git fetch origin`. Take the tip of `origin/claude/ux-gap-ad-loop-nov17` and record its SHA. It must
    include `3afab27` (pass 13: services businesses on `/today`) and `bf32ba2` (merge of Antigravity's
-   `/create` and `/first-ad` wording). Check `git cat-file -e <sha>^{commit}`.
+   `/create` and `/first-ad` wording). Check `git cat-file -e <sha>^{commit}`. If you have not deployed
+   yet, use a tip at or after the November 19 evening merges of `gemini/competitor-research-nov19`
+   (`4a48cb9`) and `gemini/ad-networks-nov19` (`259645e`) plus Claude's ad status wording; Claude's run
+   there: gate 651 passed, 2 skipped, audits 27/27 and 20/20. Hermes item 33 needs them.
 2. In a clean isolated worktree at that SHA, run the full offline gate
    (`DEMO_MODE=true META_MODEL_API_KEY= DEMO_KEY= make PY=/Users/nav/meta-smb-gtm/.venv/bin check`),
    `tests/launch_account_audit.py` and `tests/launch_browser_audit.py` (real Chromium),

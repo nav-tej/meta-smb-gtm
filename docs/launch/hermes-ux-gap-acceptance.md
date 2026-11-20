@@ -136,6 +136,13 @@ Account B, setup finished with a saved shop website:
     a Muse account (Nav's or one he supplies; never create a new account): "Continue with Google"
     reaches Google's account chooser with no `redirect_uri_mismatch`, and after choosing the account you
     land back on the alias signed in. If you have no such account, mark UNVERIFIED.
+33. Needs preview D with the November 19 merges. Account B's own workspace on `/`, research area: the
+    "Meta Ad Library Signals" card explains that Muse can only count ads that reached the EU and shows
+    each watched shop with "Search public Meta Ad Library" and a status such as "Not counted yet". Nothing in
+    that card or in the watched shops list mentions a token, an API, a server or "configured". The diagnostics card is titled
+    "Your website", not "Storefront Channel Diagnostics (Deterministic Python)", and never mentions
+    `artofsarabjitsingh.com` or "72 artworks". `/?workspace=sample` still shows the sample ads and
+    diagnostics.
 
 ## Report
 `docs/launch/HERMES_UX_GAP_NOV19.md` on your own branch: preview URL and SHA, browser and

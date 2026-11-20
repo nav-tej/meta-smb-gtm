@@ -373,11 +373,14 @@ def test_own_workspace_diagnostics_honest_ads_and_business_type_e2e(
                 ads_txt = po.locator("#metaAdsContainer").inner_text()
                 assert "reached the EU" in ads_txt, ads_txt
                 assert "Search public Meta Ad Library" in ads_txt, ads_txt
-                assert "1 active ad (API)" in ads_txt, ads_txt
+                assert "1 active ad in the EU" in ads_txt, ads_txt
                 assert "42d" in ads_txt, ads_txt
                 assert "—" not in ads_txt, ads_txt
                 assert len(seen_ads_queries) >= 1
                 assert not po.evaluate("document.documentElement.scrollWidth > window.innerWidth")
+                assert po.locator("#diagTitle").inner_text() == "Your website"
+                assert "Deterministic Python" not in po.locator("body").inner_text()
+                assert "Sample competitor ads" not in po.locator("#metaAdsSub").inner_text()
 
                 # Trigger live competitor analysis and verify business_type="services" is sent
                 po.locator("#sellerList .js-live-brief").first.click()
@@ -391,6 +394,38 @@ def test_own_workspace_diagnostics_honest_ads_and_business_type_e2e(
                 )
                 co.close()
 
+                # 1b. Hosted today: no Ad Library token on the server. Sellers see plain words,
+                # never the server message, and the competitor rows get no status line.
+                cn = browser.new_context(viewport={{"width": width, "height": 844}})
+                cn.add_cookies([{{"name": "muse_e2e_user", "value": "svc-res-u1", "url": BASE}}])
+                pn = cn.new_page()
+                pn.route(
+                    "**/api/v1/competitors/ads**",
+                    lambda route: route.fulfill(
+                        json={{
+                            "query": "Acme Advisory",
+                            "public_library_url": "https://www.facebook.com/ads/library/?q=Acme",
+                            "status": "no_token",
+                            "message": (
+                                "Meta Ad Library access token is not configured on this server."
+                            ),
+                            "total_active_ads": 0,
+                            "ads": [],
+                        }}
+                    ),
+                )
+                pn.goto(f"{{BASE}}/", wait_until="domcontentloaded")
+                pn.wait_for_function(
+                    "() => (document.querySelector('#metaAdsContainer')?.textContent || '')"
+                    ".includes('Not counted yet')"
+                )
+                no_token_txt = pn.locator("#metaAdsContainer").inner_text()
+                for word in ("token", "configured", "API", "server"):
+                    assert word not in no_token_txt, (word, no_token_txt)
+                assert "Search public Meta Ad Library" in no_token_txt, no_token_txt
+                assert pn.locator("#sellerList .jr-ad-status").count() == 0
+                cn.close()
+
                 # 2. Sample shop keeps sample diagnostics & hooks with zero overflow
                 cs = browser.new_context(viewport={{"width": width, "height": 844}})
                 ps = cs.new_page()
@@ -401,6 +436,8 @@ def test_own_workspace_diagnostics_honest_ads_and_business_type_e2e(
                     ".includes('[sample]')"
                 )
                 assert "artofsarabjitsingh.com" in ps.locator("#diagnosticsContainer").inner_text()
+                assert "Sample competitor ads" in ps.locator("#metaAdsSub").inner_text()
+                assert "Storefront Channel Diagnostics" in ps.locator("#diagTitle").inner_text()
                 assert not ps.evaluate("document.documentElement.scrollWidth > window.innerWidth")
                 cs.close()
 

@@ -1599,7 +1599,7 @@
             <div class="card-header">
               <div>
                 <h2 class="card-title">Meta Ad Library Signals</h2>
-                <p class="card-sub">Sample competitor ads illustrate the analysis workflow for the demo shop. Real accounts show verified live ads or direct public search links.</p>
+                <p class="card-sub" id="metaAdsSub">Sample competitor ads illustrate the analysis workflow for the demo shop. Real accounts show verified live ads or direct public search links.</p>
               </div>
               <span class="badge gold">Instagram + Facebook Feed/Reels</span>
             </div>
@@ -1629,8 +1629,8 @@
           </div>
 
           <div class="card">
-            <div class="ms-card-head"><h2 class="card-title" style="margin-bottom:0.4rem;">Storefront Channel Diagnostics (Deterministic Python)</h2><button type="button" class="btn btn-outline ms-rerun" id="rerunDiagBtn">↻ Re-run</button></div>
-            <p class="card-sub" style="margin-bottom:0.9rem;">Computed in Python without LLM guesswork across 72 artworks & 7 channels.</p>
+            <div class="ms-card-head"><h2 class="card-title" id="diagTitle" style="margin-bottom:0.4rem;">Storefront Channel Diagnostics (Deterministic Python)</h2><button type="button" class="btn btn-outline ms-rerun" id="rerunDiagBtn">↻ Re-run</button></div>
+            <p class="card-sub" id="diagSub" style="margin-bottom:0.9rem;">Computed in Python without LLM guesswork across 72 artworks & 7 channels.</p>
             <div class="finding-list" id="diagnosticsContainer"></div>
           </div>
         </div>
@@ -2192,36 +2192,53 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
     }
 
     const META_AD_COVERAGE_NOTE =
-      "Meta's Ad Library API returns non-political commercial ads only when they reached the EU. " +
-      "Use the public Meta Ad Library link to search worldwide commercial ads.";
+      "Muse can only count a shop's ads when they reached the EU, because that is all Meta shares with apps " +
+      "(apart from political ads). The public Meta Ad Library shows every active ad, wherever it ran.";
 
+    // Seller-facing wording only: server messages (tokens, HTTP codes) never reach the page.
     function formatAdStatusSummary(sig) {
-      if (!sig) return { badge: 'Not checked', tone: 'gold', detail: 'Public Meta Ad Library link available.' };
+      const publicOnly = 'Search the public Meta Ad Library to see their active ads.';
+      if (!sig) return { badge: 'Not checked', tone: 'gold', detail: publicOnly, counted: false };
       if (sig.status === 'live' && Number(sig.total_active_ads || 0) > 0) {
         const top = Array.isArray(sig.ads) && sig.ads.length ? sig.ads[0] : null;
-        const longest = top ? ` Longest-running: ${top.days_running || 0}d${top.headline ? ` (${top.headline})` : ''}.` : '';
+        const longest = top ? ` Longest running: ${top.days_running || 0}d${top.headline ? ` (${top.headline})` : ''}.` : '';
         return {
-          badge: `${sig.total_active_ads} active ad${sig.total_active_ads === 1 ? '' : 's'} (API)`,
+          badge: `${sig.total_active_ads} active ad${sig.total_active_ads === 1 ? '' : 's'} in the EU`,
           tone: 'green',
-          detail: `Returned via Meta Ad Library API.${longest}`,
+          detail: `Counted from Meta's Ad Library.${longest}`,
+          counted: true,
         };
       }
       if (sig.status === 'zero') {
-        return { badge: 'None via API', tone: 'gold', detail: 'No ads found via the Meta API (EU commercial coverage only).' };
+        return { badge: 'None in the EU', tone: 'gold', detail: `No active ads that reached the EU. ${publicOnly}`, counted: true };
       }
       if (sig.status === 'no_token') {
         const signedOut = /sign in/i.test(sig.message || '');
         return {
-          badge: signedOut ? 'Sign in required' : 'API token not configured',
+          badge: signedOut ? 'Sign in to count ads' : 'Not counted yet',
           tone: 'gold',
-          detail: sig.message || 'Meta Ad Library API token is not configured on this server.',
+          detail: signedOut ? `Sign in to count their ads. ${publicOnly}` : `Muse can't count ads on this site yet. ${publicOnly}`,
+          counted: false,
         };
       }
-      return { badge: 'API error', tone: 'red', detail: sig.message || 'Meta Ad Library API query failed.' };
+      return { badge: "Couldn't check", tone: 'red', detail: `Muse couldn't reach Meta's Ad Library just now. ${publicOnly}`, counted: false };
+    }
+
+    function syncResearchCardCopy(isSample) {
+      const swap = (id, ownText) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (el.dataset.sampleText === undefined) el.dataset.sampleText = el.textContent;
+        el.textContent = isSample ? el.dataset.sampleText : ownText;
+      };
+      swap('metaAdsSub', "Active Instagram and Facebook ads from the shops you watch, with a link to each shop's public Ad Library page.");
+      swap('diagTitle', 'Your website');
+      swap('diagSub', 'What Muse knows about your own site so far.');
     }
 
     function renderDiagnosticsAndAds(ws) {
       const isSample = ws.id === 'sarabjit_singh' || ws.id === 'etsy_pottery' || Boolean(ws.meta_ads_signals?.is_sample);
+      syncResearchCardCopy(isSample);
       const diag = ws.diagnostics || {};
       const diagEl = document.getElementById('diagnosticsContainer');
       if (isSample) {
@@ -2252,12 +2269,12 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
         diagEl.innerHTML = `
           <div class="finding-item">
             <div class="finding-head">
-              <strong>${esc(ownBiz)} Channel Diagnostics</strong>
-              <span class="badge green">Own workspace</span>
+              <strong>${esc(ownBiz)}</strong>
+              <span class="badge green">Your workspace</span>
             </div>
             <div style="font-size:0.83rem;">
-              ${ownSite ? `Website saved: <code>${esc(ownSite)}</code>${ownCount ? ` (${esc(ownCount)} pages scanned during setup)` : ''}.` : 'Add your website in Shop Setup to scan your public pages.'}
-              Run a live competitor analysis or storefront ingest to see channel-specific findings.
+              ${ownSite ? `Website saved: <code>${esc(ownSite)}</code>${ownCount ? ` (${esc(ownCount)} pages scanned during setup)` : ''}.` : 'Add your website in Edit shop setup so Muse can scan your public pages.'}
+              Analyze a shop you watch to compare their pages with yours.
             </div>
           </div>
         `;
@@ -2337,7 +2354,7 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
         } else {
           const div = document.createElement('div');
           div.className = 'finding-item';
-          const msg = sigs.message || 'Add a competitor in Research to check Meta Ad Library links and API status.';
+          const msg = 'Add a shop to watch and Muse will link to its Meta ads here.';
           const pubUrl = sigs.public_library_url || 'https://www.facebook.com/ads/library/';
           div.innerHTML = `
             <div style="margin-bottom:6px;"><a class="jr-meta-ad-link" href="${safeUrl(pubUrl)}" target="_blank" rel="noopener noreferrer">Search public Meta Ad Library ↗</a></div>
@@ -2660,6 +2677,11 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
         if (!match) return;
         const summary = formatAdStatusSummary(match);
         let statusEl = li.querySelector('.jr-ad-status');
+        // A row only gets a line when Muse actually counted something; the ads card explains the rest.
+        if (!summary.counted) {
+          if (statusEl) statusEl.remove();
+          return;
+        }
         if (!statusEl) {
           statusEl = document.createElement('span');
           statusEl.className = 'jr-ad-status jr-note';
@@ -2668,7 +2690,7 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
           const adLink = li.querySelector('.jr-meta-ad-link') || li.querySelector('div');
           if (adLink && adLink.parentNode) adLink.parentNode.appendChild(statusEl);
         }
-        if (statusEl) statusEl.textContent = `Ad API status: ${summary.badge}. ${META_AD_COVERAGE_NOTE}`;
+        if (statusEl) statusEl.textContent = `Meta ads: ${summary.badge}.`;
       });
     }
     async function saveBriefCache() {
