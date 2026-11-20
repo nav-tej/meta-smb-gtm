@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 from typing import Any
@@ -179,5 +180,30 @@ def test_paying_account_users_never_need_the_presenter_key() -> None:
 
 def test_pages_always_revalidate() -> None:
     client = TestClient(app)
-    for path in ("/", "/portal", "/create", "/today", "/digest", "/account"):
+    for path in ("/", "/portal", "/create", "/today", "/digest", "/account", "/first-ad"):
         assert client.get(path).headers["cache-control"] == "no-cache", path
+
+
+def test_static_and_sample_assets_carry_cdn_cache_headers() -> None:
+    client = TestClient(app)
+    expected = "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800"
+    for asset_path in (
+        "/static/account.js",
+        "/static/first-ad.js",
+        "/static/muse-shell.css",
+        "/samples/ek_onkar_original.jpg",
+    ):
+        resp = client.get(asset_path)
+        assert resp.status_code == 200, asset_path
+        assert resp.headers.get("cache-control") == expected, asset_path
+
+    vercel_cfg = json.loads((ROOT / "vercel.json").read_text(encoding="utf-8"))
+    header_rules = vercel_cfg.get("headers") or []
+    assert any(
+        rule.get("source") == "/(static|samples)/(.*)"
+        and any(
+            h.get("key") == "Cache-Control" and "s-maxage=86400" in h.get("value", "")
+            for h in (rule.get("headers") or [])
+        )
+        for rule in header_rules
+    )

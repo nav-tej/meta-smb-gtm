@@ -335,6 +335,11 @@ This app fetches arbitrary URLs, parses untrusted XML, and feeds third-party con
 - **Commits:** small, imperative subject (`Add sitemap index recursion`), body says why. Run `make check` first.
 - **Ask, don't guess,** on anything that changes the demo story or the Meta tooling usage. Those are 50% of the score.
 - **Local models (Qwen/Hermes):** if your context is small, read sections 2, 4 (the flow you're on), 6, and 7 at minimum.
+- **Vercel usage & browser testing guardrails (mandatory):**
+  - **Local-only automated browser tests:** All Playwright / E2E / visual verification tests must start a local `127.0.0.1` server (`uvicorn`) and never target `*.vercel.app`.
+  - **Mandatory remote tab cleanup:** Any agent that opens a `*.vercel.app` URL in headless Chrome or Playwright for manual smoke verification **must** close the tab/browser context (or navigate to `about:blank`) before ending its turn. Never leave background tabs open on live preview or production deployments.
+  - **No network calls inside state-change listeners:** Event listeners on `muse:account-change`, `account-change`, or `muse:workspace-mode-change` must read `window.museAccount.getSnapshot()` (or await `window.museAccount.ready()` once on initial load) and must **never** call `window.museAccount.refresh()`. Calling `refresh()` inside a `muse:account-change` listener creates an infinite `/api/v1/account/me` loop.
+  - **No unapproved deploys or Vercel mutations:** Never run `vercel deploy` or change Vercel project settings/env vars without Nav's explicit approval.
 
 ---
 

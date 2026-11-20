@@ -3,8 +3,9 @@
 import logging
 import mimetypes
 from pathlib import Path
+from typing import Any
 
-from fastapi import APIRouter, FastAPI, HTTPException, Request, status
+from fastapi import APIRouter, FastAPI, HTTPException, Request, Response, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -54,6 +55,19 @@ API_PREFIX = "/api/v1"
 # old script versions after a deploy. Static assets are versioned with ?v= instead.
 PAGE_HEADERS = {"Cache-Control": "no-cache"}
 NOINDEX_PAGE_HEADERS = {"Cache-Control": "no-cache", "X-Robots-Tag": "noindex, nofollow"}
+STATIC_CACHE_CONTROL = "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800"
+
+
+class CachedStaticFiles(StaticFiles):
+    """Serve static and sample assets with Vercel Edge CDN (s-maxage) cache headers."""
+
+    async def get_response(self, path: str, scope: Any) -> Response:
+        response = await super().get_response(path, scope)
+        if response.status_code in (200, 304) and "cache-control" not in response.headers:
+            response.headers["Cache-Control"] = STATIC_CACHE_CONTROL
+        return response
+
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 SAMPLES_DIR = REPO_ROOT / "data" / "samples"
@@ -335,8 +349,8 @@ app.include_router(monitor.router, prefix="/api", include_in_schema=False)
 
 
 if SAMPLES_DIR.is_dir():
-    app.mount("/samples", StaticFiles(directory=str(SAMPLES_DIR)), name="samples")
+    app.mount("/samples", CachedStaticFiles(directory=str(SAMPLES_DIR)), name="samples")
 if OUTPUTS_DIR.is_dir():
     app.mount("/outputs", StaticFiles(directory=str(OUTPUTS_DIR)), name="outputs")
 if STATIC_DIR.is_dir():
-    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+    app.mount("/static", CachedStaticFiles(directory=str(STATIC_DIR)), name="static")

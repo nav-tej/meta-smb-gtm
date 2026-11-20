@@ -70,8 +70,23 @@
       throw error;
     } finally { clearTimeout(timer); }
   }
+  let inFlightRefresh = null;
+  let lastEmittedKey = '';
+  function snapshotKey(snap) {
+    return JSON.stringify({
+      configured: snap.configured,
+      user: snap.user ? { id: snap.user.id, email: snap.user.email, email_verified: snap.user.email_verified } : null,
+      usage: snap.usage || null,
+      live_available: snap.live_available,
+      auth_status: snap.auth_status,
+      auth_error: snap.auth_error
+    });
+  }
   function emitChange() {
     renderAccount();
+    const key = snapshotKey(snapshot);
+    if (key === lastEmittedKey) return copy(snapshot);
+    lastEmittedKey = key;
     const detail = copy(snapshot);
     window.dispatchEvent(new CustomEvent('muse:account-change', { detail }));
     window.dispatchEvent(new CustomEvent('account-change', { detail: copy(snapshot) }));
@@ -96,27 +111,36 @@
     return emitChange();
   }
   async function refresh() {
-    const epoch = accountEpoch;
-    if (snapshot.auth_status === 'error' || snapshot.auth_status === 'expired') {
-      snapshot = { ...snapshot, auth_status: 'loading', auth_error: null };
-      emitChange();
-    }
+    if (inFlightRefresh) return inFlightRefresh;
+    const run = (async () => {
+      const epoch = accountEpoch;
+      if (snapshot.auth_status === 'error' || snapshot.auth_status === 'expired') {
+        snapshot = { ...snapshot, auth_status: 'loading', auth_error: null };
+        emitChange();
+      }
+      try {
+        const data = await request('/me');
+        if (epoch !== accountEpoch) return copy(snapshot);
+        return update(data);
+      } catch (error) {
+        if (epoch !== accountEpoch) return copy(snapshot);
+        const expired = error?.status === 401;
+        snapshot = {
+          ...snapshot,
+          user: expired ? null : snapshot.user,
+          live_available: expired ? false : snapshot.live_available,
+          auth_status: expired ? 'expired' : 'error',
+          auth_error: error?.message || (expired ? 'Your session expired. Sign in again to continue.' : 'Could not verify your account right now.')
+        };
+        emitChange();
+        throw error;
+      }
+    })();
+    inFlightRefresh = run;
     try {
-      const data = await request('/me');
-      if (epoch !== accountEpoch) return copy(snapshot);
-      return update(data);
-    } catch (error) {
-      if (epoch !== accountEpoch) return copy(snapshot);
-      const expired = error?.status === 401;
-      snapshot = {
-        ...snapshot,
-        user: expired ? null : snapshot.user,
-        live_available: expired ? false : snapshot.live_available,
-        auth_status: expired ? 'expired' : 'error',
-        auth_error: error?.message || (expired ? 'Your session expired. Sign in again to continue.' : 'Could not verify your account right now.')
-      };
-      emitChange();
-      throw error;
+      return await run;
+    } finally {
+      if (inFlightRefresh === run) inFlightRefresh = null;
     }
   }
   function renderAccount() {
