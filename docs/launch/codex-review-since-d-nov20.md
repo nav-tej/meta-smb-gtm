@@ -5,6 +5,11 @@ out, Claude merged and reviewed the work below. Nothing has been deployed since 
 preview E, this needs a second pair of eyes that did not write or merge it. Your usage may run out
 again, so work in the priority order below and push your report after each section.
 
+
+> **Update, Nov 20:** Codex ran out of usage again, and Claude ran this review at Nav's request
+> (`CLAUDE_REVIEW_SINCE_D_NOV20.md`). When Codex is back, review only what Claude could not
+> review independently: `371b085` (the `/create` draft-status fix and the `/today` brief), `2f0903d`,
+> `66db2bf` and `1cfc4a8`, plus anything merged after `b3695d6`. Same boundaries.
 ## Base and branch
 Review `29904ce..2f0903d` on `origin/claude/ux-gap-ad-loop-nov17` (`git fetch origin`; if the tip
 has moved, still review only this range and note the new tip). The range was widened on Nov 20
