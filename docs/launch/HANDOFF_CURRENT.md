@@ -170,3 +170,6 @@ Checkpoint: account Chromium audit 27/27 passed; guest audit still running (sess
 
 ### Historical reconciliation
 Previous Codex November18 read-only count at Supabase project iwatwkiogizfmetiwlqf returned affected_accounts=0 for the exact Clutch/Upwork/Toptal onboarding-competitor query in codex-preview-c-nov18.md. This was before Antigravity's November19 preview C and is historical, not a new query or current-state guarantee. No query executed during the preview D task.
+
+## Preview D alias approved and verified — November 19, 2026
+Nav explicitly confirmed Hermes is idle and approved the move. Codex assigned https://muse-preview-nav.vercel.app to exact preview D https://meta-smb-21zg6y020-navtejs-6321s-projects.vercel.app (29904ce). Vercel CLI confirmed success. Plain alias health GET returns302 to vercel.com/sso-api; authenticated vercel curl health returns200. Deployment Protection remains active; no settings changed. Hermes can now run the D checklist against the fixed alias, including the separately permitted existing-account Google check. Stale muse-growth-studio-preview alias untouched. Production unchanged. This supersedes pending-alias notes above. Ownership released; no processes remain active.

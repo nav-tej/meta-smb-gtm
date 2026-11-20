@@ -150,3 +150,5 @@ reco-actions was reduced after finding muse-shell.js already has triage, Adjust 
 
 ## November 19 — Codex preview D and release readiness checkpoint
 Nav reassigned coordinator scope after Antigravity released preview C. Scope: isolated coordination docs and release/nov19 report only. Claimed and completed independent gate on29904ce (636pass/2skip), Chromium audits27/27 +20/20, both JS contracts, protected D and GET checks. Runtime untouched; production unchanged. Draft PR https://github.com/nav-tej/meta-smb-gtm/pull/4 . Canonical evidence and assignments: HANDOFF_CURRENT.md Preview D. All execution sessions completed. Ownership released; alias move pending Nav confirmation Hermes is idle and permission. Next: Hermes exact-D acceptance and hosted email/auth evidence, then separate merge/promotion approvals.
+
+November19 alias follow-up: Nav confirmed Hermes idle and approved moving muse-preview-nav to preview D29904ce. Move completed; anonymous302 Vercel login, authenticated health200. Canonical HANDOFF_CURRENT updated. Production unchanged; ownership released.
