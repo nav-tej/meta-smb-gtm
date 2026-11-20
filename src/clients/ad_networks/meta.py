@@ -24,6 +24,7 @@ from src.clients.ad_networks.base import (
     AdNetworkDisabledError,
     AdNetworkError,
     AdNetworkId,
+    AdNetworkIncompleteError,
     AdNetworkPermissionError,
     AdNetworkRateLimitError,
 )
@@ -330,6 +331,12 @@ class MetaAdsReadClient:
                 break
             url = _sanitize_next_url(next_url)
             current_params = None
+        else:
+            # The cap was reached and Meta still reports a next page.
+            raise AdNetworkIncompleteError(
+                f"Meta list {path!r} has more than {self._max_pages} pages.",
+                network="meta",
+            )
 
         return collected
 

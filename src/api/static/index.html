@@ -2217,18 +2217,26 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
     function formatAdStatusSummary(sig) {
       const publicOnly = 'Search the public Meta Ad Library to see their active ads.';
       if (!sig) return { badge: 'Not checked', tone: 'gold', detail: publicOnly, counted: false };
+      // A saved count (served from the research cache, which keeps ad counts with no expiry) must
+      // say when it was checked, never read as today's. The cache label's "Refresh (1 run)" part is
+      // left out: this status check is free.
+      const saved = sig.is_cached === true;
+      const savedOn = saved ? (/Last checked ([^·]+?)\s*(?:·|$)/.exec(String(sig.cache_label || ''))?.[1] || '').trim() : '';
+      const savedDay = savedOn && savedOn !== 'recently' ? savedOn : '';
+      const savedTag = savedDay ? ` · ${savedDay}` : saved ? ' · saved' : '';
+      const savedNote = savedDay ? `Saved count from ${savedDay}; it may have changed since. ` : saved ? 'Saved count; it may have changed since. ' : '';
       if (sig.status === 'live' && Number(sig.total_active_ads || 0) > 0) {
         const top = Array.isArray(sig.ads) && sig.ads.length ? sig.ads[0] : null;
         const longest = top ? ` Longest running: ${top.days_running || 0}d${top.headline ? ` (${top.headline})` : ''}.` : '';
         return {
-          badge: `${sig.total_active_ads} active ad${sig.total_active_ads === 1 ? '' : 's'} in the EU`,
-          tone: 'green',
-          detail: `Counted from Meta's Ad Library.${longest}`,
+          badge: `${sig.total_active_ads} active ad${sig.total_active_ads === 1 ? '' : 's'} in the EU${savedTag}`,
+          tone: saved ? 'gold' : 'green',
+          detail: saved ? `${savedNote}Counted from Meta's Ad Library.${longest} ${publicOnly}` : `Counted from Meta's Ad Library.${longest}`,
           counted: true,
         };
       }
       if (sig.status === 'zero') {
-        return { badge: 'None in the EU', tone: 'gold', detail: `No active ads that reached the EU. ${publicOnly}`, counted: true };
+        return { badge: `None in the EU${savedTag}`, tone: 'gold', detail: `${savedNote}No active ads that reached the EU. ${publicOnly}`, counted: true };
       }
       if (sig.status === 'no_token') {
         const signedOut = /sign in/i.test(sig.message || '');

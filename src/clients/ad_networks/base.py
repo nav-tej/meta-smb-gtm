@@ -41,6 +41,11 @@ class AdNetworkAuthError(AdNetworkError):
     """Raised when an access token is missing, expired, malformed, or revoked."""
 
 
+class AdNetworkIncompleteError(AdNetworkError):
+    """Raised when a list still has pages after the page cap: a partial list is never returned as
+    complete, so advice is never built from part of a date range."""
+
+
 class AdNetworkPermissionError(AdNetworkError):
     """Raised when the token lacks required read scopes or ad-account role access."""
 

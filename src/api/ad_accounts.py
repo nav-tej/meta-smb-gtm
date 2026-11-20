@@ -20,6 +20,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from src.clients.ad_networks.base import (
     AdNetworkAuthError,
     AdNetworkError,
+    AdNetworkIncompleteError,
     AdNetworkPermissionError,
     AdNetworkRateLimitError,
 )
@@ -354,6 +355,15 @@ async def _fetch_connected_insights(
             detail=(
                 "Meta did not give Muse access to this ad account's results. "
                 "Reconnect and allow access."
+            ),
+        ) from err
+    except AdNetworkIncompleteError as err:
+        # Partial history would skew the bid advice, so nothing is returned.
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "This ad account has more results than Muse can load at once. "
+                "Try a shorter date range."
             ),
         ) from err
     except AdNetworkError as err:
