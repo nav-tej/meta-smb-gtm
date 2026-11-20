@@ -1668,13 +1668,16 @@ def rank_seller_recommendations(
 
         # 3. Time constraint fit
         est_mins = int(move["estimated_minutes"])
-        if effective_minutes <= 15:
-            if est_mins <= 15:
+        if est_mins <= effective_minutes:
+            if effective_minutes <= 15:
                 score += 24.0
-                reasons.append(f"Fits your {effective_minutes}-min weekly budget")
-            else:
-                score -= 75.0
-                reasons.append(f"Takes ~{est_mins} min (exceeds {effective_minutes}-min limit)")
+                reasons.append(f"Fits your {effective_minutes} minutes this week")
+        else:
+            score -= 75.0 if effective_minutes <= 15 else 500.0
+            reasons.append(
+                f"Takes about {est_mins} minutes, more than your {effective_minutes} "
+                "minutes this week"
+            )
 
         # 4. Goal & plain-language context match (draft goal overrides shop defaults)
         goal_lower = effective_goal.lower()
@@ -1866,7 +1869,13 @@ def rank_seller_recommendations(
             }
         )
 
-    ranked.sort(key=lambda item: (-item["score"], item["estimated_minutes"]))
+    all_over_budget = bool(ranked) and all(
+        int(item["estimated_minutes"]) > effective_minutes for item in ranked
+    )
+    if all_over_budget:
+        ranked.sort(key=lambda item: (item["estimated_minutes"], -item["score"]))
+    else:
+        ranked.sort(key=lambda item: (-item["score"], item["estimated_minutes"]))
 
     ignored_avoid = {
         t.strip().lower()
