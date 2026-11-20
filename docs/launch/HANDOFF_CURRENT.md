@@ -138,3 +138,35 @@ Next one bounded Hermes action: test EXACT new URL above (27c1f50), follow .task
 - **Read-Only Data Check (Section 4):** **skipped** (no linked Supabase CLI available without reading `.env`; Nav can run the SQL from `docs/launch/codex-preview-c-nov18.md` in the Supabase SQL editor).
 - **Next Hermes Action (Preview C):** Pass Preview C URL `https://meta-smb-nauuxl0ks-navtejs-6321s-projects.vercel.app`, fixed alias `https://muse-preview-nav.vercel.app`, and SHA `0f25fff` to Hermes.
 - Ownership released.
+
+## Resume checkpoint — November 19, Codex preview D / release preparation
+Nav assigned Codex coordinator scope after acting coordinator released preview C. Pinned source 29904ce2f16df282f13acd739f9f2b7a6d0854a0; isolated /tmp/muse-preview-d-29904ce. Writes limited to coordination docs and release/nov19 report. Independent gate next, then Chromium audits/contracts, protected preview, release report/draft PR. Alias muse-preview-nav requires Nav approval and confirmation Hermes is idle before moving. No runtime edits, production promotion, migrations, settings changes or .env reads. Other agents retain their assigned files.
+
+Checkpoint: independent full gate on 29904ce passed first attempt: 636 passed, 2 skipped, 1 expected excessive-image warning in 179.79s; lint/format clean. No retry or flake observed. Both JS contracts passed. Chromium audits starting sequentially, logs /tmp/muse-preview-d-account.log and /tmp/muse-preview-d-guest.log. Release report scaffold at /tmp/muse-release-nov19/docs/launch/CODEX_RELEASE_READINESS_NOV19.md. Production rollback target verified read-only as meta-smb-ey7g1mcto. No aliases/settings changed.
+
+Checkpoint: account Chromium audit 27/27 passed; guest audit still running (session 31973). Protected preview D deployment started from clean exact 29904ce; session 74704, log /tmp/muse-preview-d-deploy.log. Candidate URL https://meta-smb-21zg6y020-navtejs-6321s-projects.vercel.app (not yet verified READY). Project protection read-only check returned all_except_custom_domains. Next verify READY/protected GETs then ask Nav before alias move.
+
+## Preview D — November 19, 2026 (Codex independent coordinator gate)
+
+- Source pinned at fetched `origin/claude/ux-gap-ad-loop-nov17`: **29904ce2f16df282f13acd739f9f2b7a6d0854a0**; includes 3afab27 and bf32ba2. Later builder work is excluded. Mac working tree untouched.
+- **Independent first-attempt gate:** `DEMO_MODE=true META_MODEL_API_KEY= DEMO_KEY= make PY=/Users/nav/meta-smb-gtm/.venv/bin check` in /tmp/muse-preview-d-29904ce: **636 passed, 2 skipped, 1 warning in 179.79s**; lint clean, 264 files formatted. Skips require PGlite; warning is expected oversized-image rejection. Codex authored neither pass 13 nor the /create merge. No rerun/flake observed.
+- **Real Chromium audits:** `DEMO_MODE=true META_MODEL_API_KEY= DEMO_KEY= /usr/bin/python3 tests/launch_account_audit.py --output /tmp/muse-preview-d-account`: **27/27**. Same environment `tests/launch_browser_audit.py --output /tmp/muse-preview-d-guest`: **20/20**. Fixtures are local, not hosted provider acceptance.
+- `node tests/account_ui_contract.cjs` and `node tests/today_studio_contract.cjs`: both PASSED.
+- **Preview D READY:** https://meta-smb-21zg6y020-navtejs-6321s-projects.vercel.app ; [Inspect](https://vercel.com/navtejs-6321s-projects/meta-smb-gtm/BhvS5EjTLR57S85vMAzn7eW7SpEy). Deployment dpl_BhvS5EjTLR57S85vMAzn7eW7SpEy from clean exact SHA above, existing project/team; protection vercel_authentication. No env override/settings changes.
+- **Protection and GETs:** plain health GET 302 to vercel.com/sso-api (no redirect query recorded). Existing authenticated vercel curl: health, readiness, /, /create, /first-ad, /today, /digest all200; /creator307.
+- **Alias pending Nav permission:** muse-preview-nav.vercel.app still points to preview C meta-smb-nauuxl0ks. Asked Nav to confirm Hermes is idle and approve move to D. Do not move until answered. Google acceptance item32 must wait for that approved move.
+- **Stale alias:** muse-growth-studio-preview.vercel.app still targets superseded barim3ugm (7d89572), verified with alias listing. Not removed; removal needs Nav approval.
+- **Release preparation:** release/nov19 contains exact D runtime plus only docs/launch/CODEX_RELEASE_READINESS_NOV19.md. [Draft PR #4](https://github.com/nav-tej/meta-smb-gtm/pull/4), target main. [Readiness report](https://github.com/nav-tej/meta-smb-gtm/blob/release/nov19/docs/launch/CODEX_RELEASE_READINESS_NOV19.md) contains release notes, hosted requirements, optional migration rationale, rollback and go/no-go.
+- **Production unchanged:** read-only inspect resolves meta-smb-gtm.vercel.app to meta-smb-ey7g1mcto, dpl_8deG8F3rw1CtKSxU3kBA5Bz3idor. NO-GO until Hermes D acceptance and production email/auth evidence; merging and promoting need separate Nav approvals. No migrations, DB writes, billing/auth/protection changes, paid calls or .env reads.
+- Local logs /tmp/muse-preview-d-{gate,account,guest,deploy}.log; sessions22933/31973/74704/43515 completed. No testing/deployment processes left running.
+- **Next Hermes action:** use exact D URL above and SHA29904ce, follow docs/launch/hermes-ux-gap-acceptance.md at that SHA; report PASS/FAIL/UNVERIFIED per item in docs/launch/HERMES_UX_GAP_NOV19.md on own branch. No spending/crawls/emails or account writes newly authorized here. Alias still C until approval.
+- Ownership released for preview/release preparation. Alias move alone remains pending explicit Nav confirmation.
+
+### Current assignments (as supplied by the November19 brief; completion not independently re-confirmed)
+- Antigravity/Neon: gemini/competitor-research-nov19, competitor-research-any-business brief.
+- Argon: gemini/ad-networks-nov19, ad-networks brief.
+- Claude: pass14 /today brief card, draft buttons, time budget on claude/ux-gap-ad-loop-nov17; excluded from frozen D.
+- Hermes: hosted acceptance on exact preview D; waiting for Nav relay/access and alias approval for Google round trip.
+
+### Historical reconciliation
+Previous Codex November18 read-only count at Supabase project iwatwkiogizfmetiwlqf returned affected_accounts=0 for the exact Clutch/Upwork/Toptal onboarding-competitor query in codex-preview-c-nov18.md. This was before Antigravity's November19 preview C and is historical, not a new query or current-state guarantee. No query executed during the preview D task.
