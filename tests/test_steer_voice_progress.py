@@ -17,7 +17,6 @@ import shutil
 import socket
 import subprocess
 import sys
-import textwrap
 import threading
 import time
 from collections.abc import Iterator
@@ -250,7 +249,9 @@ def test_steer_voice_progress_ui(live_server_url: str) -> None:
     if not python_bin:
         pytest.skip("Playwright not installed in environment")
 
-    script = textwrap.dedent(
+    from tests.e2e_helpers import with_cpu_throttle
+
+    script = with_cpu_throttle(
         f"""
         from playwright.sync_api import sync_playwright
         import sys
@@ -262,50 +263,59 @@ def test_steer_voice_progress_ui(live_server_url: str) -> None:
 
             for width, height in [(375, 812), (1440, 900)]:
                 page = browser.new_page(viewport={{"width": width, "height": height}})
-                
+
                 # 1. Load sample workspace on home page
-                page.goto(f"{{base}}/?workspace=sample#loop-research", wait_until="networkidle")
-                
+                page.goto(
+                    f"{{base}}/?workspace=sample#loop-research", wait_until="domcontentloaded"
+                )
+
                 # Verify steer research card exists
                 steer_card = page.locator("#jrSteerResearch")
-                steer_card.wait_for(state="visible", timeout=10000)
-                
+                steer_card.wait_for(state="visible", timeout=15000)
+
                 # Click suggestion chip: "Easier moves"
                 chip = page.locator('.jr-chip-btn[data-directive*="easier"]')
-                chip.wait_for(state="visible", timeout=5000)
+                chip.wait_for(state="visible", timeout=10000)
                 chip.click()
-                
+
                 # Verify directive preview appears
-                page.wait_for_selector("#jrDirectiveSummary:has-text('Focus:')", timeout=8000)
+                page.wait_for_selector("#jrDirectiveSummary:has-text('Focus:')", timeout=15000)
                 summary_text = page.locator("#jrDirectiveSummary").inner_text()
                 assert "Focus:" in summary_text, f"Unexpected summary: {{summary_text}}"
-                
+
                 # Confirm directive
                 confirm_btn = page.locator("#jrConfirmDirectiveBtn")
                 confirm_btn.click()
                 status_el = page.locator("#jrSteerStatus")
-                status_el.wait_for(state="visible", timeout=5000)
+                status_el.wait_for(state="visible", timeout=10000)
+                page.wait_for_function(
+                    "() => (document.querySelector('#jrSteerStatus')?.textContent || '')"
+                    ".toLowerCase().includes('confirmed')",
+                    timeout=10000,
+                )
                 assert "confirmed" in status_el.inner_text().lower()
 
                 # 2. Test Dismiss reasons in triage
-                page.goto(f"{{base}}/?workspace=sample#loop-improve", wait_until="networkidle")
+                page.goto(
+                    f"{{base}}/?workspace=sample#loop-improve", wait_until="domcontentloaded"
+                )
                 dismiss_btn = page.locator(".ms-triage-dismiss").first
-                dismiss_btn.wait_for(state="visible", timeout=8000)
+                dismiss_btn.wait_for(state="visible", timeout=15000)
                 dismiss_btn.click()
 
                 # Verify dismiss reasons panel opened
                 reasons_panel = page.locator(".ms-dismiss-reasons").first
-                reasons_panel.wait_for(state="visible", timeout=5000)
-                
+                reasons_panel.wait_for(state="visible", timeout=10000)
+
                 # Click "Too advanced"
                 too_adv_btn = reasons_panel.locator('.ms-dismiss-chip[data-reason="too_advanced"]')
                 too_adv_btn.click()
-                
+
                 # Verify toast appeared with reason
                 toast_el = page.locator(".ms-toast")
-                toast_el.wait_for(state="visible", timeout=5000)
+                toast_el.wait_for(state="visible", timeout=10000)
                 assert "too advanced" in toast_el.inner_text().lower()
-                
+
                 # Verify signal in localStorage
                 get_sig_js = (
                     "() => JSON.parse(localStorage.getItem('muse.dismiss_signals') || '[]')"
@@ -315,22 +325,29 @@ def test_steer_voice_progress_ui(live_server_url: str) -> None:
                 assert matched, f"Signals: {{signals}}"
 
                 # 3. Test Voice Feedback widget in preview dialog
-                page.goto(f"{{base}}/?workspace=sample#loop-improve", wait_until="networkidle")
+                page.goto(
+                    f"{{base}}/?workspace=sample#loop-improve", wait_until="domcontentloaded"
+                )
                 preview_btn = page.locator("li:not([hidden]) .jr-reco-thumb").first
-                preview_btn.wait_for(state="visible", timeout=8000)
+                preview_btn.wait_for(state="visible", timeout=15000)
                 preview_btn.click()
 
                 # Check dialog and voice box
                 dialog = page.locator("#jrPreviewModal")
-                dialog.wait_for(state="visible", timeout=8000)
+                dialog.wait_for(state="visible", timeout=15000)
                 voice_box = dialog.locator(".jr-voice-box")
-                voice_box.wait_for(state="visible", timeout=5000)
-                
+                voice_box.wait_for(state="visible", timeout=10000)
+
                 # Click "More casual"
                 casual_chip = voice_box.locator(".jr-voice-chip", has_text="More casual")
                 casual_chip.click()
                 vstatus = voice_box.locator(".jr-voice-status")
-                vstatus.wait_for(state="visible", timeout=5000)
+                vstatus.wait_for(state="visible", timeout=10000)
+                page.wait_for_function(
+                    "() => (document.querySelector('#jrPreviewModal .jr-voice-status')"
+                    "?.textContent || '').toLowerCase().includes('casual')",
+                    timeout=10000,
+                )
                 assert "casual" in vstatus.inner_text().lower()
 
                 # Close dialog
@@ -338,10 +355,15 @@ def test_steer_voice_progress_ui(live_server_url: str) -> None:
                 close_btn.click()
 
                 # 4. Test /progress page
-                page.goto(f"{{base}}/progress", wait_until="networkidle")
+                page.goto(f"{{base}}/progress", wait_until="domcontentloaded")
                 assert "Progress & ROI Tracker" in page.title()
                 kpi_grid = page.locator(".pg-kpi-grid")
-                kpi_grid.wait_for(state="visible", timeout=8000)
+                kpi_grid.wait_for(state="visible", timeout=15000)
+                page.wait_for_function(
+                    "() => document.querySelector('#pgRevenueSub')?.textContent"
+                    " === 'Logged on this device'",
+                    timeout=15000,
+                )
 
                 # Verify honest labels: no live tag without server storage,
                 # and no ROI figure without a logged result
@@ -355,17 +377,28 @@ def test_steer_voice_progress_ui(live_server_url: str) -> None:
                     "  detail: {{ user: {{ id: 'usr_prog_a', email: 'a@prog.test' }} }}"
                     "}}))"
                 )
-                page.wait_for_timeout(100)
+                page.wait_for_function(
+                    "() => document.querySelector('#pgNetReturn')?.textContent === '—'",
+                    timeout=10000,
+                )
 
                 open_modal_btn = page.locator("#pgOpenLogBtn")
                 open_modal_btn.click()
                 log_modal = page.locator("#pgLogModal")
-                log_modal.wait_for(state="visible", timeout=5000)
+                log_modal.wait_for(state="visible", timeout=10000)
 
                 page.locator("#pgFormTitle").fill("Featured Spring Floral Vase")
                 page.locator("#pgFormRevenue").fill("50")
-                page.locator("#pgLogForm button[type='submit']").click()
-                page.wait_for_timeout(200)
+                with page.expect_response(
+                    lambda r: "/api/v1/outcomes" in r.url and r.request.method == "POST",
+                    timeout=15000,
+                ):
+                    page.locator("#pgLogForm button[type='submit']").click()
+                page.wait_for_function(
+                    "() => document.querySelector('#pgNetReturn')?.textContent === '+$38' && "
+                    "document.querySelector('#pgMovesCount')?.textContent === '1'",
+                    timeout=15000,
+                )
 
                 # Honest ROI: $50 revenue minus $12 plan cost = +$38
                 assert page.locator("#pgNetReturn").inner_text() == "+$38"
@@ -377,7 +410,11 @@ def test_steer_voice_progress_ui(live_server_url: str) -> None:
                     "  detail: {{ user: {{ id: 'usr_prog_b', email: 'b@prog.test' }} }}"
                     "}}))"
                 )
-                page.wait_for_timeout(200)
+                page.wait_for_function(
+                    "() => document.querySelector('#pgNetReturn')?.textContent === '—' && "
+                    "document.querySelector('#pgMovesCount')?.textContent === '0'",
+                    timeout=15000,
+                )
                 assert page.locator("#pgNetReturn").inner_text() == "—"
                 assert page.locator("#pgMovesCount").inner_text() == "0"
 

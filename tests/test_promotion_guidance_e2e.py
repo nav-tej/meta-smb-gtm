@@ -10,7 +10,6 @@ import shutil
 import socket
 import subprocess
 import sys
-import textwrap
 import threading
 import time
 from pathlib import Path
@@ -253,16 +252,18 @@ def promotion_guidance_server(monkeypatch: pytest.MonkeyPatch):
 
 def test_promotion_guidance_5_click_handoff_truthfulness_and_isolation_e2e(
     promotion_guidance_server: tuple[str, dict[str, int], dict[str, Any]],
+    tmp_path: Path,
 ) -> None:
     """Verify truthful guidance, handoff->PNG clicks, reload/cloud persistence, and isolation."""
     pw_python = _find_playwright_python()
     if pw_python is None:
         pytest.skip("Playwright Python runtime unavailable")
 
-    ARTIFACT_SCRATCH_DIR.mkdir(parents=True, exist_ok=True)
+    from tests.e2e_helpers import with_cpu_throttle
+
     base_url, muse_calls, stores = promotion_guidance_server
 
-    script = textwrap.dedent(
+    script = with_cpu_throttle(
         f"""
         import json
         from pathlib import Path
@@ -270,7 +271,7 @@ def test_promotion_guidance_5_click_handoff_truthfulness_and_isolation_e2e(
         from playwright.sync_api import sync_playwright
 
         BASE = {base_url!r}
-        OUT = Path({str(ARTIFACT_SCRATCH_DIR)!r})
+        OUT = Path({str(tmp_path)!r})
 
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
@@ -309,7 +310,8 @@ def test_promotion_guidance_5_click_handoff_truthfulness_and_isolation_e2e(
             ctx_guest.close()
 
             # 2. Desktop own-account (user-a): no photo -> import -> select -> handoff -> PNG
-            page.goto(f"{{BASE}}/", wait_until="networkidle")
+            page.goto(f"{{BASE}}/", wait_until="domcontentloaded")
+            page.wait_for_selector("#smShowImproveTabBtn", state="visible", timeout=15000)
             page.click("#smShowImproveTabBtn")
             page.wait_for_selector("#loop-improve ol.jr-recos li[data-sm-reco-id]")
             first_card = page.locator("#loop-improve ol.jr-recos li[data-sm-reco-id]").first
@@ -381,7 +383,7 @@ def test_promotion_guidance_5_click_handoff_truthfulness_and_isolation_e2e(
             assert clicks == 6, f"Expected 6 clicks in no-photo candidate flow, got {{clicks}}"
 
             # Reload SAME ?sm_handoff=... URL: consumed handoff must not overwrite edits
-            page.reload(wait_until="networkidle")
+            page.reload(wait_until="domcontentloaded")
             page.wait_for_function(
                 "() => document.getElementById('headline')?.value"
                 " === 'Botanical Linocut Studio Proof'"
@@ -403,7 +405,11 @@ def test_promotion_guidance_5_click_handoff_truthfulness_and_isolation_e2e(
                 "url": BASE,
             }}])
             page_a2 = ctx_a2.new_page()
-            page_a2.goto(f"{{BASE}}/create", wait_until="networkidle")
+            page_a2.goto(f"{{BASE}}/create", wait_until="domcontentloaded")
+            page_a2.wait_for_function(
+                "() => document.documentElement.dataset.museMode === 'account_own'"
+            )
+            page_a2.wait_for_selector("#loadAccountDraft:not([disabled])")
             page_a2.click("#loadAccountDraft")
             page_a2.wait_for_function(
                 "() => document.getElementById('headline')?.value"
@@ -423,7 +429,7 @@ def test_promotion_guidance_5_click_handoff_truthfulness_and_isolation_e2e(
             # 2. Invalid / wrong-owner sm_handoff safe recovery (keeps existing draft)
             page.goto(
                 f"{{BASE}}/create?sm_handoff=sm_wrong_owner_or_expired",
-                wait_until="networkidle",
+                wait_until="domcontentloaded",
             )
             page.wait_for_selector("#notice:not([hidden])")
             notice_text = page.locator("#notice").inner_text()
@@ -435,9 +441,9 @@ def test_promotion_guidance_5_click_handoff_truthfulness_and_isolation_e2e(
             assert next_txt == "Ready to share →", next_txt
 
             # 4. Sample mode /create?workspace=sample does not mutate user-a's own draft
-            page.goto(f"{{BASE}}/create?workspace=sample", wait_until="networkidle")
+            page.goto(f"{{BASE}}/create?workspace=sample", wait_until="domcontentloaded")
             page.wait_for_selector('#imageCandidatesGrid [data-use-image-id]')
-            page.goto(f"{{BASE}}/create", wait_until="networkidle")
+            page.goto(f"{{BASE}}/create", wait_until="domcontentloaded")
             page.wait_for_function(
                 "() => document.getElementById('headline')?.value"
                 " === 'Botanical Linocut Studio Proof'"
@@ -453,7 +459,8 @@ def test_promotion_guidance_5_click_handoff_truthfulness_and_isolation_e2e(
                 "url": BASE,
             }}])
             page_b = ctx_b.new_page()
-            page_b.goto(f"{{BASE}}/", wait_until="networkidle")
+            page_b.goto(f"{{BASE}}/", wait_until="domcontentloaded")
+            page_b.wait_for_selector("#smShowImproveTabBtn", state="visible", timeout=15000)
             page_b.click("#smShowImproveTabBtn")
             page_b.wait_for_selector("#loop-improve ol.jr-recos li[data-sm-reco-id]")
             card_b = page_b.locator("#loop-improve ol.jr-recos li[data-sm-reco-id]").first
@@ -496,7 +503,7 @@ def test_promotion_guidance_5_click_handoff_truthfulness_and_isolation_e2e(
         capture_output=True,
         text=True,
         check=False,
-        timeout=90,
+        timeout=150,
     )
     assert proc.returncode == 0, f"STDOUT:\n{proc.stdout}\nSTDERR:\n{proc.stderr}"
     assert muse_calls["count"] == 0
