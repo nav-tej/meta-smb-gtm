@@ -3,7 +3,7 @@
 - **Branch:** `gemini/meta-connect-followups-nov20`
 - **Worktree:** `/private/tmp/muse-meta-connect-followups-nov20`
 - **Base commit (`origin/claude/ux-gap-ad-loop-nov17`):** `f35431e1e0f002ac5f6fc468c39750f3219b55a1` (`f35431e`)
-- **Final commit:** see branch tip (`git rev-parse HEAD` on `gemini/meta-connect-followups-nov20`)
+- **Implementation commit:** `96ceb03ba6e5bd3ef483990f541aa592e2e650fc` (`96ceb03`)
 - **Default runtime posture:** `AD_CONNECT_ENABLED=false` (read-only Meta routes remain unregistered unless explicitly enabled; zero live calls made to `graph.facebook.com` or `www.facebook.com`, zero Meta App Dashboard mutations, zero Vercel env mutations, zero Supabase migrations applied).
 
 ---
