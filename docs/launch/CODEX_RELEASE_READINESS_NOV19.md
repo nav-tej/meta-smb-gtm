@@ -13,7 +13,7 @@ Codex authored neither pass 13 nor the /create merge; the checks below are indep
 - `node tests/account_ui_contract.cjs`: ACCOUNT UI CONTRACT PASSED.
 - `node tests/today_studio_contract.cjs`: DAILY STUDIO CONTRACT PASSED.
 - Protected preview D: https://meta-smb-21zg6y020-navtejs-6321s-projects.vercel.app ; [Inspect](https://vercel.com/navtejs-6321s-projects/meta-smb-gtm/BhvS5EjTLR57S85vMAzn7eW7SpEy). Deployment `dpl_BhvS5EjTLR57S85vMAzn7eW7SpEy`, READY, target preview, protection `vercel_authentication`. Deploy from clean 29904ce succeeded (CLI exit 0; no --prod or env overrides). Plain health GET returns 302 to vercel.com/sso-api; authenticated `vercel curl` returns 200 for health, readiness, /, /create, /first-ad, /today, /digest; /creator returns 307. No auth bypass links created. Deployment session 74704 and GET session 43515 completed.
-- Alias: `muse-preview-nav.vercel.app` remains on preview C until Nav confirms Hermes is idle and explicitly approves moving it.
+- Alias: Nav confirmed Hermes idle and explicitly approved the move; `https://muse-preview-nav.vercel.app` now points to preview D. Plain health GET returns302 to vercel.com/sso-api; authenticated health returns200. Protection remains active.
 - Draft PR: https://github.com/nav-tej/meta-smb-gtm/pull/4 (`release/nov19` → `main`, draft, not merged).
 
 ## What sellers get
@@ -93,4 +93,4 @@ Outstanding builder findings intentionally excluded: pass 14's empty /today brie
 
 ## Resume checkpoint
 
-All independent local checks and protected preview GETs completed. No source edits, .env reads, settings changes, migration, merge or promotion. Alias permission requested from Nav; until answered it stays on C. Next external step: Hermes acceptance on the exact D URL, then Nav hosted-auth evidence and separate merge/promotion decisions. Ownership released for release preparation; coordinator may perform only the separately approved alias move.
+All independent local checks and protected preview GETs completed. No source edits, .env reads, settings changes, migration, merge or promotion. Alias move approved by Nav and completed, with protection and authenticated health reverified. Next external step: Hermes acceptance on the exact D URL, then Nav hosted-auth evidence and separate merge/promotion decisions. Ownership released for release preparation; alias move is complete and ownership is released.
