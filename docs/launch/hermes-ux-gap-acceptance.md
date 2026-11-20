@@ -4,11 +4,14 @@ Prepared November 17, 2026 by Claude at Nav's request. Status: PROPOSED until Na
 Read-only browser acceptance. No code edits.
 
 ## Target
-- Preview C only: the protected preview the coordinator deployed from `claude/ux-gap-ad-loop-nov17`
-  and recorded in the handoff
+- Preview D only (updated November 19): the protected preview the coordinator deployed from
+  `claude/ux-gap-ad-loop-nov17` and recorded in the handoff
   (`git show origin/codex/coordination-nov16:docs/launch/HANDOFF_CURRENT.md`). It contains every item
-  below. If the handoff has no preview C yet, or the SHA there differs from the one in Nav's message,
-  stop and report. Previews A (`f83125a`) and B (`be453db`) are superseded.
+  below. If the handoff has no preview D yet, or the SHA there differs from the one in Nav's message,
+  stop and report. Previews A (`f83125a`), B (`be453db`) and C (`0f25fff`) are superseded; if you
+  already have results from preview C, list them separately and retest on D.
+- Use the fixed alias `https://muse-preview-nav.vercel.app` for anything that needs Google sign-in;
+  the coordinator moves it to preview D.
 - The preview has Vercel Deployment Protection; get access from Nav (a bypass link or Nav's signed-in
   browser). Google sign-in works only on the fixed preview alias, if the coordinator recorded one and
   Nav registered its callback; otherwise sign in with email and password.
@@ -120,7 +123,21 @@ Account B, setup finished with a saved shop website:
     <business> includes"), not "Refresh titles & descriptions for up to 5 listings", gifts or
     commissions. The sample shop (`/today?workspace=sample`) still shows Ek Onkar and its posts.
 
+30. Needs preview D. Account B's own workspace on `/create`: the first step reads "Start with what you
+    offer" and "What are you promoting?" (not "Start with what you make" or "Product name"). Upload
+    any photo from your machine: the caption under it changes to "Uploaded photo (...) · Kept on this
+    device." and never mentions Ek Onkar, Sarabjit or an "artwork preview". Do not press anything that
+    generates. `/create?workspace=sample` still reads "Start with what you make".
+31. Needs preview D. Account B's own workspace on `/first-ad`: the outcomes read "Bring visitors to your
+    website" and "Test a direct offer"; the item field asks "What are you promoting?"; the image step
+    says "photo" or "Image", not "product photo". No em-dash (—) anywhere on the page.
+    `/first-ad?workspace=sample` still reads "Bring visitors to your shop" and "Product or artwork name".
+32. Google sign-in on `https://muse-preview-nav.vercel.app`, only with a Google account that already has
+    a Muse account (Nav's or one he supplies; never create a new account): "Continue with Google"
+    reaches Google's account chooser with no `redirect_uri_mismatch`, and after choosing the account you
+    land back on the alias signed in. If you have no such account, mark UNVERIFIED.
+
 ## Report
-`docs/launch/HERMES_UX_GAP_NOV18.md` on your own branch: preview URL and SHA, browser and
+`docs/launch/HERMES_UX_GAP_NOV19.md` on your own branch: preview URL and SHA, browser and
 viewports, PASS / FAIL / UNVERIFIED per numbered item with a screenshot or exact text for each
 FAIL, and anything blocked. End with "Ownership released".
