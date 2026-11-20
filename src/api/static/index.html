@@ -2191,33 +2191,80 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
       });
     }
 
+    const META_AD_COVERAGE_NOTE =
+      "Meta's Ad Library API returns non-political commercial ads only when they reached the EU. " +
+      "Use the public Meta Ad Library link to search worldwide commercial ads.";
+
+    function formatAdStatusSummary(sig) {
+      if (!sig) return { badge: 'Not checked', tone: 'gold', detail: 'Public Meta Ad Library link available.' };
+      if (sig.status === 'live' && Number(sig.total_active_ads || 0) > 0) {
+        const top = Array.isArray(sig.ads) && sig.ads.length ? sig.ads[0] : null;
+        const longest = top ? ` Longest-running: ${top.days_running || 0}d${top.headline ? ` (${top.headline})` : ''}.` : '';
+        return {
+          badge: `${sig.total_active_ads} active ad${sig.total_active_ads === 1 ? '' : 's'} (API)`,
+          tone: 'green',
+          detail: `Returned via Meta Ad Library API.${longest}`,
+        };
+      }
+      if (sig.status === 'zero') {
+        return { badge: 'None via API', tone: 'gold', detail: 'No ads found via the Meta API (EU commercial coverage only).' };
+      }
+      if (sig.status === 'no_token') {
+        const signedOut = /sign in/i.test(sig.message || '');
+        return {
+          badge: signedOut ? 'Sign in required' : 'API token not configured',
+          tone: 'gold',
+          detail: sig.message || 'Meta Ad Library API token is not configured on this server.',
+        };
+      }
+      return { badge: 'API error', tone: 'red', detail: sig.message || 'Meta Ad Library API query failed.' };
+    }
+
     function renderDiagnosticsAndAds(ws) {
+      const isSample = ws.id === 'sarabjit_singh' || ws.id === 'etsy_pottery' || Boolean(ws.meta_ads_signals?.is_sample);
       const diag = ws.diagnostics || {};
       const diagEl = document.getElementById('diagnosticsContainer');
-      diagEl.innerHTML = `
-        <div class="finding-item">
-          <div class="finding-head">
-            <strong>Direct Website Checkout Friction</strong>
-            <span class="badge red">HIGH IMPACT FIX</span>
+      if (isSample) {
+        diagEl.innerHTML = `
+          <div class="finding-item">
+            <div class="finding-head">
+              <strong>Direct Website Checkout Friction</strong>
+              <span class="badge red">HIGH IMPACT FIX</span>
+            </div>
+            <div style="font-size:0.83rem;">
+              <code>artofsarabjitsingh.com</code> requires buyers to fill out a manual contact form for $75–$900 signed prints, while FineArtAmerica captures 1-click impulse buyers at $14–$22.
+            </div>
           </div>
-          <div style="font-size:0.83rem;">
-            <code>artofsarabjitsingh.com</code> requires buyers to fill out a manual contact form for $75–$900 signed prints, while FineArtAmerica captures 1-click impulse buyers at $14–$22.
+          <div class="finding-item">
+            <div class="finding-head">
+              <strong>Catalog Metadata Coverage (${esc(diag.total_artworks_indexed || 72)} Artworks)</strong>
+              <span class="badge gold">${esc(diag.artworks_missing_series_tag || 50)} Missing Series Tag</span>
+            </div>
+            <div style="font-size:0.83rem;">
+              ${esc(diag.artworks_missing_original_price || 69)} listings on FineArtAmerica omit original canvas pricing ($2,000–$4,000), hiding collector scarcity.
+            </div>
           </div>
-        </div>
-        <div class="finding-item">
-          <div class="finding-head">
-            <strong>Catalog Metadata Coverage (${esc(diag.total_artworks_indexed || 72)} Artworks)</strong>
-            <span class="badge gold">${esc(diag.artworks_missing_series_tag || 50)} Missing Series Tag</span>
+        `;
+      } else {
+        const ownBiz = (ownOnboarding && (ownOnboarding.business_name || (ownOnboarding.crawl_summary || {}).business_name)) || 'Your business';
+        const ownSite = (ownOnboarding && Array.isArray(ownOnboarding.shop_urls) && ownOnboarding.shop_urls.find(Boolean)) || '';
+        const ownCount = Number((ownOnboarding && ownOnboarding.crawl_summary && ownOnboarding.crawl_summary.pages_found) || 0);
+        diagEl.innerHTML = `
+          <div class="finding-item">
+            <div class="finding-head">
+              <strong>${esc(ownBiz)} Channel Diagnostics</strong>
+              <span class="badge green">Own workspace</span>
+            </div>
+            <div style="font-size:0.83rem;">
+              ${ownSite ? `Website saved: <code>${esc(ownSite)}</code>${ownCount ? ` (${esc(ownCount)} pages scanned during setup)` : ''}.` : 'Add your website in Shop Setup to scan your public pages.'}
+              Run a live competitor analysis or storefront ingest to see channel-specific findings.
+            </div>
           </div>
-          <div style="font-size:0.83rem;">
-            ${esc(diag.artworks_missing_original_price || 69)} listings on FineArtAmerica omit original canvas pricing ($2,000–$4,000), hiding collector scarcity.
-          </div>
-        </div>
-      `;
+        `;
+      }
 
       const adsEl = document.getElementById('metaAdsContainer');
       adsEl.innerHTML = '';
-      const isSample = ws.id === 'sarabjit_singh' || ws.id === 'etsy_pottery' || Boolean(ws.meta_ads_signals?.is_sample);
       if (isSample) {
         const hooks = (ws.meta_ads_signals && ws.meta_ads_signals.sample_hooks) || [
           "[sample] Desi Canvas Co (81d active on IG+FB): 'Golden Temple Sunset Framed Canvas — Ready to Hang' ($129+)",
@@ -2240,8 +2287,37 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
           adsEl.appendChild(div);
         });
       } else {
+        const covDiv = document.createElement('div');
+        covDiv.className = 'finding-item';
+        covDiv.innerHTML = `<div style="font-size:0.82rem;color:var(--text-muted);">${esc(META_AD_COVERAGE_NOTE)}</div>`;
+        adsEl.appendChild(covDiv);
+
         const sigs = ws.meta_ads_signals || {};
-        if (sigs.ads && sigs.ads.length > 0) {
+        const compResults = Array.isArray(sigs.competitors) ? sigs.competitors : [];
+        if (compResults.length > 0) {
+          compResults.forEach((item) => {
+            const summary = formatAdStatusSummary(item);
+            const pubUrl = item.public_library_url || `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=ALL&q=${encodeURIComponent(item.query || '')}`;
+            const div = document.createElement('div');
+            div.className = 'finding-item';
+            let adsHtml = '';
+            if (item.status === 'live' && Array.isArray(item.ads) && item.ads.length > 0) {
+              adsHtml = item.ads.slice(0, 3).map((ad) =>
+                `<div style="font-size:0.8rem;margin-top:4px;"><strong>${esc(ad.page_name || item.query)}</strong> (${esc(ad.days_running || 0)}d active): ${esc(ad.headline || ad.body_excerpt || 'Ad text unavailable')} <a class="jr-meta-ad-link" href="${safeUrl(ad.library_url || pubUrl)}" target="_blank" rel="noopener noreferrer">View ↗</a></div>`
+              ).join('');
+            }
+            div.innerHTML = `
+              <div class="finding-head">
+                <strong>${esc(item.query || 'Competitor')}</strong>
+                <span class="badge ${esc(summary.tone)}">${esc(summary.badge)}</span>
+              </div>
+              <div style="margin-top:4px;"><a class="jr-meta-ad-link" href="${safeUrl(pubUrl)}" target="_blank" rel="noopener noreferrer">Search public Meta Ad Library ↗</a></div>
+              <div style="font-size:0.8rem;color:var(--text-muted);margin-top:4px;">${esc(summary.detail)}</div>
+              ${adsHtml}
+            `;
+            adsEl.appendChild(div);
+          });
+        } else if (sigs.ads && sigs.ads.length > 0) {
           sigs.ads.forEach((ad, idx) => {
             const div = document.createElement('div');
             div.className = 'finding-item';
@@ -2261,11 +2337,11 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
         } else {
           const div = document.createElement('div');
           div.className = 'finding-item';
-          const msg = sigs.message || (sigs.status === 'zero' ? 'No ads found via the Meta API.' : 'No live ads retrieved from Meta Ad Library API for this shop.');
+          const msg = sigs.message || 'Add a competitor in Research to check Meta Ad Library links and API status.';
           const pubUrl = sigs.public_library_url || 'https://www.facebook.com/ads/library/';
           div.innerHTML = `
+            <div style="margin-bottom:6px;"><a class="jr-meta-ad-link" href="${safeUrl(pubUrl)}" target="_blank" rel="noopener noreferrer">Search public Meta Ad Library ↗</a></div>
             <div style="font-size:0.85rem;color:var(--text-muted);">${esc(msg)}</div>
-            <div style="margin-top:6px;"><a class="jr-meta-ad-link" href="${safeUrl(pubUrl)}" target="_blank" rel="noopener noreferrer">Search public Meta Ad Library ↗</a></div>
           `;
           adsEl.appendChild(div);
         }
@@ -2546,7 +2622,54 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
       } else {
         try { Object.assign(briefCache, JSON.parse(localStorage.getItem(DEMO_BRIEFS_KEY) || '{}')); } catch {}
       }
-      if (epoch === briefLoadEpoch) refreshSellerButtons();
+      if (epoch === briefLoadEpoch) {
+        refreshSellerButtons();
+        loadOwnCompetitorAdSignals(epoch);
+      }
+    }
+    async function loadOwnCompetitorAdSignals(epoch) {
+      const snap = liveSnapshot();
+      if (!snap?.user || window.museModes?.isSampleMode?.()) return;
+      renderDiagnosticsAndAds({ id: 'own', diagnostics: {}, meta_ads_signals: {} });
+      const comps = Array.isArray(ownOnboarding?.competitors) ? ownOnboarding.competitors : [];
+      if (!comps.length || typeof fetch !== 'function') return;
+      const results = [];
+      for (const comp of comps.slice(0, 6)) {
+        const query = String(comp?.name || comp?.url || '').replace(/^https?:\/\/(www\.)?/i, '').split('/')[0].trim();
+        if (!query) continue;
+        try {
+          const resp = await fetch(`/api/v1/competitors/ads?query=${encodeURIComponent(query)}`, {
+            credentials: 'same-origin',
+            cache: 'no-store',
+          });
+          if (epoch !== briefLoadEpoch || window.museModes?.isSampleMode?.()) return;
+          if (resp.ok) {
+            results.push(await resp.json());
+          } else {
+            results.push({ query, status: 'error', message: `Ad Library status check returned HTTP ${resp.status}.`, total_active_ads: 0, ads: [] });
+          }
+        } catch {
+          results.push({ query, status: 'error', message: 'Could not reach the Ad Library status endpoint.', total_active_ads: 0, ads: [] });
+        }
+      }
+      if (epoch !== briefLoadEpoch || window.museModes?.isSampleMode?.()) return;
+      renderDiagnosticsAndAds({ id: 'own', diagnostics: {}, meta_ads_signals: { competitors: results } });
+      document.querySelectorAll('#sellerList .jr-seller').forEach((li) => {
+        const label = (li.querySelector('strong')?.textContent || li.dataset?.url || '').toLowerCase();
+        const match = results.find((r) => label.includes(String(r.query || '').toLowerCase()));
+        if (!match) return;
+        const summary = formatAdStatusSummary(match);
+        let statusEl = li.querySelector('.jr-ad-status');
+        if (!statusEl) {
+          statusEl = document.createElement('span');
+          statusEl.className = 'jr-ad-status jr-note';
+          statusEl.style.display = 'block';
+          statusEl.style.marginTop = '2px';
+          const adLink = li.querySelector('.jr-meta-ad-link') || li.querySelector('div');
+          if (adLink && adLink.parentNode) adLink.parentNode.appendChild(statusEl);
+        }
+        if (statusEl) statusEl.textContent = `Ad API status: ${summary.badge}. ${META_AD_COVERAGE_NOTE}`;
+      });
     }
     async function saveBriefCache() {
       try {
@@ -2626,14 +2749,18 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
       try {
         await shellProgress('Analyzing ' + url.replace(/^https?:\/\/(www\.)?/, '').split('/')[0],
           ['Crawling the shop pages', 'Comparing prices and catalog', 'Ranking what they skip']);
+        const reqBody = {
+          competitor_url: url,
+          max_urls: 40,
+          seller_context: sellerContextForAnalysis(),
+        };
+        if (ownOnboarding?.business_type && !window.museModes?.isSampleMode?.()) {
+          reqBody.business_type = ownOnboarding.business_type;
+        }
         const resp = await portalFetch('/api/v1/analyze-competitors?live=true', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            competitor_url: url,
-            max_urls: 40,
-            seller_context: sellerContextForAnalysis(),
-          }),
+          body: JSON.stringify(reqBody),
         });
         if (resp.status === 401 || resp.status === 403) {
           window.museAccount?.open('account');

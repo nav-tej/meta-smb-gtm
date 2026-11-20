@@ -605,6 +605,7 @@ def test_batch1_corrections_security_merge_drafts_and_handoff_e2e(
         import json
         import os
         import tempfile
+        import time
         import urllib.request
         from playwright.sync_api import sync_playwright
 
@@ -789,9 +790,16 @@ def test_batch1_corrections_security_merge_drafts_and_handoff_e2e(
             page.fill("#smCtxMinutes", "25")
             page.click("#smSaveDefaultBtn")
             page.wait_for_selector("#smConflictModalBackdrop:not([hidden])")
-            page.click("#smConflictMergeBtn")
+            with page.expect_response(
+                lambda r: r.url.endswith("/api/v1/seller-memory/recommend") and r.status == 200
+            ):
+                page.click("#smConflictMergeBtn")
             page.wait_for_selector("#smConflictModalBackdrop[hidden]", state="attached")
-            page.wait_for_timeout(300)
+            page.wait_for_function(
+                "() => window.museSellerMemory.getState().preferences?.goal "
+                "=== 'Server concurrent holiday focus' && "
+                "window.museSellerMemory.getState().preferences?.access?.minutes_per_week === 25"
+            )
 
             merged = page.evaluate("window.museSellerMemory.getState()")
             assert (
@@ -808,7 +816,10 @@ def test_batch1_corrections_security_merge_drafts_and_handoff_e2e(
             # --- 4. Non-top rec handoff to /create (uploaded photo + export PNG) ---
             page.fill("#smCtxProduct", "Botanical Linocut")
             page.fill("#smCtxDestination", "website")
-            page.click("#smApplyDraftBtn")
+            with page.expect_response(
+                lambda r: r.url.endswith("/api/v1/seller-memory/recommend") and r.status == 200
+            ):
+                page.click("#smApplyDraftBtn")
             page.wait_for_function(
                 "() => window.museSellerMemory.getState()"
                 ".recommendResult?.editor_defaults?.price_claim === 'EUR 45'"
@@ -850,7 +861,11 @@ def test_batch1_corrections_security_merge_drafts_and_handoff_e2e(
             second_li.locator("a", has_text="Make ad").click()
             page.wait_for_url("**/create?sm_handoff=*")
             page.wait_for_selector("#smStudioContextBar")
-            page.wait_for_timeout(300)
+            page.wait_for_function(
+                "expectedId => document.documentElement.dataset.museMode === 'account_own' && "
+                "window.museCreatorSnapshot?.().idea_id === expectedId",
+                arg=non_top_rec["id"],
+            )
             assert_no_overflow(page, "/create desktop 1440")
 
             # Must carry non-top recommendation & uploaded photo, ZERO Sarabjit leak
@@ -893,7 +908,9 @@ def test_batch1_corrections_security_merge_drafts_and_handoff_e2e(
                 f"{{base_url}}/create?idea=bogus-unrecognized-id",
                 wait_until="domcontentloaded",
             )
-            page.wait_for_timeout(300)
+            page.wait_for_function(
+                "() => document.documentElement.dataset.museMode === 'account_own'"
+            )
             assert page.evaluate("document.documentElement.dataset.museMode") == "account_own"
             bogus_hl = page.locator("#headline").input_value()
             assert "ek onkar" not in bogus_hl.lower(), bogus_hl
@@ -924,7 +941,10 @@ def test_batch1_corrections_security_merge_drafts_and_handoff_e2e(
             m_li.locator("a", has_text="Draft daily post").click()
             page_m.wait_for_url("**/today?sm_handoff=*")
             page_m.wait_for_selector("#smStudioContextBar")
-            page_m.wait_for_timeout(350)
+            page_m.wait_for_function(
+                "expectedId => window.museDailySnapshot?.().idea_id === expectedId",
+                arg=m_non_top["id"],
+            )
             assert_no_overflow(page_m, "/today mobile 375")
 
             snap_today = page_m.evaluate("window.museDailySnapshot()")
@@ -1006,7 +1026,9 @@ def test_batch1_corrections_security_merge_drafts_and_handoff_e2e(
             page.click("#smSaveDefaultBtn")
             page.fill("#smCtxGoal", "Queued save 2 from Account A")
             page.click("#smSaveDefaultBtn")
-            page.wait_for_timeout(200)
+            deadline = time.time() + 10.0
+            while (len(held_routes) < 1 or len(held_puts) < 1) and time.time() < deadline:
+                page.evaluate("() => new Promise((r) => setTimeout(r, 25))")
             assert len(held_routes) == 1
             assert len(held_puts) == 1
             assert len(put_attempts) == 1
@@ -1018,7 +1040,7 @@ def test_batch1_corrections_security_merge_drafts_and_handoff_e2e(
             page.evaluate('''async () => {{
                 await window.museAccount?.refresh?.();
             }}''')
-            page.wait_for_timeout(200)
+            page.wait_for_selector("#smMemoryModalBackdrop[hidden]", state="attached")
 
             # Modal & private UI must close/empty synchronously on signout
             assert page.evaluate(
@@ -1033,13 +1055,23 @@ def test_batch1_corrections_security_merge_drafts_and_handoff_e2e(
             page.evaluate('''async () => {{
                 await window.museAccount?.refresh?.();
             }}''')
-            page.wait_for_timeout(300)
+            page.wait_for_function(
+                "() => window.museSellerMemory.getState().ownerId === 'user-b'"
+            )
 
             # Release delayed Account A responses -> queued PUT #2 must abort,
             # and delayed responses must not overwrite Account B!
-            held_routes[0].continue_()
-            held_puts[0].continue_()
-            page.wait_for_timeout(350)
+            with page.expect_response(
+                lambda r: r.url.endswith("/api/v1/seller-memory/recommend")
+            ):
+                held_routes[0].continue_()
+            with page.expect_response(
+                lambda r: r.url.endswith("/api/v1/seller-memory") and r.request.method == "PUT"
+            ):
+                held_puts[0].continue_()
+            page.wait_for_function(
+                "() => window.museSellerMemory.getState().ownerId === 'user-b'"
+            )
             assert len(put_attempts) == 1, f"Stale queued PUT executed: {{put_attempts}}"
             state_b = page.evaluate("window.museSellerMemory.getState()")
             assert state_b["ownerId"] == "user-b", state_b

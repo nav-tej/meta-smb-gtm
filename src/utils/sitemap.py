@@ -498,6 +498,36 @@ def classify_url_bucket(url: str) -> UrlBucket:
         "galleries",
     }:
         return "collections"
+    if (
+        first
+        in {
+            "services",
+            "service",
+            "consulting",
+            "advisory",
+            "solutions",
+            "offerings",
+            "capabilities",
+            "practices",
+        }
+        or "/services/" in path
+    ):
+        return "services"
+    if (
+        first
+        in {
+            "case-studies",
+            "case-study",
+            "case_studies",
+            "case_study",
+            "client-stories",
+            "customer-stories",
+            "success-stories",
+        }
+        or "/case-studies/" in path
+        or "/case-study/" in path
+    ):
+        return "case_studies"
     if first in {"blogs", "blog", "news", "journal", "articles", "article", "posts", "guides"}:
         return "blogs"
     if first in {"pages", "page", "about", "contact", "faq", "shipping", "pricing", "policies"}:
