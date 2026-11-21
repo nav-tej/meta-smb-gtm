@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en" data-setup-check="editor">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f6f3eb"><title>Daily Post Studio | Muse Growth Studio</title><meta name="description" content="Draft and refine your daily Instagram and Facebook art post from competitive research insights."><link rel="canonical" href="https://meta-smb-gtm.vercel.app/today"><meta name="robots" content="index, follow"><link rel="stylesheet" href="/static/today.css?v=20261120-uxgap14"><link rel="stylesheet" href="/static/muse-shell.css?v=20261112-integrated"><link rel="stylesheet" href="/static/account.css?v=20261112-integrated"><script src="/static/analytics.js?v=20261109-ux" defer></script>
-<script src="/static/account.js?v=20261120-calls1" defer></script><script src="/static/workspace-modes.js?v=20261117-uxgap6" defer></script><script src="/static/muse-shell.js?v=20261120-uxgap14" defer></script><script src="/static/today.js?v=20261120-uxgap14" defer></script><script src="/static/research.js?v=20261112-integrated" defer></script><link rel="stylesheet" href="/static/seller-memory.css?v=20261112-integrated"><script src="/static/seller-memory.js?v=20261120-uxgap15" defer></script></head>
+<script src="/static/account.js?v=20261120-calls1" defer></script><script src="/static/workspace-modes.js?v=20261117-uxgap6" defer></script><script src="/static/muse-shell.js?v=20261120-uxgap14" defer></script><script src="/static/today.js?v=20261120-ag1" defer></script><script src="/static/research.js?v=20261112-integrated" defer></script><link rel="stylesheet" href="/static/seller-memory.css?v=20261112-integrated"><script src="/static/seller-memory.js?v=20261120-uxgap15" defer></script></head>
 <body>
 <header><a class="brand" href="/today"><i>m</i> muse</a><span id="saveStatus">Your daily studio</span><nav style="display:flex;gap:16px;align-items:center"><a href="/">← Your plan</a><a href="/create">Full studio ↗</a></nav></header>
 <p id="draftBoundaryStatus" role="status" aria-live="polite"></p>
@@ -19,7 +19,7 @@
       <label for="postCaption">Your words <span id="copyCount"></span></label><textarea id="postCaption" rows="5" maxlength="2200"></textarea>
       <p class="tip" id="channelTip"></p>
       <p class="destination"><a id="destinationLink" target="_blank" rel="noopener noreferrer">Pixels ↗</a><span id="offerNote">No price assumed</span></p>
-      <details class="small-details"><summary>Image ideas &amp; video direction</summary><p id="visualDirection"></p><label for="scenePrompt">Optional scene</label><textarea id="scenePrompt" rows="2" maxlength="1500">A simple, softly lit room. Keep attention on the artwork.</textarea><button id="museImage" class="quiet">Create a scene with Muse</button><button id="useOriginal" class="quiet">Use original</button><p class="muted">AI scenes can change artwork details. Compare with your original.</p></details>
+      <details class="small-details"><summary>Image ideas &amp; video direction</summary><p id="visualDirection"></p><label for="scenePrompt">Optional scene</label><textarea id="scenePrompt" rows="2" maxlength="1500">A simple, softly lit room. Keep attention on the artwork.</textarea><button id="museImage" class="quiet">Create a scene with Muse</button><button id="useOriginal" class="quiet">Use original</button><p id="sceneNote" class="muted">AI scenes can change artwork details. Compare with your original.</p></details>
       <label class="check"><input id="reviewed" type="checkbox"> Image, words and destination look right.</label>
       <div class="primary-actions"><button id="getPost" class="primary">Get photo + caption</button><button id="copyOnly" class="secondary">Copy text</button></div>
       <p id="deliveryNote" class="muted">Downloads the image and copies your text. You post from your account.</p>
@@ -31,7 +31,7 @@
   <section class="week" aria-labelledby="weekTitle"><div class="section-title"><div><p class="eyebrow">NO NEED TO START OVER TOMORROW</p><h2 id="weekTitle">Your next three posts</h2></div><button id="downloadPlan" class="quiet">Save plan</button></div><div id="planCards" class="plan-cards"></div><p class="muted">Suggested days, not scheduled posts. Try them when your audience is active.</p></section>
   <details class="research-workspace" id="researchWorkspace"><summary>Find my next idea · research similar businesses</summary>
     <p>Your business first. Change the direction as you learn what works.</p>
-    <form id="researchForm"><label for="researchWebsite">Your business website</label><input id="researchWebsite" type="text" required maxlength="500" placeholder="nplusalpha.com or your shop website">
+    <form id="researchForm"><label for="researchWebsite">Your business website</label><input id="researchWebsite" type="text" required maxlength="500" placeholder="your-website.com">
     <label for="researchDirection">What should Muse look for?</label><textarea id="researchDirection" rows="2" maxlength="1500"></textarea>
     <button id="discoverTargets" class="secondary">Find or refresh competitors</button> <button id="researchExample" type="button" class="quiet">Try a saved example</button></form>
     <p id="researchStatus" role="status" aria-live="polite"></p><div id="researchTargets"></div><div id="researchBrief"></div>
