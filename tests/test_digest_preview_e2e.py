@@ -217,7 +217,8 @@ def test_digest_preview_and_draft_preferences_mobile_and_desktop_e2e(
                 banner = page.text_content("#draftOnlyBanner") or ""
                 assert "Preview & draft settings only" in banner
                 sub_note = page.text_content("#draftExistingSubNote") or ""
-                assert "not configured" in sub_note.lower()
+                assert "emails are not being sent yet" in sub_note.lower(), sub_note
+                assert "configured" not in sub_note.lower() and "—" not in sub_note, sub_note
 
                 if vp_name == "mobile":
                     page.select_option("#draftCadence", "monthly")

@@ -95,7 +95,7 @@
       if (subNote) {
         subNote.textContent = data?.available === true
           ? 'Live email delivery is open below (separate from your draft settings). Active subscriptions are managed via confirmation and unsubscribe links.'
-          : 'Live email delivery is not configured right now — you can still save draft schedule preferences and preview your personal digest below.';
+          : 'Emails are not being sent yet. You can still save your schedule preferences and preview your digest below.';
       }
       try {
         const snap = await window.museAccount?.ready?.();

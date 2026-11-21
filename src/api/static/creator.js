@@ -1334,7 +1334,7 @@
       return await response.json();
     } catch (error) {
       if (error.name === 'AbortError') throw new Error('This request timed out. It may still be processing and may be billed. Your edits are safe; check completion before generating again.');
-      if (isOfflineNow() || /failed to fetch|networkerror/i.test(error?.message || '')) throw new Error('You appear to be offline or the server could not be reached. Your edits are safe on this device. Reconnect and try again.');
+      if (isOfflineNow() || /failed to fetch|networkerror/i.test(error?.message || '')) throw new Error('You appear to be offline or Muse could not be reached. Your edits are safe on this device. Reconnect and try again.');
       throw error;
     } finally { clearTimeout(timer); }
   }
@@ -1428,7 +1428,7 @@
       const assetUrl = mediaAssetPath(creative.media_asset_url);
       const inlineUrl = validInline(creative.media_data_url) ? creative.media_data_url : '';
       const nextImage = assetUrl || inlineUrl;
-      if (!nextImage) throw new Error('Muse completed the request, but this server has not delivered a usable inline image. Check saved output before trying again.');
+      if (!nextImage) throw new Error('Muse finished, but the image did not come through. Check your saved results before trying again.');
       let chosenImage = nextImage;
       try {
         await imageElement(chosenImage);
@@ -1591,7 +1591,7 @@
   $('liveMode').addEventListener('change', () => {
     if ($('liveMode').checked && state.readiness && !state.readiness.provider_key_configured) {
       $('liveMode').checked = false;
-      notify('Live Muse AI is unavailable on this server right now. Saved examples and manual editing still work.', 'error');
+      notify('Live Muse AI is not available right now. Saved examples and manual editing still work.', 'error');
     } else if ($('liveMode').checked && window.museAccount?.liveReady && !window.museAccount.liveReady()) {
       $('liveMode').checked = false;
     } else if ($('liveMode').checked && !window.museAccount && !state.defaultLive) {
@@ -1607,7 +1607,7 @@
     if (!serverReady) {
       if (state.live) { $('liveMode').checked = false; state.live = false; }
       $('liveMode').disabled = true;
-      if (eligibilityEl) eligibilityEl.textContent = 'Live Muse AI is unavailable on this server right now. Manual editing and free downloads (0 runs) remain available.';
+      if (eligibilityEl) eligibilityEl.textContent = 'Live Muse AI is not available right now. Manual editing and free downloads (0 runs) remain available.';
       updateMode();
       return;
     }

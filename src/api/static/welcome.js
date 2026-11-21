@@ -353,7 +353,7 @@
       });
       if (!putResp.ok) {
         const errJson = await putResp.json().catch(() => ({}));
-        throw new Error(errJson.detail || errJson.message || 'Failed to save workspace to server.');
+        throw new Error(errJson.detail || errJson.message || 'Your setup could not be saved to your account. Try again.');
       }
       return true;
     } catch (err) {
@@ -606,7 +606,7 @@
           }),
         });
         if (!resp.ok) {
-          throw new Error(`Could not scan shop (HTTP ${resp.status})`);
+          throw new Error('Muse could not read that website. Check the address or skip this step.');
         }
         const data = await resp.json();
         const items = Array.isArray(data.discovered_catalog_items) ? data.discovered_catalog_items : [];
@@ -1200,7 +1200,7 @@
       if (doneSub) {
         doneSub.textContent = editing
           ? 'Muse uses your updated setup from now on (0 runs used):'
-          : 'Workspace configured with your shop crawl data and competitor watchlist (0 runs used):';
+          : 'Your workspace is set up with what Muse found on your website and the shops you watch (0 runs used):';
       }
       if (editing) document.getElementById('wkEditBanner')?.remove();
 

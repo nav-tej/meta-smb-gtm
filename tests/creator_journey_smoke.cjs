@@ -444,7 +444,7 @@ async function trigger(id, eventName = 'click') {
     }]
   };
   await trigger('generateButton');
-  assert.match(getNode('notice').textContent, /usable inline image/i, 'Must reject missing inline media_data_url without attempting local GET');
+  assert.match(getNode('notice').textContent, /image did not come through/i, 'Must reject missing inline media_data_url without attempting local GET');
 
   // Case B: Response has valid media_data_url
   mockFetchResponse = {

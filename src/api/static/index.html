@@ -1013,7 +1013,7 @@
   <script src="/static/account.js?v=20261120-calls1" defer></script>
   <script src="/static/workspace-modes.js?v=20261117-uxgap6" defer></script>
   <script src="/static/muse-shell.js?v=20261120-uxgap14" defer></script>
-  <script src="/static/welcome.js?v=20261120-calls1" defer></script>
+  <script src="/static/welcome.js?v=20261120-uxgap16" defer></script>
   <script src="/static/seller-memory.js?v=20261120-uxgap15" defer></script>
 </head>
 <body>
@@ -3093,8 +3093,8 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
         if (!guard.isCurrent()) return;
         const nowMode = window.museModes?.current?.() || initialMode;
         if (shouldShowSample(nowMode)) {
-          renderAdGallery({ artworks_showcase: SAMPLE_AD_FALLBACKS }, 'Showing built-in sample creatives (preset server unavailable).');
-          showToast(`Demo could not load: ${err.message}. Built-in sample formats remain available.`);
+          renderAdGallery({ artworks_showcase: SAMPLE_AD_FALLBACKS }, 'Showing built-in sample creatives (the sample shop did not load).');
+          showToast('The sample shop could not load. Built-in sample formats remain available.');
           const compEl = document.getElementById('compSummaryText');
           if (compEl) compEl.textContent = 'Sample presets unavailable right now. Built-in sample creatives remain visible above.';
         }
