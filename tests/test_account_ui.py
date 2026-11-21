@@ -34,6 +34,24 @@ def test_account_ui_contract_node_runner() -> None:
     assert "ACCOUNT UI CONTRACT PASSED" in result.stdout
 
 
+def test_shared_get_contract_node_runner() -> None:
+    """Identical /api/v1 GETs in flight share one request (tests/shared_get_contract.cjs)."""
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("Node.js is required to execute shared_get_contract.cjs")
+
+    root = Path(__file__).resolve().parents[1]
+    result = subprocess.run(
+        [node, str(root / "tests/shared_get_contract.cjs")],
+        capture_output=True,
+        text=True,
+        timeout=20,
+        check=False,
+    )
+    assert result.returncode == 0, f"STDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}"
+    assert "shared GET contract: ok" in result.stdout
+
+
 def test_workspace_get_binds_owner_and_rejects_cross_tab_cookie_mismatch(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

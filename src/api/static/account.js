@@ -517,10 +517,72 @@
   // and saved fallbacks are given back on the server), say when a saved result stood in for a new
   // one, and handle a session that ended before the run started.
   const nativeFetch = window.fetch?.bind(window);
+  // Two scripts asking for the same thing at the same moment share one request. Each /api/v1 call
+  // runs the server function once, so a duplicate on page load costs as much as the first. Only an
+  // identical GET still in flight is shared (same URL, headers and account); nothing is kept once
+  // the response arrives, and an account change starts fresh. A caller that aborts leaves on its
+  // own; the request is cancelled when every caller has left. Only a request that started under a
+  // second ago is joined, so a retry after a timeout never waits on a request that hangs.
+  const inFlightGets = new Map();
+  const JOIN_WINDOW_MS = 1000;
+  function sharedGetKey(input, init) {
+    if (typeof input !== 'string' && !(input instanceof URL)) return '';
+    if (String(init?.method || 'GET').toUpperCase() !== 'GET' || init?.body != null) return '';
+    if (init?.signal?.aborted) return '';
+    let target;
+    try { target = new URL(String(input), window.location.href); } catch { return ''; }
+    if (target.origin !== window.location.origin || !target.pathname.startsWith('/api/v1/')) return '';
+    let headers;
+    try { headers = [...new Headers(init?.headers || {}).entries()].filter(([name]) => name !== 'content-type').sort(); } catch { return ''; }
+    return JSON.stringify([accountEpoch, snapshot.user?.id || null, target.href, init?.credentials || 'same-origin', headers]);
+  }
+  function sharedGet(key, input, init) {
+    let entry = inFlightGets.get(key);
+    if (!entry || Date.now() - entry.startedAt > JOIN_WINDOW_MS) {
+      const controller = new AbortController();
+      const { signal: _callerSignal, ...rest } = init || {};
+      entry = { waiters: 0, controller, startedAt: Date.now(), promise: nativeFetch(input, { ...rest, signal: controller.signal }) };
+      inFlightGets.set(key, entry);
+      const created = entry;
+      const forget = () => { if (inFlightGets.get(key) === created) inFlightGets.delete(key); };
+      created.promise.then(forget, forget);
+    }
+    const shared = entry;
+    shared.waiters += 1;
+    const signal = init?.signal;
+    return new Promise((resolve, reject) => {
+      let done = false;
+      const leave = () => {
+        if (done) return;
+        done = true;
+        reject(signal.reason ?? new DOMException('The operation was aborted.', 'AbortError'));
+        shared.waiters -= 1;
+        if (shared.waiters <= 0 && inFlightGets.get(key) === shared) {
+          inFlightGets.delete(key);
+          shared.controller.abort();
+        }
+      };
+      signal?.addEventListener('abort', leave, { once: true });
+      shared.promise.then((response) => {
+        if (done) return;
+        done = true;
+        signal?.removeEventListener('abort', leave);
+        try { resolve(response.clone()); } catch (error) { reject(error); }
+      }, (error) => {
+        if (done) return;
+        done = true;
+        signal?.removeEventListener('abort', leave);
+        reject(error);
+      });
+    });
+  }
   if (nativeFetch) {
     window.fetch = async (input, init) => {
       const url = typeof input === 'string' ? input : input?.url || '';
-      if (!/[?&]live=(true|1)\b/.test(url)) return nativeFetch(input, init);
+      if (!/[?&]live=(true|1)\b/.test(url)) {
+        const key = sharedGetKey(input, init);
+        return key ? sharedGet(key, input, init) : nativeFetch(input, init);
+      }
       const response = await nativeFetch(input, init);
       try {
         if (snapshot.configured) {

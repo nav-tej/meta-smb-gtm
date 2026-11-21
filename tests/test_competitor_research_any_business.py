@@ -457,3 +457,108 @@ def test_own_workspace_diagnostics_honest_ads_and_business_type_e2e(
         timeout=150,
     )
     assert proc.returncode == 0, f"STDOUT:\n{proc.stdout}\nSTDERR:\n{proc.stderr}"
+
+
+def test_own_ad_check_survives_sample_presets_arriving_late_e2e(
+    own_services_research_server: tuple[str, list[dict[str, Any]]],
+) -> None:
+    """The competitor ad check on a seller's dashboard is not replaced by placeholders.
+
+    Antigravity saw this test's 'Not counted yet' wait time out under load
+    (ANTIGRAVITY_TESTS_UNDER_LOAD_NOV20.md). Cause: when `/api/v1/demo-presets` answers after the
+    own-workspace ad check has rendered, `loadPresets` calls `__museApplySignedInWorkspace`, and
+    welcome.js refilled #metaAdsContainer with "No live ads retrieved from Meta Ad Library API",
+    which is untrue when the competitor runs ads. Here the presets are held until the ad check
+    has rendered, so the late order happens on every run.
+    """
+    pw_python = _find_playwright_python()
+    if pw_python is None:
+        pytest.skip("Playwright Python runtime unavailable")
+
+    base_url, _ = own_services_research_server
+
+    from tests.e2e_helpers import with_cpu_throttle
+
+    script = with_cpu_throttle(
+        f"""
+        import json
+        from playwright.sync_api import sync_playwright
+
+        BASE = {base_url!r}
+        HOLD_PRESETS = '''
+        (() => {{
+          const realFetch = window.fetch.bind(window);
+          const checked = () => (document.querySelector('#metaAdsContainer')?.textContent || '')
+            .includes('Not counted yet');
+          const waitForAdCheck = () => new Promise((resolve) => {{
+            const started = Date.now();
+            const poll = () => (checked() || Date.now() - started > 20000)
+              ? resolve() : setTimeout(poll, 50);
+            poll();
+          }});
+          window.fetch = (input, init) => String(input && input.url || input)
+            .includes('/api/v1/demo-presets')
+            ? waitForAdCheck().then(() => realFetch(input, init))
+            : realFetch(input, init);
+          let applyFn = null;
+          window.__applyCalls = 0;
+          Object.defineProperty(window, '__museApplySignedInWorkspace', {{
+            configurable: true,
+            get() {{
+              return applyFn
+                ? (...args) => {{ window.__applyCalls += 1; return applyFn(...args); }}
+                : applyFn;
+            }},
+            set(value) {{ applyFn = value; }},
+          }});
+        }})();
+        '''
+
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            ctx = browser.new_context(viewport={{"width": 1440, "height": 900}})
+            ctx.add_cookies([{{"name": "muse_e2e_user", "value": "svc-res-u1", "url": BASE}}])
+            ctx.add_init_script(HOLD_PRESETS)
+            page = ctx.new_page()
+            page.route(
+                "**/api/v1/competitors/ads**",
+                lambda route: route.fulfill(
+                    json={{
+                        "query": "Acme Advisory",
+                        "public_library_url": "https://www.facebook.com/ads/library/?q=Acme",
+                        "status": "no_token",
+                        "message": "Meta Ad Library access token is not configured on this server.",
+                        "total_active_ads": 0,
+                        "ads": [],
+                    }}
+                ),
+            )
+            page.goto(f"{{BASE}}/", wait_until="domcontentloaded")
+            page.wait_for_function(
+                "() => document.documentElement.dataset.museMode === 'account_own' && "
+                "(document.querySelector('#metaAdsContainer')?.textContent || '')"
+                ".includes('Not counted yet')",
+                timeout=30000,
+            )
+            # The presets are released now; loadPresets re-applies the seller's workspace.
+            page.wait_for_function("() => window.__applyCalls >= 1", timeout=30000)
+            ads = page.locator("#metaAdsContainer").inner_text()
+            assert "Not counted yet" in ads, ads
+            for word in ("API", "token", "No live ads retrieved"):
+                assert word not in ads, (word, ads)
+            assert page.locator("#metaAdsContainer").get_attribute(
+                "data-own-signals-owner"
+            ) == "svc-res-u1"
+            browser.close()
+        print(json.dumps({{"status": "ok"}}))
+        """
+    )
+
+    proc = subprocess.run(
+        [pw_python, "-c", script],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=150,
+    )
+    assert proc.returncode == 0, f"STDOUT:\n{proc.stdout}\nSTDERR:\n{proc.stderr}"

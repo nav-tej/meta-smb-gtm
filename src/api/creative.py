@@ -9,6 +9,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, Field
 
+from src.api.cache_policy import cache_for_everyone
 from src.api.demo import LiveMode, demo_unavailable
 from src.api.media_delivery import MediaResponseTooLargeError, attach_inline_media
 from src.clients.comfyui import SUPPORTED_COMFY_WORKFLOWS, discover_comfy_cli
@@ -73,8 +74,9 @@ def _read_previews_json() -> dict[str, Any]:
 
 
 @router.get("/previews")
-async def get_insight_previews() -> dict[str, Any]:
+async def get_insight_previews(response: Response) -> dict[str, Any]:
     """Track B: return 1:1 demo previews for research insights and ranked moves."""
+    cache_for_everyone(response)
     return _read_previews_json()
 
 

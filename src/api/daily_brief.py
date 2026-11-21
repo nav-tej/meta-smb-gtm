@@ -4,6 +4,7 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Query, Request, Response
 
+from src.api.cache_policy import cache_for_everyone, never_cache
 from src.services import durable_state
 from src.services.accounts import resolve_account
 from src.services.daily_brief import DailyBrief, daily_brief
@@ -32,4 +33,10 @@ async def get_daily_brief(
         if workspace == "own"
         else None
     )
+    # The sample brief is the same for every visitor, so the CDN may answer it; a seller's own
+    # brief and an explicit rebuild never come from a shared cache.
+    if workspace == "own" or refresh:
+        never_cache(response)
+    else:
+        cache_for_everyone(response)
     return await daily_brief(refresh=refresh, response=response, account=account)

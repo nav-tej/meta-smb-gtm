@@ -12,6 +12,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Header, HTTPException, Query, Request, Response
 
+from src.api.cache_policy import cache_for_everyone
 from src.api.demo import valid_demo_key
 from src.config import get_settings
 from src.services import competitor_monitor as monitor
@@ -22,9 +23,11 @@ router = APIRouter(tags=["monitor"])
 
 @router.get("/monitor", response_model=monitor.ChangeLog)
 async def get_change_log(
+    response: Response,
     limit: Annotated[int, Query(ge=1, le=60)] = 10,
 ) -> monitor.ChangeLog:
     """The stored change log, newest run first. Never crawls."""
+    cache_for_everyone(response)
     await durable_state.hydrate_monitor()
     log = monitor.load_changelog()
     log.runs = log.runs[:limit]
@@ -76,7 +79,8 @@ async def cron_check(
 
 
 @router.get("/weekly-digest", response_model=monitor.WeeklyDigest)
-async def get_weekly_digest() -> monitor.WeeklyDigest:
+async def get_weekly_digest(response: Response) -> monitor.WeeklyDigest:
     """The last 7 days of competitor changes, from the monitor change log."""
+    cache_for_everyone(response)
     await durable_state.hydrate_monitor()
     return monitor.weekly_digest()

@@ -33,6 +33,7 @@ from src.api import (
     seller_memory,
     voice,
 )
+from src.api.cache_policy import cache_for_everyone
 from src.clients.comfyui import ComfyUIError
 from src.clients.meta import MetaAPIError
 from src.clients.supabase import SupabaseError
@@ -102,8 +103,10 @@ async def health() -> dict[str, str]:
 
 
 @health_router.get("/readiness")
-async def readiness() -> dict[str, str | bool | int]:
+async def readiness(response: Response) -> dict[str, str | bool | int]:
     """Report configuration only; this check never calls a billed provider."""
+    # Server configuration, the same for every visitor; /health stays uncached for monitors.
+    cache_for_everyone(response)
     settings = get_settings()
     guarded = settings.demo_mode or settings.hosted_environment
     from src.clients.supabase import configured as accounts_configured

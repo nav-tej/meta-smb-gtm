@@ -1802,6 +1802,8 @@
     }
     ['findingsContainer', 'insightsContainer', 'diagnosticsContainer', 'metaAdsContainer', 'reallocationsContainer', 'audiencesContainer'].forEach((id) => {
       const el = document.getElementById(id);
+      // The dashboard's competitor ad check may already have filled this card for this seller.
+      if (el && user?.id && el.dataset.ownSignalsOwner === user.id) return;
       if (el) {
         el.textContent = '';
         const div = document.createElement('div');
@@ -1811,7 +1813,7 @@
           const firstComp = compNames[0] || 'competitors';
           const pubUrl = `https://www.facebook.com/ads/library/?active_status=active&AdCandidate=&q=${encodeURIComponent(firstComp)}&search_type=keyword_unordered&media_type=all`;
           div.innerHTML = `
-            <div style="font-size:0.85rem;color:var(--text-muted);">No live ads retrieved from Meta Ad Library API for ${esc(shopName)}.</div>
+            <div style="font-size:0.85rem;color:var(--text-muted);">Competitor ads have not been checked yet.</div>
             <div style="margin-top:6px;"><a class="jr-meta-ad-link" href="${safeUrl(pubUrl)}" target="_blank" rel="noopener noreferrer">Search public Meta Ad Library for ${esc(firstComp)} ↗</a></div>
           `;
         } else {

@@ -1010,10 +1010,10 @@
   <link rel="stylesheet" href="/static/seller-memory.css?v=20261112-integrated">
   <script src="/static/analytics.js?v=20261109-ux" defer></script>
   <script src="/static/reco-actions.js?v=20261118-uxgap12" defer></script>
-  <script src="/static/account.js?v=20261120-vu1" defer></script>
+  <script src="/static/account.js?v=20261120-calls1" defer></script>
   <script src="/static/workspace-modes.js?v=20261117-uxgap6" defer></script>
   <script src="/static/muse-shell.js?v=20261120-uxgap14" defer></script>
-  <script src="/static/welcome.js?v=20261118-uxgap12" defer></script>
+  <script src="/static/welcome.js?v=20261120-calls1" defer></script>
   <script src="/static/seller-memory.js?v=20261120-uxgap15" defer></script>
 </head>
 <body>
@@ -2262,7 +2262,18 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
       swap('diagSub', 'What Muse knows about your own site so far.');
     }
 
+    // Cards the own-workspace ad check filled carry the seller's id (see loadOwnCompetitorAdSignals);
+    // every render here clears that first.
+    function markOwnSignalCards(ownerId) {
+      ['diagnosticsContainer', 'metaAdsContainer'].forEach((id) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (ownerId) el.dataset.ownSignalsOwner = ownerId;
+        else delete el.dataset.ownSignalsOwner;
+      });
+    }
     function renderDiagnosticsAndAds(ws) {
+      markOwnSignalCards(null);
       const isSample = ws.id === 'sarabjit_singh' || ws.id === 'etsy_pottery' || Boolean(ws.meta_ads_signals?.is_sample);
       syncResearchCardCopy(isSample);
       const diag = ws.diagnostics || {};
@@ -2697,6 +2708,9 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
       }
       if (epoch !== briefLoadEpoch || window.museModes?.isSampleMode?.()) return;
       renderDiagnosticsAndAds({ id: 'own', diagnostics: {}, meta_ads_signals: { competitors: results } });
+      // welcome.js fills this seller's dashboard with placeholders again when the sample presets
+      // arrive late; the mark keeps it from replacing a check that has already finished.
+      markOwnSignalCards(snap.user.id);
       document.querySelectorAll('#sellerList .jr-seller').forEach((li) => {
         const label = (li.querySelector('strong')?.textContent || li.dataset?.url || '').toLowerCase();
         const match = results.find((r) => label.includes(String(r.query || '').toLowerCase()));

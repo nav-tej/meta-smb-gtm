@@ -12,6 +12,7 @@ from urllib.parse import urlparse
 from fastapi import APIRouter, Depends, Query, Request, Response
 from pydantic import BaseModel, Field
 
+from src.api.cache_policy import cache_for_everyone
 from src.api.demo import LiveMode, demo_unavailable
 from src.clients.ad_library import (
     MetaAdLibraryClient,
@@ -357,8 +358,9 @@ def _read_sample_json(filename: str) -> dict[str, Any]:
 
 
 @router.get("/demo-presets")
-async def get_demo_presets() -> dict[str, Any]:
+async def get_demo_presets(response: Response) -> dict[str, Any]:
     """Return pre-verified live demo data for the Customer Portal (Art of Sarabjit Singh + Etsy)."""
+    cache_for_everyone(response)
     profile_raw = _read_sample_json("sarabjit_singh_profile.json")
     diagnostics_dict: dict[str, Any] = {}
     if profile_raw:

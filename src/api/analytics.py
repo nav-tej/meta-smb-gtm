@@ -6,6 +6,7 @@ from typing import Any
 
 from fastapi import APIRouter, Response
 
+from src.api.cache_policy import cache_for_everyone
 from src.config import get_settings
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
@@ -14,7 +15,7 @@ router = APIRouter(prefix="/analytics", tags=["analytics"])
 @router.get("/config")
 async def analytics_config(response: Response) -> dict[str, Any]:
     """The PostHog project key is a public, write-only ingestion key; it is safe in browsers."""
-    response.headers["Cache-Control"] = "public, max-age=300"
+    cache_for_everyone(response)
     settings = get_settings()
     key = settings.posthog_key.strip()
     if not key:
