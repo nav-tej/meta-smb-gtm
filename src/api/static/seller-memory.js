@@ -897,7 +897,7 @@
 
     transcriptPreview.append(
       el('label', { for: 'smVoiceTranscriptEdit', style: 'font-size:0.78rem;font-weight:600;display:block;margin-bottom:4px;' },
-        'Unapproved transcript (edit freely before extracting items — nothing is saved yet):'
+        'Unapproved transcript (edit freely before extracting items; nothing is saved yet):'
       ),
       transcriptInput,
       el('div', { class: 'sm-btn-row', style: 'margin-top:6px;' }, reviewTranscriptBtn)
@@ -1110,7 +1110,7 @@
         el('div', {},
           el('h2', { class: 'sm-card-title' }, 'What Muse found on your public pages'),
           el('p', { class: 'sm-sub' },
-            'Observed facts come straight from your pages. Interpretations are tentative hypotheses — edit, confirm, or dismiss any item.'
+            'Observed facts come straight from your pages. Interpretations are guesses: edit, confirm, or dismiss any item.'
           )
         ),
         el('span', { class: 'sm-badge sm-badge-observation' }, '0 runs')
@@ -1651,7 +1651,7 @@
       await fetchRecommendations(true, { gen: boundGen, expectedOwner: boundOwner, expectedSample: boundSample });
       if (!isCurrentRequestContext(boundGen, boundOwner, boundSample)) return;
       renderHomeUI();
-      toast('Applied to this draft only — saved shop defaults unchanged.');
+      toast('Applied to this draft only. Your saved shop defaults are unchanged.');
     });
 
     saveDefaultBtn.addEventListener('click', async () => {
@@ -1834,6 +1834,8 @@
       title: rec?.title || moveDef.recommendation_title || '',
       action: rec?.action || moveDef.recommendation_action || '',
       why_this_fits: rec?.why_this_fits || moveDef.why_this_fits || '',
+      // More minutes than the seller has this week: /create says "Heads up", not "Why this fits".
+      over_budget: Boolean(rec?.over_budget),
       output_provenance: sampleMode ? 'artist_example' : (moveDef.output_provenance || rec?.output_provenance || 'suggested_starting_approach'),
       output_label: sampleMode ? 'Artist example' : (moveDef.output_label || rec?.output_label || 'Suggested starting approach'),
       organic_first: moveDef.organic_first !== undefined ? Boolean(moveDef.organic_first) : (rec?.organic_first !== undefined ? Boolean(rec.organic_first) : true),

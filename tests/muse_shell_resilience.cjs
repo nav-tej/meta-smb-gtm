@@ -67,7 +67,7 @@ function harness(routes) {
 
   // Network failures become a friendly message after retries.
   h = harness({ '/down': [new TypeError('Failed to fetch'), new TypeError('x'), new TypeError('y')] });
-  await assert.rejects(h.shell.fetch('/down'), /offline or the server is unreachable/);
+  await assert.rejects(h.shell.fetch('/down'), /offline or Muse could not be reached/);
 
   // Friendly messages: server detail strings pass; traces and non-JSON fall back by status.
   h = harness({});

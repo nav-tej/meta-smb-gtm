@@ -562,7 +562,7 @@
     box.hidden = false;
     if ($('handoffProvenanceBadge')) $('handoffProvenanceBadge').textContent = ctx.output_label || 'Suggested starting approach';
     if ($('handoffPlacementNote')) $('handoffPlacementNote').textContent = ctx.placement_note || 'App export preset (not verified Meta policy)';
-    if ($('handoffWhyFits')) $('handoffWhyFits').textContent = ctx.why_this_fits ? `Why this fits: ${ctx.why_this_fits}` : '';
+    if ($('handoffWhyFits')) $('handoffWhyFits').textContent = ctx.why_this_fits ? `${ctx.over_budget ? 'Heads up' : 'Why this fits'}: ${ctx.why_this_fits}` : '';
     if ($('handoffOrganicNote')) $('handoffOrganicNote').textContent = ctx.organic_guidance_note || '';
     if ($('handoffApprovedFacts')) {
       const facts = Array.isArray(ctx.approved_facts)
@@ -597,6 +597,7 @@
       missing_facts: Array.isArray(handoff.missing_facts) ? handoff.missing_facts : [],
       placement_note: handoff.placement_note || 'App export preset (not verified Meta policy)',
       why_this_fits: handoff.why_this_fits || '',
+      over_budget: handoff.over_budget === true,
     };
     const ownSession = !isSampleMode();
     if (ownSession) {

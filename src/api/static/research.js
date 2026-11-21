@@ -23,8 +23,8 @@
     render(); status('Start with your own website. Suggestions run only when you ask.');
   }
   async function liveRequest(path, body) {
-    if (isOfflineNow()) throw new Error('You appear to be offline. Your saved research is still here — reconnect and try again.');
-    if (readiness && readiness.provider_key_configured === false) throw new Error('Live research is currently unavailable on this server. Your previous research is kept.');
+    if (isOfflineNow()) throw new Error('You appear to be offline. Your saved research is still here. Reconnect and try again.');
+    if (readiness && readiness.provider_key_configured === false) throw new Error('Live research is not available right now. Your previous research is kept.');
     if (window.museAccount?.liveReady && !window.museAccount.liveReady()) throw new Error('Sign in with a confirmed email and available runs to run live research.');
     if (!window.museAccount && readiness?.default_mode !== 'live') throw new Error('Sign in before running personalized research.');
     const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), 285000);
@@ -35,14 +35,14 @@
       if (!response.ok) {
         const detail = typeof data.detail === 'string' && !/<html|traceback/i.test(data.detail) ? data.detail : '';
         if (response.status === 401 || response.status === 403) throw new Error(detail || 'Your session expired before Muse started, so no run was used. Sign in again; your research is still here.');
-        if (response.status === 402 || response.status === 429) throw new Error(detail || 'You have reached your current run allowance. Check your plan or wait a moment — your research is still here.');
+        if (response.status === 402 || response.status === 429) throw new Error(detail || 'You have reached your current run allowance. Check your plan or wait a moment; your research is still here.');
         if (response.status >= 500) throw new Error(detail || 'Muse is temporarily unavailable right now. No run was used and your previous results are kept.');
         throw new Error(detail || 'Research could not finish. Your previous results are kept.');
       }
       return data;
     } catch (error) {
       if (error.name === 'AbortError') throw new Error('Research timed out and may still be processing. Check completion before running again.');
-      if (isOfflineNow() || /failed to fetch|networkerror/i.test(error?.message || '')) throw new Error('You appear to be offline or the server could not be reached. Your previous results are kept.');
+      if (isOfflineNow() || /failed to fetch|networkerror/i.test(error?.message || '')) throw new Error('You appear to be offline or Muse could not be reached. Your previous results are kept.');
       throw error;
     }
     finally { clearTimeout(timer); window.museAccount?.refresh?.().catch(() => {}); window.museShell?.syncCredits?.(); }

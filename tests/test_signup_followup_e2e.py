@@ -470,7 +470,7 @@ def test_mobile_375_dialog_forgot_password_and_retry_feedback(
             resp = page.goto(f"{base}/welcome", wait_until="domcontentloaded")
             assert resp.status == 200
             html_welcome = resp.text()
-            assert "account.js?v=20261120-calls1" in html_welcome
+            assert "account.js?v=20261120-uxgap17" in html_welcome
             assert "account.css?v=20261112-integrated" in html_welcome
 
             page.goto(f"{base}/", wait_until="networkidle")

@@ -180,7 +180,7 @@
       write('dgHeroSource', 'Personal workspace · 0 runs used to inspect');
     } else {
       write('dgHeroTitle', 'Your personal digest starts empty until you add competitors');
-      write('dgHeroBody', 'Connect your shop website and pick up to 3 competitors to track price changes, new listings, and personalized next moves — or view the sample digest.');
+      write('dgHeroBody', 'Connect your shop website and pick up to 3 competitors to track price changes, new listings, and personalized next moves, or view the sample digest.');
       const link = document.getElementById('dgHeroLink');
       if (link) {
         link.setAttribute('href', '/welcome?step=3');

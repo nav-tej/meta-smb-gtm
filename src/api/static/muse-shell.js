@@ -61,7 +61,7 @@
   const RETRY_STATUS = new Set([502, 503, 504]);
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const STATUS_MESSAGES = {
-    401: 'Your session expired. Sign in again to continue — your work is safe on this device.',
+    401: 'Your session expired. Sign in again to continue; your work is safe on this device.',
     402: 'You are out of runs. Saved results are still free to view.',
     403: 'This needs a live session. Saved results still work.',
     408: 'Muse is taking longer than expected. Your inputs are safe; try again in a minute.',
@@ -71,7 +71,7 @@
     429: 'Too many live runs this hour. Saved results still work; try again later.',
     500: 'Something went wrong on our side. Your work is safe; please try again.',
     502: 'Muse could not finish this right now. Your inputs are safe; try again in a minute.',
-    503: 'This service is busy or not configured. Saved results still work.',
+    503: 'Muse is busy or not available right now. Saved results still work.',
     504: 'This took too long. Your inputs are safe; try again in a minute.',
   };
   let forcedOffline = false;
@@ -80,7 +80,7 @@
     return typeof navigator !== 'undefined' && navigator.onLine === false;
   }
   function friendlyError(errorOrMessage, status = 0, fallback = 'Something went wrong. Your work is safe; please try again.') {
-    if (isOffline()) return 'You appear to be offline. Your work is saved on this device — reconnect and try again.';
+    if (isOffline()) return 'You appear to be offline. Your work is saved on this device. Reconnect and try again.';
     const raw = typeof errorOrMessage === 'string' ? errorOrMessage : (errorOrMessage?.message || '');
     if (errorOrMessage?.name === 'AbortError' || status === 504 || status === 408 || /timed?\s*out/i.test(raw)) {
       return STATUS_MESSAGES[504];
@@ -104,7 +104,7 @@
   }
   async function museFetch(url, options = {}, { retries = 2, safe, timeoutMs = 30000 } = {}) {
     if (isOffline()) {
-      const err = new Error('You appear to be offline. Your work is saved on this device — reconnect and try again.');
+      const err = new Error('You appear to be offline. Your work is saved on this device. Reconnect and try again.');
       err.code = 'OFFLINE';
       throw err;
     }
@@ -119,14 +119,14 @@
       try {
         const response = await fetch(url, { credentials: 'same-origin', ...options, ...(controller && !options.signal ? { signal: controller.signal } : {}) });
         if (response.status === 401 && serverSnapshot()?.user) {
-          window.museAccount?.open?.('signin', 'Your session expired. Sign in again — your work is still on this device.');
+          window.museAccount?.open?.('signin', 'Your session expired. Sign in again; your work is still on this device.');
         }
         if (!RETRY_STATUS.has(response.status) || attempt === attempts - 1) return response;
         lastError = new Error(await errorMessage(response));
       } catch (error) {
         lastError = error?.name === 'AbortError'
           ? new Error(STATUS_MESSAGES[504])
-          : new Error(isOffline() ? 'You appear to be offline. Your work is saved on this device — reconnect and try again.' : 'You seem to be offline or the server is unreachable. Your work is safe; try again.');
+          : new Error(isOffline() ? 'You appear to be offline. Your work is saved on this device. Reconnect and try again.' : 'You seem to be offline or Muse could not be reached. Your work is safe; try again.');
         if (attempt === attempts - 1) throw lastError;
       } finally { if (timer) clearTimeout(timer); }
       await wait(400 * 3 ** attempt);
@@ -236,7 +236,7 @@
       menu = el('div', { class: 'ms-credits-menu', hidden: '' });
       menu.appendChild(el('strong', {}, 'Runs'));
       menu.appendChild(el('p', {}, '1 run = one competitor analysis, refinement, re-run or ad scene. Viewing results you already have is free.'));
-      menu.appendChild(el('p', { class: 'ms-muted' }, 'Runs are checked on the server before any live Muse call. Repeat live results come from a 24-hour cache and give the run back, so they never spend Muse API credit twice.'));
+      menu.appendChild(el('p', { class: 'ms-muted' }, 'Muse checks your runs before any live call. Ask for the same result again within 24 hours and you get the saved result with the run given back.'));
       menu.appendChild(el('p', { class: 'ms-muted ms-credit-note' }, creditNote));
       const more = el('button', { type: 'button', class: 'ms-link ms-more' }, 'Get more runs →');
       more.addEventListener('click', () => { closeMenu(); openPricing(); });
@@ -350,7 +350,7 @@
     if (note && comingSoon) { note.textContent = 'Paid plans open soon. Your 3 free Muse runs work now.'; return; }
     if (note) note.textContent = serverMode()
       ? 'Secure checkout via Stripe for n Plus Alpha LLC. Cancel anytime; runs reset monthly. 1 run = one competitor analysis, ad generation or budget review.'
-      : 'Demo checkout: no card is needed and no payment is taken; runs are added to your demo balance on this server. 1 run = one analysis, refinement, re-run or ad scene.';
+      : 'Demo checkout: no card is needed and no payment is taken; runs are added to your demo balance. 1 run = one analysis, refinement, re-run or ad scene.';
   }
   let pricingDialog;
   function openPricing(mode = '') {
@@ -406,7 +406,7 @@
       checkoutDialog.appendChild(el('h2', { id: 'msCheckoutTitle' }));
       const summary = el('div', { class: 'ms-checkout-summary' });
       checkoutDialog.appendChild(summary);
-      checkoutDialog.appendChild(el('p', { class: 'ms-checkout-note' }, 'This is a demo: no card is needed, nothing is charged, and no payment details are collected. Runs are added to your demo balance on this server.'));
+      checkoutDialog.appendChild(el('p', { class: 'ms-checkout-note' }, 'This is a demo: no card is needed, nothing is charged, and no payment details are collected. Runs are added to your demo balance.'));
       const pay = el('button', { type: 'button', class: 'ms-primary ms-pay' });
       checkoutDialog.appendChild(pay);
       checkoutDialog.addEventListener('click', (event) => { if (event.target === checkoutDialog) checkoutDialog.close(); });
@@ -476,7 +476,7 @@
       const demo = el('button', { type: 'button', class: 'ms-link ms-demo-user' }, 'Or continue as the demo user (Art of Sarabjit Singh) →');
       demo.addEventListener('click', () => { createAccount('demo@artofsarabjitsingh.example', 'Art of Sarabjit Singh'); signupDialog.close(); });
       signupDialog.appendChild(demo);
-      signupDialog.appendChild(el('p', { class: 'ms-muted' }, 'Demo mode: your account is saved in this browser and your runs are counted on the server. No email is sent and no password is stored.'));
+      signupDialog.appendChild(el('p', { class: 'ms-muted' }, 'Demo mode: your account is saved in this browser and Muse counts your runs. No email is sent and no password is stored.'));
       signupDialog.addEventListener('click', (event) => { if (event.target === signupDialog) signupDialog.close(); });
       document.body.appendChild(signupDialog);
     }
@@ -1701,7 +1701,7 @@
     if (banner) {
       banner.hidden = false;
       banner.textContent = matched
-        ? `Focused on “${text}”: ${matched} of ${total} saved items match and are shown first. A fresh Muse Spark run with this focus needs a live server.`
+        ? `Focused on “${text}”: ${matched} of ${total} saved items match and are shown first. A fresh Muse Spark run with this focus is not available right now.`
         : `Nothing in the saved analysis covers “${text}” yet. It’s saved to memory, and a live Muse Spark run would analyse it.`;
     }
   }
@@ -1772,7 +1772,7 @@
           'aria-live': 'polite',
           hidden: '',
         },
-        'You appear to be offline. Your work is saved on this device — reconnect to generate with Muse.'
+        'You appear to be offline. Your work is saved on this device. Reconnect to generate with Muse.'
       );
       document.body.prepend(offlineBannerNode);
     }

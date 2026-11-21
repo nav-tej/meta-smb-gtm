@@ -66,7 +66,7 @@ def test_own_chips_parse_to_four_distinct_focuses_and_versions_match() -> None:
         "today.html",
     ):
         html = (REPO_ROOT / f"src/api/static/{name}").read_text(encoding="utf-8")
-        assert "muse-shell.js?v=20261120-uxgap14" in html, name
+        assert "muse-shell.js?v=20261120-uxgap17" in html, name
 
 
 @pytest.fixture

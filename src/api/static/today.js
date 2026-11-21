@@ -547,7 +547,7 @@
   }
   function postIdentity() { return JSON.stringify([state.product.title, state.product.destination_url, state.channel, state.format, state.selected, currentCopy()]); }
   async function jsonRequest(path, payload, live = false) {
-    if (isOfflineNow()) throw new Error('You appear to be offline. Your edits are saved on this device — reconnect and try again.');
+    if (isOfflineNow()) throw new Error('You appear to be offline. Your edits are saved on this device. Reconnect and try again.');
     const control = new AbortController(); const timer = setTimeout(() => control.abort(), live ? 285000 : 45000);
     try {
       const init = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), signal: control.signal };
@@ -559,14 +559,14 @@
       if (!response.ok) {
         const detail = typeof data.detail === 'string' && !/<html|traceback/i.test(data.detail) ? data.detail : '';
         if (response.status === 401 || response.status === 403) throw new Error(detail || 'Your session expired before Muse started, so no run was used. Sign in again; your edits are still here.');
-        if (response.status === 402 || response.status === 429) throw new Error(detail || 'You have reached your current run allowance. Check your plan or wait a moment — your edits are still here.');
-        if (response.status >= 500) throw new Error(detail || 'Muse is temporarily unavailable right now. No run was used and your edits are still here — please try again shortly.');
+        if (response.status === 402 || response.status === 429) throw new Error(detail || 'You have reached your current run allowance. Check your plan or wait a moment; your edits are still here.');
+        if (response.status >= 500) throw new Error(detail || 'Muse is temporarily unavailable right now. No run was used and your edits are still here. Please try again shortly.');
         throw new Error(detail || 'Check the item details and try again.');
       }
       return data;
     } catch (error) {
       if (error.name === 'AbortError') throw new Error(live ? 'Muse timed out and may still be processing. Check completion before paying for another request.' : 'That site is taking too long. Enter your item below.');
-      if (isOfflineNow() || /failed to fetch|networkerror/i.test(error?.message || '')) throw new Error('You appear to be offline or the server could not be reached. Your edits are still here — reconnect and try again.');
+      if (isOfflineNow() || /failed to fetch|networkerror/i.test(error?.message || '')) throw new Error('You appear to be offline or Muse could not be reached. Your edits are still here. Reconnect and try again.');
       throw error;
     }
     finally { clearTimeout(timer); }
@@ -721,7 +721,7 @@
       saveBlob(blob, state.format === 'video' ? `clip.${blob.type === 'video/mp4' ? 'mp4' : 'webm'}` : 'feed.png'); const copied = await copyText();
       window.museTrack?.('post_downloaded', { placement: state.format || 'feed', page: '/today' });
       markIdeaExported();
-      notice(`${state.format === 'video' ? 'Clip' : 'Image'} downloaded. ${copied ? 'Caption copied' : 'Caption downloaded'} — open ${names[state.channel]} and add your post.`);
+      notice(`${state.format === 'video' ? 'Clip' : 'Image'} downloaded. ${copied ? 'Caption copied' : 'Caption downloaded'}. Open ${names[state.channel]} and add your post.`);
     } catch (error) { notice(error.message, true); } finally { lock(false); }
   }
   function populateSetup() {
@@ -783,7 +783,7 @@
   function formatTodayImageNote(meta) {
     if (!meta) return '';
     const dims = meta.width && meta.height ? `${meta.width} × ${meta.height} px` : 'Size unknown';
-    if (meta.isLowRes) return `Low-res web preview (${dims}) — suitable for social preview, not a print master.`;
+    if (meta.isLowRes) return `Low-res web preview (${dims}): fine for social posts, not for printing.`;
     if (meta.provenance === 'sample_original') return `Original artwork preview (${dims}) · Sample studio.`;
     if (meta.provenance === 'sample_generated') return `Saved AI ad example (${dims}) · Staging example.`;
     if (meta.provenance === 'upload') return `Uploaded photo (${dims}) · Kept on this device.`;
@@ -838,7 +838,7 @@
     if (item.is_low_res) {
       const warn = document.createElement('span');
       warn.className = 'muse-image-warn';
-      warn.textContent = `Low-resolution web preview (${dims}) — not a print master.`;
+      warn.textContent = `Low-resolution web preview (${dims}): fine for social posts, not for printing.`;
       card.append(warn);
     }
 
@@ -1142,7 +1142,7 @@
       }
       if (!choices.length) {
         $('importStatus').textContent = 'No items found. Paste a product link or enter one below.';
-        notice('No product listings came back automatically. Enter your item details manually below — your existing draft is still here.');
+        notice('No product listings came back automatically. Enter your item details below; your draft is still here.');
         return;
       }
       renderListingChoices(choices);
@@ -1152,7 +1152,7 @@
       await planAfterImport();
       persist();
       $('importStatus').textContent = 'Listings loaded. Choose an image in “Choose an image” or select a listing.';
-      notice('Website scanned. Your existing draft & photo are preserved — choose an image below when ready.');
+      notice('Website scanned. Your draft and photo are kept; choose an image below when ready.');
     } catch (error) {
       $('importStatus').textContent = error.message;
       notice(`${error.message} Your existing draft is intact.`, true);
@@ -1176,7 +1176,7 @@
       state.live = false;
       if (toggle) { toggle.checked = false; toggle.disabled = true; }
       if (musePlanBtn) musePlanBtn.disabled = true;
-      if (note) note.textContent = 'Live Muse AI is not configured on this server yet. Starter plans and exports (0 runs) work cleanly.';
+      if (note) note.textContent = 'Live Muse AI is not available yet. Starter plans and exports (0 runs) still work.';
       return;
     }
     const eligible = !!(snapshot?.user?.email_verified && snapshot?.live_available);
@@ -1216,7 +1216,7 @@
     window.addEventListener('account-change', (event) => syncAccountLive(event.detail));
   }
   function liveReady() {
-    if (!state.readiness?.provider_key_configured) { notice('Live Muse AI is not configured on this server yet. Starter drafts still work with 0 runs.', true); return false; }
+    if (!state.readiness?.provider_key_configured) { notice('Live Muse AI is not available yet. Starter drafts still work with 0 runs.', true); return false; }
     const needsAccount = state.readiness?.accounts_required === true || typeof window.museAccount !== 'undefined';
     if (!needsAccount) {
       if (!state.live) { notice('Enable live Muse AI above (uses 1 run per live request) first.', true); return false; }

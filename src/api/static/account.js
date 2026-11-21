@@ -66,7 +66,7 @@
       }
       return data;
     } catch (error) {
-      if (error.name === 'AbortError') throw new Error('The account server took too long. Your draft is still here.');
+      if (error.name === 'AbortError') throw new Error('Muse took too long to answer. Your draft is still here.');
       throw error;
     } finally { clearTimeout(timer); }
   }
@@ -233,7 +233,7 @@
     setMode(targetMode, resolvedText);
     if (!dialog.open) dialog.showModal();
     focusInitialField();
-    if (!snapshot.configured) say('Account setup is unavailable on this server. Your saved demo and draft still work.', true);
+    if (!snapshot.configured) say('Accounts are not available right now. Your saved demo and draft still work.', true);
   }
   function liveReady() {
     if (!snapshot.user) { open('signup', 'Create an account or sign in to make a new Muse generation. Your current draft stays here.'); return false; }
@@ -250,7 +250,7 @@
   async function onSubmit(event) {
     event.preventDefault();
     if (busy) return;
-    if (!snapshot.configured) { say('Account setup is unavailable on this server. Please try again later.', true); return; }
+    if (!snapshot.configured) { say('Accounts are not available right now. Please try again later.', true); return; }
     const selectedMode = mode;
     const emailValue = email.value.trim();
     const passwordValue = password.value;
@@ -317,7 +317,7 @@
         if (password && !password.hidden) password.focus();
       } else {
         const retryNote = retryCount > 1 && ['signin', 'signup'].includes(selectedMode)
-          ? ` (Attempt ${retryCount} — check your details${selectedMode === 'signin' ? ' or choose Forgot password? below' : ''}.)`
+          ? ` (Attempt ${retryCount}: check your details${selectedMode === 'signin' ? ' or choose Forgot password? below' : ''}.)`
           : '';
         say(`${rawMsg}${retryNote}`, true);
       }
@@ -326,7 +326,7 @@
   }
   async function onGoogle() {
     if (busy) return;
-    if (!snapshot.configured) { say('Account setup is unavailable on this server. Please try again later.', true); return; }
+    if (!snapshot.configured) { say('Accounts are not available right now. Please try again later.', true); return; }
     setBusy(true); say('Redirecting to Google…');
     try {
       track('oauth_started', { provider: 'google', mode });

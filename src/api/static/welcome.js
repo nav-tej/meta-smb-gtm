@@ -1752,7 +1752,7 @@
 
     // 8. Full Workspace Hero & Panels — replace Sarabjit title, KPIs, and findings with user's own shop
     const heroTitle = document.getElementById('heroTitle');
-    if (heroTitle) heroTitle.textContent = `${shopName} — Growth Workspace`;
+    if (heroTitle) heroTitle.textContent = `${shopName} · Growth workspace`;
     const heroCat = document.getElementById('heroCategory');
     if (heroCat) heroCat.textContent = 'Signed-in Seller Workspace';
     const heroDesc = document.getElementById('heroDesc');
