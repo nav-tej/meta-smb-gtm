@@ -2,7 +2,8 @@
 (() => {
   const $ = id => document.getElementById(id);
   const names = { instagram: 'Instagram', facebook: 'Facebook', x: 'X', tiktok: 'TikTok' };
-  const shops = { pixels: 'Pixels', fineartamerica: 'Fine Art America', saatchi: 'Saatchi Art', website: 'Artist website', other: 'Your shop' };
+  const SAMPLE_DESTINATIONS = { pixels: 'Pixels', fineartamerica: 'Fine Art America', saatchi: 'Saatchi Art', website: 'Artist website', other: 'My shop / inquiry page' };
+  const OWN_DESTINATIONS = { website: 'My website', booking: 'Booking or contact page', etsy: 'Etsy shop or listing', shopify: 'Shopify store', other: 'Other link' };
   const storageKey = 'muse-daily-v1';
   const standaloneVm = typeof window.museModes === 'undefined' && typeof window.museAccount === 'undefined';
   const isSampleMode = () => {
@@ -100,7 +101,7 @@
       state.image = imageSource(data.image) ? data.image : state.original;
       state.imageMode = data.imageMode === 'live' ? 'live' : 'original';
       state.product.destination_url = safeURL(state.product.destination_url);
-      if (!Object.hasOwn(shops, state.product.destination)) state.product.destination = 'other';
+      state.product.destination = normalizeDestination(state.product.destination);
 
     state.revision += 1; $('reviewed').checked = false; populateSetup(); render();
   }
@@ -113,7 +114,23 @@
   const cloneDraft = value => JSON.parse(JSON.stringify(value));
   const draftStatus = text => { $('draftStatus').textContent = text; };
   const isEffectiveSample = () => (typeof activeSampleMode === 'boolean' ? activeSampleMode : isSampleMode());
-  const shopLabel = key => (key === 'website' && !isEffectiveSample() ? 'My website' : shops[key] || 'Your shop');
+  const activeDestinations = () => isEffectiveSample() ? SAMPLE_DESTINATIONS : OWN_DESTINATIONS;
+  const normalizeDestination = key => Object.hasOwn(activeDestinations(), key) ? key : 'other';
+  const shopLabel = key => activeDestinations()[normalizeDestination(key)];
+  function syncDestinationOptions() {
+    const select = $('destination');
+    if (typeof select.replaceChildren === 'function') {
+      select.replaceChildren();
+      for (const [value, label] of Object.entries(activeDestinations())) {
+        const option = document.createElement('option');
+        option.value = value; option.textContent = label;
+        select.append(option);
+      }
+    }
+    state.product.destination = normalizeDestination(state.product.destination);
+    select.value = state.product.destination;
+  }
+  const offerWords = () => offersServices() ? 'service or offer' : ownBusinessType === 'both' ? 'product or service' : 'product';
   // The sample artist keeps its wording; a seller's own workspace gets labels that fit what they offer.
   function applyOfferWording() {
     const sample = isEffectiveSample();
@@ -127,12 +144,22 @@
       if (attr) el.setAttribute?.(attr, text); else el.textContent = text;
     };
     swap(find('#noPhoto span'), 'Add a photo to finish this post.');
-    swap(find('#destination option[value="website"]'), 'My website');
     swap(find('label[for="productLink"]'), 'Link people should visit');
     swap(find('label[for="sellerName"]'), services ? 'Your name / business' : 'Your name / shop');
     swap(find('#goal option[value="visits"]'), services ? 'Website visits' : 'Shop visits');
     swap($('quickFindItems'), services ? 'Find items on my site' : 'Find products');
     swap($('saveWebsiteOnlyBtn'), 'Save website only');
+    swap($('itemHint'), `Choose the page for this ${offerWords()}. Each destination keeps its own price and link.`);
+    swap($('sceneNote'), 'AI scenes can change details in your photo. Compare with your original.');
+    const prompt = $('scenePrompt');
+    if (prompt?.dataset) {
+      const samplePrompt = 'A simple, softly lit room. Keep attention on the artwork.';
+      const nextPrompt = sample ? samplePrompt : `A simple, softly lit setting. Keep attention on the ${offerWords()}.`;
+      const previousDefault = prompt.dataset.defaultPrompt || samplePrompt;
+      // Refresh defaults without replacing a scene the seller has written.
+      if (prompt.value === previousDefault) prompt.value = nextPrompt;
+      prompt.dataset.defaultPrompt = nextPrompt;
+    }
     swap($('productName'), services ? 'Name the service or offer' : 'Name the item you are sharing', 'placeholder');
   }
   const deviceKey = () => `muse-editor-v1:${draftNamespace}:${isEffectiveSample() ? 'sample' : (draftOwner ? 'account:' + encodeURIComponent(draftOwner) : 'guest')}`;
@@ -468,7 +495,7 @@
       state.product.price = handoff.price_claim;
     }
     if (handoff.destination) {
-      state.product.destination = Object.hasOwn(shops, handoff.destination) ? handoff.destination : 'other';
+      state.product.destination = normalizeDestination(handoff.destination);
     }
     if (handoff.channel && Object.hasOwn(names, String(handoff.channel).toLowerCase())) {
       state.channel = String(handoff.channel).toLowerCase();
@@ -654,7 +681,7 @@
   }
   function paint() { const token = ++state.paint; const height = state.format === 'video' ? 1920 : 1350; layout(height).then(canvas => { if (token !== state.paint) return; const preview = $('postCanvas'); preview.width = canvas.width; preview.height = canvas.height; preview.getContext('2d').drawImage(canvas, 0, 0); }).catch(error => notice(error.message, true)); }
   function saveBlob(blob, suffix) { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `${state.product.title.replace(/[^a-z0-9]+/gi, '-').slice(0, 45)}-${state.channel}-${suffix}`; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000); }
-  function captionText() { const copy = currentCopy(); const url = safeURL(state.product.destination_url); let text = `${copy.hook}\n\n${copy.caption}`; const cta = state.cta || currentPost()?.cta; if (cta && !text.includes(cta)) text += `\n\n${cta}`; if (url && ['facebook', 'x'].includes(state.channel) && !text.includes(url)) text += `\n\n${url}`; if (url && ['instagram', 'tiktok'].includes(state.channel) && !/profile link|link in my profile/i.test(text)) text += '\n\nExplore the work through the link in my profile.'; return text; }
+  function captionText() { const copy = currentCopy(); const url = safeURL(state.product.destination_url); let text = `${copy.hook}\n\n${copy.caption}`; const cta = state.cta || currentPost()?.cta; if (cta && !text.includes(cta)) text += `\n\n${cta}`; if (url && ['facebook', 'x'].includes(state.channel) && !text.includes(url)) text += `\n\n${url}`; if (url && ['instagram', 'tiktok'].includes(state.channel) && !/profile link|link in my profile/i.test(text)) text += isEffectiveSample() ? '\n\nExplore the work through the link in my profile.' : `\n\nLearn more about this ${offerWords()} through the link in my profile.`; return text; }
   async function copyText() {
     const text = captionText(); let timeout;
     try {
@@ -698,6 +725,7 @@
     } catch (error) { notice(error.message, true); } finally { lock(false); }
   }
   function populateSetup() {
+    syncDestinationOptions();
     const p = state.product; $('productName').value = p.placeholder ? '' : p.title; $('sellerName').value = p.seller || ''; $('productDescription').value = p.description || ''; $('destination').value = p.destination || 'other'; $('price').value = p.price || ''; $('productLink').value = p.destination_url || ''; $('collection').value = p.collection || ''; $('goal').value = state.goal; $('salesGoal').value = state.salesGoal || '';
   }
   function openSetup() {
@@ -717,7 +745,9 @@
   function draftDestination() {
     const old = state.product.destination; state.offers[old] = { price: $('price').value, url: $('productLink').value };
     const next = $('destination').value; const offer = state.offers[next] || { price: '', url: '' }; state.product.destination = next; $('price').value = offer.price; $('productLink').value = offer.url;
-    $('itemHint').textContent = `${shopLabel(next)} keeps its own price and link. Choose a matching listing; other shops may carry different work.`;
+    $('itemHint').textContent = isEffectiveSample()
+      ? `${shopLabel(next)} keeps its own price and link. Choose a matching listing; other shops may carry different work.`
+      : `${shopLabel(next)} keeps its own price and link. Choose the matching page for this ${offerWords()}.`;
   }
   const TODAY_SAMPLE_ORIGINALS = [
     { id: 'sample-orig-ek-onkar', title: 'Ek Onkar — Original artwork', image_data_url: '/samples/ek_onkar_original.jpg', source_url: 'https://www.artofsarabjitsingh.com/guru-nanak-dev-ekonkar.html', source_label: 'Art of Sarabjit Singh · Original artwork', width: 900, height: 900, is_low_res: false, provenance: 'sample_original' },
@@ -1486,6 +1516,11 @@
           } finally {
             applyingDraft = false;
           }
+        } else {
+          // Account refresh supplies wording, not a new edit or a replacement save status.
+          applyingDraft = true;
+          try { applyOfferWording(); }
+          finally { applyingDraft = false; }
         }
       } catch {
         if (seq !== todayModeSeq) return;
