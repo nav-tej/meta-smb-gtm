@@ -5,6 +5,33 @@
  * Never sends URLs or social handles to PostHog.
  */
 (function () {
+  // Same rule as index.html's adLibraryQuery: a short name, else the brand in the web address.
+  function adLibraryQuery(name, url) {
+    if (window.museAdLibrary?.query) return window.museAdLibrary.query(name, url);
+    const n = String(name || '').trim();
+    if (n && !/^https?:\/\//i.test(n) && n.split(/\s+/).length <= 2 && !n.includes('.')) return n;
+    const raw = String(url || (n.includes('.') ? n : '') || '').trim();
+    try {
+      const host = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`).hostname.replace(/^www\./i, '');
+      const label = host.split('.')[0];
+      if (label) return label.charAt(0).toUpperCase() + label.slice(1);
+    } catch (_) {}
+    return n || raw;
+  }
+  function adLibraryUrl(query) {
+    if (window.museAdLibrary?.url) return window.museAdLibrary.url(query);
+    return `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=ALL&q=${encodeURIComponent(query)}&search_type=keyword_unordered&media_type=all`;
+  }
+  // Older accounts saved the n+α example competitors (directories, not rivals) during setup.
+  const OLD_EXAMPLE_HOSTS = ['clutch.co', 'upwork.com', 'toptal.com'];
+  function isOldExampleCompetitor(comp) {
+    try {
+      const host = new URL(String(comp?.url || '')).hostname.replace(/^www\./i, '');
+      return OLD_EXAMPLE_HOSTS.includes(host) && /Directory|Talent/i.test(String(comp?.name || ''));
+    } catch (_) {
+      return false;
+    }
+  }
   const LOCAL_ONBOARDING_KEY = 'muse.onboarding.v1';
   // A guest asked to create an account (for competitor suggestions here, or to analyze a shop
   // they added on home) leaves a short-lived note. After sign-in the setup wizard adopts it, so
@@ -1345,6 +1372,7 @@
 
   function resetSignedOutHomeWorkspace({ preserveMode = false } = {}) {
     document.getElementById('ownWorkspaceOptionBtn')?.remove();
+    document.getElementById('oldExampleCompetitorsNote')?.remove();
     window.__museApplySignedInWorkspace = null;
     lastRenderedUserId = null;
     if (!preserveMode) {
@@ -1586,6 +1614,26 @@
     }
     if (sellerListEl) {
       sellerListEl.textContent = '';
+      // Outside the list: seller memory decorates every row of #sellerList by position.
+      document.getElementById('oldExampleCompetitorsNote')?.remove();
+      const examples = competitors.filter(isOldExampleCompetitor);
+      if (examples.length) {
+        const note = document.createElement('div');
+        note.id = 'oldExampleCompetitorsNote';
+        note.className = 'jr-note jr-example-note';
+        note.setAttribute('data-own-only', '');
+        note.setAttribute('role', 'note');
+        const st = document.createElement('strong');
+        const names = examples.map((c) => adLibraryQuery(c.name, c.url));
+        st.textContent = `${names.join(', ').replace(/, ([^,]*)$/, ' and $1')} came from an example, not from your business.`;
+        const sp = document.createElement('span');
+        sp.textContent = ' They are directories and talent marketplaces that setup used to fill in. Swap them for businesses your customers compare you with. Changing setup uses no runs. ';
+        const a = document.createElement('a');
+        a.href = '/welcome?step=3';
+        a.textContent = 'Change competitors →';
+        note.append(st, sp, a);
+        sellerListEl.parentNode?.insertBefore(note, sellerListEl);
+      }
       if (competitors.length === 0) {
         const li = document.createElement('li');
         li.className = 'jr-seller';
@@ -1616,9 +1664,9 @@
           adLink.className = 'jr-meta-ad-link';
           adLink.target = '_blank';
           adLink.rel = 'noopener noreferrer';
-          const query = comp.name || comp.url;
-          adLink.href = `https://www.facebook.com/ads/library/?active_status=active&AdCandidate=&q=${encodeURIComponent(query)}&search_type=keyword_unordered&media_type=all`;
-          adLink.textContent = 'See their ads on Meta ↗';
+          const query = adLibraryQuery(comp.name, comp.url);
+          adLink.href = adLibraryUrl(query);
+          adLink.textContent = `Search Meta ads for “${query}” ↗`;
           d.append(st, sp, adLink);
           const btn = document.createElement('button');
           btn.type = 'button';
@@ -1822,9 +1870,8 @@
         const div = document.createElement('div');
         div.className = 'finding-item';
         if (id === 'metaAdsContainer') {
-          const compNames = competitors.map((c) => c.name || c.url);
-          const firstComp = compNames[0] || 'competitors';
-          const pubUrl = `https://www.facebook.com/ads/library/?active_status=active&AdCandidate=&q=${encodeURIComponent(firstComp)}&search_type=keyword_unordered&media_type=all`;
+          const firstComp = competitors[0] ? adLibraryQuery(competitors[0].name, competitors[0].url) : 'competitors';
+          const pubUrl = adLibraryUrl(firstComp);
           div.innerHTML = `
             <div style="font-size:0.85rem;color:var(--text-muted);">Competitor ads have not been checked yet.</div>
             <div style="margin-top:6px;"><a class="jr-meta-ad-link" href="${safeUrl(pubUrl)}" target="_blank" rel="noopener noreferrer">Search public Meta Ad Library for ${esc(firstComp)} ↗</a></div>

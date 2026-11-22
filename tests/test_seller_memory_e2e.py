@@ -392,7 +392,12 @@ def test_seller_memory_full_mobile_multi_browser_workflow(
             page.click("#smOpenMemoryBtn")
             page.wait_for_selector("#smMemoryModalBackdrop:not([hidden])")
 
-            # Sample watercolor voice note fixture (0 runs, editable before approve)
+            # Sample watercolor voice note fixture (0 runs, editable before approve). Since pass 18
+            # a seller's own workspace hides this demo button; the test reveals it to drive the
+            # same transcript review a live voice note goes through.
+            page.evaluate(
+                "document.getElementById('smUseVoiceFixtureBtn').style.display = ''"
+            )
             page.click("#smUseVoiceFixtureBtn")
             page.wait_for_selector('#smVoiceTranscriptBox:not([hidden])')
             assert "Archival" in (page.input_value("#smVoiceTranscriptEdit") or "")

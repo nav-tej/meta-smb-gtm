@@ -54,11 +54,41 @@ def _document(name: str, business_type: str, goal: str, channels: list[str]) -> 
     }
 
 
+def _old_example_document() -> dict[str, Any]:
+    """An account that saved the n+α example competitors during setup (before pass 9)."""
+    doc = _document(
+        "n Plus Alpha Ventures", "services", "More client inquiries", ["linkedin", "youtube"]
+    )
+    doc["onboarding"]["competitors"] = [
+        {
+            "name": "Clutch B2B Marketing Directory",
+            "url": "https://clutch.co/",
+            "reason": "Example",
+        },
+        {
+            "name": "Upwork Fractional Marketing Talent",
+            "url": "https://www.upwork.com/",
+            "reason": "Example",
+        },
+        {
+            "name": "Toptal Marketing Talent Network",
+            "url": "https://www.toptal.com/",
+            "reason": "Example",
+        },
+    ]
+    doc["preferences"]["competitor_entries"] = [
+        {**c, "role": "similar_audience", "rationale": "Example", "selected": True}
+        for c in doc["onboarding"]["competitors"]
+    ]
+    return doc
+
+
 USERS = {
     "svc": _document(
         "North Star Advisory", "services", "More client inquiries", ["linkedin", "website"]
     ),
     "prod": _document("Wild Meadow Prints", "products", "More sales", ["instagram", "website"]),
+    "oldex": _old_example_document(),
 }
 
 
@@ -285,5 +315,107 @@ print("ANY_BUSINESS_OK")
         [python_bin, "-c", script], capture_output=True, text=True, timeout=240, check=False
     )
     assert proc.returncode == 0 and "ANY_BUSINESS_OK" in proc.stdout, (
+        f"STDOUT:\n{proc.stdout}\nSTDERR:\n{proc.stderr}"
+    )
+
+
+def test_own_workspace_shows_no_sample_shop_and_flags_old_example_e2e(
+    any_business_server: str,
+) -> None:
+    """Pass 18 (Nov 22): Nav's own nplusalpha.com workspace showed the sample artist.
+
+    Opening "Full workspace" showed the "Interactive demo" note, the artist's KPIs (14-day ROAS,
+    POD prices, checkout fix), a Step 0 form filled with artofsarabjitsingh.com, Saatchi and
+    FineArtAmerica, and "Gift buyers" chips. "What Muse remembers" was empty and offered a sample
+    watercolor voice note. "See their ads on Meta" searched "Upwork Fractional Marketing Talent",
+    which no ad contains. Clutch, Upwork and Toptal (the old setup example) were never flagged.
+    The sample shop keeps all of its demo blocks.
+    """
+    python_bin = _find_playwright_python()
+    if not python_bin:
+        pytest.skip("Playwright runtime not installed")
+    script = f"""
+import json, re
+from urllib.parse import urlparse, parse_qs
+from playwright.sync_api import sync_playwright
+
+BASE = {any_business_server!r}
+SAMPLE_TERMS = re.compile(
+    r"(?i)ek onkar|sarabjit|sikhiart|fineartamerica|saatchi|gift buyers|14-day ad roas|"
+    r"interactive demo|watercolor|catalog indexed|checkout fix|local tools"
+)
+
+with sync_playwright() as p:
+    browser = p.chromium.launch()
+    for width in (1440, 375):
+        ctx = browser.new_context(viewport={{"width": width, "height": 900}})
+        ctx.add_cookies([{{"name": "muse_e2e_user", "value": "oldex", "url": BASE}}])
+        page = ctx.new_page()
+        errors = []
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.goto(BASE + "/", wait_until="domcontentloaded")
+        page.wait_for_selector("#oldExampleCompetitorsNote", state="visible", timeout=20000)
+        note = page.locator("#oldExampleCompetitorsNote")
+        assert "Clutch, Upwork and Toptal came from an example" in note.inner_text()
+        assert note.locator("a").get_attribute("href") == "/welcome?step=3"
+        # The note sits outside the list: seller memory still decorates exactly three rows.
+        page.wait_for_function(
+            "document.querySelectorAll('#sellerList .sm-comp-role-wrap').length === 3",
+            timeout=10000,
+        )
+        page.locator("#toggleWorkspace").click()
+        page.wait_for_function(
+            "document.querySelectorAll('#metaAdsContainer .jr-meta-ad-link').length > 0",
+            timeout=15000,
+        )
+        body = page.evaluate("document.body.innerText")
+        found = sorted({{m.group(0).lower() for m in SAMPLE_TERMS.finditer(body)}})
+        assert not found, (width, found)
+        queries = page.evaluate(
+            "Array.from(document.querySelectorAll('#sellerList a.jr-meta-ad-link'))"
+            ".map((a) => a.href)"
+        )
+        assert [parse_qs(urlparse(u).query)["q"][0] for u in queries] == [
+            "Clutch", "Upwork", "Toptal"
+        ], queries
+        tabs = page.evaluate(
+            "Array.from(document.querySelectorAll('.step-tab')).filter((t) => t.offsetParent)"
+            ".map((t) => t.dataset.tab)"
+        )
+        assert tabs == ["tab-intel", "tab-bids"], tabs
+        assert not page.evaluate("document.documentElement.scrollWidth > window.innerWidth")
+
+        page.get_by_text("What Muse remembers", exact=True).first.click()
+        facts = page.locator("#smSetupFacts")
+        facts.wait_for(state="visible", timeout=10000)
+        text = facts.inner_text()
+        for want in ("n Plus Alpha Ventures", "Services", "More client inquiries",
+                     "30 minutes a week", "LinkedIn, YouTube", "Clutch B2B Marketing Directory"):
+            assert want in text, (want, text)
+        assert page.evaluate(
+            "getComputedStyle(document.getElementById('smUseVoiceFixtureBtn')).display"
+        ) == "none"
+        assert not errors, errors
+        ctx.close()
+
+    # The sample shop keeps its demo blocks and its own competitor names.
+    ctx = browser.new_context(viewport={{"width": 1440, "height": 900}})
+    ctx.add_cookies([{{"name": "muse_e2e_user", "value": "oldex", "url": BASE}}])
+    page = ctx.new_page()
+    page.goto(BASE + "/?workspace=sample", wait_until="domcontentloaded")
+    page.wait_for_function("document.documentElement.dataset.museMode === 'account_sample'",
+                           timeout=20000)
+    page.locator("#toggleWorkspace").click()
+    page.wait_for_timeout(800)
+    body = page.evaluate("document.body.innerText")
+    assert "Interactive demo" in body and "Local tools" in body
+    assert not page.locator("#oldExampleCompetitorsNote").is_visible()
+    browser.close()
+print("OWN_NO_SAMPLE_OK")
+"""
+    proc = subprocess.run(
+        [python_bin, "-c", script], capture_output=True, text=True, timeout=240, check=False
+    )
+    assert proc.returncode == 0 and "OWN_NO_SAMPLE_OK" in proc.stdout, (
         f"STDOUT:\n{proc.stdout}\nSTDERR:\n{proc.stderr}"
     )

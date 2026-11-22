@@ -862,6 +862,8 @@
     const sampleVoiceBtn = el('button', { type: 'button', id: 'smUseVoiceFixtureBtn', class: 'sm-btn' },
       'Use sample watercolor voice note (demo · 0 runs)'
     );
+    // The watercolor note belongs to the sample shop; a seller's own memory never offers it.
+    if (!isSampleMode()) sampleVoiceBtn.style.display = 'none';
     btnRow.append(interpretBtn, sampleVoiceBtn);
 
     // Live consent-gated voice upload/record row
@@ -2140,9 +2142,46 @@
     return backdrop;
   }
 
+  const BUSINESS_TYPE_LABELS = { products: 'Products', services: 'Services', both: 'Products and services' };
+  const SETUP_CHANNEL_LABELS = {
+    linkedin: 'LinkedIn', youtube: 'YouTube', tiktok: 'TikTok', x: 'X', instagram: 'Instagram',
+    facebook: 'Facebook', website: 'Website', email: 'Email', pinterest: 'Pinterest',
+  };
+
+  // What setup told Muse, shown first so "What Muse remembers" is never empty for a seller who
+  // finished setup. Read-only here; setup is where it changes (saving uses no runs).
+  function renderSetupFacts() {
+    if (isSampleMode() || !state.authenticated) return;
+    const pref = state.preferences || {};
+    const minutes = Number(pref.access?.minutes_per_week) || 0;
+    const channels = (Array.isArray(pref.access?.channels) ? pref.access.channels : [])
+      .map((c) => SETUP_CHANNEL_LABELS[String(c).toLowerCase()] || String(c))
+      .filter(Boolean);
+    const comps = (state.competitorEntries || []).filter((c) => c && c.selected !== false);
+    const rows = [
+      ['Business', state.businessName],
+      ['What you offer', BUSINESS_TYPE_LABELS[state.businessType] || ''],
+      ['Goal', String(pref.goal || '').trim()],
+      ['Time for marketing', minutes ? `${minutes} minutes a week` : ''],
+      ['Channels', channels.join(', ')],
+      ['Competitors you watch', comps.map((c) => c.name || c.url).join(', ')],
+    ].filter(([, value]) => value);
+    if (!rows.length) return;
+    const section = el('div', { id: 'smSetupFacts', class: 'sm-setup-facts' });
+    section.appendChild(el('h3', { style: 'font-size:0.9rem;margin:4px 0 6px;' }, 'From your setup'));
+    const list = el('dl', { class: 'sm-setup-list', style: 'display:grid;grid-template-columns:max-content 1fr;gap:4px 12px;margin:0 0 6px;font-size:0.86rem;' });
+    rows.forEach(([label, value]) => {
+      list.append(el('dt', { style: 'color:var(--muted,#6b6b6b);' }, label), el('dd', { style: 'margin:0;overflow-wrap:anywhere;' }, value));
+    });
+    section.appendChild(list);
+    section.appendChild(el('a', { href: '/welcome', class: 'sm-link', id: 'smEditSetupLink' }, 'Change these in setup →'));
+    modalBodyEl.appendChild(section);
+  }
+
   function renderMemoryModalBody() {
     if (!modalBodyEl) return;
     modalBodyEl.textContent = '';
+    renderSetupFacts();
 
     const entries = (state.memoryEntries || []).filter((e) => e.status !== 'dismissed');
     const groups = [
@@ -2278,6 +2317,8 @@
   function openMemoryModal() {
     const backdrop = ensureMemoryModal();
     renderMemoryModalBody();
+    const sampleVoiceBtn = document.getElementById('smUseVoiceFixtureBtn');
+    if (sampleVoiceBtn) sampleVoiceBtn.style.display = isSampleMode() ? '' : 'none';
     backdrop.hidden = false;
   }
 
