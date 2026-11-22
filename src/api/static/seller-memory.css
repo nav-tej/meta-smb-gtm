@@ -281,6 +281,16 @@
   width: 100%;
 }
 
+/* On home the watch role sits in a one-line seller row; give it its own line so the select and
+   the reason are not cut off at the card's edge. */
+.jr-seller:has(> .sm-comp-role-wrap) {
+  flex-wrap: wrap;
+}
+
+.jr-seller > .sm-comp-role-wrap {
+  flex: 1 1 100%;
+}
+
 .sm-field-inline {
   display: inline-flex;
   flex-wrap: wrap;

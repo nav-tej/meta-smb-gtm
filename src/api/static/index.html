@@ -1007,14 +1007,14 @@
   <link rel="stylesheet" href="/static/pricing-modal.css?v=20261109-ux">
   <link rel="stylesheet" href="/static/account.css?v=20261112-integrated">
   <link rel="stylesheet" href="/static/muse-shell.css?v=20261112-integrated">
-  <link rel="stylesheet" href="/static/seller-memory.css?v=20261112-integrated">
+  <link rel="stylesheet" href="/static/seller-memory.css?v=20261121-uxgap19">
   <script src="/static/analytics.js?v=20261109-ux" defer></script>
-  <script src="/static/reco-actions.js?v=20261118-uxgap12" defer></script>
+  <script src="/static/reco-actions.js?v=20261121-uxgap19" defer></script>
   <script src="/static/account.js?v=20261120-uxgap17" defer></script>
   <script src="/static/workspace-modes.js?v=20261117-uxgap6" defer></script>
   <script src="/static/muse-shell.js?v=20261120-uxgap17" defer></script>
-  <script src="/static/welcome.js?v=20261121-uxgap18" defer></script>
-  <script src="/static/seller-memory.js?v=20261120-uxgap17" defer></script>
+  <script src="/static/welcome.js?v=20261121-uxgap19" defer></script>
+  <script src="/static/seller-memory.js?v=20261121-uxgap19" defer></script>
 </head>
 <body>
   <!-- Top Bar -->
@@ -1212,7 +1212,7 @@
       <section id="firstMoveCard" class="first-move-card" aria-labelledby="firstMoveTitle" hidden></section>
       <nav class="jr-loop" aria-label="Growth loop stages">
         <ol>
-          <li class="c2"><a href="#loop-research"><span>1</span><strong>Research</strong><em>What similar sellers do</em></a></li>
+          <li class="c2"><a href="#loop-research"><span>1</span><strong>Research</strong><em>What similar businesses do</em></a></li>
           <li class="c4"><a href="#loop-create"><span>2</span><strong>Create</strong><em>One ready-to-post ad</em></a></li>
           <li class="c1"><a href="#loop-improve"><span>3</span><strong>Improve</strong><em>Ranked next moves</em></a></li>
           <li class="c3"><a href="#loop-iterate"><span>4</span><strong>Iterate</strong><em>Learn, then go again</em></a></li>
@@ -1223,7 +1223,7 @@
 
       <!-- 1. RESEARCH -->
       <div class="jr-stage c2" id="loop-research">
-        <header class="jr-stage-head"><span class="jr-stage-num">1</span><div><h2>Research</h2><p>Who sells similar art, what they charge and how they advertise.</p></div></header>
+        <header class="jr-stage-head"><span class="jr-stage-num">1</span><div><h2>Research</h2><p>Who offers something similar, what they charge and how they advertise.</p></div></header>
         <div class="jr-row three">
           <article class="jr-card c1">
             <header><h3>Your business</h3></header>
@@ -1279,7 +1279,7 @@
             </ul>
             <form class="jr-add" id="addCompetitorForm" novalidate>
               <label for="addCompetitorInput">Add another competitor to analyze</label>
-              <div><input id="addCompetitorInput" type="url" inputmode="url" placeholder="https://their-shop.com" maxlength="300" aria-describedby="addCompetitorCost"><button type="submit" class="jr-mini primary" id="addCompetitorBtn">Add · 🪙 1 run (live) / 0 in demo</button></div>
+              <div><input id="addCompetitorInput" type="url" inputmode="url" placeholder="https://their-website.com" maxlength="300" aria-describedby="addCompetitorCost"><button type="submit" class="jr-mini primary" id="addCompetitorBtn">Add · 🪙 1 run (live) / 0 in demo</button></div>
               <p class="jr-add-cost" id="addCompetitorCost">Live crawl uses 1 run. In this saved demo the shop is added to your list and no run is used.</p>
             </form>
             <p class="jr-note" id="competitorSnapshotsNote">Saved public snapshots from Nov 3, 2026. Only SikhiArt.com has a saved analysis; new analyses need a live server.</p>
@@ -2607,20 +2607,24 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
         return;
       }
       if (!user) {
-        if (addBtn) addBtn.textContent = 'Add shop';
-        if (addCost) addCost.textContent = 'Analyzing a shop needs a free account. You get 3 free runs, and each analysis uses 1.';
-        if (snapNote) snapNote.textContent = 'Saved public snapshots from Nov 3, 2026. Create a free account to analyze shops you choose.';
+        if (addBtn) addBtn.textContent = 'Add competitor';
+        if (addCost) addCost.textContent = 'Analyzing a competitor needs a free account. You get 3 free runs, and each analysis uses 1.';
+        if (snapNote) snapNote.textContent = 'Saved public snapshots from Nov 3, 2026. Create a free account to analyze competitors you choose.';
         return;
       }
       if (ready) {
         if (addBtn) addBtn.textContent = 'Add and analyze · 1 run';
-        if (addCost) addCost.textContent = 'Muse checks the shop and compares it with yours. Uses 1 run.';
+        if (addCost) addCost.textContent = 'Muse checks their website and compares it with yours. Uses 1 run.';
       } else if (!user.email_verified) {
-        if (addBtn) addBtn.textContent = 'Add shop';
-        if (addCost) addCost.textContent = 'Confirm your email address first to analyze a new shop. Check your inbox or resend the link from Account.';
+        if (addBtn) addBtn.textContent = 'Add competitor';
+        if (addCost) addCost.textContent = 'Confirm your email address first to analyze a new competitor. Check your inbox or resend the link from Account.';
+      } else if (snap.usage && snap.usage.remaining === 0) {
+        if (addBtn) addBtn.textContent = 'Add competitor';
+        if (addCost) addCost.textContent = 'No runs remaining on your current plan. Choose a plan in Account to analyze a new competitor.';
       } else {
-        if (addBtn) addBtn.textContent = 'Add shop';
-        if (addCost) addCost.textContent = 'No runs remaining on your current plan. Choose a plan in Account to analyze a new shop.';
+        // Runs are left but live Muse is off: say that, not "no runs" (promptForLiveRuns agrees).
+        if (addBtn) addBtn.textContent = 'Add competitor';
+        if (addCost) addCost.textContent = 'Live analysis is unavailable right now, so no run is used. Saved research still works.';
       }
       // A seller's own list holds shops they chose, not the Nov 3 sample snapshots.
       if (snapNote) snapNote.textContent = window.museModes?.isSampleMode?.()
@@ -2810,7 +2814,7 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
       btn.textContent = 'Analyzing…';
       try {
         await shellProgress('Analyzing ' + url.replace(/^https?:\/\/(www\.)?/, '').split('/')[0],
-          ['Crawling the shop pages', 'Comparing prices and catalog', 'Ranking what they skip']);
+          ['Reading their website', 'Comparing prices and offers', 'Ranking what they skip']);
         const reqBody = {
           competitor_url: url,
           max_urls: 40,
@@ -2885,7 +2889,7 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
       let url = null;
       try { url = new URL(input.value.trim()); } catch { url = null; }
       if (!url || !['http:', 'https:'].includes(url.protocol) || !url.hostname.includes('.')) {
-        input.setCustomValidity('Enter a full shop link, like https://their-shop.com');
+        input.setCustomValidity('Enter a full website address, like https://their-website.com');
         input.reportValidity();
         return;
       }

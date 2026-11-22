@@ -603,9 +603,10 @@
     $('format').value = state.format;
     document.querySelectorAll('[data-channel]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.channel === state.channel)));
     $('planMode').textContent = plan?.mode === 'muse' ? 'Muse Spark draft' : 'Starter draft';
+    const linkWords = isEffectiveSample() ? 'shop link' : 'link';
     const tips = {
-      instagram: 'Use the image for Feed. Put the shop link in your profile or a Story link sticker.',
-      facebook: 'Add your shop link to the caption. Check linked Instagram sharing before posting twice.',
+      instagram: `Use the image for Feed. Put your ${linkWords} in your profile or a Story link sticker.`,
+      facebook: `Add your ${linkWords} to the caption. Check linked Instagram sharing before posting twice.`,
       x: 'Keep one clear point and one link. Add an image description when you upload.',
       tiktok: 'Start with a visual hook. Use vertical video and captions; add suitable audio in TikTok.'
     };
@@ -899,7 +900,9 @@
 
     if (!todayWebsiteCandidates.length) {
       if (!status.dataset.explicitMessage) {
-        status.textContent = 'Enter your shop or product URL above to browse verified images, or upload your own photo.';
+        status.textContent = isEffectiveSample()
+          ? 'Enter your shop or product URL above to browse verified images, or upload your own photo.'
+          : 'Enter your website or one of its pages above to see its images, or upload your own photo.';
       }
       return;
     }

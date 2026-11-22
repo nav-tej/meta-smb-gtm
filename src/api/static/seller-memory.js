@@ -1410,10 +1410,17 @@
     if (!guestDemo && !isDraftActive && !rememberedCount && !pendingSuggestion && !state.homePanelExpanded) {
       panel.classList.add('sm-card-compact');
       const sub = titleRow.querySelector('.sm-sub');
-      if (sub) sub.textContent = 'Muse ranks your moves by your goal and the time you have each week. Nothing saved yet.';
+      // Setup already saves a goal and weekly minutes; "Nothing saved yet" contradicted the move below.
+      const goalSaved = String(state.preferences?.goal || '').trim();
+      const minutesSaved = Number(state.preferences?.access?.minutes_per_week) || 0;
+      const byGoal = goalSaved ? `your goal (${goalSaved.toLowerCase()})` : 'your goal';
+      const byTime = minutesSaved ? `your ${minutesSaved} minutes a week` : 'the time you have each week';
+      if (sub) sub.textContent = goalSaved || minutesSaved
+        ? `Muse ranks your moves by ${byGoal} and ${byTime}.`
+        : 'Muse ranks your moves by your goal and the time you have each week. Nothing saved yet.';
       const memBtn = titleRow.querySelector('#smOpenMemoryBtn');
       if (memBtn) memBtn.textContent = 'What Muse remembers';
-      const openBtn = el('button', { type: 'button', id: 'smExpandContextBtn', class: 'sm-btn sm-btn-primary' }, 'Set your goal');
+      const openBtn = el('button', { type: 'button', id: 'smExpandContextBtn', class: 'sm-btn sm-btn-primary' }, goalSaved ? 'Change your goal' : 'Set your goal');
       openBtn.addEventListener('click', () => {
         state.homePanelExpanded = true;
         renderHomeUI();
@@ -2473,6 +2480,19 @@
     return { handoff, selectedRec, def };
   }
 
+  // The ranker's editor defaults carry goal keys; the chip shows words a seller would use.
+  const GOAL_LABELS = {
+    story: ['Tell the story behind it', 'Share what you do'],
+    gift: ['Show it as a gift', 'Show a client result'],
+    visits: ['Bring people to your website', 'Bring people to your website'],
+    visit: ['Bring people to your website', 'Bring people to your website'],
+  };
+  function goalLabel(goal) {
+    const words = GOAL_LABELS[String(goal || '')];
+    if (!words) return String(goal || 'One good post');
+    return words[state.businessType === 'services' ? 1 : 0];
+  }
+
   function renderStudioBar() {
     const isToday = location.pathname.startsWith('/today');
     const isCreate = location.pathname.startsWith('/create');
@@ -2492,7 +2512,7 @@
     bar.dataset.smSelectedRecoId = selectedRec?.recommendation_id || selectedRec?.id || '';
 
     const badges = el('div', { class: 'sm-badge-row' },
-      el('span', { class: 'sm-badge sm-badge-goal' }, `Goal: ${state.draftOverride?.goal || def.goal || state.preferences?.goal || 'Focus post'}`)
+      el('span', { class: 'sm-badge sm-badge-goal' }, `Goal: ${goalLabel(state.draftOverride?.goal || def.goal || state.preferences?.goal)}`)
     );
     if (selectedRec?.title) {
       badges.appendChild(el('span', { class: 'sm-badge sm-badge-preference' }, `Selected move: ${selectedRec.title}`));
@@ -2512,10 +2532,10 @@
 
     const memBtn = el('button', { type: 'button', class: 'sm-btn' }, 'What Muse remembers');
     memBtn.addEventListener('click', openMemoryModal);
-    const applyBtn = el('button', { type: 'button', id: 'smStudioApplyBtn', class: 'sm-btn sm-btn-primary' }, 'Apply defaults to editor');
+    const applyBtn = el('button', { type: 'button', id: 'smStudioApplyBtn', class: 'sm-btn sm-btn-primary' }, 'Use this move in my post');
     applyBtn.addEventListener('click', () => {
       applyEditorDefaults(true);
-      toast('Applied your selected context to studio fields.');
+      toast('Your post now follows this move. Change anything you like.');
     });
 
     const subtitleWhy = selectedRec?.why_this_fits || def.why_this_fits || '';

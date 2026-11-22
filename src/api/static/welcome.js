@@ -590,7 +590,7 @@
       const scanBtn = document.getElementById('wkScanShopBtn');
       if (scanBtn) {
         scanBtn.disabled = true;
-        scanBtn.textContent = 'Scanning your shop pages…';
+        scanBtn.textContent = 'Scanning your website…';
       }
       try {
         const resp = await fetch('/api/v1/ingest-storefront', {
@@ -1399,6 +1399,10 @@
     lastRenderedUserId = user?.id || null;
 
     const shopName = onboarding?.business_name || (user?.email ? `${user.email.split('@')[0]}’s Shop` : 'Your Shop');
+    // A services business is not a shop; the steering chips (reco-actions.js) read this too.
+    const services = onboarding?.business_type === 'services';
+    document.documentElement.dataset.ownBusinessType = onboarding?.business_type || '';
+    window.dispatchEvent(new CustomEvent('muse:own-business-type'));
     const summary = onboarding?.crawl_summary || null;
     const socials = (onboarding?.socials || []).filter((s) => s.confirmed !== false);
     const competitors = (onboarding?.competitors || []).filter((c) => c.selected !== false);
@@ -1407,7 +1411,7 @@
 
     // 1. Topbar workspace label & kicker
     const kickerEl = document.getElementById('activeWorkspaceKicker') || document.querySelector('.workspace-kicker');
-    if (kickerEl) kickerEl.textContent = 'Your shop';
+    if (kickerEl) kickerEl.textContent = services ? 'Your business' : 'Your shop';
     const labelEl = document.getElementById('activeWorkspaceLabel');
     if (labelEl) labelEl.textContent = shopName;
     const avatarEl = document.getElementById('activeAvatar');
@@ -1453,7 +1457,7 @@
       monRight.textContent = '';
       const pill1 = document.createElement('span');
       pill1.className = 'monitoring-pill';
-      pill1.textContent = `${pagesCrawled} shop ${pagesCrawled === 1 ? 'page' : 'pages'} scanned`;
+      pill1.textContent = `${pagesCrawled} website ${pagesCrawled === 1 ? 'page' : 'pages'} scanned`;
       const pill2 = document.createElement('a');
       pill2.className = 'monitoring-pill';
       pill2.href = '/?workspace=sample';
@@ -1472,28 +1476,28 @@
       const s0Strong = document.createElement('strong');
       s0Strong.textContent = String(pagesCrawled);
       const s0Span = document.createElement('span');
-      s0Span.textContent = 'your shop pages scanned [live]';
+      s0Span.textContent = 'pages scanned on your website';
       statsBoxes[0].append(s0Strong, s0Span);
 
       statsBoxes[1].innerHTML = '';
       const s1Strong = document.createElement('strong');
       s1Strong.textContent = String(competitors.length);
       const s1Span = document.createElement('span');
-      s1Span.textContent = 'competitors on your watchlist [live]';
+      s1Span.textContent = 'competitors on your watchlist';
       statsBoxes[1].append(s1Strong, s1Span);
 
       statsBoxes[2].innerHTML = '';
       const s2Strong = document.createElement('strong');
       s2Strong.textContent = String(socials.length);
       const s2Span = document.createElement('span');
-      s2Span.textContent = 'confirmed social channels [live]';
+      s2Span.textContent = 'confirmed social channels';
       statsBoxes[2].append(s2Strong, s2Span);
 
       statsBoxes[3].innerHTML = '';
       const s3Strong = document.createElement('strong');
       s3Strong.textContent = priceRange || '—';
       const s3Span = document.createElement('span');
-      s3Span.textContent = 'detected shop price range [live]';
+      s3Span.textContent = 'price range found on your website';
       statsBoxes[3].append(s3Strong, s3Span);
     }
 
@@ -1533,7 +1537,7 @@
 
         const sellsLabel = document.createElement('p');
         sellsLabel.className = 'jr-label';
-        sellsLabel.textContent = 'Shop pages';
+        sellsLabel.textContent = services ? 'Website pages' : 'Shop pages';
         const sellsPills = document.createElement('div');
         sellsPills.className = 'jr-pills';
         onboarding.shop_urls.forEach((u) => {
@@ -1619,7 +1623,7 @@
           const btn = document.createElement('button');
           btn.type = 'button';
           btn.className = 'jr-mini primary js-live-brief';
-          btn.textContent = 'Analyze seller →';
+          btn.textContent = 'Analyze competitor →';
           li.append(d, btn);
           sellerListEl.appendChild(li);
         });
@@ -1641,7 +1645,7 @@
         const p = document.createElement('p');
         p.style.fontWeight = '700';
         p.style.fontSize = '1.05rem';
-        p.textContent = `Your detected price range: ${priceRange} [live]`;
+        p.textContent = `Your price range: ${priceRange}`;
         const sub = document.createElement('p');
         sub.className = 'jr-note';
         sub.textContent = `Extracted from ${pagesCrawled} crawled pages on ${shopName}. Run a live analysis on a watched competitor to plot their price bar beside yours.`;
@@ -1649,11 +1653,13 @@
       } else {
         const p = document.createElement('p');
         p.className = 'jr-note';
-        p.textContent = 'No public product prices detected yet. Scan your product pages so Muse can compare your price range against competitors.';
+        p.textContent = services
+          ? 'Muse found no prices on your website. Many service businesses quote on request, so you can leave this empty.'
+          : 'No public product prices detected yet. Scan your product pages so Muse can compare your price range against competitors.';
         const a = document.createElement('a');
         a.className = 'jr-action';
         a.href = '/welcome?step=1';
-        a.textContent = 'Scan shop prices →';
+        a.textContent = services ? 'Scan my website again →' : 'Scan shop prices →';
         priceCard.append(p, a);
       }
     }
@@ -1733,8 +1739,8 @@
     const steerInput = document.getElementById('jrSteerInput');
     if (steerInput) {
       steerInput.placeholder = competitors[0]
-        ? `e.g. Look at why ${competitors[0].name || competitors[0].url} prices start higher`
-        : 'e.g. Look at competitor prices or find gift ideas under $50';
+        ? `e.g. How do ${competitors[0].name || competitors[0].url}’s prices compare with mine?`
+        : 'e.g. How do my prices compare with competitors?';
     }
     document.querySelectorAll('.jr-chip-btn').forEach((chip) => {
       if (/SikhiArt/i.test(chip.textContent || '')) {
@@ -1804,7 +1810,7 @@
     const compSummaryText = document.getElementById('compSummaryText');
     if (compSummaryText) {
       compSummaryText.textContent = competitors.length
-        ? `Ready to analyze ${competitors.map((c) => c.name || c.url).join(', ')}. Click "Analyze seller" to generate your first brief.`
+        ? `Ready to analyze ${competitors.map((c) => c.name || c.url).join(', ')}. Click "Analyze competitor" to generate your first brief.`
         : 'No competitor brief loaded yet. Add a competitor in onboarding to compare catalogs and prices.';
     }
     ['findingsContainer', 'insightsContainer', 'diagnosticsContainer', 'metaAdsContainer', 'reallocationsContainer', 'audiencesContainer'].forEach((id) => {
@@ -1862,7 +1868,7 @@
     titleDiv.append(nameStrong, subDiv);
     const badge = document.createElement('span');
     badge.className = 'badge green';
-    badge.textContent = setupDone ? 'Your shop' : 'Finish setup';
+    badge.textContent = setupDone ? (onboarding?.business_type === 'services' ? 'Your business' : 'Your shop') : 'Finish setup';
     ownBtn.append(titleDiv, badge);
 
     ownBtn.addEventListener('click', () => {
@@ -1927,7 +1933,7 @@
       card.textContent = '';
       card.hidden = true;
     });
-    const title = make('h2', '', 'Your shop is set up. Get your first result.');
+    const title = make('h2', '', 'Your workspace is set up. Get your first result.');
     title.id = 'firstMoveTitle';
     const actions = make('div', 'first-move-actions');
 
@@ -1937,7 +1943,7 @@
     compBtn.id = 'firstMoveCompetitorBtn';
     if (!first) {
       compOption.append(make('strong', '', 'Add a competitor to compare with'),
-        make('span', '', 'Muse compares their prices and listings with yours.'));
+        make('span', '', 'Muse compares what they offer and charge with yours.'));
       compBtn.textContent = 'Add a competitor';
       compBtn.addEventListener('click', () => {
         const input = document.getElementById('addCompetitorInput');
@@ -1950,7 +1956,7 @@
       compBtn.textContent = 'View analysis';
     } else {
       compOption.append(make('strong', '', `Analyze ${name}`),
-        make('span', '', `Muse compares their prices and listings with yours. Uses 1 run${runsLeft === null ? '' : ` (you have ${runsLeft} left)`}.`));
+        make('span', '', `Muse compares what they offer and charge with yours. Uses 1 run${runsLeft === null ? '' : ` (you have ${runsLeft} left)`}.`));
       compBtn.textContent = `Analyze ${name} · 1 run`;
     }
     if (first) {
@@ -1967,7 +1973,7 @@
     const postLink = make('a', 'first-move-btn', "Open today's studio");
     postLink.href = window.museModes?.ownHref ? window.museModes.ownHref('/today') : '/today';
     postOption.append(make('strong', '', "Make today's post"),
-      make('span', '', 'Muse drafts a post from one of your listings. Free.'), postLink);
+      make('span', '', 'Muse drafts a post from your website. Free.'), postLink);
 
     actions.append(compOption, postOption);
     card.append(make('p', 'first-move-eyebrow', 'Start here'), title, actions, hide);

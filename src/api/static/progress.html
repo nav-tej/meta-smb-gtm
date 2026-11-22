@@ -122,12 +122,12 @@
     <!-- Modal for 30s Result Logging -->
     <dialog class="pg-dialog" id="pgLogModal" aria-labelledby="pgModalTitle">
       <form id="pgLogForm" class="pg-form" method="dialog">
-        <h3 id="pgModalTitle" style="margin:0 0 0.25rem;color:#1e3a29;">Log Move Result</h3>
-        <p style="margin:0 0 0.5rem;font-size:0.85rem;color:#6b665c;">Record the real outcome of an Instagram post, shop edit, or promotion.</p>
+        <h3 id="pgModalTitle" style="margin:0 0 0.25rem;color:#1e3a29;">Log a result</h3>
+        <p style="margin:0 0 0.5rem;font-size:0.85rem;color:#6b665c;">Record what really happened after a post, a website change or a promotion.</p>
 
         <label>
           Move / Idea
-          <input type="text" name="title" id="pgFormTitle" required placeholder="e.g. Featured collection post or shop update" maxlength="120">
+          <input type="text" name="title" id="pgFormTitle" required placeholder="e.g. Instagram post about my newest offer" maxlength="120">
         </label>
 
         <div class="pg-form-row">
@@ -137,7 +137,11 @@
               <option value="instagram_feed">Instagram Feed</option>
               <option value="instagram_story">Instagram Story</option>
               <option value="facebook_feed">Facebook Feed</option>
-              <option value="shop_direct">Online Shop / Direct</option>
+              <option value="linkedin">LinkedIn</option>
+              <option value="tiktok">TikTok</option>
+              <option value="x">X</option>
+              <option value="email">Email or newsletter</option>
+              <option value="shop_direct">Website or direct</option>
             </select>
           </label>
           <label>
@@ -159,7 +163,7 @@
 
         <div class="pg-form-row">
           <label>
-            Orders
+            Orders / bookings
             <input type="number" name="orders" id="pgFormOrders" min="0" placeholder="0">
           </label>
           <label>
@@ -319,6 +323,11 @@
             const metrics = document.createElement('div');
             metrics.className = 'pg-item-metrics';
 
+            const CHANNEL_LABELS = {
+              instagram_feed: 'Instagram feed', instagram_story: 'Instagram story',
+              facebook_feed: 'Facebook feed', linkedin: 'LinkedIn', tiktok: 'TikTok', x: 'X',
+              email: 'Email or newsletter', shop_direct: 'Website or direct', site: 'Website or direct',
+            };
             const addMetric = (label, val) => {
               const span = document.createElement('span');
               span.textContent = label + ': ';
@@ -328,10 +337,10 @@
               metrics.appendChild(span);
             };
 
-            addMetric('Channel', item.channel || 'direct');
+            addMetric('Channel', CHANNEL_LABELS[item.channel] || item.channel || 'Website or direct');
             if (item.reach) addMetric('Reach', item.reach);
-            if (item.clicks) addMetric('Clicks', item.clicks);
-            if (item.orders) addMetric('Orders', item.orders);
+            if (item.clicks) addMetric('Clicks / inquiries', item.clicks);
+            if (item.orders) addMetric('Orders / bookings', item.orders);
             if (item.revenue) addMetric('Revenue', '$' + Number(item.revenue).toFixed(2));
             addMetric('Time', (item.minutes || 15) + 'm');
 

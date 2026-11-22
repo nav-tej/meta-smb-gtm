@@ -62,7 +62,7 @@ def _find_playwright_python() -> str | None:
 def test_first_move_wiring_and_copy() -> None:
     home = (STATIC_DIR / "welcome.js").read_text(encoding="utf-8")
     fn = home[home.index("function syncFirstMoveCard(") : home.index("let setupHeroHidLoggedOut")]
-    assert "Your shop is set up. Get your first result." in fn
+    assert "Your workspace is set up. Get your first result." in fn
     assert "Viewing it is free." in fn and "Uses 1 run" in fn
     assert "—" not in fn
     assert "li.dataset.url = competitorUrl(comp.url);" in home
@@ -145,7 +145,7 @@ def test_first_move_card_e2e(live_server_url: str) -> None:
                 page.goto(BASE + "/", wait_until="networkidle")
                 page.wait_for_selector("#firstMoveCard:not([hidden])", timeout=15000)
                 text = card_text(page)
-                assert "Your shop is set up. Get your first result." in text, text
+                assert "Your workspace is set up. Get your first result." in text, text
                 assert "(you have 3 left)" in text, text
                 btn = page.locator("#firstMoveCompetitorBtn")
                 assert btn.inner_text() == "Analyze Kiln Row Ceramics · 1 run", btn.inner_text()

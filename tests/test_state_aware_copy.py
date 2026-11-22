@@ -56,7 +56,7 @@ def test_own_chips_parse_to_four_distinct_focuses_and_versions_match() -> None:
     assert len(set(focuses)) == 4
 
     index_html = (REPO_ROOT / "src/api/static/index.html").read_text(encoding="utf-8")
-    assert "reco-actions.js?v=20261118-uxgap12" in index_html
+    assert "reco-actions.js?v=20261121-uxgap19" in index_html
     for name in (
         "index.html",
         "creator.html",
@@ -220,7 +220,7 @@ def test_four_visitor_states_and_sample_freshness_e2e(state_copy_server: str) ->
                 pg.goto(f"{{BASE}}/", wait_until="domcontentloaded")
                 pg.wait_for_function(
                     "() => (document.querySelector('#addCompetitorBtn') || {{}})"
-                    ".textContent.trim() === 'Add shop'"
+                    ".textContent.trim() === 'Add competitor'"
                 )
                 assert "3 free runs" in pg.locator("#addCompetitorCost").inner_text()
                 snap_note_g = pg.locator("#competitorSnapshotsNote").inner_text()
@@ -303,7 +303,7 @@ def test_four_visitor_states_and_sample_freshness_e2e(state_copy_server: str) ->
                     px.goto(f"{{BASE}}/", wait_until="domcontentloaded")
                     px.wait_for_function(
                         "() => (document.querySelector('#addCompetitorBtn') || {{}})"
-                        ".textContent.trim() === 'Add shop'"
+                        ".textContent.trim() === 'Add competitor'"
                     )
                     assert expected_cost in px.locator("#addCompetitorCost").inner_text()
                     assert not px.evaluate(

@@ -16,7 +16,7 @@
   <script src="/static/account.js?v=20261120-uxgap17" defer></script>
   <script src="/static/workspace-modes.js?v=20261117-uxgap6" defer></script>
   <script src="/static/muse-shell.js?v=20261120-uxgap17" defer></script>
-  <script src="/static/digest.js?v=20261120-uxgap17" defer></script>
+  <script src="/static/digest.js?v=20261121-uxgap19" defer></script>
   <script src="/static/digest-signup.js?v=20261120-uxgap16" defer></script>
 </head>
 <body>
@@ -34,7 +34,7 @@
   <main class="digest" id="digest">
     <p class="dg-eyebrow" id="digestWeek">This week</p>
     <h1>Weekly Market Digest</h1>
-    <p class="dg-lede">What changed at the shops you watch, and what to do about it. Built from your competitor checks and daily brief, so reading it never uses a run.</p>
+    <p class="dg-lede">What changed at the competitors you watch, and what to do about it. Built from your competitor checks and daily brief, so reading it never uses a run.</p>
     <p class="dg-status" id="digestStatus" role="status" aria-live="polite">Loading this week’s digest…</p>
 
     <section class="dg-hero" aria-labelledby="dgHeroTitle">
@@ -75,9 +75,9 @@
       </div>
 
       <form id="digestDraftForm" class="dg-sub-form dg-draft-form" novalidate hidden>
-        <label>Watched shop 1<span>(optional, up to 3)</span><input type="text" inputmode="url" name="draftShop" maxlength="300" placeholder="https://competitor-shop.com"></label>
-        <label>Watched shop 2<span>(optional)</span><input type="text" inputmode="url" name="draftShop" maxlength="300"></label>
-        <label>Watched shop 3<span>(optional)</span><input type="text" inputmode="url" name="draftShop" maxlength="300"></label>
+        <label>Watched competitor 1<span>(optional, up to 3)</span><input type="text" inputmode="url" name="draftShop" maxlength="300" placeholder="https://competitor-website.com"></label>
+        <label>Watched competitor 2<span>(optional)</span><input type="text" inputmode="url" name="draftShop" maxlength="300"></label>
+        <label>Watched competitor 3<span>(optional)</span><input type="text" inputmode="url" name="draftShop" maxlength="300"></label>
 
         <label>
           Draft cadence
@@ -113,9 +113,9 @@
         <fieldset class="dg-options-group">
           <legend>Canonical preview topics</legend>
           <div class="dg-topics-list">
-            <label class="dg-check-label"><input type="checkbox" name="draftTopic" value="listing_changes" checked> Listing changes (new &amp; removed)</label>
+            <label class="dg-check-label"><input type="checkbox" name="draftTopic" value="listing_changes" checked> New and removed listings or pages</label>
             <label class="dg-check-label"><input type="checkbox" name="draftTopic" value="pricing" checked> Pricing updates</label>
-            <label class="dg-check-label"><input type="checkbox" name="draftTopic" value="suggested_moves" checked> Suggested next move for your shop</label>
+            <label class="dg-check-label"><input type="checkbox" name="draftTopic" value="suggested_moves" checked> Suggested next move for your business</label>
           </div>
         </fieldset>
 
@@ -160,7 +160,7 @@
 
       <form id="digestSignupForm" class="dg-sub-form" novalidate hidden>
         <input type="hidden" name="email" id="digestHiddenEmail">
-        <label>Competitor shop<input type="text" inputmode="url" name="shop" required maxlength="300" placeholder="https://competitor-shop.com"></label>
+        <label>Competitor shop<input type="text" inputmode="url" name="shop" required maxlength="300" placeholder="https://competitor-website.com"></label>
         <label>Another shop <span>(optional)</span><input type="text" inputmode="url" name="shop" maxlength="300"></label>
         <label>Another shop <span>(optional)</span><input type="text" inputmode="url" name="shop" maxlength="300"></label>
 

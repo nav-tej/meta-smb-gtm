@@ -1006,7 +1006,7 @@
 
     if (!websiteImageCandidates.length) {
       if (!status.dataset.explicitMessage) {
-        status.textContent = 'Enter your website or choose a listing to browse verified images, or upload a photo.';
+        status.textContent = 'Enter your website or choose a page to see its images, or upload a photo.';
       }
       return;
     }

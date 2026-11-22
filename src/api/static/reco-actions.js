@@ -1120,12 +1120,20 @@
         { label: 'Gift ideas', directive: 'Gift ideas for my shop this season' },
         { label: 'Weekly post ideas', directive: 'What should I post on Instagram this week?' }
       ];
+      // A services business gets inquiries instead of gift ideas (parses to the leads focus).
+      var OWN_SERVICES_CHIPS = [
+        OWN_CHIPS[0],
+        { label: 'Easier moves', directive: 'Show me easier moves for a solo business' },
+        { label: 'More inquiries', directive: 'How can I get more inquiries this month?' },
+        OWN_CHIPS[3]
+      ];
       var syncSteerChips = function () {
         var m = modes();
         var sample = !!(m && m.isSampleMode && m.isSampleMode());
         var snap = window.museAccount && window.museAccount.getSnapshot ? window.museAccount.getSnapshot() : null;
         var isOwnSignedIn = !!(snap && snap.user && !sample);
-        var targetSet = isOwnSignedIn ? OWN_CHIPS : SAMPLE_CHIPS;
+        var services = document.documentElement.dataset.ownBusinessType === 'services';
+        var targetSet = isOwnSignedIn ? (services ? OWN_SERVICES_CHIPS : OWN_CHIPS) : SAMPLE_CHIPS;
         steerChips.forEach(function (btn, idx) {
           var item = targetSet[idx];
           if (!item) return;
@@ -1139,6 +1147,7 @@
       }
       window.addEventListener('muse:mode-change', syncSteerChips);
       window.addEventListener('muse:account-change', syncSteerChips);
+      window.addEventListener('muse:own-business-type', syncSteerChips);
 
       steerChips.forEach(function (btn) {
         btn.addEventListener('click', function () {

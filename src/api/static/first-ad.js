@@ -6,15 +6,15 @@
     inquiries: {
       label: 'Start conversations & inquiries',
       metaObjective: 'Engagement / Messages (or Traffic to inquiry page); verify in Ads Manager',
-      note: 'Suggested starting approach: Ideal when you take custom inquiries, book calls, or sell via messages without online checkout.',
-      sampleNote: 'Suggested starting approach: Ideal when you take custom orders or sell via DMs without online checkout.',
+      note: 'Ideal when you take custom inquiries, book calls, or sell via messages without online checkout.',
+      sampleNote: 'Ideal when you take custom orders or sell via DMs without online checkout.',
     },
     visits: {
       label: 'Bring visitors to your website',
       sampleLabel: 'Bring visitors to your shop',
       metaObjective: 'Traffic (Link clicks / Landing page views); verify in Ads Manager',
-      note: 'Suggested starting approach: Sends interested people to read a page, see your work, or book a call.',
-      sampleNote: 'Suggested starting approach: Sends interested buyers directly to your product or shop listing.',
+      note: 'Sends interested people to read a page, see your work, or book a call.',
+      sampleNote: 'Sends interested buyers directly to your product or shop listing.',
     },
     sales: {
       label: 'Test a direct offer',

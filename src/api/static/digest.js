@@ -164,7 +164,7 @@
     if (status) {
       status.textContent = competitors.length
         ? `Showing your personal watchlist for ${shopName}.`
-        : `Personal digest for ${shopName} starts once you add your shop website or watched competitors.`;
+        : `Personal digest for ${shopName} starts once you add your website or watched competitors.`;
       status.hidden = false;
     }
 
@@ -180,7 +180,7 @@
       write('dgHeroSource', 'Personal workspace · 0 runs used to inspect');
     } else {
       write('dgHeroTitle', 'Your personal digest starts empty until you add competitors');
-      write('dgHeroBody', 'Connect your shop website and pick up to 3 competitors to track price changes, new listings, and personalized next moves, or view the sample digest.');
+      write('dgHeroBody', 'Connect your website and pick up to 3 competitors to track price changes, new pages, and personalized next moves, or view the sample digest.');
       const link = document.getElementById('dgHeroLink');
       if (link) {
         link.setAttribute('href', '/welcome?step=3');
@@ -194,7 +194,7 @@
     if (stats) {
       stats.replaceChildren(
         el('li', { class: 'dg-stat' }, el('strong', {}, String(competitors.length)), el('span', {}, 'personal competitors watched')),
-        el('li', { class: 'dg-stat' }, el('strong', {}, shopUrls.length ? 'Connected' : 'Not added'), el('span', {}, 'your shop website')),
+        el('li', { class: 'dg-stat' }, el('strong', {}, shopUrls.length ? 'Connected' : 'Not added'), el('span', {}, 'your website')),
         el('li', { class: 'dg-stat' }, el('strong', {}, '0 runs'), el('span', {}, 'used to view your digest'))
       );
     }
@@ -228,9 +228,9 @@
       recos.replaceChildren();
       const li = el('li', { class: 'dg-reco high' });
       li.appendChild(el('span', { class: 'ms-chip high' }, 'My workspace'));
-      li.appendChild(el('strong', {}, shopUrls.length ? 'Draft a post from your shop website' : 'Add your shop website in My workspace'));
+      li.appendChild(el('strong', {}, shopUrls.length ? 'Draft a post from your website' : 'Add your website in My workspace'));
       li.appendChild(el('p', {}, shopUrls.length
-        ? 'Jump straight to Studio to create an ad or social post using your own products and photos.'
+        ? 'Jump straight to Studio to create an ad or social post with your own photos and words.'
         : 'Paste your shop URL or product photo in Studio to generate custom creatives for your own store.'));
       li.appendChild(el('a', { href: '/create' }, 'Open Studio in My workspace →'));
       const sampleLi = el('li', { class: 'dg-reco medium' });

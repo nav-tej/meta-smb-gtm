@@ -69,6 +69,24 @@ def _today_iso() -> str:
     return datetime.now(UTC).date().isoformat()
 
 
+# Channel keys are lower case ("linkedin", "tiktok"); str.title() would print "Linkedin".
+_CHANNEL_NAMES = {
+    "linkedin": "LinkedIn",
+    "tiktok": "TikTok",
+    "youtube": "YouTube",
+    "x": "X",
+    "facebook": "Facebook",
+    "instagram": "Instagram",
+    "pinterest": "Pinterest",
+    "etsy": "Etsy",
+}
+
+
+def _channel_name(channel: object) -> str:
+    key = str(channel or "").strip()
+    return _CHANNEL_NAMES.get(key.lower(), key.title())
+
+
 _PRICE_TOKEN_RE = re.compile(
     r"\b(EUR|GBP|USD|CAD|AUD|CHF|JPY|INR)\s*([0-9]{1,5}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?)"
     r"|([$€£¥₹])\s*([0-9]{1,5}(?:,[0-9]{3})*(?:\.[0-9]{1,2})?)",
@@ -572,7 +590,7 @@ def parse_context_to_proposals(
                 id="pref-excluded-channels",
                 key="excluded_channels",
                 label="Unavailable channels",
-                value=f"Exclude {', '.join(c.title() for c in excluded_channels)}",
+                value=f"Exclude {', '.join(_channel_name(c) for c in excluded_channels)}",
                 kind="preference",
                 scope="shop_default",
                 source=actual_source,  # type: ignore[arg-type]
@@ -587,7 +605,7 @@ def parse_context_to_proposals(
                 id="pref-allowed-channels",
                 key="channels",
                 label="Active channels",
-                value=", ".join(c.title() for c in allowed_channels),
+                value=", ".join(_channel_name(c) for c in allowed_channels),
                 kind="preference",
                 scope="shop_default",
                 source=actual_source,  # type: ignore[arg-type]
@@ -608,8 +626,8 @@ def parse_context_to_proposals(
                     {
                         "key": "channels",
                         "message": (
-                            f"You mentioned {ch.title()}, which is currently marked as excluded. "
-                            "Choose which preference should win."
+                            f"You mentioned {_channel_name(ch)}, which is currently marked as "
+                            "excluded. Choose which preference should win."
                         ),
                     }
                 )
@@ -900,11 +918,11 @@ def suggest_memory_updates(
                 SuggestedMemoryUpdate(
                     id=f"suggest-exclude-{ch}",
                     key="excluded_channels",
-                    label=f"Stop suggesting {ch.title()} moves",
-                    proposed_value=f"Exclude {ch.title()} from recommendations",
+                    label=f"Stop suggesting {_channel_name(ch)} moves",
+                    proposed_value=f"Exclude {_channel_name(ch)} from recommendations",
                     kind="preference",
                     reason_signal=(
-                        f"Based on your '{ch.title()}' unavailable/wrong-channel feedback."
+                        f"Based on your '{_channel_name(ch)}' unavailable/wrong-channel feedback."
                     ),
                     patch={"exclude_channel": ch},
                     dismiss_count=ch_count,
@@ -1008,8 +1026,8 @@ def respond_to_suggestion(
                 new_entry = SellerMemoryEntry(
                     id=f"pref-exclude-{ch}",
                     key="excluded_channels",
-                    label=f"Excluded channel: {ch.title()}",
-                    value=f"Exclude {ch.title()}",
+                    label=f"Excluded channel: {_channel_name(ch)}",
+                    value=f"Exclude {_channel_name(ch)}",
                     kind="preference",
                     scope="shop_default",
                     source="feedback_suggestion",
@@ -1207,7 +1225,7 @@ def _services_moves(
     any_comp: CompetitorEntry | None,
 ) -> list[dict[str, Any]]:
     """Moves for a business that sells a service. Same categories, so scoring still applies."""
-    channel_title = primary_channel.title()
+    channel_title = _channel_name(primary_channel)
 
     def comp_fields(comp: CompetitorEntry | None) -> dict[str, Any]:
         return {
@@ -1478,7 +1496,7 @@ def rank_seller_recommendations(
             any_comp=any_comp,
         )
     elif primary_channel is not None:
-        channel_title = primary_channel.title()
+        channel_title = _channel_name(primary_channel)
 
         # Move A: Price positioning / Entry offer (rises when competitor role == "price_reference")
         comp_a = price_comp or any_comp
@@ -1746,7 +1764,7 @@ def rank_seller_recommendations(
             "; ".join(reasons)
             if reasons
             else (
-                f"Uses {business_name}'s {str(move['channel']).title()} channel. "
+                f"Uses {business_name}'s {_channel_name(move['channel'])} channel. "
                 "Based on your setup, not new research."
                 if move.get("channel")
                 else f"Based on {business_name}'s saved setup, not new research."
@@ -1967,7 +1985,7 @@ def rank_seller_recommendations(
     )
 
     if all_channels_excluded:
-        excl_names = ", ".join(c.title() for c in sorted(excluded_channels))
+        excl_names = ", ".join(_channel_name(c) for c in sorted(excluded_channels))
         missing_prompt = (
             f"All available channels are excluded ({excl_names}). "
             "Restore a posting channel in Your context or clear channel exclusions "
