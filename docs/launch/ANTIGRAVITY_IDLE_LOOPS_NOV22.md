@@ -58,4 +58,16 @@ AssertionError: Idle /api/ request loop detected:
 
 ---
 
-*(Checkpoint 3: full gate and both launch audits in progress...)*
+## Verification (Full Gate & Both Audits)
+- **Full offline gate (`DEMO_MODE=true META_MODEL_API_KEY= DEMO_KEY= make PY=/Users/nav/meta-smb-gtm/.venv/bin check`):**
+  - `ruff check .`: All checks passed!
+  - `ruff format --check .`: `315 files already formatted`
+  - `pytest`: **725 passed, 2 skipped, 1 warning in 347.52s (0:05:47)** (`tests/test_idle_request_loops_e2e.py` included and passing).
+- **Account audit (`DEMO_MODE=true META_MODEL_API_KEY= DEMO_KEY= /usr/bin/python3 tests/launch_account_audit.py`):** **27 passed, 0 failed**.
+- **Guest audit (`DEMO_MODE=true META_MODEL_API_KEY= DEMO_KEY= /usr/bin/python3 tests/launch_browser_audit.py`):** **20 passed, 0 failed**.
+
+## What Was Not Verified
+- Hosted `*.vercel.app` targets, live paid Muse API calls, or `.env` configuration (out of scope; local `127.0.0.1` server only).
+- Multi-hour idle tabs beyond the 20-second idle window (note: background timers firing longer than 20s would require a longer window).
+
+Ownership released.
