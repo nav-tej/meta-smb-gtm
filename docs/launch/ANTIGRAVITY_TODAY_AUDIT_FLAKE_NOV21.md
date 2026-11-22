@@ -52,4 +52,28 @@ Command: `DEMO_MODE=true META_MODEL_API_KEY= DEMO_KEY= /usr/bin/python3 tests/la
 
 ---
 
-*(Checkpoint 3: 5 full account audits overlapping a concurrent full gate run in progress...)*
+## Checkpoint 3: 5 Full Account Audits Under Concurrent Full Gate Load (`5/5 PASS`, `27/27` each)
+
+Ran 5 consecutive full `tests/launch_account_audit.py` runs while `DEMO_MODE=true META_MODEL_API_KEY= DEMO_KEY= make PY=/Users/nav/meta-smb-gtm/.venv/bin check` ran concurrently in the same worktree (matching the Nov 20 overlap condition):
+
+| Overlap Run | Result | Duration | Start Load (`uptime`) | End Load (`uptime`) |
+|---|---|---|---|---|
+| 01/05 | PASS (`27/27`) | 47.9s | `4.82 6.81 5.73` | `7.08 7.06 5.88` |
+| 02/05 | PASS (`27/27`) | 44.8s | `7.08 7.06 5.88` | `6.25 6.89 5.88` |
+| 03/05 | PASS (`27/27`) | 43.3s | `6.25 6.89 5.88` | `5.47 6.61 5.83` |
+| 04/05 | PASS (`27/27`) | 44.0s | `5.47 6.61 5.83` | `4.81 6.29 5.75` |
+| 05/05 | PASS (`27/27`) | 43.9s | `4.81 6.29 5.75` | `4.88 6.08 5.70` |
+
+- **Concurrent full offline gate (`make check`):** `ruff check` + `ruff format --check` clean; pytest **724 passed, 2 skipped, 1 warning in 268.27s (0:04:28)** (`rc=0`).
+- All 25 full audit logs (`solo_run_01.log`..`solo_run_20.log`, `overlap_run_01.log`..`overlap_run_05.log`, `concurrent_gate.log`) were saved during the run.
+
+## Findings & Conclusion
+- **Nothing failed** across 3/3 `--match` runs, 20/20 consecutive solo full account audits (`540/540` cases), and 5/5 full account audits overlapping a concurrent full gate (`135/135` cases) — **25/25 full runs (`675/675` cases) passed** at `740d1fe`.
+- **Mechanism assessment:** Static review of `sharedGet` (`src/api/static/account.js:526-578`) and `tests/shared_get_contract.cjs` found no path where an aborted or completed waiter fails to settle. Combined with 25/25 passing full runs (including under concurrent gate load and 1-minute load spikes up to `11.74`), the Nov 20 20-minute window (which coincided with a ~13-minute host stall) points to a transient machine stall rather than a reproducible `sharedGet` or audit-wait bug.
+- **Changes made:** None to `src/` or `tests/` (per time-box rule 4: stop after 20 consecutive solo + 5 under-gate runs pass). Only this report was added.
+
+## What Was Not Verified
+- Artificial host-wide 13-minute OS stalls or thermal throttling (not simulated; shared Mac).
+- Live hosted Vercel previews, paid Muse calls, or `.env` configuration (out of scope).
+
+Ownership released.
