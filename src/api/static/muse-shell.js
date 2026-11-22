@@ -1022,7 +1022,7 @@
     head.append(titleBox, actions);
     const body = el('div', { class: 'ms-brief-body', id: 'msBriefBody' });
     const list = el('ul', { class: 'ms-watch' });
-    const CHIP = { new: 'New', first: 'First check', fresh: 'Fresh Muse brief', changed: 'Changed' };
+    const CHIP = { new: 'New', first: 'First check', fresh: 'Fresh Muse brief', changed: 'Changed', unchecked: 'Not checked yet' };
     const renderItems = (items) => {
       list.replaceChildren();
       for (const item of items) {
@@ -1111,22 +1111,49 @@
       else { const ul = el('ul', {}); rows.forEach((row) => ul.appendChild(row)); box.appendChild(ul); }
       if (note) box.appendChild(el('p', { class: 'ms-muted ms-card-note' }, note));
     };
-    const renderBrief = (brief) => {
+    const ownMoveLink = (link, item) => {
+      link.href = '/create?workspace=own';
+      link.onclick = (event) => {
+        if (isSampleShopMode() || !window.museModes?.current?.().isAuthenticated) {
+          event.preventDefault();
+          return;
+        }
+        const id = window.museSellerMemory?.createStudioHandoff?.(item.recommendation || item);
+        if (!id) {
+          event.preventDefault();
+          toast('Your context is still loading. Try this move again.', 'warn');
+          return;
+        }
+        link.href = `/create?workspace=own&sm_handoff=${encodeURIComponent(id)}`;
+      };
+    };
+    const renderBrief = (brief, own = false) => {
+      if (own) {
+        showBriefFrame(`${brief.business_name || 'Your business'} · today’s brief`, 'From your saved context and results. Reading or re-checking uses 0 runs.', true);
+        goAlt.hidden = true;
+        recheck.disabled = false;
+        recheck.title = 'Re-read your saved context · 0 runs';
+        renderItems(brief.items || []);
+      }
+      const reason = (item) => own ? `${item.over_budget ? 'Heads up' : 'Why this fits'}: ${item.reason || ''}` : String(item.reason || '');
       if (Array.isArray(brief.items) && brief.items.length) renderItems(brief.items);
       const focus = brief.focus || brief.move;
       if (focus?.title) {
         moveChip.textContent = `Focus of the day · ${focus.impact || 'high'} impact`;
         moveTitle.textContent = String(focus.title);
-        moveReason.textContent = String(focus.reason || '');
-        const href = safeHref(focus.href, true);
+        moveReason.textContent = reason(focus);
+        const href = own ? '/create?workspace=own' : safeHref(focus.href, true);
         linkTo(go, href, goLabel(href));
-        setMoveIdea(true);
+        go.onclick = null;
+        if (own) ownMoveLink(go, focus);
+        setMoveIdea(!own);
       }
       const actions = Array.isArray(brief.action_items) ? brief.action_items.slice(0, 3) : [];
       card(actionsBox, 'Top 3 actions', actions.map((item, index) => {
         const li = el('li', { class: `ms-action ${item.impact || ''}` });
-        const link = el('a', { href: safeHref(item.href, true) }, `${index + 1}. ${String(item.title || '')}`);
-        li.append(link, el('span', { class: 'ms-note' }, String(item.reason || '')));
+        const link = el('a', { href: own ? '/create?workspace=own' : safeHref(item.href, true) }, `${index + 1}. ${String(item.title || '')}`);
+        if (own) ownMoveLink(link, item);
+        li.append(link, el('span', { class: 'ms-note' }, reason(item)));
         if (item.source) li.appendChild(el('span', { class: 'ms-where' }, String(item.source)));
         return li;
       }), 'No actions today.');
@@ -1137,17 +1164,17 @@
         return li;
       }), String(brief.overnight_note || 'No competitor changes logged overnight.'), changes.length ? String(brief.overnight_note || '') : '');
       const trends = Array.isArray(brief.trends) ? brief.trends : [];
-      card(trendsBox, 'Performance trends', trends.map((trend) => {
+      card(trendsBox, own ? 'Your logged results' : 'Performance trends', trends.map((trend) => {
         const arrow = trend.direction === 'up' ? '▲' : trend.direction === 'down' ? '▼' : '•';
         const tone = trend.good === true ? 'good' : trend.good === false ? 'bad' : '';
         const li = el('li', { class: `ms-trend ${tone}` });
         li.append(el('strong', {}, `${arrow} ${String(trend.value || '')}`), el('span', {}, ` ${String(trend.label || '')}`));
         if (trend.note) li.appendChild(el('span', { class: 'ms-note' }, String(trend.note)));
         return li;
-      }), 'Add campaign data to see trends.', String(brief.trends_source || ''));
-      if (brief.overnight_note) meta.lastChild.textContent = `Watchlist: 4 competitors · ${brief.overnight_note}`;
+      }), own ? 'Log a result after posting to see it here.' : 'Add campaign data to see trends.', String(brief.trends_source || ''));
+      if (brief.overnight_note) meta.lastChild.textContent = `Watchlist: ${own ? (brief.items || []).length : 4} competitors · ${brief.overnight_note}`;
       const built = brief.generated_at ? new Date(brief.generated_at).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) : '';
-      sourceNote.textContent = `${String(brief.source || '')}${built ? ` Generated ${built}; cached for today.` : ''}`;
+      sourceNote.textContent = `${String(brief.source || '')}${built ? ` Generated ${built}${own ? ' from your current saved context.' : '; cached for today.'}` : ''}`;
     };
     const setLoading = (loading, message = '') => {
       section.classList.toggle('ms-loading', loading);
@@ -1156,22 +1183,30 @@
       statusLine.hidden = !message;
     };
     const loadBrief = async (refresh = false) => {
-      if (!isSampleShopMode()) return false;
+      const own = !isSampleShopMode();
+      if (own && !window.museModes?.current?.().isAuthenticated) return false;
       const guard = window.museModes?.bindAsyncGuard?.() || { isCurrent: () => true };
-      setLoading(true, refresh ? 'Rebuilding sample brief…' : 'Loading sample brief…');
+      setLoading(true, own ? 'Loading your brief…' : refresh ? 'Rebuilding sample brief…' : 'Loading sample brief…');
       retry.hidden = true;
       try {
-        const response = await museFetch(`/api/v1/daily-brief${refresh ? '?refresh=true' : ''}`, {}, { retries: 2, timeoutMs: 15000 });
+        const response = await museFetch(`/api/v1/daily-brief${own ? '?workspace=own' : refresh ? '?refresh=true' : ''}`, {}, { retries: own ? 0 : 2, timeoutMs: 15000 });
+        if (own && response.status === 409 && guard.isCurrent()) {
+          setLoading(false);
+          return false;
+        }
         if (!guard.isCurrent()) return false;
         if (!response.ok) throw new Error(await errorMessage(response, 'Could not load sample brief.'));
         const data = await response.json();
         if (!guard.isCurrent()) return false;
-        renderBrief(data);
+        renderBrief(data, own);
         setLoading(false);
         return true;
       } catch (error) {
         if (!guard.isCurrent()) return false;
-        setLoading(false, `${error.message || 'Could not load today’s brief.'} Showing the saved sample brief.`);
+        if (own) {
+          showOwnPlaceholder();
+          setLoading(false, 'Could not load your brief. Try again; your saved context is unchanged.');
+        } else setLoading(false, `${error.message || 'Could not load today’s brief.'} Showing the saved sample brief.`);
         retry.hidden = false;
         return false;
       }
@@ -1188,6 +1223,29 @@
         weekly.textContent = digest.checks ? `This week: ${digest.total_changes} competitor change(s) across ${digest.checks} check(s).${first}` : String(digest.note || '');
       } catch { /* the weekly line is optional */ }
     };
+    const clearBriefCards = () => {
+      actionsBox.replaceChildren();
+      overnightBox.replaceChildren();
+      trendsBox.replaceChildren();
+    };
+    const showOwnPlaceholder = () => {
+      clearBriefCards();
+      list.replaceChildren();
+      setMoveIdea(false);
+      go.onclick = null;
+      showBriefFrame('Your shop’s brief is not built yet', 'Today you can make a post from your own website below. The sample shop shows what a full brief looks like.', false);
+      meta.lastChild.textContent = 'My workspace';
+      moveChip.textContent = 'Today';
+      moveTitle.textContent = 'Start today’s post from your website';
+      moveReason.textContent = 'Pick an item or service from your site and Muse drafts the words. Nothing is posted until you post it yourself.';
+      linkTo(go, 'editor', 'Start today’s post ↓');
+      linkTo(goAlt, 'sample', 'See a sample brief');
+      goAlt.hidden = false;
+      sourceNote.textContent = '';
+      recheck.disabled = true;
+    };
+    let appliedMode = '';
+    let initialOwnRead = false;
     const applyModeState = (modeState) => {
       const s = modeState || window.museModes?.current?.() || {
         state: isSampleShopMode() ? 'guest_sample' : 'guest_entry',
@@ -1196,6 +1254,11 @@
         isError: false,
         isExpired: false
       };
+      const modeKey = `${s.state}:${s.ownerId || ''}:${Boolean(s.isLoading)}:${Boolean(s.isError)}:${Boolean(s.isExpired)}`;
+      if (modeKey === appliedMode) return;
+      appliedMode = modeKey;
+      clearBriefCards();
+      go.onclick = null;
       retry.hidden = true;
       weekly.textContent = '';
       goAlt.hidden = true;
@@ -1235,6 +1298,7 @@
       }
       if (s.isSample) {
         showBriefFrame(SAMPLE_TITLE, SAMPLE_PLAN, true);
+        recheck.title = 'Check competitors’ public pages and rebuild today’s brief · 1 run';
         renderItems(WATCH);
         meta.lastChild.textContent = 'Sample watchlist: 4 competitors · 6 shop pages · last checked Nov 3';
         moveChip.textContent = 'Sample focus · high impact';
@@ -1248,18 +1312,11 @@
         loadWeekly();
         return;
       }
-      // Own workspace or signed out. /today builds a brief for the sample shop only, so say so plainly
-      // and point at what works today: the post editor below and the sample brief.
+      // Keep private data out of guest and unfinished-setup states.
       list.replaceChildren();
       setMoveIdea(false);
       if (s.isAuthenticated) {
-        showBriefFrame('Your shop’s brief is not built yet', 'Today you can make a post from your own website below. The sample shop shows what a full brief looks like.', false);
-        meta.lastChild.textContent = 'My workspace';
-        moveChip.textContent = 'Today';
-        moveTitle.textContent = 'Start today’s post from your website';
-        moveReason.textContent = 'Pick an item or service from your site and Muse drafts the words. Nothing is posted until you post it yourself.';
-        linkTo(go, 'editor', 'Start today’s post ↓');
-        linkTo(goAlt, 'sample', 'See a sample brief');
+        showOwnPlaceholder();
       } else {
         showBriefFrame('See what a daily brief looks like', 'The sample shop’s brief shows what changed at the four shops it watches and three things to do today. Reading a brief never uses a Muse credit.', false);
         meta.lastChild.textContent = 'Not signed in · your own workspace starts empty';
@@ -1277,7 +1334,7 @@
     retry.addEventListener('click', () => { loadBrief(false); loadWeekly(); });
     recheck.addEventListener('click', async () => {
       if (!isSampleShopMode()) {
-        toast('Add your shop competitors in onboarding first to run a personal brief check.');
+        await loadBrief(true);
         return;
       }
       if (!requireRun('Brief re-check')) return;
@@ -1299,7 +1356,13 @@
       toast(ok ? (monitorNote || 'Brief rebuilt with the latest competitor check') : 'Could not rebuild the brief; showing the saved one.', ok && !monitorNote ? '' : 'warn');
     });
     if (window.museModes?.subscribe) window.museModes.subscribe(applyModeState);
-    if (window.museModes?.resolve) window.museModes.resolve().then(applyModeState);
+    if (window.museModes?.resolve) window.museModes.resolve().then((s) => {
+      applyModeState(s);
+      if (!initialOwnRead && s.isAuthenticated && !s.isSample && !s.isError && !s.isExpired) {
+        initialOwnRead = true;
+        loadBrief(false);
+      }
+    });
     else applyModeState();
     body.append(statusRow, move, columns, list, weekly);
     body.appendChild(sourceNote);

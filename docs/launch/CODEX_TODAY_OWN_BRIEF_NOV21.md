@@ -11,3 +11,9 @@
 - Evidence: `/Users/nav/muse-worktrees/validation-today-own-brief/before-gate.log`.
 - Both baseline audits and eight Node contracts are running sequentially in exec session 54607. No runtime edits yet. Next: inspect every result, then implement and verify.
 - Delegated disjoint scopes: Averroes owns backend and API tests; James owns new Chromium test; coordinator owns brief frontend, existing-test updates, versions and integration. Both workers must wait for all baseline checks before editing. No other agent scope claimed.
+
+## Frontend implementation checkpoint — November 22, 2026
+- Baseline audits: account **27 passed, 0 failed**, guest **20 passed, 0 failed**. All **8/8 Node runners passed** (creator journey: 7/7 criteria). Durable `before-*` evidence files record each result.
+- Frontend brief now reads own context once after initial account readiness; account/mode subscriptions clear private cards without fetching own data. It renders business name, ranker reasons with Heads up, honest watch status and logged results, and hands the selected recommendation to the own studio. Re-check is a free read. Failure restores pass-14 card and retry; setup 409 remains the existing setup card.
+- Only seller-memory export added: `createStudioHandoff`. Loader versions bumped from upstream versions to `20261121-cx1`; own /today call ceiling 8→9 for the single brief request, others unchanged. No CSS changed.
+- `node --check src/api/static/muse-shell.js` and `node --check src/api/static/seller-memory.js` passed. Integration tests pending backend and Chromium worker patches. Two old API tests require minimal expectation changes because they explicitly expect the stub or signed-out own access.
