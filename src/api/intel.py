@@ -9,11 +9,11 @@ from pathlib import Path
 from typing import Annotated, Any
 from urllib.parse import urlparse
 
-from fastapi import APIRouter, Depends, Query, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
 
 from src.api.cache_policy import cache_for_everyone
-from src.api.demo import LiveMode, demo_unavailable
+from src.api.demo import LiveMode, _client_ip_hash, demo_unavailable
 from src.clients.ad_library import (
     MetaAdLibraryClient,
     build_ad_library_search_url,
@@ -33,7 +33,7 @@ from src.models.seller import (
     SellerFootprintAudit,
     SellerProfile,
 )
-from src.services import demo, result_cache
+from src.services import demo, result_cache, scan_guard
 from src.services.accounts import resolve_account
 from src.services.competitor_intel import CompetitorIntelService, collect_entries
 from src.services.research_cache import NAMESPACE_AD_PREVIEWS, cached_research
@@ -115,9 +115,45 @@ async def audit_seller(
     )
 
 
+SCAN_CACHE_HEADER = "X-Muse-Scan-Cache"
+BLOCKED_SCAN_HOSTS = ("instagram.com", "facebook.com", "saatchiart.com", "etsy.com")
+
+
+def scan_url(raw_url: str) -> tuple[str, str, bool]:
+    """(address to crawl, host, whether the host refuses automated reading)."""
+    normalized = raw_url if "://" in raw_url else f"https://{raw_url.lstrip('@')}"
+    host = (urlparse(normalized).hostname or "").lower()
+    return normalized, host, any(name in host for name in BLOCKED_SCAN_HOSTS)
+
+
+def reserve_scan_crawls(
+    http_request: Request, response: Response, urls: list[str], max_urls: int
+) -> None:
+    """Refuse a public scan with 429 before any crawl when the visitor is over the cap.
+
+    Both public scans (this route and /seller-memory/scan) call it with every address they would
+    crawl. The cap and the cache in src/services/scan_guard.py are off unless configured.
+    """
+    fresh = scan_guard.fresh_count(urls, max_urls)
+    retry_after = scan_guard.reserve_scans(_client_ip_hash(http_request), fresh)
+    if retry_after is not None:
+        raise HTTPException(
+            status_code=429,
+            detail=scan_guard.refusal_message(retry_after),
+            headers={"Retry-After": str(retry_after)},
+        )
+    if fresh < len(urls):
+        response.headers[SCAN_CACHE_HEADER] = f"{len(urls) - fresh}/{len(urls)}"
+
+
 @router.post("/ingest-storefront")
-async def ingest_storefront(request: IngestStorefrontRequest) -> dict[str, Any]:
-    """Crawl a seller's own website & marketplace pages to build a live reference profile."""
+async def ingest_storefront(
+    request: IngestStorefrontRequest, http_request: Request, response: Response
+) -> dict[str, Any]:
+    """Crawl a seller's own website & marketplace pages to build a live reference profile.
+
+    Public, because setup and the editors use it before sign-in; see reserve_scan_crawls.
+    """
     sources: list[tuple[str, str]] = []
     if request.website_url.strip():
         sources.append(("own_website", request.website_url.strip()))
@@ -128,17 +164,20 @@ async def ingest_storefront(request: IngestStorefrontRequest) -> dict[str, Any]:
         if s_url.strip():
             sources.append(("social", s_url.strip()))
 
+    targets = [(kind, raw_url, *scan_url(raw_url)) for kind, raw_url in sources]
+    reserve_scan_crawls(
+        http_request,
+        response,
+        [normalized for _, _, normalized, _, blocked in targets if not blocked],
+        request.max_urls_per_source,
+    )
+
     channel_results: list[dict[str, Any]] = []
     discovered_items: list[dict[str, Any]] = []
     price_hints: list[str] = []
 
-    for kind, raw_url in sources:
-        normalized = raw_url if "://" in raw_url else f"https://{raw_url.lstrip('@')}"
-        host = (urlparse(normalized).hostname or "").lower()
-        if any(
-            blocked in host
-            for blocked in ("instagram.com", "facebook.com", "saatchiart.com", "etsy.com")
-        ):
+    for kind, raw_url, normalized, host, blocked in targets:
+        if blocked:
             channel_results.append(
                 {
                     "kind": kind,
@@ -147,19 +186,23 @@ async def ingest_storefront(request: IngestStorefrontRequest) -> dict[str, Any]:
                     "status": "vision_or_manual",
                     "pages_found": 0,
                     "note": (
-                        f"{host} blocks automated crawlers (robots.txt / 403). Connected via "
-                        "profile metadata + Muse Spark 1.3 Vision screenshot analyzer."
+                        f"{host} does not allow automated reading, so Muse did not scan it. "
+                        "Add items from it yourself."
                     ),
                 }
             )
             continue
 
         try:
-            entries, sitemaps = await collect_entries(
+            entries, sitemaps = await scan_guard.crawl(
                 normalized,
-                fetch_titles=True,
-                max_urls=request.max_urls_per_source,
-                max_title_fetches=12,
+                request.max_urls_per_source,
+                lambda normalized=normalized: collect_entries(
+                    normalized,
+                    fetch_titles=True,
+                    max_urls=request.max_urls_per_source,
+                    max_title_fetches=12,
+                ),
             )
             channel_results.append(
                 {

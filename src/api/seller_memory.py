@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 
 from src.api import demo as demo_api
 from src.api.demo import demo_unavailable
+from src.api.intel import reserve_scan_crawls, scan_url
 from src.clients.meta import MetaAPIError, get_meta_client
 from src.models.seller import (
     AccessPreferences,
@@ -25,6 +26,7 @@ from src.models.seller import (
     TastePreferences,
 )
 from src.models.voice import VoiceProfile
+from src.services import scan_guard
 from src.services.accounts import (
     AccountSession,
     load_workspace,
@@ -456,13 +458,15 @@ async def scan_shop_baseline(
                 }
             )
     else:
-        for kind, raw_url in sources:
-            normalized = raw_url if "://" in raw_url else f"https://{raw_url.lstrip('@')}"
-            host = (urlparse(normalized).hostname or "").lower()
-            if any(
-                blocked in host
-                for blocked in ("instagram.com", "facebook.com", "saatchiart.com", "etsy.com")
-            ):
+        targets = [(kind, *scan_url(raw_url)) for kind, raw_url in sources]
+        reserve_scan_crawls(
+            request,
+            response,
+            [normalized for _, normalized, _, blocked in targets if not blocked],
+            body.max_urls_per_source,
+        )
+        for kind, normalized, host, blocked in targets:
+            if blocked:
                 channel_results.append(
                     {
                         "kind": kind,
@@ -479,11 +483,15 @@ async def scan_shop_baseline(
                 continue
 
             try:
-                entries, _sitemaps = await collect_entries(
+                entries, _sitemaps = await scan_guard.crawl(
                     normalized,
-                    fetch_titles=True,
-                    max_urls=body.max_urls_per_source,
-                    max_title_fetches=12,
+                    body.max_urls_per_source,
+                    lambda normalized=normalized: collect_entries(
+                        normalized,
+                        fetch_titles=True,
+                        max_urls=body.max_urls_per_source,
+                        max_title_fetches=12,
+                    ),
                 )
                 channel_results.append(
                     {

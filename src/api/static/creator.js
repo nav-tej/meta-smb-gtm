@@ -1163,6 +1163,11 @@
       const response = await fetch('/api/v1/ingest-storefront', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ business_name: (shopName || host).slice(0, 160), website_url: url, max_urls_per_source: 30 }), signal: controller.signal });
       let data = {}; try { data = await response.json(); } catch { /* Gateways may return an HTML timeout page. */ }
       if (!current()) return;
+      // Too many scans from this connection: Muse did not try, so the next visit tries again.
+      if (response.status === 429) {
+        hint.textContent = typeof data.detail === 'string' && !/<html|traceback/i.test(data.detail) ? data.detail : `Muse could not check ${host} right now. Choose “Find products” to try again, or enter the details below.`;
+        return;
+      }
       tried = true;
       if (!response.ok) throw new Error('Shop website could not be read.');
       // A manual scan started meanwhile shows its own results.

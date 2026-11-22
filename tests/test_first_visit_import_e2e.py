@@ -608,6 +608,50 @@ def test_first_visit_brings_in_the_sellers_listings_e2e(live_server_url: str) ->
             assert not calls["outside"], calls["outside"]
             ctx.close()
 
+            # 9. Muse refuses the scan (too many from this connection, 429, see scan_guard.py):
+            #    each editor shows Muse's own words, records nothing as tried, and the next visit
+            #    scans again and brings the listing in.
+            REFUSAL = (
+                "Muse has checked a lot of websites from your connection in the last few "
+                "minutes. Try again in 4 minutes, or enter the details yourself."
+            )
+            ctx, page, calls, errors = open_page(browser)
+            refused = []
+
+            def refuse(route):
+                refused.append(route.request.url)
+                route.fulfill(
+                    status=429, content_type="application/json",
+                    headers={{"Retry-After": "200"}}, body=json.dumps({{"detail": REFUSAL}}),
+                )
+
+            page.route("**/api/v1/ingest-storefront", refuse)
+            page.goto(BASE + "/today", wait_until="domcontentloaded")
+            page.wait_for_function(
+                "document.getElementById('notice').textContent === " + json.dumps(REFUSAL),
+                timeout=15000,
+            )
+            assert page.locator("#importStatus").inner_text() == REFUSAL
+            assert tried(page) is None
+            page.goto(BASE + "/create", wait_until="domcontentloaded")
+            page.wait_for_function(
+                "document.getElementById('importHint').textContent === " + json.dumps(REFUSAL),
+                timeout=15000,
+            )
+            assert tried(page) is None
+            assert len(refused) == 2
+            page.unroute("**/api/v1/ingest-storefront")
+            page.goto(BASE + "/today", wait_until="domcontentloaded")
+            page.wait_for_function(
+                "document.getElementById('itemTitle').textContent === 'Speckled Stoneware Mug'"
+                " && document.getElementById('notice').textContent.startsWith('Started with')",
+                timeout=15000,
+            )
+            assert tried(page) == "today"
+            assert not errors, errors
+            assert not calls["outside"], calls["outside"]
+            ctx.close()
+
             browser.close()
         print("FIRST_VISIT_IMPORT_OK")
         """

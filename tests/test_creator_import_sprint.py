@@ -69,7 +69,9 @@ def test_ingest_storefront_blocked_domains_offline(
     channel = data["channels"][0]
     assert channel["status"] == "vision_or_manual"
     assert channel["pages_found"] == 0
-    assert "blocks automated crawlers" in channel["note"]
+    # Nothing reads the blocked site, so the note must not claim a connection or a Vision check.
+    assert "does not allow automated reading, so Muse did not scan it" in channel["note"]
+    assert "Vision" not in channel["note"] and "Connected" not in channel["note"]
     assert data["discovered_catalog_items"] == []
 
 

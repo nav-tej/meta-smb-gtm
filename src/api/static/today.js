@@ -558,10 +558,12 @@
       let data; try { data = await response.json(); } catch { throw new Error('The server could not finish. Your edits are still here.'); }
       if (!response.ok) {
         const detail = typeof data.detail === 'string' && !/<html|traceback/i.test(data.detail) ? data.detail : '';
-        if (response.status === 401 || response.status === 403) throw new Error(detail || 'Your session expired before Muse started, so no run was used. Sign in again; your edits are still here.');
-        if (response.status === 402 || response.status === 429) throw new Error(detail || 'You have reached your current run allowance. Check your plan or wait a moment; your edits are still here.');
-        if (response.status >= 500) throw new Error(detail || 'Muse is temporarily unavailable right now. No run was used and your edits are still here. Please try again shortly.');
-        throw new Error(detail || 'Check the item details and try again.');
+        // The status travels with the message: a refused website scan (429) is not a finished try.
+        const fail = (message) => Object.assign(new Error(message), { status: response.status });
+        if (response.status === 401 || response.status === 403) throw fail(detail || 'Your session expired before Muse started, so no run was used. Sign in again; your edits are still here.');
+        if (response.status === 402 || response.status === 429) throw fail(detail || 'You have reached your current run allowance. Check your plan or wait a moment; your edits are still here.');
+        if (response.status >= 500) throw fail(detail || 'Muse is temporarily unavailable right now. No run was used and your edits are still here. Please try again shortly.');
+        throw fail(detail || 'Check the item details and try again.');
       }
       return data;
     } catch (error) {
@@ -1106,6 +1108,12 @@
       notice(`Started with “${state.product.title}” from ${host}. Choose an image below, or choose “Change” to pick another listing.`);
     } catch (error) {
       if (!current()) return;
+      // Too many scans from this connection: Muse did not try, so the next visit tries again.
+      if (error?.status === 429) {
+        status(error.message);
+        notice(error.message);
+        return;
+      }
       tried = true;
       status(`We could not read ${host} automatically. ${error?.message || ''}`.trim());
       notice(`We could not read ${host} automatically. Choose “Find products” to try again, or enter your item manually.`);

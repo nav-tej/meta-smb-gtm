@@ -55,6 +55,10 @@ class Settings(BaseModel):
     demo_key: str = ""
     live_calls_per_hour: int = 5
     hosted_environment: bool = False
+    # Public website scan (POST /ingest-storefront) guards, per running instance; 0 turns each
+    # off. See src/services/scan_guard.py.
+    scan_cache_seconds: int = 0
+    scans_per_visitor_per_10_min: int = 0
 
     # Freemium accounts: verified users spend runs from a Supabase-tracked quota
     # instead of the shared demo key. 1 run = one live action; the trial is 3 runs,

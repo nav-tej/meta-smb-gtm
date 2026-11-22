@@ -606,7 +606,14 @@
           }),
         });
         if (!resp.ok) {
-          throw new Error('Muse could not read that website. Check the address or skip this step.');
+          // A refusal for too many scans carries Muse's own wording; anything else is the site.
+          let detail = '';
+          if (resp.status === 429) {
+            try { detail = (await resp.json()).detail; } catch { detail = ''; }
+          }
+          throw new Error(typeof detail === 'string' && detail && !/<html|traceback/i.test(detail)
+            ? detail
+            : 'Muse could not read that website. Check the address or skip this step.');
         }
         const data = await resp.json();
         const items = Array.isArray(data.discovered_catalog_items) ? data.discovered_catalog_items : [];
