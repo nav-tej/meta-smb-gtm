@@ -16,8 +16,8 @@
   <script src="/static/account.js?v=20261120-uxgap17" defer></script>
   <script src="/static/workspace-modes.js?v=20261117-uxgap6" defer></script>
   <script src="/static/muse-shell.js?v=20261120-uxgap17" defer></script>
-  <script src="/static/digest.js?v=20261121-uxgap19" defer></script>
-  <script src="/static/digest-signup.js?v=20261120-uxgap16" defer></script>
+  <script src="/static/digest.js?v=20261122-ag1" defer></script>
+  <script src="/static/digest-signup.js?v=20261122-ag1" defer></script>
 </head>
 <body>
   <header class="topbar ms-topbar">
@@ -47,7 +47,8 @@
     <ul class="dg-stats" id="dgStats" aria-label="This week in numbers"></ul>
 
     <section class="dg-section" aria-labelledby="dgCompTitle">
-      <div class="dg-section-head"><h2 id="dgCompTitle">Competitor activity</h2><a href="/portal#loop-research">Manage watchlist →</a></div>
+      <div class="dg-section-head"><h2 id="dgCompTitle">Competitor activity</h2><div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;"><button type="button" id="dgCheckNowBtn" class="dg-secondary-btn" hidden>Check now (free)</button><a href="/portal#loop-research">Manage watchlist →</a></div></div>
+      <p class="dg-note" id="dgCheckStatus" role="status" aria-live="polite" hidden></p>
       <div class="dg-grid" id="dgCompetitors"></div>
     </section>
 
@@ -111,7 +112,7 @@
         </label>
 
         <fieldset class="dg-options-group">
-          <legend>Canonical preview topics</legend>
+          <legend>What to include</legend>
           <div class="dg-topics-list">
             <label class="dg-check-label"><input type="checkbox" name="draftTopic" value="listing_changes" checked> New and removed listings or pages</label>
             <label class="dg-check-label"><input type="checkbox" name="draftTopic" value="pricing" checked> Pricing updates</label>

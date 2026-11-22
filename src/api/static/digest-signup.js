@@ -269,7 +269,9 @@
     });
     const shopInputs = [...(draftForm?.querySelectorAll('input[name="draftShop"]') || [])];
     const savedShops = Array.isArray(prefs.competitors) ? prefs.competitors : [];
-    shopInputs.forEach((inp, idx) => { inp.value = savedShops[idx] || ''; });
+    const fallbackShops = Array.isArray(window.__museWatchlistUrls) ? window.__museWatchlistUrls : [];
+    const prefillShops = savedShops.length ? savedShops : fallbackShops;
+    shopInputs.forEach((inp, idx) => { inp.value = prefillShops[idx] || ''; });
     if (draftNextEl && data?.next_send_display) draftNextEl.textContent = data.next_send_display;
   }
 

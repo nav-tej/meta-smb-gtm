@@ -139,7 +139,74 @@
     write('dgRecoSource', 'Recommendations from the Art of Sarabjit Singh sample shop · Reading never uses a run.');
   }
 
+  const safeExternalHref = (raw) => {
+    try {
+      const u = new URL(String(raw || ''));
+      return u.protocol === 'https:' || u.protocol === 'http:' ? u.href : '';
+    } catch {
+      return '';
+    }
+  };
+  const normalizeCompetitorUrl = (raw) => {
+    const cleaned = String(raw || '').trim();
+    if (!cleaned) return '';
+    const withScheme = cleaned.includes('://') ? cleaned : `https://${cleaned.replace(/^@+/, '')}`;
+    try {
+      const u = new URL(withScheme);
+      const path = u.pathname.replace(/\/+$/, '');
+      return `${u.protocol.toLowerCase()}//${u.host.toLowerCase()}${path}${u.search}`;
+    } catch {
+      return cleaned;
+    }
+  };
+  const extractWatchlist = (wsDoc) => {
+    const prefs = wsDoc?.preferences && typeof wsDoc.preferences === 'object' ? wsDoc.preferences : {};
+    const onb = wsDoc?.onboarding && typeof wsDoc.onboarding === 'object' ? wsDoc.onboarding : {};
+    const rawList = Array.isArray(prefs.competitor_entries) && prefs.competitor_entries.length
+      ? prefs.competitor_entries
+      : (Array.isArray(onb.competitors) ? onb.competitors : []);
+    const seen = new Set();
+    const out = [];
+    for (const item of rawList) {
+      const isSelected = typeof item === 'string' ? true : item?.selected !== false;
+      const rawUrl = typeof item === 'string' ? item.trim() : String(item?.url || '').trim();
+      const rawName = typeof item === 'string' ? '' : String(item?.name || '').trim();
+      if (!isSelected || !rawUrl) continue;
+      const norm = normalizeCompetitorUrl(rawUrl);
+      if (!norm || seen.has(norm)) continue;
+      seen.add(norm);
+      let host = norm;
+      try { host = new URL(norm).hostname.replace(/^www\./i, ''); } catch {}
+      out.push({ name: rawName || host, url: norm });
+      if (out.length >= 6) break;
+    }
+    return out;
+  };
+  const prefillDraftShops = (watchlist) => {
+    const urls = watchlist.slice(0, 3).map((c) => c.url).filter(Boolean);
+    window.__museWatchlistUrls = urls;
+    const inputs = [...document.querySelectorAll('#digestDraftForm input[name="draftShop"]')];
+    if (!inputs.length || !urls.length) return;
+    const anyFilled = inputs.some((inp) => inp.value.trim());
+    if (!anyFilled) {
+      inputs.forEach((inp, idx) => { inp.value = urls[idx] || ''; });
+    }
+  };
+
+  let ownState = { ownerId: null, wsDoc: {}, version: 0, busy: false };
+
+  function setCheckControls(visible, statusText = '') {
+    const btn = document.getElementById('dgCheckNowBtn');
+    const st = document.getElementById('dgCheckStatus');
+    if (btn) btn.hidden = !visible;
+    if (st) {
+      st.textContent = statusText;
+      st.hidden = !statusText;
+    }
+  }
+
   function clearBody(heroTitle, heroBody, statusText) {
+    setCheckControls(false, '');
     write('digestWeek', 'Account check');
     write('digestStatus', statusText);
     write('dgHeroTitle', heroTitle);
@@ -153,34 +220,109 @@
     document.getElementById('dgRecos')?.replaceChildren();
   }
 
-  function renderOwnWorkspaceDigest(wsDoc) {
+  function computeOwnTopInsight(watchlist, checksMap) {
+    const checkedItems = watchlist
+      .map((c) => ({ comp: c, check: checksMap[c.url] || null }))
+      .filter((x) => x.check && typeof x.check === 'object');
+
+    let best = null;
+    let bestTotal = 0;
+    for (const item of checkedItems) {
+      const counts = item.check.counts || {};
+      const total = (Number(counts.new_listing) || 0) + (Number(counts.price_change) || 0) + (Number(counts.removed_listing) || 0);
+      if (total > bestTotal) {
+        bestTotal = total;
+        best = item;
+      }
+    }
+    if (best && bestTotal > 0) {
+      const counts = best.check.counts || {};
+      const nNew = Number(counts.new_listing) || 0;
+      const nPrice = Number(counts.price_change) || 0;
+      const nRem = Number(counts.removed_listing) || 0;
+      let title;
+      if (nNew >= nPrice && nNew >= nRem && nNew > 0) {
+        title = `${best.comp.name} added ${nNew} ${nNew === 1 ? 'page' : 'pages'}`;
+      } else if (nPrice >= nRem && nPrice > 0) {
+        title = `${best.comp.name} updated ${nPrice} ${nPrice === 1 ? 'price' : 'prices'}`;
+      } else {
+        title = `${best.comp.name} removed ${nRem} ${nRem === 1 ? 'page' : 'pages'}`;
+      }
+      return {
+        title,
+        body: best.check.summary || 'Review the changes below and decide if you want to respond with a post.',
+      };
+    }
+
+    const unchanged = checkedItems.filter((x) => x.check.status === 'unchanged');
+    if (unchanged.length) {
+      const sinceIso = unchanged.find((x) => x.check.compared_with)?.check.compared_with || unchanged[0].check.checked_at;
+      const since = shortDate(sinceIso);
+      return {
+        title: since ? `No changes at the competitors you watch since ${since}` : 'No changes at the competitors you watch since your last check',
+        body: 'Muse checked their public pages and found no new, removed, or repriced pages.',
+      };
+    }
+
+    const firstChecks = checkedItems.filter((x) => x.check.status === 'first_check');
+    if (firstChecks.length) {
+      const totalPages = firstChecks.reduce((acc, x) => acc + (Number(x.check.page_count) || 0), 0);
+      return {
+        title: `Baseline saved for ${firstChecks.length} ${firstChecks.length === 1 ? 'competitor' : 'competitors'}`,
+        body: `Muse now knows ${totalPages} public pages across your watchlist. Changes show from the next check.`,
+      };
+    }
+
+    if (checkedItems.length && checkedItems.every((x) => x.check.status === 'error')) {
+      return {
+        title: 'Could not read your watched competitors right now',
+        body: 'See each competitor card below for details, or try Check now (free) again later.',
+      };
+    }
+
+    return {
+      title: 'Your watchlist has not been checked yet',
+      body: 'Click Check now (free) below to scan your watched competitors and save a baseline. No Muse runs are used.',
+    };
+  }
+
+  function renderOwnWorkspaceDigest(wsDoc, wsVersion = ownState.version) {
+    ownState.wsDoc = wsDoc || {};
+    ownState.version = Number.isFinite(Number(wsVersion)) ? Number(wsVersion) : 0;
+
     const onboarding = wsDoc?.onboarding || {};
-    const competitors = Array.isArray(onboarding.competitors) ? onboarding.competitors : [];
+    const prefs = wsDoc?.preferences || {};
+    const checksMap = prefs.competitor_checks && typeof prefs.competitor_checks === 'object' ? prefs.competitor_checks : {};
+    const watchlist = extractWatchlist(wsDoc);
     const shopUrls = Array.isArray(onboarding.shop_urls) ? onboarding.shop_urls : [];
     const shopName = onboarding.business_name || (shopUrls[0] ? shopUrls[0] : 'My workspace');
+
+    prefillDraftShops(watchlist);
+    setCheckControls(watchlist.length > 0, document.getElementById('dgCheckStatus')?.textContent || '');
 
     write('digestWeek', `My workspace · ${shopName}`);
     const status = document.getElementById('digestStatus');
     if (status) {
-      status.textContent = competitors.length
+      status.textContent = watchlist.length
         ? `Showing your personal watchlist for ${shopName}.`
         : `Personal digest for ${shopName} starts once you add your website or watched competitors.`;
       status.hidden = false;
     }
 
-    if (competitors.length) {
-      write('dgHeroTitle', `Watching ${competitors.length} ${competitors.length === 1 ? 'competitor' : 'competitors'} for ${shopName}`);
-      write('dgHeroBody', 'Your personal automated digest runs on your chosen schedule below and emails you changes in your own market. Sample artist data is kept separate.');
+    if (watchlist.length) {
+      const insight = computeOwnTopInsight(watchlist, checksMap);
+      write('dgHeroTitle', insight.title);
+      write('dgHeroBody', insight.body);
       const link = document.getElementById('dgHeroLink');
       if (link) {
         link.setAttribute('href', '/create');
         link.textContent = 'Open My workspace in Studio →';
         link.hidden = false;
       }
-      write('dgHeroSource', 'Personal workspace · 0 runs used to inspect');
+      write('dgHeroSource', 'Personal workspace · 0 runs used to check or inspect');
     } else {
       write('dgHeroTitle', 'Your personal digest starts empty until you add competitors');
-      write('dgHeroBody', 'Connect your website and pick up to 3 competitors to track price changes, new pages, and personalized next moves, or view the sample digest.');
+      write('dgHeroBody', 'Connect your website and pick competitors to track price changes, new pages, and next moves, or view the sample digest.');
       const link = document.getElementById('dgHeroLink');
       if (link) {
         link.setAttribute('href', '/welcome?step=3');
@@ -190,28 +332,77 @@
       write('dgHeroSource', 'My workspace · Sample artist examples stay separate');
     }
 
+    const totalChanges = watchlist.reduce((sum, c) => {
+      const counts = checksMap[c.url]?.counts || {};
+      return sum + (Number(counts.new_listing) || 0) + (Number(counts.price_change) || 0) + (Number(counts.removed_listing) || 0);
+    }, 0);
+    const checkedCount = watchlist.filter((c) => Boolean(checksMap[c.url]?.checked_at)).length;
+
     const stats = document.getElementById('dgStats');
     if (stats) {
       stats.replaceChildren(
-        el('li', { class: 'dg-stat' }, el('strong', {}, String(competitors.length)), el('span', {}, 'personal competitors watched')),
-        el('li', { class: 'dg-stat' }, el('strong', {}, shopUrls.length ? 'Connected' : 'Not added'), el('span', {}, 'your website')),
-        el('li', { class: 'dg-stat' }, el('strong', {}, '0 runs'), el('span', {}, 'used to view your digest'))
+        el('li', { class: 'dg-stat' }, el('strong', {}, `${checkedCount}/${watchlist.length}`), el('span', {}, 'watched competitors checked')),
+        el('li', { class: 'dg-stat' }, el('strong', {}, String(totalChanges)), el('span', {}, `competitor ${totalChanges === 1 ? 'change' : 'changes'} found`)),
+        el('li', { class: 'dg-stat' }, el('strong', {}, '0 runs'), el('span', {}, 'used to check or view'))
       );
     }
 
     const grid = document.getElementById('dgCompetitors');
     if (grid) {
       grid.replaceChildren();
-      if (competitors.length) {
-        for (const comp of competitors) {
-          const name = typeof comp === 'string' ? comp : (comp.name || comp.url || 'Competitor');
-          const url = typeof comp === 'string' ? comp : (comp.url || '');
+      if (watchlist.length) {
+        for (const comp of watchlist) {
+          const check = checksMap[comp.url] || null;
           const card = el('article', { class: 'dg-card' });
-          const head = el('div', { class: 'dg-card-head' }, el('h3', {}, String(name)));
-          head.appendChild(el('div', { class: 'dg-chips' }, el('span', { class: 'ms-chip first' }, 'My watchlist')));
+          const head = el('div', { class: 'dg-card-head' }, el('h3', {}, String(comp.name)));
+          const chipRow = el('div', { class: 'dg-chips' });
+
+          if (!check) {
+            chipRow.appendChild(el('span', { class: 'ms-chip first' }, 'Not checked yet'));
+          } else if (check.status === 'error') {
+            chipRow.appendChild(el('span', { class: 'ms-chip error' }, 'Could not check'));
+          } else if (check.status === 'first_check') {
+            chipRow.appendChild(el('span', { class: 'ms-chip first' }, 'First check'));
+          } else {
+            const counts = check.counts || {};
+            const nNew = Number(counts.new_listing) || 0;
+            const nPrice = Number(counts.price_change) || 0;
+            const nRem = Number(counts.removed_listing) || 0;
+            if (nNew > 0) chipRow.appendChild(el('span', { class: 'ms-chip new' }, `${nNew} new ${nNew === 1 ? 'page' : 'pages'}`));
+            if (nPrice > 0) chipRow.appendChild(el('span', { class: 'ms-chip price' }, `${nPrice} price ${nPrice === 1 ? 'change' : 'changes'}`));
+            if (nRem > 0) chipRow.appendChild(el('span', { class: 'ms-chip removed' }, `${nRem} removed`));
+            if (!nNew && !nPrice && !nRem) chipRow.appendChild(el('span', { class: 'ms-chip none' }, 'No changes'));
+          }
+          head.appendChild(chipRow);
           card.appendChild(head);
-          card.appendChild(el('p', { class: 'dg-where' }, url ? String(url) : 'Configured in setup'));
-          card.appendChild(el('p', { class: 'dg-detail' }, 'Queued for your scheduled digest updates.'));
+          card.appendChild(el('p', { class: 'dg-where' }, String(comp.url)));
+
+          if (!check) {
+            card.appendChild(el('p', { class: 'dg-detail' }, 'Not checked yet. Click Check now (free) above to save a baseline of their public pages.'));
+          } else {
+            card.appendChild(el('p', { class: 'dg-detail' }, String(check.summary || check.error || 'Checked.')));
+            const newPages = Array.isArray(check.new_pages) ? check.new_pages.slice(0, 5) : [];
+            if (newPages.length) {
+              const ul = el('ul', { class: 'dg-detail', style: 'margin:0.35rem 0 0;padding-left:1.1rem;' });
+              for (const p of newPages) {
+                const href = safeExternalHref(p.loc);
+                const label = String(p.title || p.loc || 'New page');
+                ul.appendChild(el('li', {}, href ? el('a', { href, target: '_blank', rel: 'noopener noreferrer' }, label) : label));
+              }
+              card.appendChild(ul);
+            }
+            const priceChanges = Array.isArray(check.price_changes) ? check.price_changes.slice(0, 5) : [];
+            if (priceChanges.length) {
+              const ul = el('ul', { class: 'dg-detail', style: 'margin:0.35rem 0 0;padding-left:1.1rem;' });
+              for (const pc of priceChanges) {
+                const label = `${pc.title || 'Page'}: ${pc.old_price || 'none'} to ${pc.new_price || 'none'}`;
+                ul.appendChild(el('li', {}, label));
+              }
+              card.appendChild(ul);
+            }
+            const whenStr = shortDate(check.checked_at);
+            card.appendChild(el('p', { class: 'dg-when' }, whenStr ? `Checked ${whenStr}` : 'Checked'));
+          }
           grid.appendChild(card);
         }
       } else {
@@ -231,7 +422,7 @@
       li.appendChild(el('strong', {}, shopUrls.length ? 'Draft a post from your website' : 'Add your website in My workspace'));
       li.appendChild(el('p', {}, shopUrls.length
         ? 'Jump straight to Studio to create an ad or social post with your own photos and words.'
-        : 'Paste your shop URL or product photo in Studio to generate custom creatives for your own store.'));
+        : 'Paste your website URL or photo in Studio to generate custom posts for your business.'));
       li.appendChild(el('a', { href: '/create' }, 'Open Studio in My workspace →'));
       const sampleLi = el('li', { class: 'dg-reco medium' });
       sampleLi.appendChild(el('span', { class: 'ms-chip first' }, 'Sample example'));
@@ -242,6 +433,53 @@
       recos.appendChild(sampleLi);
     }
     write('dgRecoSource', 'Personal recommendations never mix with Sample shop data.');
+  }
+
+  async function runOwnWatchlistCheck() {
+    if (ownState.busy) return;
+    const btn = document.getElementById('dgCheckNowBtn');
+    const st = document.getElementById('dgCheckStatus');
+    ownState.busy = true;
+    if (btn) { btn.disabled = true; btn.textContent = 'Checking…'; }
+    if (st) { st.textContent = 'Checking public pages across your watchlist (free, 0 runs)…'; st.hidden = false; }
+    try {
+      const resp = await fetch('/api/v1/competitors/check', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          expected_version: ownState.version,
+          expected_owner: ownState.ownerId || undefined,
+        }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok) {
+        const msg = typeof data.detail === 'string'
+          ? data.detail
+          : (resp.status === 409 ? 'Your workspace changed in another tab. Reloading…' : 'Could not check your watchlist right now.');
+        if (st) { st.textContent = msg; st.hidden = false; }
+        if (resp.status === 409 && ownState.ownerId && window.museAccount?.loadWorkspace) {
+          const fresh = await window.museAccount.loadWorkspace(ownState.ownerId).catch(() => null);
+          if (fresh) renderOwnWorkspaceDigest(fresh.document || {}, fresh.version || 0);
+        }
+        return;
+      }
+      const nextDoc = {
+        ...(ownState.wsDoc || {}),
+        preferences: {
+          ...((ownState.wsDoc && ownState.wsDoc.preferences) || {}),
+          competitor_checks: data.competitor_checks || {},
+        },
+      };
+      if (st) { st.textContent = 'Watchlist checked. 0 runs used.'; st.hidden = false; }
+      renderOwnWorkspaceDigest(nextDoc, data.version);
+      try { window.museSellerMemory?.reload?.(); } catch {}
+    } catch {
+      if (st) { st.textContent = 'Could not reach Muse right now. Try again shortly.'; st.hidden = false; }
+    } finally {
+      ownState.busy = false;
+      if (btn) { btn.disabled = false; btn.textContent = 'Check now (free)'; }
+    }
   }
 
   async function applyMode(modeState) {
@@ -268,23 +506,28 @@
 
     if (s.state === 'account_own') {
       const guard = window.museModes?.bindAsyncGuard?.() || { isCurrent: () => true };
+      ownState.ownerId = s.ownerId || null;
       write('digestStatus', 'Loading your personal workspace…');
       let wsDoc = {};
+      let wsVersion = 0;
       try {
         if (window.museAccount && typeof window.museAccount.loadWorkspace === 'function') {
           const loaded = await window.museAccount.loadWorkspace(s.ownerId);
           if (!guard.isCurrent()) return;
           wsDoc = loaded?.document || {};
+          wsVersion = Number(loaded?.version || 0);
         }
       } catch {
         if (!guard.isCurrent()) return;
         wsDoc = {};
+        wsVersion = 0;
       }
-      renderOwnWorkspaceDigest(wsDoc);
+      renderOwnWorkspaceDigest(wsDoc, wsVersion);
       return;
     }
 
     // Guest or explicit Sample shop view -> render clearly labeled Sample digest
+    setCheckControls(false, '');
     const guard = window.museModes?.bindAsyncGuard?.() || { isCurrent: () => true };
     const status = document.getElementById('digestStatus');
     const shell = window.museShell;
@@ -302,6 +545,7 @@
   }
 
   async function start() {
+    document.getElementById('dgCheckNowBtn')?.addEventListener('click', runOwnWatchlistCheck);
     if (window.museModes?.subscribe) window.museModes.subscribe(applyMode);
     if (window.museModes?.resolve) await applyMode(await window.museModes.resolve());
     else await applyMode();

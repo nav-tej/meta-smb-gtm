@@ -34,7 +34,18 @@ from src.models.seller import (
     SellerProfile,
 )
 from src.services import demo, result_cache, scan_guard
-from src.services.accounts import resolve_account
+from src.services.accounts import load_workspace, resolve_account, save_workspace
+from src.services.competitor_checks import (
+    MAX_PAGES_PER_COMPETITOR,
+    classify_check_error,
+    compute_top_insight,
+    diff_competitor_pages,
+    entries_to_snapshot_pages,
+    error_competitor_result,
+    extract_selected_competitors,
+    normalize_competitor_url,
+    now_iso_utc,
+)
 from src.services.competitor_intel import CompetitorIntelService, collect_entries
 from src.services.research_cache import NAMESPACE_AD_PREVIEWS, cached_research
 from src.services.seller_audit import (
@@ -292,6 +303,156 @@ async def audit_screenshot(
         lambda: analyze_social_screenshots([img_bytes], context=request.context),
         response,
     )
+
+
+class CompetitorCheckRequest(BaseModel):
+    expected_version: int | None = None
+    expected_owner: str | None = None
+
+
+@router.post("/competitors/check")
+async def check_own_competitors(
+    http_request: Request,
+    response: Response,
+    body: CompetitorCheckRequest | None = None,
+) -> dict[str, Any]:
+    """Free check of the signed-in seller's own watchlist against saved page snapshots.
+
+    Uses `reserve_scan_crawls` and `scan_guard.crawl` (capped at 6 competitors x 30 pages).
+    Zero Muse calls and zero runs used.
+    """
+    response.headers["Cache-Control"] = "no-store"
+    account = await resolve_account(http_request, response, require_verified=True)
+    assert account is not None
+
+    req = body or CompetitorCheckRequest()
+    if req.expected_owner and req.expected_owner != account.user_id:
+        raise HTTPException(status_code=409, detail="Workspace owner mismatch.")
+
+    ws = await load_workspace(account)
+    ws_version = int(ws.get("version") or 0)
+    if req.expected_version is not None and req.expected_version != ws_version:
+        raise HTTPException(
+            status_code=409,
+            detail="Your workspace changed in another tab. Reload and check again.",
+        )
+
+    doc = dict(ws.get("document") or {})
+    selected = extract_selected_competitors(doc)
+    checked_at = now_iso_utc()
+
+    if not selected:
+        return {
+            "checked_at": checked_at,
+            "version": ws_version,
+            "competitors": [],
+            "top_insight": {
+                "kind": "empty",
+                "title": "Add competitors to start checking for changes",
+                "body": "Add up to 6 competitor websites in setup or your watchlist.",
+            },
+            "competitor_checks": (
+                doc.get("preferences", {}).get("competitor_checks", {})
+                if isinstance(doc.get("preferences"), dict)
+                else {}
+            ),
+        }
+
+    targets = [(item["name"], item["url"], *scan_url(item["url"])) for item in selected]
+    reserve_scan_crawls(
+        http_request,
+        response,
+        [normalized for _, _, normalized, _, blocked in targets if not blocked],
+        MAX_PAGES_PER_COMPETITOR,
+    )
+
+    prefs = dict(doc.get("preferences") or {}) if isinstance(doc.get("preferences"), dict) else {}
+    existing_checks = (
+        dict(prefs.get("competitor_checks") or {})
+        if isinstance(prefs.get("competitor_checks"), dict)
+        else {}
+    )
+
+    results: list[dict[str, Any]] = []
+    for name, raw_url, normalized, _host, blocked in targets:
+        key = normalize_competitor_url(normalized or raw_url)
+        prev = existing_checks.get(key) if isinstance(existing_checks.get(key), dict) else None
+        if blocked:
+            err_kind, err_msg = classify_check_error("", blocked_host=True)
+            item_res, stored = error_competitor_result(
+                prev,
+                name=name,
+                url=key,
+                checked_at=checked_at,
+                error_kind=err_kind,
+                error_message=err_msg,
+            )
+            existing_checks[key] = stored
+            results.append(item_res)
+            continue
+
+        try:
+            entries, _sitemaps = await scan_guard.crawl(
+                normalized,
+                MAX_PAGES_PER_COMPETITOR,
+                lambda target=normalized: collect_entries(
+                    target, max_urls=MAX_PAGES_PER_COMPETITOR
+                ),
+            )
+            pages = entries_to_snapshot_pages(entries)
+            if not pages:
+                err_kind, err_msg = classify_check_error("no urls found")
+                item_res, stored = error_competitor_result(
+                    prev,
+                    name=name,
+                    url=key,
+                    checked_at=checked_at,
+                    error_kind=err_kind,
+                    error_message=err_msg,
+                )
+            else:
+                item_res, stored = diff_competitor_pages(
+                    prev,
+                    pages,
+                    name=name,
+                    url=key,
+                    checked_at=checked_at,
+                )
+        except Exception as err:
+            err_kind, err_msg = classify_check_error(err)
+            item_res, stored = error_competitor_result(
+                prev,
+                name=name,
+                url=key,
+                checked_at=checked_at,
+                error_kind=err_kind,
+                error_message=err_msg,
+            )
+
+        existing_checks[key] = stored
+        results.append(item_res)
+
+    # Keep only active watchlist keys (plus cap) so the workspace document stays compact.
+    active_keys = {normalize_competitor_url(item["url"]) for item in selected}
+    pruned_checks = {k: v for k, v in existing_checks.items() if k in active_keys}
+    prefs["competitor_checks"] = pruned_checks
+    doc["preferences"] = prefs
+
+    saved = await save_workspace(
+        account,
+        doc,
+        expected_version=ws_version,
+        expected_owner=account.user_id,
+    )
+    new_version = int(saved.get("version") or (ws_version + 1))
+    top_insight = compute_top_insight(results, checked_at)
+    return {
+        "checked_at": checked_at,
+        "version": new_version,
+        "competitors": results,
+        "top_insight": top_insight,
+        "competitor_checks": pruned_checks,
+    }
 
 
 @router.get("/competitors/ads", response_model=CompetitorAdSignalsResponse)
