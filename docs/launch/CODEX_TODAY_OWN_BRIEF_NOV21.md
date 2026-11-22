@@ -17,3 +17,8 @@
 - Frontend brief now reads own context once after initial account readiness; account/mode subscriptions clear private cards without fetching own data. It renders business name, ranker reasons with Heads up, honest watch status and logged results, and hands the selected recommendation to the own studio. Re-check is a free read. Failure restores pass-14 card and retry; setup 409 remains the existing setup card.
 - Only seller-memory export added: `createStudioHandoff`. Loader versions bumped from upstream versions to `20261121-cx1`; own /today call ceiling 8→9 for the single brief request, others unchanged. No CSS changed.
 - `node --check src/api/static/muse-shell.js` and `node --check src/api/static/seller-memory.js` passed. Integration tests pending backend and Chromium worker patches. Two old API tests require minimal expectation changes because they explicitly expect the stub or signed-out own access.
+
+## State regression checkpoint — November 22, 2026
+- Updated only the finished-own-workspace case in `tests/test_today_brief_states_e2e.py` and its brief fixture to expect the real brief, free re-check and own studio link. Signed-out and sample assertions remain intact.
+- `DEMO_MODE=true META_MODEL_API_KEY= DEMO_KEY= /Users/nav/meta-smb-gtm/.venv/bin/pytest -q tests/test_today_brief_states_e2e.py`: **1 passed**, 4.99 seconds (375px and 1440px). Evidence: `targeted-states.log` in the durable validation directory.
+- Backend/new real-route Chromium tests remain in progress; next integrate their patches and run complete after gates plus mutation.

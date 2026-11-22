@@ -7,9 +7,8 @@ sample's focus could be stored under "Preparing your daily workspace". The draft
 unstyled browser buttons above the page, "Checking device draft…" never went away, and on a phone
 an empty 4:5 photo frame pushed the editor far down.
 
-Now only the sample shop gets the full brief and triage, keyed to the idea on screen. The own
-workspace and signed-out visitors get a short, honest card whose links open the sample brief or
-jump to the editor. The draft row sits under the post actions, says where the draft lives, and
+The sample gets its full brief and triage, keyed to the idea on screen. Finished own workspaces
+get their private brief without triage; signed-out visitors keep the short sample/editor card. The draft row sits under the post actions, says where the draft lives, and
 offers account saving and recovery only when they apply.
 """
 
@@ -106,6 +105,13 @@ def test_today_brief_and_draft_row_fit_each_state_e2e(live_server_url: str) -> N
                             "preferences": {{}}, "voice_profile": {{}}, "memory_entries": [],
                             "competitor_entries": [], "suggested_updates": [],
                             "dismiss_signals": []}}
+                elif url.endswith("/api/v1/daily-brief") and user:
+                    move = {{"title": "Share how you help clients", "reason": "Uses your saved setup.",
+                             "href": "/create?workspace=own", "impact": "high", "over_budget": False}}
+                    body = {{"business_name": ONB["business_name"], "items": [], "move": move,
+                            "focus": move, "action_items": [move], "overnight_changes": [],
+                            "overnight_note": "Muse does not check these competitors overnight yet.",
+                            "trends": [], "source": "Saved context. 0 runs spent."}}
                 elif url.endswith("/api/v1/ingest-storefront"):
                     body = {{"discovered_catalog_items": []}}
                 if body is None:
@@ -191,17 +197,17 @@ def test_today_brief_and_draft_row_fit_each_state_e2e(live_server_url: str) -> N
                 assert not errors, errors
                 ctx.close()
 
-                # 2. Own workspace: honest header, links to the editor and the sample brief.
+                # 2. Finished own workspace: private brief, free re-check and own studio links.
                 ctx, page, errors = open_page(browser, width, USER)
                 page.goto(BASE + "/today", wait_until="networkidle")
-                settled(page, "Your shop’s brief is not built yet")
+                settled(page, "North Star Advisory · today’s brief")
                 page.wait_for_function(
                     "document.getElementById('itemTitle').textContent"
                     " === 'North Star Advisory · choose a service or offer'", timeout=15000)
                 assert page.locator("#msBrief .ms-triage").count() == 0
-                assert not visible(page, "#msBrief .ms-brief-columns")
-                assert not page.get_by_role("button", name="Re-check now").is_visible()
-                assert page.locator("#msBrief .ms-move-alt").inner_text() == "See a sample brief"
+                assert visible(page, "#msBrief .ms-brief-columns")
+                assert page.get_by_role("button", name="Re-check now").is_visible()
+                assert not page.locator("#msBrief .ms-move-alt").is_visible()
                 row = draft_row(page)
                 assert row["status"] == ("Your draft is kept on this device as you edit."
                                          " Save to account to open it on another device."), row
@@ -211,16 +217,8 @@ def test_today_brief_and_draft_row_fit_each_state_e2e(live_server_url: str) -> N
                 assert page.locator("#saveWebsiteOnlyBtn").inner_text() == "Save website only"
                 assert not BAD_WORDS.search(page.locator("#msBrief").inner_text())
                 go = page.locator("#msBrief .ms-move-links a").first
-                assert go.inner_text() == "Start today’s post ↓"
-                go.click()
-                page.wait_for_function(
-                    "document.activeElement && document.activeElement.id === 'quickShopUrl'",
-                    timeout=5000)
-                page.wait_for_function(
-                    "(() => {{ const r = document.getElementById('todayWebsiteBar')"
-                    ".getBoundingClientRect();"
-                    " return r.top >= -2 && r.top < innerHeight / 2; }})()",
-                    timeout=5000)
+                assert go.inner_text() == "Make this post →"
+                assert go.get_attribute("href") == "/create?workspace=own"
                 assert not errors, errors
                 ctx.close()
 
