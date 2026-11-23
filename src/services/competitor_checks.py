@@ -106,11 +106,14 @@ def entries_to_snapshot_pages(entries: list[SitemapEntry]) -> list[dict[str, str
         title = (raw_title or _title_from_url(loc))[:MAX_TITLE_LENGTH]
         raw_price = str(getattr(entry, "price_hint", "") or "").strip()
         price_hint = raw_price[:MAX_PRICE_HINT_LENGTH]
+        lastmod = getattr(entry, "lastmod", None)
         pages.append(
             {
                 "loc": loc,
                 "title": title,
                 "price_hint": price_hint,
+                # Date only: on a site bigger than the window it is the only proof a page is new.
+                "lastmod": lastmod.date().isoformat() if isinstance(lastmod, datetime) else "",
             }
         )
         if len(pages) >= MAX_STORED_PAGES_PER_COMPETITOR:
@@ -147,8 +150,14 @@ def diff_competitor_pages(
     name: str,
     url: str,
     checked_at: str,
+    truncated: bool = False,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Diff `current_pages` against `previous_snapshot`.
+
+    `truncated` means the crawl stopped at the page cap, so the site is bigger than what Muse
+    read. Then the window can shift between checks: a page missing from it may still exist and
+    a page entering it may be old. Such a check never counts removed pages and counts a page as
+    new only when the sitemap dates it on or after the previous check (`partial` in the result).
 
     Returns `(result_item, stored_snapshot)` where:
     - `result_item` is shaped for both `/digest` and `muse-shell.js`'s `competitorStatus()`
@@ -170,10 +179,12 @@ def diff_competitor_pages(
     # First check: no prior baseline pages stored yet.
     if prev_pages_raw is None:
         page_count = len(current_pages)
-        summary = (
-            f"First check: Muse now knows {page_count} of their pages. "
-            "Changes show from the next check."
+        known = (
+            f"Muse saved {page_count} of their pages (they have more)"
+            if truncated
+            else f"Muse now knows {page_count} of their pages"
         )
+        summary = f"First check: {known}. Changes show from the next check."
         counts = {"new_listing": 0, "removed_listing": 0, "price_change": 0}
         result_item = {
             "name": name,
@@ -186,6 +197,7 @@ def diff_competitor_pages(
             "removed_pages": [],
             "price_changes": [],
             "page_count": page_count,
+            "partial": truncated,
             "summary": summary,
             "error": "",
             "error_kind": "",
@@ -196,6 +208,7 @@ def diff_competitor_pages(
             "checked_at": checked_at,
             "compared_with": "",
             "status": "first_check",
+            "partial": truncated,
             "page_count": page_count,
             "counts": counts,
             "new_pages": [],
@@ -222,6 +235,17 @@ def diff_competitor_pages(
 
     curr_by_loc: dict[str, dict[str, str]] = {p["loc"]: p for p in current_pages if p.get("loc")}
 
+    # A full previous window (an older snapshot has no `partial` flag) means the site was
+    # bigger than the window then too.
+    partial = truncated or len(prev_by_loc) >= MAX_STORED_PAGES_PER_COMPETITOR
+    since_day = prev_checked_at[:10]
+
+    def _counts_as_new(page: dict[str, str]) -> bool:
+        if not partial:
+            return True
+        lastmod = str(page.get("lastmod") or "")
+        return bool(lastmod and since_day and lastmod >= since_day)
+
     all_new: list[dict[str, str]] = [
         {
             "loc": loc,
@@ -229,17 +253,21 @@ def diff_competitor_pages(
             "price_hint": curr["price_hint"],
         }
         for loc, curr in curr_by_loc.items()
-        if loc not in prev_by_loc
+        if loc not in prev_by_loc and _counts_as_new(curr)
     ]
-    all_removed: list[dict[str, str]] = [
-        {
-            "loc": loc,
-            "title": prev["title"],
-            "price_hint": prev["price_hint"],
-        }
-        for loc, prev in prev_by_loc.items()
-        if loc not in curr_by_loc
-    ]
+    all_removed: list[dict[str, str]] = (
+        []
+        if partial
+        else [
+            {
+                "loc": loc,
+                "title": prev["title"],
+                "price_hint": prev["price_hint"],
+            }
+            for loc, prev in prev_by_loc.items()
+            if loc not in curr_by_loc
+        ]
+    )
     all_price_changes: list[dict[str, str]] = []
     for loc, curr in curr_by_loc.items():
         if loc not in prev_by_loc:
@@ -267,7 +295,8 @@ def diff_competitor_pages(
     parts: list[str] = []
     if counts["new_listing"]:
         n = counts["new_listing"]
-        parts.append(f"{n} new {'page' if n == 1 else 'pages'}")
+        new_word = "new or updated" if partial else "new"
+        parts.append(f"{n} {new_word} {'page' if n == 1 else 'pages'}")
     if counts["price_change"]:
         n = counts["price_change"]
         parts.append(f"{n} price {'change' if n == 1 else 'changes'}")
@@ -280,6 +309,11 @@ def diff_competitor_pages(
         summary = f"Found {', '.join(parts)}" + (f" since {since}." if since else ".")
     else:
         summary = f"No changes since {since}." if since else "No changes since the last check."
+    if partial:
+        summary += (
+            f" They have more than {MAX_STORED_PAGES_PER_COMPETITOR} pages, so Muse counts only "
+            "pages dated since your last check and does not report removed pages."
+        )
 
     new_capped = all_new[:MAX_CHANGES_PER_KIND]
     removed_capped = all_removed[:MAX_CHANGES_PER_KIND]
@@ -296,6 +330,7 @@ def diff_competitor_pages(
         "removed_pages": removed_capped,
         "price_changes": price_capped,
         "page_count": len(current_pages),
+        "partial": partial,
         "summary": summary,
         "error": "",
         "error_kind": "",
@@ -306,6 +341,7 @@ def diff_competitor_pages(
         "checked_at": checked_at,
         "compared_with": prev_checked_at,
         "status": status,
+        "partial": partial,
         "page_count": len(current_pages),
         "counts": counts,
         "new_pages": new_capped,
@@ -394,7 +430,9 @@ def compute_top_insight(competitors: list[dict[str, Any]], checked_at: str) -> d
         n_new = int(counts.get("new_listing") or 0)
         n_price = int(counts.get("price_change") or 0)
         n_rem = int(counts.get("removed_listing") or 0)
-        if n_new >= n_price and n_new >= n_rem and n_new > 0:
+        if n_new >= n_price and n_new >= n_rem and n_new > 0 and best_item.get("partial"):
+            title = f"{name} has {n_new} new or updated {'page' if n_new == 1 else 'pages'}"
+        elif n_new >= n_price and n_new >= n_rem and n_new > 0:
             title = f"{name} added {n_new} {'page' if n_new == 1 else 'pages'}"
         elif n_price >= n_rem and n_price > 0:
             title = f"{name} updated {n_price} {'price' if n_price == 1 else 'prices'}"

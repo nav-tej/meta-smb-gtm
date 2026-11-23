@@ -241,7 +241,9 @@
       const nPrice = Number(counts.price_change) || 0;
       const nRem = Number(counts.removed_listing) || 0;
       let title;
-      if (nNew >= nPrice && nNew >= nRem && nNew > 0) {
+      if (nNew >= nPrice && nNew >= nRem && nNew > 0 && best.check.partial) {
+        title = `${best.comp.name} has ${nNew} new or updated ${nNew === 1 ? 'page' : 'pages'}`;
+      } else if (nNew >= nPrice && nNew >= nRem && nNew > 0) {
         title = `${best.comp.name} added ${nNew} ${nNew === 1 ? 'page' : 'pages'}`;
       } else if (nPrice >= nRem && nPrice > 0) {
         title = `${best.comp.name} updated ${nPrice} ${nPrice === 1 ? 'price' : 'prices'}`;
@@ -368,7 +370,8 @@
             const nNew = Number(counts.new_listing) || 0;
             const nPrice = Number(counts.price_change) || 0;
             const nRem = Number(counts.removed_listing) || 0;
-            if (nNew > 0) chipRow.appendChild(el('span', { class: 'ms-chip new' }, `${nNew} new ${nNew === 1 ? 'page' : 'pages'}`));
+            const newWord = check.partial ? 'new or updated' : 'new';
+            if (nNew > 0) chipRow.appendChild(el('span', { class: 'ms-chip new' }, `${nNew} ${newWord} ${nNew === 1 ? 'page' : 'pages'}`));
             if (nPrice > 0) chipRow.appendChild(el('span', { class: 'ms-chip price' }, `${nPrice} price ${nPrice === 1 ? 'change' : 'changes'}`));
             if (nRem > 0) chipRow.appendChild(el('span', { class: 'ms-chip removed' }, `${nRem} removed`));
             if (!nNew && !nPrice && !nRem) chipRow.appendChild(el('span', { class: 'ms-chip none' }, 'No changes'));

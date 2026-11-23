@@ -417,6 +417,8 @@ async def check_own_competitors(
                     name=name,
                     url=key,
                     checked_at=checked_at,
+                    # The crawl stops at the cap, so a full window means a bigger site.
+                    truncated=len(entries) >= MAX_PAGES_PER_COMPETITOR,
                 )
         except Exception as err:
             err_kind, err_msg = classify_check_error(err)

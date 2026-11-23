@@ -58,7 +58,7 @@ def test_digest_script_versions_and_copy_contracts() -> None:
     """Verify cache-busting pins and removal of old digest wording."""
     digest_html = (REPO_ROOT / "src/api/static/digest.html").read_text(encoding="utf-8")
     digest_js = (REPO_ROOT / "src/api/static/digest.js").read_text(encoding="utf-8")
-    assert "digest.js?v=20261122-ag1" in digest_html
+    assert "digest.js?v=20261123-uxgap21" in digest_html
     assert "digest-signup.js?v=20261122-ag1" in digest_html
     assert "Canonical preview topics" not in digest_html
     assert "What to include" in digest_html
@@ -197,6 +197,75 @@ def test_caps_selected_filtering_and_error_preserves_baseline() -> None:
     assert err_res["status"] == "error"
     assert err_res["error_kind"] == "blocked"
     assert len(err_stored["pages"]) == 2
+
+
+def test_big_site_window_shift_never_invents_removed_or_new_pages() -> None:
+    """A site bigger than the 30-page window: a shifted window is not a change (pass 21)."""
+    from datetime import datetime
+
+    def window(start: int, *, dated: dict[int, str] | None = None) -> list[dict[str, str]]:
+        dated = dated or {}
+        return entries_to_snapshot_pages(
+            [
+                SitemapEntry(
+                    loc=f"https://big.test/p/{i}",
+                    title=f"Page {i}",
+                    lastmod=datetime.fromisoformat(dated[i]) if i in dated else None,
+                )
+                for i in range(start, start + MAX_STORED_PAGES_PER_COMPETITOR)
+            ]
+        )
+
+    res1, snap1 = diff_competitor_pages(
+        None,
+        window(0),
+        name="Big Co",
+        url="https://big.test",
+        checked_at="2026-11-20T10:00:00Z",
+        truncated=True,
+    )
+    assert res1["partial"] is True
+    assert "(they have more)" in res1["summary"]
+
+    # The window slid by two pages: two old pages entered, two left, none of it dated.
+    res2, snap2 = diff_competitor_pages(
+        snap1,
+        window(2, dated={30: "2026-01-05", 31: "2026-01-06"}),
+        name="Big Co",
+        url="https://big.test",
+        checked_at="2026-11-21T10:00:00Z",
+        truncated=True,
+    )
+    assert res2["counts"] == {"new_listing": 0, "removed_listing": 0, "price_change": 0}
+    assert res2["status"] == "unchanged"
+    assert "does not report removed pages" in res2["summary"]
+
+    # A page dated on or after the last check does count, as "new or updated".
+    res3, _ = diff_competitor_pages(
+        snap2,
+        window(3, dated={32: "2026-11-21"}),
+        name="Big Co",
+        url="https://big.test",
+        checked_at="2026-11-22T10:00:00Z",
+        truncated=True,
+    )
+    assert res3["counts"] == {"new_listing": 1, "removed_listing": 0, "price_change": 0}
+    assert [p["title"] for p in res3["new_pages"]] == ["Page 32"]
+    assert res3["summary"].startswith("Found 1 new or updated page since Nov 21.")
+    insight = compute_top_insight([res3], "2026-11-22T10:00:00Z")
+    assert insight["title"] == "Big Co has 1 new or updated page"
+
+    # A snapshot saved before the flag existed is still treated as a full window.
+    legacy = {k: v for k, v in snap1.items() if k != "partial"}
+    res_legacy, _ = diff_competitor_pages(
+        legacy,
+        window(5),
+        name="Big Co",
+        url="https://big.test",
+        checked_at="2026-11-21T10:00:00Z",
+    )
+    assert res_legacy["counts"]["removed_listing"] == 0
+    assert res_legacy["counts"]["new_listing"] == 0
 
 
 def test_competitors_check_route_auth_429_409_and_diff(monkeypatch: pytest.MonkeyPatch) -> None:
