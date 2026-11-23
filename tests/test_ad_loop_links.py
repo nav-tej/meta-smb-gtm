@@ -117,10 +117,16 @@ def test_ad_loop_copy_and_script_version_contracts() -> None:
     """Verify cache-busting tags and honest copy rules on touched templates."""
     index_html = (REPO_ROOT / "src/api/static/index.html").read_text(encoding="utf-8")
     welcome_html = (REPO_ROOT / "src/api/static/welcome.html").read_text(encoding="utf-8")
+    today_html = (REPO_ROOT / "src/api/static/today.html").read_text(encoding="utf-8")
+    creator_html = (REPO_ROOT / "src/api/static/creator.html").read_text(encoding="utf-8")
     first_ad_html = (REPO_ROOT / "src/api/static/first-ad.html").read_text(encoding="utf-8")
 
     assert "welcome.js?v=20261122-uxgap20" in index_html
     assert "welcome.js?v=20261122-uxgap20" in welcome_html
+    assert "seller-memory.js?v=20261124-ag1" in index_html
+    assert "seller-memory.js?v=20261124-ag1" in welcome_html
+    assert "seller-memory.js?v=20261124-ag1" in today_html
+    assert "seller-memory.js?v=20261124-ag1" in creator_html
     assert "first-ad.js?v=20261121-uxgap19" in first_ad_html
     for link_id in ("improveFirstAdLink", "iterateFirstAdLink", "bidsFirstAdLink"):
         assert link_id in index_html
