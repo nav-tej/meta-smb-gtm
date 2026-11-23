@@ -1172,6 +1172,17 @@
         if (trend.note) li.appendChild(el('span', { class: 'ms-note' }, String(trend.note)));
         return li;
       }), own ? 'Log a result after posting to see it here.' : 'Add campaign data to see trends.', String(brief.trends_source || ''));
+      if (own) {
+        const outcomes = Array.isArray(brief.outcomes) ? brief.outcomes : [];
+        card(trendsBox, 'Your logged results', outcomes.map((result) => {
+          const li = el('li', { class: 'ms-trend' });
+          li.appendChild(el('strong', {}, String(result.title || 'Logged result')));
+          li.appendChild(el('span', { class: 'ms-note' }, `${String(result.date || '')} · ${String(result.channel || '')}`));
+          li.appendChild(el('span', { class: 'ms-note' }, `${result.reach} reached · ${result.clicks} clicks · ${result.orders} orders · $${result.revenue} revenue`));
+          if (result.notes) li.appendChild(el('span', { class: 'ms-note' }, String(result.notes)));
+          return li;
+        }), String(brief.results_note || 'Log a result after posting to see it here.'), outcomes.length ? String(brief.results_note || '') : '');
+      }
       if (brief.overnight_note) meta.lastChild.textContent = `Watchlist: ${own ? (brief.items || []).length : 4} competitors · ${brief.overnight_note}`;
       const built = brief.generated_at ? new Date(brief.generated_at).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) : '';
       sourceNote.textContent = `${String(brief.source || '')}${built ? ` Generated ${built}${own ? ' from your current saved context.' : '; cached for today.'}` : ''}`;
@@ -1191,6 +1202,7 @@
       try {
         const response = await museFetch(`/api/v1/daily-brief${own ? '?workspace=own' : refresh ? '?refresh=true' : ''}`, {}, { retries: own ? 0 : 2, timeoutMs: 15000 });
         if (own && response.status === 409 && guard.isCurrent()) {
+          showOwnPlaceholder();
           setLoading(false);
           return false;
         }

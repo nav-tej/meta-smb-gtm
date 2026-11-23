@@ -80,7 +80,7 @@ def test_own_brief_and_rebuild_are_never_shared(
     monkeypatch.setattr("src.api.daily_brief.resolve_account", signed_out)
     for path in ("/api/v1/daily-brief?workspace=own", "/api/v1/daily-brief?refresh=true"):
         response = client.get(path)
-        assert response.status_code == 200, path
+        assert response.status_code == (401 if "workspace=own" in path else 200), path
         assert response.headers["cache-control"] == PRIVATE_API_CACHE_CONTROL, path
         assert "vercel-cdn-cache-control" not in response.headers, path
 

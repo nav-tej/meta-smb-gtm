@@ -22,3 +22,10 @@
 - Updated only the finished-own-workspace case in `tests/test_today_brief_states_e2e.py` and its brief fixture to expect the real brief, free re-check and own studio link. Signed-out and sample assertions remain intact.
 - `DEMO_MODE=true META_MODEL_API_KEY= DEMO_KEY= /Users/nav/meta-smb-gtm/.venv/bin/pytest -q tests/test_today_brief_states_e2e.py`: **1 passed**, 4.99 seconds (375px and 1440px). Evidence: `targeted-states.log` in the durable validation directory.
 - Backend/new real-route Chromium tests remain in progress; next integrate their patches and run complete after gates plus mutation.
+
+## Resumed after usage interruption — November 22, 2026
+- Prior workers Averroes and James stopped with explicit usage-limit errors. Nav confirmed the six preserved uncommitted backend/test files and requested takeover. Coordinator reclaimed those scoped files; new workers own only the missing API test and new Chromium test respectively. No outside runtime scope touched.
+- Reviewed all six patches: own route now returns private/no-store 401 and setup 409, never hydrates sample monitoring, reads one account workspace, uses the zero-run ranker and returns logged outcomes without shared cache access. `_extract_profile_parts` moved unchanged between API/service layers; old stub/cache expectations updated narrowly.
+- Corrected missing frontend rendering of returned logged outcomes. Also clear the private brief if a re-check gets setup 409.
+- Targeted demo-mode pytest (`test_daily_brief.py`, `test_shared_api_cache.py`, `test_today_brief_states_e2e.py`): **19 passed**, 5.35 seconds. Ruff import fixes/format applied only to scoped Python files. Evidence `resume-targeted.log`.
+- Fetched upstream exact tip **4ac4396f2418f17b2780adfb689d737f78ede22b**. Next: finish new tests, checkpoint, merge this tip preserving pass 18, bump seller-memory.js to `20261122-cx1`, run all gates/audits/contracts/mutations. No deployment authorized or attempted.
