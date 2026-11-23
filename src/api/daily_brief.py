@@ -1,4 +1,4 @@
-"""GET /daily-brief: today's growth brief for /today (no model call; cached per day)."""
+"""GET /daily-brief: today's growth brief (sample cached per day; own context read fresh)."""
 
 from typing import Annotated, Literal
 

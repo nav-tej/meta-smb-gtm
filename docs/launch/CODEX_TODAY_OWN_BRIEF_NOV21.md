@@ -29,3 +29,9 @@
 - Corrected missing frontend rendering of returned logged outcomes. Also clear the private brief if a re-check gets setup 409.
 - Targeted demo-mode pytest (`test_daily_brief.py`, `test_shared_api_cache.py`, `test_today_brief_states_e2e.py`): **19 passed**, 5.35 seconds. Ruff import fixes/format applied only to scoped Python files. Evidence `resume-targeted.log`.
 - Fetched upstream exact tip **4ac4396f2418f17b2780adfb689d737f78ede22b**. Next: finish new tests, checkpoint, merge this tip preserving pass 18, bump seller-memory.js to `20261122-cx1`, run all gates/audits/contracts/mutations. No deployment authorized or attempted.
+
+## Private-brief contract checkpoint — November 22, 2026
+- New `tests/test_daily_brief_own.py`: **12 passed**; combined daily-brief/cache tests **30 passed**, reported by scoped worker Russell and reviewed by coordinator. Guards reject external HTTP and Muse construction, all shared evidence/cache reads, cross-account results and stale preferences. Full fixed-date sample JSON SHA-256 matches original `740d1fe`.
+- Moved helper source equality independently verified via AST source extraction against `740d1fe`.
+- No-ranked-move state opens context editing instead of constructing a pretend recommendation handoff. Updated existing UI fixture with its recommendation payload; state regression **1 passed**, 5.49 seconds (`context-fallback.log`).
+- Chromium worker still owns only the new test; next checkpoint will integrate it before upstream merge and final verification.

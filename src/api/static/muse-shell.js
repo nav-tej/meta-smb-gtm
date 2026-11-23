@@ -1118,7 +1118,12 @@
           event.preventDefault();
           return;
         }
-        const id = window.museSellerMemory?.createStudioHandoff?.(item.recommendation || item);
+        if (!item.recommendation) {
+          event.preventDefault();
+          window.museSellerMemory?.openMemoryModal?.();
+          return;
+        }
+        const id = window.museSellerMemory?.createStudioHandoff?.(item.recommendation);
         if (!id) {
           event.preventDefault();
           toast('Your context is still loading. Try this move again.', 'warn');
@@ -1145,7 +1150,10 @@
         const href = own ? '/create?workspace=own' : safeHref(focus.href, true);
         linkTo(go, href, goLabel(href));
         go.onclick = null;
-        if (own) ownMoveLink(go, focus);
+        if (own) {
+          ownMoveLink(go, focus);
+          if (!focus.recommendation) go.textContent = 'Update context →';
+        }
         setMoveIdea(!own);
       }
       const actions = Array.isArray(brief.action_items) ? brief.action_items.slice(0, 3) : [];

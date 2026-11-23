@@ -10,7 +10,7 @@ No model is called here, so reading the brief never spends Muse API credit. It c
   labelled as such), computed in Python by the Bid Advisor.
 - Top 3 actions and a focus of the day, ranked from those signals.
 
-The brief is cached per UTC day. `refresh=True` rebuilds it only when its inputs changed (a new
+The sample brief is cached per UTC day. Own briefs read only the account workspace and are never cached. `refresh=True` rebuilds it only when its inputs changed (a new
 monitor run or fresh analysis), so it still regenerates at most once per day for the same data.
 Each section falls back to saved data on its own, so one bad input never breaks the brief.
 """
@@ -159,7 +159,7 @@ def _own_brief(workspace: dict[str, Any], today: date, now: datetime) -> DailyBr
     fallback = DailyMove(
         title="Choose a posting channel",
         reason="Update your context to choose where you want to post.",
-        href="/today?workspace=own#smContextBar",
+        href="/today?workspace=own#smStudioContextBar",
         impact="low",
         source="Your saved setup",
     )
@@ -538,7 +538,7 @@ async def daily_brief(
     response: Response | None = None,
     account: AccountSession | None = None,
 ) -> DailyBrief:
-    """Today's brief: built once per day and reused until its inputs change.
+    """Read own context fresh, or reuse the sample brief until its inputs change.
 
     Every read compares the cached brief's input fingerprint (latest monitor run, fresh cached
     analyses) with the current one, so a new competitor check shows up without regenerating the
