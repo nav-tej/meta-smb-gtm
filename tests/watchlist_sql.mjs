@@ -81,8 +81,13 @@ try {
       onboarding: { completed_at: '2026-11-22T00:00:00Z' },
     });
 
-    // Pause U4 and make U2 not due yet
+    // Pause U4 (while due!) and make U2 not due yet
     await call('public.muse_watchlist_set_paused($1, true)', [U4]);
+    await db.query(
+      `update muse_private.watchlist_schedule set next_check_at = now() - interval '1 hour'
+       where user_id = $1`,
+      [U4],
+    );
     await db.query(
       `insert into muse_private.watchlist_schedule (user_id, next_check_at, paused)
        values ($1, now() + interval '3 days', false)`,
@@ -250,7 +255,7 @@ try {
   console.log(`${passed} watchlist SQL checks passed`);
 } catch (err) {
   console.error(err);
-  process.exitCode = 1;
-} finally {
   await db.close();
+  process.exit(1);
 }
+await db.close();

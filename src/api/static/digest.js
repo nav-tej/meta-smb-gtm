@@ -193,7 +193,87 @@
     }
   };
 
-  let ownState = { ownerId: null, wsDoc: {}, version: 0, busy: false };
+  let ownState = {
+    ownerId: null,
+    wsDoc: {},
+    version: 0,
+    busy: false,
+    autoCheck: null,
+    checksMap: null,
+  };
+
+  function formatNextCheckDate(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '';
+    return d.toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      timeZone: 'UTC',
+    });
+  }
+
+  function clearAutoCheckBar() {
+    document.getElementById('dgAutoCheckBar')?.remove();
+  }
+
+  function renderAutoCheckBar(autoCheck) {
+    clearAutoCheckBar();
+    if (!autoCheck || autoCheck.enabled !== true) return;
+    const grid = document.getElementById('dgCompetitors');
+    if (!grid || !grid.parentNode) return;
+
+    const bar = el('div', {
+      id: 'dgAutoCheckBar',
+      class: 'dg-note',
+      style: 'display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:0.5rem 1rem;margin:0.35rem 0 0.75rem;padding:0.6rem 0.75rem;border:1px solid var(--border,#e5e1d8);border-radius:10px;max-width:100%;box-sizing:border-box;',
+    });
+
+    const nextStr = formatNextCheckDate(autoCheck.next_check_at);
+    const noteText = autoCheck.paused
+      ? 'Automatic weekly checks are paused. Press Check now (free) whenever you want an update.'
+      : (nextStr
+        ? `Muse checks your watchlist once a week. Next check: about ${nextStr}.`
+        : 'Muse checks your watchlist once a week.');
+    bar.appendChild(el('span', { id: 'dgAutoCheckNote', style: 'overflow-wrap:anywhere;' }, noteText));
+
+    const label = el('label', {
+      for: 'dgAutoCheckToggle',
+      style: 'display:inline-flex;align-items:center;gap:0.45rem;cursor:pointer;font-weight:500;',
+    });
+    const checkbox = el('input', {
+      type: 'checkbox',
+      id: 'dgAutoCheckToggle',
+    });
+    checkbox.checked = !autoCheck.paused;
+    checkbox.addEventListener('change', async () => {
+      const wantPaused = !checkbox.checked;
+      checkbox.disabled = true;
+      try {
+        const resp = await fetch('/api/v1/competitors/auto-check', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ paused: wantPaused }),
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (resp.ok && data.auto_check) {
+          ownState.autoCheck = data.auto_check;
+          renderAutoCheckBar(ownState.autoCheck);
+          return;
+        }
+        checkbox.checked = !wantPaused;
+      } catch {
+        checkbox.checked = !wantPaused;
+      } finally {
+        checkbox.disabled = false;
+      }
+    });
+    label.append(checkbox, document.createTextNode('Check my watchlist automatically each week'));
+    bar.appendChild(label);
+    grid.parentNode.insertBefore(bar, grid);
+  }
 
   function setCheckControls(visible, statusText = '') {
     const btn = document.getElementById('dgCheckNowBtn');
@@ -294,13 +374,17 @@
 
     const onboarding = wsDoc?.onboarding || {};
     const prefs = wsDoc?.preferences || {};
-    const checksMap = prefs.competitor_checks && typeof prefs.competitor_checks === 'object' ? prefs.competitor_checks : {};
+    const autoCheck = ownState.autoCheck && ownState.autoCheck.enabled === true ? ownState.autoCheck : null;
+    const checksMap = autoCheck && ownState.checksMap && typeof ownState.checksMap === 'object'
+      ? ownState.checksMap
+      : (prefs.competitor_checks && typeof prefs.competitor_checks === 'object' ? prefs.competitor_checks : {});
     const watchlist = extractWatchlist(wsDoc);
     const shopUrls = Array.isArray(onboarding.shop_urls) ? onboarding.shop_urls : [];
     const shopName = onboarding.business_name || (shopUrls[0] ? shopUrls[0] : 'My workspace');
 
     prefillDraftShops(watchlist);
     setCheckControls(watchlist.length > 0, document.getElementById('dgCheckStatus')?.textContent || '');
+    renderAutoCheckBar(autoCheck);
 
     write('digestWeek', `My workspace · ${shopName}`);
     const status = document.getElementById('digestStatus');
@@ -404,7 +488,12 @@
               card.appendChild(ul);
             }
             const whenStr = shortDate(check.checked_at);
-            card.appendChild(el('p', { class: 'dg-when' }, whenStr ? `Checked ${whenStr}` : 'Checked'));
+            if (autoCheck) {
+              const sourceLabel = check.source === 'auto' ? 'Automatic check' : 'Checked by you';
+              card.appendChild(el('p', { class: 'dg-when' }, whenStr ? `${sourceLabel} · ${whenStr}` : sourceLabel));
+            } else {
+              card.appendChild(el('p', { class: 'dg-when' }, whenStr ? `Checked ${whenStr}` : 'Checked'));
+            }
           }
           grid.appendChild(card);
         }
@@ -467,6 +556,10 @@
         }
         return;
       }
+      if (data.auto_check && data.auto_check.enabled === true) {
+        ownState.autoCheck = data.auto_check;
+        ownState.checksMap = data.competitor_checks || {};
+      }
       const nextDoc = {
         ...(ownState.wsDoc || {}),
         preferences: {
@@ -510,15 +603,25 @@
     if (s.state === 'account_own') {
       const guard = window.museModes?.bindAsyncGuard?.() || { isCurrent: () => true };
       ownState.ownerId = s.ownerId || null;
+      ownState.autoCheck = null;
+      ownState.checksMap = null;
       write('digestStatus', 'Loading your personal workspace…');
       let wsDoc = {};
       let wsVersion = 0;
       try {
-        if (window.museAccount && typeof window.museAccount.loadWorkspace === 'function') {
-          const loaded = await window.museAccount.loadWorkspace(s.ownerId);
-          if (!guard.isCurrent()) return;
-          wsDoc = loaded?.document || {};
-          wsVersion = Number(loaded?.version || 0);
+        const wsPromise = (window.museAccount && typeof window.museAccount.loadWorkspace === 'function')
+          ? window.museAccount.loadWorkspace(s.ownerId).catch(() => null)
+          : Promise.resolve(null);
+        const checksPromise = fetch('/api/v1/competitors/checks', { credentials: 'same-origin' })
+          .then((r) => (r.ok ? r.json() : null))
+          .catch(() => null);
+        const [loaded, checksResp] = await Promise.all([wsPromise, checksPromise]);
+        if (!guard.isCurrent()) return;
+        wsDoc = loaded?.document || {};
+        wsVersion = Number(loaded?.version || 0);
+        if (checksResp && checksResp.auto_check && checksResp.auto_check.enabled === true) {
+          ownState.autoCheck = checksResp.auto_check;
+          ownState.checksMap = checksResp.competitor_checks || {};
         }
       } catch {
         if (!guard.isCurrent()) return;
@@ -530,6 +633,9 @@
     }
 
     // Guest or explicit Sample shop view -> render clearly labeled Sample digest
+    ownState.autoCheck = null;
+    ownState.checksMap = null;
+    clearAutoCheckBar();
     setCheckControls(false, '');
     const guard = window.museModes?.bindAsyncGuard?.() || { isCurrent: () => true };
     const status = document.getElementById('digestStatus');
