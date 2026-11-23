@@ -43,6 +43,8 @@
     competitorEntries: [],
     suggestedUpdates: [],
     dismissSignals: [],
+    contentSources: {},
+    youtubeHandle: '',
     draftOverride: null,
     scope: 'draft', // 'draft' | 'shop_default'
     draftId: 'default',
@@ -226,6 +228,8 @@
     state.competitorEntries = [];
     state.suggestedUpdates = [];
     state.dismissSignals = [];
+    state.contentSources = {};
+    state.youtubeHandle = '';
     state.draftOverride = null;
     state.recommendResult = null;
     state.previousTopId = null;
@@ -411,6 +415,14 @@
       state.competitorEntries = res.data.competitor_entries || [];
       state.suggestedUpdates = res.data.suggested_updates || [];
       state.dismissSignals = res.data.dismiss_signals || [];
+      state.contentSources = (res.data.content_sources && typeof res.data.content_sources === 'object')
+        ? res.data.content_sources
+        : (res.data.preferences?.content_sources && typeof res.data.preferences.content_sources === 'object'
+          ? res.data.preferences.content_sources
+          : {});
+      state.youtubeHandle = typeof res.data.youtube_handle === 'string'
+        ? res.data.youtube_handle
+        : '';
       state.serverBaseline = cloneDeep({
         preferences: state.preferences,
         voiceProfile: state.voiceProfile,
@@ -2148,6 +2160,165 @@
     facebook: 'Facebook', website: 'Website', email: 'Email', pinterest: 'Pinterest',
   };
 
+  function safeYouTubeWatchUrl(video) {
+    const vid = video && typeof video.video_id === 'string' ? video.video_id.trim() : '';
+    if (!/^[A-Za-z0-9_-]{11}$/.test(vid)) return '';
+    return `https://www.youtube.com/watch?v=${vid}`;
+  }
+
+  function renderYouTubeSourceBlock(parent) {
+    if (isSampleMode() || !state.authenticated) return;
+    const savedYoutube = state.contentSources && typeof state.contentSources.youtube === 'object'
+      ? state.contentSources.youtube
+      : null;
+    const savedVideos = (savedYoutube && Array.isArray(savedYoutube.videos) ? savedYoutube.videos : [])
+      .filter((v) => v && safeYouTubeWatchUrl(v) && v.title)
+      .slice(0, 5);
+    const ytHandle = String(state.youtubeHandle || '').trim();
+
+    const wrap = el('div', {
+      id: 'smYouTubeSourceBlock',
+      class: 'sm-youtube-source',
+      style: 'margin-top:10px;padding-top:10px;border-top:1px solid var(--border,#e5e1d8);max-width:100%;box-sizing:border-box;',
+    });
+
+    wrap.appendChild(el('div', {
+      id: 'smYouTubeHeading',
+      style: 'font-weight:600;font-size:0.86rem;margin:0 0 4px;',
+    }, 'Your videos'));
+
+    if (ytHandle) {
+      wrap.appendChild(el('p', {
+        id: 'smYouTubeChannelHint',
+        class: 'sm-sub',
+        style: 'margin:0 0 6px;overflow-wrap:anywhere;',
+      }, `${ytHandle} · Paste links from your channel`));
+    }
+
+    if (savedVideos.length) {
+      const ul = el('ul', {
+        id: 'smYouTubeVideoList',
+        style: 'margin:0 0 8px;padding-left:18px;font-size:0.84rem;display:grid;gap:4px;',
+      });
+      savedVideos.forEach((video) => {
+        const watchUrl = safeYouTubeWatchUrl(video);
+        if (!watchUrl) return;
+        const li = el('li', { style: 'overflow-wrap:anywhere;' });
+        li.appendChild(el('a', {
+          href: watchUrl,
+          target: '_blank',
+          rel: 'noopener noreferrer',
+          class: 'sm-link',
+        }, String(video.title)));
+        const author = String(video.author_name || '').trim();
+        if (author) {
+          li.appendChild(el('span', { class: 'sm-sub' }, ` · ${author}`));
+        }
+        ul.appendChild(li);
+      });
+      wrap.appendChild(ul);
+    }
+
+    const label = el('label', {
+      for: 'smYouTubeUrlsInput',
+      style: 'display:block;font-size:0.82rem;font-weight:600;margin-bottom:4px;',
+    }, 'Paste links to your videos (one per line, up to 5)');
+    const textarea = el('textarea', {
+      id: 'smYouTubeUrlsInput',
+      class: 'sm-memory-input',
+      rows: '3',
+      placeholder: 'https://www.youtube.com/watch?v=...',
+      'aria-label': 'Paste links to your videos (one per line, up to 5)',
+      style: 'width:100%;max-width:100%;box-sizing:border-box;margin-bottom:6px;font-family:inherit;font-size:0.84rem;',
+    });
+    if (savedVideos.length) {
+      textarea.value = savedVideos.map(safeYouTubeWatchUrl).filter(Boolean).join('\n');
+    }
+
+    const helperCopy = el('p', {
+      id: 'smYouTubeHelperCopy',
+      class: 'sm-sub',
+      style: 'margin:0 0 8px;',
+    }, 'Muse reads the title of each video you paste.');
+
+    const statusEl = el('div', {
+      id: 'smYouTubeStatus',
+      class: 'sm-sub',
+      role: 'status',
+      'aria-live': 'polite',
+      style: 'margin-top:6px;overflow-wrap:anywhere;',
+    });
+
+    const saveBtn = el('button', {
+      type: 'button',
+      id: 'smYouTubeSaveBtn',
+      class: 'sm-btn',
+    }, 'Save videos (free)');
+    const removeBtn = el('button', {
+      type: 'button',
+      id: 'smYouTubeRemoveBtn',
+      class: 'sm-btn',
+    }, 'Remove');
+
+    async function runYouTubeAction(payload) {
+      const boundGen = state.activeGeneration;
+      const boundOwner = currentOwnerId();
+      const boundSample = isSampleMode();
+      const controls = [saveBtn, removeBtn, textarea];
+      controls.forEach((c) => { if (c) c.disabled = true; });
+      statusEl.textContent = payload.remove ? 'Removing saved videos…' : 'Reading video titles…';
+      try {
+        const res = await apiJson('/api/v1/seller-memory/sources/youtube', {
+          method: 'POST',
+          body: JSON.stringify({
+            ...payload,
+            expected_version: state.version,
+            expected_owner: boundOwner,
+          }),
+        });
+        if (!isCurrentRequestContext(boundGen, boundOwner, boundSample)) return;
+        if (!res.ok) {
+          statusEl.textContent = (res.data && res.data.detail)
+            ? String(res.data.detail)
+            : 'Could not save videos right now.';
+          controls.forEach((c) => { if (c) c.disabled = false; });
+          if (res.status === 409) {
+            await loadServerMemory(true);
+            if (currentOwnerId() === boundOwner && isSampleMode() === boundSample) renderMemoryModalBody();
+          }
+          return;
+        }
+        await loadServerMemory(true);
+        if (currentOwnerId() === boundOwner && isSampleMode() === boundSample) {
+          renderMemoryModalBody();
+          if (location.pathname.startsWith('/today') && !isSampleMode()) {
+            const recheckBtn = document.querySelector('#msBrief .ms-brief-actions button');
+            if (recheckBtn && !recheckBtn.disabled) recheckBtn.click();
+          }
+        }
+      } catch (_err) {
+        if (!isCurrentRequestContext(boundGen, boundOwner, boundSample)) return;
+        statusEl.textContent = 'Could not reach Muse right now. Try again shortly.';
+        controls.forEach((c) => { if (c) c.disabled = false; });
+      }
+    }
+
+    saveBtn.addEventListener('click', () => {
+      const urls = String(textarea.value || '')
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean);
+      runYouTubeAction({ urls });
+    });
+    removeBtn.addEventListener('click', () => {
+      runYouTubeAction({ remove: true });
+    });
+
+    const actions = el('div', { style: 'display:flex;flex-wrap:wrap;gap:8px;' }, saveBtn, removeBtn);
+    wrap.append(label, textarea, helperCopy, actions, statusEl);
+    parent.appendChild(wrap);
+  }
+
   // What setup told Muse, shown first so "What Muse remembers" is never empty for a seller who
   // finished setup. Read-only here; setup is where it changes (saving uses no runs).
   function renderSetupFacts() {
@@ -2166,15 +2337,17 @@
       ['Channels', channels.join(', ')],
       ['Competitors you watch', comps.map((c) => c.name || c.url).join(', ')],
     ].filter(([, value]) => value);
-    if (!rows.length) return;
     const section = el('div', { id: 'smSetupFacts', class: 'sm-setup-facts' });
     section.appendChild(el('h3', { style: 'font-size:0.9rem;margin:4px 0 6px;' }, 'From your setup'));
-    const list = el('dl', { class: 'sm-setup-list', style: 'display:grid;grid-template-columns:max-content 1fr;gap:4px 12px;margin:0 0 6px;font-size:0.86rem;' });
-    rows.forEach(([label, value]) => {
-      list.append(el('dt', { style: 'color:var(--muted,#6b6b6b);' }, label), el('dd', { style: 'margin:0;overflow-wrap:anywhere;' }, value));
-    });
-    section.appendChild(list);
-    section.appendChild(el('a', { href: '/welcome', class: 'sm-link', id: 'smEditSetupLink' }, 'Change these in setup →'));
+    if (rows.length) {
+      const list = el('dl', { class: 'sm-setup-list', style: 'display:grid;grid-template-columns:max-content 1fr;gap:4px 12px;margin:0 0 6px;font-size:0.86rem;' });
+      rows.forEach(([label, value]) => {
+        list.append(el('dt', { style: 'color:var(--muted,#6b6b6b);' }, label), el('dd', { style: 'margin:0;overflow-wrap:anywhere;' }, value));
+      });
+      section.appendChild(list);
+      section.appendChild(el('a', { href: '/welcome', class: 'sm-link', id: 'smEditSetupLink' }, 'Change these in setup →'));
+    }
+    renderYouTubeSourceBlock(section);
     modalBodyEl.appendChild(section);
   }
 

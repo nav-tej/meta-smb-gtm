@@ -49,6 +49,17 @@ from src.services.seller_memory import (
     suggest_memory_updates,
 )
 from src.services.social_extract import extract_social_handles
+from src.services.youtube_videos import (
+    MAX_AUTHOR_CHARS,
+    MAX_TITLE_CHARS,
+    MAX_VIDEOS,
+    VIDEO_ID_RE,
+    YouTubeVideoError,
+    extract_youtube_social_handle,
+    fetch_video_info,
+    oembed_url_for_video,
+    parse_video_id,
+)
 from src.utils.sitemap import SitemapError
 
 router = APIRouter(prefix="/seller-memory", tags=["seller-memory"])
@@ -91,9 +102,17 @@ class RecommendRequest(BaseModel):
     preferences: SellerPreferences | None = None
     voice_profile: VoiceProfile | None = None
     competitor_entries: list[CompetitorEntry] | None = None
+    content_videos: list[dict[str, Any]] | None = None
     draft_override: dict[str, Any] | None = None
     dismiss_signals: list[DismissSignal] = Field(default_factory=list)
     previous_top_id: str | None = Field(default=None, max_length=120)
+
+
+class YouTubeSourcesRequest(BaseModel):
+    urls: list[str] = Field(default_factory=list)
+    remove: bool = False
+    expected_version: int | None = None
+    expected_owner: str | None = None
 
 
 _BUSINESS_TYPES: dict[str, BusinessType] = {
@@ -184,6 +203,27 @@ async def _load_account_state(
     return ws, pref, voice, comps, signals
 
 
+def _extract_content_sources(doc: Any) -> dict[str, Any]:
+    if not isinstance(doc, dict):
+        return {}
+    raw_prefs = doc.get("preferences")
+    if not isinstance(raw_prefs, dict):
+        return {}
+    raw_sources = raw_prefs.get("content_sources")
+    return dict(raw_sources) if isinstance(raw_sources, dict) else {}
+
+
+def _extract_youtube_videos(doc: Any) -> list[dict[str, Any]]:
+    sources = _extract_content_sources(doc)
+    yt = sources.get("youtube")
+    if not isinstance(yt, dict):
+        return []
+    videos = yt.get("videos")
+    if not isinstance(videos, list):
+        return []
+    return [v for v in videos if isinstance(v, dict)]
+
+
 @router.get("")
 async def get_seller_memory(
     request: Request,
@@ -206,6 +246,8 @@ async def get_seller_memory(
             "competitor_entries": [],
             "suggested_updates": [],
             "dismiss_signals": [],
+            "content_sources": {},
+            "youtube_handle": "",
         }
 
     verify_workspace_owner(account, x_muse_owner)
@@ -214,11 +256,14 @@ async def get_seller_memory(
     onb = doc.get("onboarding") if isinstance(doc, dict) else None
     biz_name = str(onb.get("business_name") or "") if isinstance(onb, dict) else ""
     biz_type = _business_type(onb)
+    content_sources = _extract_content_sources(doc)
+    youtube_handle = extract_youtube_social_handle(onb)
 
     suggestions = suggest_memory_updates(
         preferences=pref, voice_profile=voice, dismiss_signals=signals
     )
     pref.suggested_updates = suggestions
+    merged_pref, merged_voice = _dump_preserving_workspace_extras(ws, pref, voice)
 
     return {
         "authenticated": True,
@@ -226,14 +271,16 @@ async def get_seller_memory(
         "version": int(ws.get("version") or 0),
         "business_name": biz_name,
         "business_type": biz_type,
-        "preferences": pref.model_dump(mode="json"),
-        "voice_profile": voice.model_dump(mode="json"),
+        "preferences": merged_pref,
+        "voice_profile": merged_voice,
         "memory_entries": [e.model_dump(mode="json") for e in pref.memory_entries],
         "competitor_entries": [c.model_dump(mode="json") for c in comps],
         "suggested_updates": [
             s.model_dump(mode="json") for s in suggestions if s.status == "pending"
         ],
         "dismiss_signals": [s.model_dump(mode="json") for s in signals],
+        "content_sources": content_sources,
+        "youtube_handle": youtube_handle,
     }
 
 
@@ -711,16 +758,18 @@ async def recommend_for_context(
     pref = body.preferences
     voice = body.voice_profile
     comps = body.competitor_entries
+    content_videos = body.content_videos
     signals = list(body.dismiss_signals)
     biz_name = body.business_name
     biz_type = body.business_type
 
-    if pref is None or comps is None:
+    if pref is None or comps is None or content_videos is None:
         account = await resolve_account(request, response, require_verified=False)
         if account is not None:
             verify_workspace_owner(account, x_muse_owner)
             try:
                 ws, ws_pref, ws_voice, ws_comps, ws_signals = await _load_account_state(account)
+                doc = ws.get("document") or {}
                 if pref is None:
                     pref = ws_pref
                 if voice is None:
@@ -729,9 +778,21 @@ async def recommend_for_context(
                     comps = ws_comps
                 if not signals:
                     signals = ws_signals
-                onb = (ws.get("document") or {}).get("onboarding")
-                if isinstance(onb, dict) and onb.get("business_name") and biz_name == "Your Studio":
+                if content_videos is None:
+                    content_videos = _extract_youtube_videos(doc)
+                onb = doc.get("onboarding") if isinstance(doc, dict) else None
+                if (
+                    isinstance(onb, dict)
+                    and onb.get("business_name")
+                    and biz_name == "Your Studio"
+                ):
                     biz_name = str(onb["business_name"])
+                if (
+                    biz_type is None
+                    and body.preferences is None
+                    and body.business_name == "Your Studio"
+                ):
+                    biz_type = _business_type(onb)
             except Exception:
                 pass
 
@@ -749,4 +810,136 @@ async def recommend_for_context(
         ),
         "generated_at": datetime.now(UTC).isoformat(),
         "runs_used": 0,
+    }
+
+
+@router.post("/sources/youtube")
+async def save_youtube_sources(
+    body: YouTubeSourcesRequest,
+    request: Request,
+    response: Response,
+    x_muse_owner: Annotated[str | None, Header()] = None,
+) -> dict[str, Any]:
+    """Read and save (or remove) up to 5 seller-pasted YouTube video links via oEmbed (0 runs)."""
+    response.headers["Cache-Control"] = "no-store"
+    account = await resolve_account(request, response, require_verified=True)
+    assert account is not None
+    verify_workspace_owner(account, x_muse_owner, body.expected_owner)
+
+    ws = await load_workspace(account)
+    ws_version = int(ws.get("version") or 0)
+    if body.expected_version is not None and body.expected_version != ws_version:
+        raise HTTPException(
+            status_code=409,
+            detail="Your workspace changed in another tab. Reload and try again.",
+        )
+
+    doc = dict(ws.get("document") or {})
+    prefs = dict(doc.get("preferences") or {}) if isinstance(doc.get("preferences"), dict) else {}
+    content_sources = (
+        dict(prefs.get("content_sources") or {})
+        if isinstance(prefs.get("content_sources"), dict)
+        else {}
+    )
+
+    if body.remove:
+        content_sources.pop("youtube", None)
+        prefs["content_sources"] = content_sources
+        doc["preferences"] = prefs
+        saved = await save_workspace(
+            account,
+            doc,
+            expected_version=ws_version,
+            expected_owner=account.user_id,
+        )
+        return {
+            "success": True,
+            "owner_id": account.user_id,
+            "version": int(saved.get("version") or ws_version + 1),
+            "content_sources": content_sources,
+            "youtube": None,
+        }
+
+    raw_urls = [u.strip() for u in (body.urls or []) if isinstance(u, str) and u.strip()]
+    if not raw_urls:
+        raise HTTPException(status_code=400, detail="Paste at least one YouTube video link.")
+    if len(raw_urls) > MAX_VIDEOS:
+        raise HTTPException(status_code=400, detail="Paste up to 5 YouTube video links.")
+
+    ordered_ids: list[str] = []
+    seen_ids: set[str] = set()
+    try:
+        for raw_url in raw_urls:
+            vid = parse_video_id(raw_url)
+            if vid not in seen_ids:
+                seen_ids.add(vid)
+                ordered_ids.append(vid)
+    except YouTubeVideoError as err:
+        raise HTTPException(status_code=err.status_code, detail=err.user_message) from err
+
+    existing_yt = content_sources.get("youtube")
+    existing_by_id: dict[str, dict[str, str]] = {}
+    if isinstance(existing_yt, dict) and isinstance(existing_yt.get("videos"), list):
+        for item in existing_yt["videos"]:
+            if not isinstance(item, dict):
+                continue
+            evid = str(item.get("video_id") or "").strip()
+            etitle = str(item.get("title") or "").strip()
+            if VIDEO_ID_RE.fullmatch(evid) and etitle:
+                existing_by_id[evid] = {
+                    "video_id": evid,
+                    "title": etitle[:MAX_TITLE_CHARS],
+                    "author_name": str(item.get("author_name") or "").strip()[:MAX_AUTHOR_CHARS],
+                    "added_at": str(item.get("added_at") or "").strip()
+                    or datetime.now(UTC).isoformat(timespec="seconds"),
+                }
+
+    new_ids = [vid for vid in ordered_ids if vid not in existing_by_id]
+    if new_ids:
+        reserve_scan_crawls(
+            request,
+            response,
+            [oembed_url_for_video(vid) for vid in new_ids],
+            1,
+        )
+
+    now_iso = datetime.now(UTC).isoformat(timespec="seconds")
+    fetched_by_id: dict[str, dict[str, str]] = {}
+    if new_ids:
+        try:
+            for vid in new_ids:
+                info = await fetch_video_info(vid)
+                fetched_by_id[vid] = {
+                    "video_id": info["video_id"],
+                    "title": info["title"],
+                    "author_name": info["author_name"],
+                    "added_at": now_iso,
+                }
+        except YouTubeVideoError as err:
+            raise HTTPException(status_code=err.status_code, detail=err.user_message) from err
+
+    videos = [
+        existing_by_id[vid] if vid in existing_by_id else fetched_by_id[vid]
+        for vid in ordered_ids
+    ]
+    youtube_data = {
+        "videos": videos,
+        "updated_at": now_iso,
+    }
+    content_sources["youtube"] = youtube_data
+    prefs["content_sources"] = content_sources
+    doc["preferences"] = prefs
+
+    saved = await save_workspace(
+        account,
+        doc,
+        expected_version=ws_version,
+        expected_owner=account.user_id,
+    )
+    return {
+        "success": True,
+        "owner_id": account.user_id,
+        "version": int(saved.get("version") or ws_version + 1),
+        "content_sources": content_sources,
+        "youtube": youtube_data,
     }
