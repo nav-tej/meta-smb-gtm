@@ -363,7 +363,7 @@ with sync_playwright() as p:
             assert len(brief["items"]) == 2
             assert page.locator("#msBrief .ms-watch li").count() == 2
             assert "not checked yet" in text.lower(), text
-            assert "does not check" in text and "overnight yet" in text
+            assert "Check now (free) on your digest" in text
             for other in ("services", "products", "budget"):
                 if other != USER:
                     assert other + " rival" not in text
