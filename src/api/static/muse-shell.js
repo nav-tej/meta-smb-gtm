@@ -1022,7 +1022,7 @@
     head.append(titleBox, actions);
     const body = el('div', { class: 'ms-brief-body', id: 'msBriefBody' });
     const list = el('ul', { class: 'ms-watch' });
-    const CHIP = { new: 'New', first: 'First check', fresh: 'Fresh Muse brief', changed: 'Changed', unchecked: 'Not checked yet' };
+    const CHIP = { new: 'New', first: 'First check', fresh: 'Fresh Muse brief', changed: 'Changed', unchecked: 'Not checked yet', unchanged: 'No change', failed: 'Couldn’t check' };
     const renderItems = (items) => {
       list.replaceChildren();
       for (const item of items) {

@@ -1,5 +1,15 @@
 # Antigravity Report: Saved Competitor Checks in Own `/today` Brief & Seller YouTube Videos (Nov 23)
 
+> **Claude review, Nov 23 (coordinator).** Item 1 is merged into `claude/ux-gap-ad-loop-nov17`
+> (cherry-picked `aaa5c56`, `dd5e32a`, `2461b39`), with one change: a saved `unchanged` check
+> showed the sample brief's "Fresh Muse brief" chip, and a failed check showed "Not checked yet".
+> They now read "No change" and "Couldn't check" (`muse-shell.js` `20261123-uxgap22`).
+> **Item 2 (YouTube) is not merged.** YouTube's robots.txt (checked Nov 23) has
+> `Disallow: /feeds/videos.xml` for `User-agent: *`, and AGENTS.md says to honor robots.txt. The
+> code checked robots for the channel page but not for the feed it then fetched. That was a flaw
+> in Claude's brief, not in the implementation. Item 2 stays on `gemini/own-sources-nov23` at
+> `5ca48b6` until Nav picks a sanctioned route. Everything below is Antigravity's report as written.
+
 - **Brief:** `docs/launch/antigravity-own-sources-nov23.md`
 - **Base:** `origin/claude/ux-gap-ad-loop-nov17` at `1e8e0a7`
 - **Branch:** `gemini/own-sources-nov23`

@@ -158,11 +158,11 @@ def test_own_brief_maps_every_saved_competitor_check_status(
     assert by_name["Rival Changed"]["note"] == "2 new pages, 1 price change since Nov 21."
     assert by_name["Rival Changed"]["checked_at"] == "2026-11-23T14:30:00Z"
 
-    assert by_name["Rival Unchanged"]["status"] == "fresh"
+    assert by_name["Rival Unchanged"]["status"] == "unchanged"
     assert by_name["Rival Unchanged"]["note"] == "No changes since Nov 21."
     assert by_name["Rival Unchanged"]["checked_at"] == "2026-11-22T10:00:00Z"
 
-    assert by_name["Rival Error"]["status"] == "unchecked"
+    assert by_name["Rival Error"]["status"] == "failed"
     assert by_name["Rival Error"]["note"] == "This site blocks automated reading."
     assert by_name["Rival Error"]["checked_at"] == "2026-11-22T11:00:00Z"
 

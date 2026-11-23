@@ -56,7 +56,7 @@ class WatchItem(BaseModel):
     name: str
     url: str
     where: str
-    status: Literal["new", "first", "fresh", "changed", "unchecked"]
+    status: Literal["new", "first", "fresh", "changed", "unchecked", "unchanged", "failed"]
     note: str
     checked_at: str | None = None
 
@@ -135,11 +135,13 @@ class SetupIncompleteError(ValueError):
     """The account has not completed its own workspace setup."""
 
 
-_SAVED_CHECK_STATUS_MAP: dict[str, Literal["first", "changed", "fresh", "unchecked"]] = {
+# "fresh" is the sample brief's "Fresh Muse brief" chip; a saved own check is never a brief and may
+# be days old, so it gets its own chips ("No change", "Couldn't check" in muse-shell.js).
+_SAVED_CHECK_STATUS_MAP: dict[str, Literal["first", "changed", "unchanged", "failed"]] = {
     "first_check": "first",
     "changed": "changed",
-    "unchanged": "fresh",
-    "error": "unchecked",
+    "unchanged": "unchanged",
+    "error": "failed",
 }
 
 _UNCHECKED_WATCH_NOTE = "Not checked yet. Check now (free) on your digest."

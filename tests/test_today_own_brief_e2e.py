@@ -71,6 +71,27 @@ def _document(uid: str, minutes: int) -> dict[str, Any]:
         "preferences": {
             "goal": "Grow visits",
             "access": {"minutes_per_week": minutes, "channels": ["instagram", "website"]},
+            # The products seller pressed "Check now (free)" on the digest earlier; nobody else did.
+            **(
+                {
+                    "competitor_checks": {
+                        "https://products-rival-0.test": {
+                            "status": "unchanged",
+                            "checked_at": "2026-11-20T09:00:00Z",
+                            "summary": "No changes since Nov 18.",
+                            "error": "",
+                        },
+                        "https://products-rival-1.test": {
+                            "status": "error",
+                            "checked_at": "2026-11-20T09:00:00Z",
+                            "summary": "",
+                            "error": "This site blocks automated reading.",
+                        },
+                    }
+                }
+                if uid == "products"
+                else {}
+            ),
         },
     }
 
@@ -362,8 +383,23 @@ with sync_playwright() as p:
             assert brief["business_name"] == NAME
             assert len(brief["items"]) == 2
             assert page.locator("#msBrief .ms-watch li").count() == 2
-            assert "not checked yet" in text.lower(), text
             assert "Check now (free) on your digest" in text
+            assert "fresh muse brief" not in text.lower(), text
+            # textContent: the chips are uppercased by CSS and the notes are hidden on phones.
+            chips = page.locator("#msBrief .ms-watch .ms-chip").all_text_contents()
+            notes = page.locator("#msBrief .ms-watch .ms-note").all_text_contents()
+            if USER == "products":
+                # A saved check days old is neither "fresh" nor "not checked yet".
+                assert chips == ["No change", "Couldn’t check"], chips
+                assert notes == [
+                    "No changes since Nov 18.",
+                    "This site blocks automated reading.",
+                ], notes
+                assert "Last check: Nov 20." in text, text
+                assert "not checked yet" not in text.lower(), text
+            else:
+                assert chips == ["Not checked yet", "Not checked yet"], chips
+                assert "not checked yet" in text.lower(), text
             for other in ("services", "products", "budget"):
                 if other != USER:
                     assert other + " rival" not in text
