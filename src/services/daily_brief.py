@@ -209,9 +209,7 @@ def _own_watch_items(
         )
     short_date = _format_short_date(latest_iso) if latest_iso else ""
     overnight_note = (
-        f"{_OWN_OVERNIGHT_NOTE} Last check: {short_date}."
-        if short_date
-        else _OWN_OVERNIGHT_NOTE
+        f"{_OWN_OVERNIGHT_NOTE} Last check: {short_date}." if short_date else _OWN_OVERNIGHT_NOTE
     )
     return items, overnight_note
 
