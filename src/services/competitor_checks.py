@@ -9,11 +9,13 @@ diff summaries. Zero Muse calls and zero runs used.
 from __future__ import annotations
 
 import re
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Literal
 from urllib.parse import urlsplit, urlunsplit
 
 from src.models.intel import SitemapEntry
+from src.services import scan_guard
 
 MAX_COMPETITORS_PER_CHECK = 6
 MAX_PAGES_PER_COMPETITOR = 30
@@ -484,3 +486,93 @@ def compute_top_insight(competitors: list[dict[str, Any]], checked_at: str) -> d
 
 def now_iso_utc() -> str:
     return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+async def run_watchlist_checks(
+    selected: list[dict[str, str]],
+    existing_checks: dict[str, Any],
+    *,
+    checked_at: str,
+    scan_url_fn: Callable[[str], tuple[str, str, bool]],
+    collect_entries_fn: Callable[..., Awaitable[tuple[list[SitemapEntry], list[str]]]],
+    source: Literal["manual", "auto"] = "manual",
+) -> tuple[list[dict[str, Any]], dict[str, dict[str, Any]], int]:
+    """Check up to 6 selected competitors through scan_guard + collect_entries and diff snapshots.
+
+    Shared by both the manual button (`POST /api/v1/competitors/check`) and the scheduled
+    weekly run (`GET /api/v1/watchlist/run`). Zero Muse calls.
+    Returns `(results, stored_by_url, total_pages_fetched)`.
+    """
+    capped = selected[:MAX_COMPETITORS_PER_CHECK]
+    targets = [(item["name"], item["url"], *scan_url_fn(item["url"])) for item in capped]
+
+    results: list[dict[str, Any]] = []
+    stored_by_url: dict[str, dict[str, Any]] = {}
+    total_pages_fetched = 0
+
+    for name, raw_url, normalized, _host, blocked in targets:
+        key = normalize_competitor_url(normalized or raw_url)
+        prev = existing_checks.get(key) if isinstance(existing_checks.get(key), dict) else None
+        if blocked:
+            err_kind, err_msg = classify_check_error("", blocked_host=True)
+            item_res, stored = error_competitor_result(
+                prev,
+                name=name,
+                url=key,
+                checked_at=checked_at,
+                error_kind=err_kind,
+                error_message=err_msg,
+            )
+            item_res["source"] = source
+            stored["source"] = source
+            stored_by_url[key] = stored
+            results.append(item_res)
+            continue
+
+        try:
+            entries, _sitemaps = await scan_guard.crawl(
+                normalized,
+                MAX_PAGES_PER_COMPETITOR,
+                lambda target=normalized: collect_entries_fn(
+                    target, max_urls=MAX_PAGES_PER_COMPETITOR
+                ),
+            )
+            total_pages_fetched += len(entries)
+            pages = entries_to_snapshot_pages(entries)
+            if not pages:
+                err_kind, err_msg = classify_check_error("no urls found")
+                item_res, stored = error_competitor_result(
+                    prev,
+                    name=name,
+                    url=key,
+                    checked_at=checked_at,
+                    error_kind=err_kind,
+                    error_message=err_msg,
+                )
+            else:
+                item_res, stored = diff_competitor_pages(
+                    prev,
+                    pages,
+                    name=name,
+                    url=key,
+                    checked_at=checked_at,
+                    # The crawl stops at the cap, so a full window means a bigger site.
+                    truncated=len(entries) >= MAX_PAGES_PER_COMPETITOR,
+                )
+        except Exception as err:
+            err_kind, err_msg = classify_check_error(err)
+            item_res, stored = error_competitor_result(
+                prev,
+                name=name,
+                url=key,
+                checked_at=checked_at,
+                error_kind=err_kind,
+                error_message=err_msg,
+            )
+
+        item_res["source"] = source
+        stored["source"] = source
+        stored_by_url[key] = stored
+        results.append(item_res)
+
+    return results, stored_by_url, total_pages_fetched

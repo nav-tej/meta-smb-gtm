@@ -94,6 +94,10 @@ class Settings(BaseModel):
     stripe_price_starter_annual: str = ""
     stripe_price_growth: str = ""
     stripe_price_unlimited: str = ""
+    # Automatic weekly competitor watchlist checks (Supabase muse_private.watchlist_checks).
+    # Off until the migration is applied and Nav enables it.
+    watchlist_auto_check_enabled: bool = False
+    watchlist_auto_check_accounts_per_run: int = 10
 
 
 @lru_cache

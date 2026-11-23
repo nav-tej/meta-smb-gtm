@@ -2,17 +2,20 @@
 
 import base64
 import binascii
+import hmac
 import json
 import logging
+import os
+import time
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, Any
 from urllib.parse import urlparse
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
 
-from src.api.cache_policy import cache_for_everyone
+from src.api.cache_policy import cache_for_everyone, never_cache
 from src.api.demo import LiveMode, _client_ip_hash, demo_unavailable
 from src.clients.ad_library import (
     MetaAdLibraryClient,
@@ -33,18 +36,15 @@ from src.models.seller import (
     SellerFootprintAudit,
     SellerProfile,
 )
-from src.services import demo, result_cache, scan_guard
+from src.services import demo, result_cache, scan_guard, watchlist_store
 from src.services.accounts import load_workspace, resolve_account, save_workspace
 from src.services.competitor_checks import (
     MAX_PAGES_PER_COMPETITOR,
-    classify_check_error,
     compute_top_insight,
-    diff_competitor_pages,
-    entries_to_snapshot_pages,
-    error_competitor_result,
     extract_selected_competitors,
     normalize_competitor_url,
     now_iso_utc,
+    run_watchlist_checks,
 )
 from src.services.competitor_intel import CompetitorIntelService, collect_entries
 from src.services.research_cache import NAMESPACE_AD_PREVIEWS, cached_research
@@ -310,6 +310,84 @@ class CompetitorCheckRequest(BaseModel):
     expected_owner: str | None = None
 
 
+class WatchlistAutoCheckRequest(BaseModel):
+    paused: bool
+
+
+WATCHLIST_RUN_BUDGET_SECONDS = 200.0
+WATCHLIST_LEASE_SECONDS = 600
+
+
+def _merge_previous_snapshots(
+    table_data: dict[str, Any] | None, legacy_checks: Any
+) -> dict[str, Any]:
+    """Build per-URL previous snapshot map: table first, legacy workspace fallback."""
+    merged: dict[str, Any] = {}
+    if isinstance(legacy_checks, dict):
+        for raw_key, val in legacy_checks.items():
+            if not isinstance(val, dict):
+                continue
+            key = normalize_competitor_url(str(raw_key or val.get("url") or ""))
+            if key:
+                merged[key] = val
+    if isinstance(table_data, dict) and table_data.get("enabled"):
+        for key, val in (table_data.get("checks") or {}).items():
+            if isinstance(val, dict):
+                merged[key] = val
+    return merged
+
+
+@router.get("/competitors/checks")
+async def get_own_competitor_checks(
+    http_request: Request,
+    response: Response,
+) -> dict[str, Any]:
+    """Return the signed-in seller's saved competitor checks (display-only, no snapshots)."""
+    never_cache(response)
+    account = await resolve_account(http_request, response, require_verified=True)
+    assert account is not None
+
+    ws = await load_workspace(account)
+    doc = ws.get("document") if isinstance(ws.get("document"), dict) else {}
+    prefs = doc.get("preferences") if isinstance(doc.get("preferences"), dict) else {}
+    legacy_checks = prefs.get("competitor_checks")
+
+    table_data = (
+        await watchlist_store.get_checks(account.user_id, with_snapshots=False)
+        if watchlist_store.auto_check_enabled()
+        else None
+    )
+    merged, auto_check = watchlist_store.merge_checks_for_display(table_data, legacy_checks)
+    return {
+        "competitor_checks": merged,
+        "auto_check": auto_check,
+    }
+
+
+@router.post("/competitors/auto-check")
+async def set_own_watchlist_auto_check(
+    body: WatchlistAutoCheckRequest,
+    http_request: Request,
+    response: Response,
+) -> dict[str, Any]:
+    """Pause or resume weekly automatic watchlist checks for the signed-in seller."""
+    response.headers["Cache-Control"] = "no-store"
+    if not watchlist_store.auto_check_enabled():
+        raise HTTPException(status_code=404, detail="Automatic watchlist checks are not enabled.")
+    account = await resolve_account(http_request, response, require_verified=True)
+    assert account is not None
+
+    sched = await watchlist_store.set_paused(account.user_id, body.paused)
+    return {
+        "auto_check": {
+            "enabled": True,
+            "paused": bool(sched.get("paused", body.paused)),
+            "next_check_at": sched.get("next_check_at"),
+            "last_auto_check_at": sched.get("last_auto_check_at"),
+        }
+    }
+
+
 @router.post("/competitors/check")
 async def check_own_competitors(
     http_request: Request,
@@ -340,8 +418,30 @@ async def check_own_competitors(
     doc = dict(ws.get("document") or {})
     selected = extract_selected_competitors(doc)
     checked_at = now_iso_utc()
+    use_table = watchlist_store.auto_check_enabled()
 
     if not selected:
+        if use_table:
+            sched = await watchlist_store.save_checks(
+                account.user_id, source="manual", checks=[], keep_urls=[]
+            )
+            return {
+                "checked_at": checked_at,
+                "version": ws_version,
+                "competitors": [],
+                "top_insight": {
+                    "kind": "empty",
+                    "title": "Add competitors to start checking for changes",
+                    "body": "Add up to 6 competitor websites in setup or your watchlist.",
+                },
+                "competitor_checks": {},
+                "auto_check": {
+                    "enabled": True,
+                    "paused": bool(sched.get("paused", False)),
+                    "next_check_at": sched.get("next_check_at"),
+                    "last_auto_check_at": sched.get("last_auto_check_at"),
+                },
+            }
         return {
             "checked_at": checked_at,
             "version": ws_version,
@@ -367,77 +467,61 @@ async def check_own_competitors(
     )
 
     prefs = dict(doc.get("preferences") or {}) if isinstance(doc.get("preferences"), dict) else {}
-    existing_checks = (
+    legacy_checks = (
         dict(prefs.get("competitor_checks") or {})
         if isinstance(prefs.get("competitor_checks"), dict)
         else {}
     )
 
-    results: list[dict[str, Any]] = []
-    for name, raw_url, normalized, _host, blocked in targets:
-        key = normalize_competitor_url(normalized or raw_url)
-        prev = existing_checks.get(key) if isinstance(existing_checks.get(key), dict) else None
-        if blocked:
-            err_kind, err_msg = classify_check_error("", blocked_host=True)
-            item_res, stored = error_competitor_result(
-                prev,
-                name=name,
-                url=key,
-                checked_at=checked_at,
-                error_kind=err_kind,
-                error_message=err_msg,
-            )
-            existing_checks[key] = stored
-            results.append(item_res)
-            continue
+    if use_table:
+        table_data = await watchlist_store.get_checks(account.user_id, with_snapshots=True)
+        existing_checks = _merge_previous_snapshots(table_data, legacy_checks)
+    else:
+        existing_checks = legacy_checks
 
-        try:
-            entries, _sitemaps = await scan_guard.crawl(
-                normalized,
-                MAX_PAGES_PER_COMPETITOR,
-                lambda target=normalized: collect_entries(
-                    target, max_urls=MAX_PAGES_PER_COMPETITOR
-                ),
-            )
-            pages = entries_to_snapshot_pages(entries)
-            if not pages:
-                err_kind, err_msg = classify_check_error("no urls found")
-                item_res, stored = error_competitor_result(
-                    prev,
-                    name=name,
-                    url=key,
-                    checked_at=checked_at,
-                    error_kind=err_kind,
-                    error_message=err_msg,
-                )
-            else:
-                item_res, stored = diff_competitor_pages(
-                    prev,
-                    pages,
-                    name=name,
-                    url=key,
-                    checked_at=checked_at,
-                    # The crawl stops at the cap, so a full window means a bigger site.
-                    truncated=len(entries) >= MAX_PAGES_PER_COMPETITOR,
-                )
-        except Exception as err:
-            err_kind, err_msg = classify_check_error(err)
-            item_res, stored = error_competitor_result(
-                prev,
-                name=name,
-                url=key,
-                checked_at=checked_at,
-                error_kind=err_kind,
-                error_message=err_msg,
-            )
+    results, stored_by_url, _pages_fetched = await run_watchlist_checks(
+        selected,
+        existing_checks,
+        checked_at=checked_at,
+        scan_url_fn=scan_url,
+        collect_entries_fn=collect_entries,
+        source="manual",
+    )
 
-        existing_checks[key] = stored
-        results.append(item_res)
+    active_keys = [normalize_competitor_url(item["url"]) for item in selected]
+    active_key_set = set(active_keys)
+    pruned_checks = {k: v for k, v in stored_by_url.items() if k in active_key_set}
+    top_insight = compute_top_insight(results, checked_at)
 
-    # Keep only active watchlist keys (plus cap) so the workspace document stays compact.
-    active_keys = {normalize_competitor_url(item["url"]) for item in selected}
-    pruned_checks = {k: v for k, v in existing_checks.items() if k in active_keys}
-    prefs["competitor_checks"] = pruned_checks
+    if use_table:
+        rows = watchlist_store.build_db_check_rows(results, pruned_checks)
+        sched = await watchlist_store.save_checks(
+            account.user_id,
+            source="manual",
+            checks=rows,
+            keep_urls=active_keys,
+        )
+        display_checks = {
+            k: {fk: fv for fk, fv in v.items() if fk != "pages"} for k, v in pruned_checks.items()
+        }
+        return {
+            "checked_at": checked_at,
+            "version": ws_version,
+            "competitors": results,
+            "top_insight": top_insight,
+            "competitor_checks": display_checks,
+            "auto_check": {
+                "enabled": True,
+                "paused": bool(sched.get("paused", False)),
+                "next_check_at": sched.get("next_check_at"),
+                "last_auto_check_at": sched.get("last_auto_check_at"),
+            },
+        }
+
+    # Flag off: keep exact legacy workspace persistence behavior.
+    merged_legacy = {**legacy_checks, **stored_by_url}
+    pruned_legacy = {k: v for k, v in merged_legacy.items() if k in active_key_set}
+    prefs["competitor_checks"] = pruned_legacy
     doc["preferences"] = prefs
 
     saved = await save_workspace(
@@ -447,13 +531,121 @@ async def check_own_competitors(
         expected_owner=account.user_id,
     )
     new_version = int(saved.get("version") or (ws_version + 1))
-    top_insight = compute_top_insight(results, checked_at)
     return {
         "checked_at": checked_at,
         "version": new_version,
         "competitors": results,
         "top_insight": top_insight,
-        "competitor_checks": pruned_checks,
+        "competitor_checks": pruned_legacy,
+    }
+
+
+@router.get("/watchlist/run")
+async def run_scheduled_watchlist_checks(
+    response: Response,
+    authorization: Annotated[str | None, Header()] = None,
+) -> dict[str, Any]:
+    """Scheduled daily Vercel Cron endpoint that checks due sellers' watchlists once a week.
+
+    Strict CRON_SECRET bearer auth (no user-agent fallback). Logs and returns counts only.
+    """
+    never_cache(response)
+    if not watchlist_store.auto_check_enabled():
+        raise HTTPException(status_code=404, detail="Automatic watchlist checks are not enabled.")
+
+    cron_secret = (os.environ.get("CRON_SECRET") or "").strip()
+    expected_auth = f"Bearer {cron_secret}"
+    if (
+        not cron_secret
+        or not authorization
+        or not hmac.compare_digest(authorization.strip(), expected_auth)
+    ):
+        raise HTTPException(status_code=401, detail="Unauthorized.")
+
+    started = time.monotonic()
+    per_run = max(1, min(int(get_settings().watchlist_auto_check_accounts_per_run or 10), 50))
+    sellers = await watchlist_store.claim_due(limit=per_run, lease_seconds=WATCHLIST_LEASE_SECONDS)
+
+    sellers_checked = 0
+    sites_checked = 0
+    errors = 0
+    skipped_unconfirmed = 0
+    stopped_for_budget = False
+
+    for seller in sellers:
+        if time.monotonic() - started >= WATCHLIST_RUN_BUDGET_SECONDS:
+            stopped_for_budget = True
+            break
+
+        user_id = str(seller.get("user_id") or "").strip()
+        if not user_id:
+            continue
+
+        try:
+            confirmed = await watchlist_store.is_email_confirmed(user_id)
+            if not confirmed:
+                await watchlist_store.save_checks(user_id, source="auto", checks=[], keep_urls=[])
+                skipped_unconfirmed += 1
+                continue
+
+            doc = await watchlist_store.load_workspace_document(user_id)
+            if doc is None:
+                doc = {
+                    "onboarding": seller.get("onboarding") or {},
+                    "preferences": seller.get("preferences") or {},
+                }
+
+            selected = extract_selected_competitors(doc)
+            if not selected:
+                await watchlist_store.save_checks(user_id, source="auto", checks=[], keep_urls=[])
+                sellers_checked += 1
+                continue
+
+            legacy_checks = (
+                doc.get("preferences", {}).get("competitor_checks")
+                if isinstance(doc.get("preferences"), dict)
+                else None
+            )
+            table_data = await watchlist_store.get_checks(user_id, with_snapshots=True)
+            existing_checks = _merge_previous_snapshots(table_data, legacy_checks)
+
+            checked_at = now_iso_utc()
+            results, stored_by_url, _pages = await run_watchlist_checks(
+                selected,
+                existing_checks,
+                checked_at=checked_at,
+                scan_url_fn=scan_url,
+                collect_entries_fn=collect_entries,
+                source="auto",
+            )
+            keep_urls = [normalize_competitor_url(item["url"]) for item in selected]
+            rows = watchlist_store.build_db_check_rows(results, stored_by_url)
+            await watchlist_store.save_checks(
+                user_id,
+                source="auto",
+                checks=rows,
+                keep_urls=keep_urls,
+            )
+            sellers_checked += 1
+            sites_checked += len(results)
+        except Exception:
+            errors += 1
+
+    logger.info(
+        "Watchlist auto-check run finished: sellers_checked=%d sites_checked=%d "
+        "skipped_unconfirmed=%d errors=%d stopped_for_budget=%s",
+        sellers_checked,
+        sites_checked,
+        skipped_unconfirmed,
+        errors,
+        stopped_for_budget,
+    )
+    return {
+        "sellers_checked": sellers_checked,
+        "sites_checked": sites_checked,
+        "skipped_unconfirmed": skipped_unconfirmed,
+        "errors": errors,
+        "stopped_for_budget": stopped_for_budget,
     }
 
 

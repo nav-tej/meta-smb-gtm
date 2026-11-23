@@ -37,7 +37,7 @@ from pydantic import (
 
 from src.config import get_settings
 from src.models.outcome import Outcome
-from src.services import competitor_monitor, result_cache
+from src.services import competitor_monitor, result_cache, watchlist_store
 from src.services.accounts import AccountSession, load_workspace
 from src.services.competitor_checks import _format_short_date, normalize_competitor_url
 from src.services.demo import demo_competitor_brief, snapshot_competitor_brief
@@ -146,6 +146,7 @@ _SAVED_CHECK_STATUS_MAP: dict[str, Literal["first", "changed", "unchanged", "fai
 
 _UNCHECKED_WATCH_NOTE = "Not checked yet. Check now (free) on your digest."
 _OWN_OVERNIGHT_NOTE = "Muse checks your watchlist when you press Check now (free) on your digest."
+_AUTO_OVERNIGHT_NOTE = "Muse checks your watchlist once a week."
 
 
 def _parse_iso_timestamp(raw: Any) -> datetime | None:
@@ -159,13 +160,18 @@ def _parse_iso_timestamp(raw: Any) -> datetime | None:
 
 
 def _own_watch_items(
-    workspace: dict[str, Any], competitors: list[Any]
+    workspace: dict[str, Any],
+    competitors: list[Any],
+    watchlist_table: dict[str, Any] | None = None,
 ) -> tuple[list[WatchItem], str]:
     raw_prefs = workspace.get("preferences")
-    saved_checks = (
+    legacy_checks = (
         raw_prefs.get("competitor_checks")
         if isinstance(raw_prefs, dict) and isinstance(raw_prefs.get("competitor_checks"), dict)
         else {}
+    )
+    saved_checks, auto_check = watchlist_store.merge_checks_for_display(
+        watchlist_table, legacy_checks
     )
     items: list[WatchItem] = []
     latest_dt: datetime | None = None
@@ -210,13 +216,21 @@ def _own_watch_items(
             )
         )
     short_date = _format_short_date(latest_iso) if latest_iso else ""
-    overnight_note = (
-        f"{_OWN_OVERNIGHT_NOTE} Last check: {short_date}." if short_date else _OWN_OVERNIGHT_NOTE
+    base_note = (
+        _AUTO_OVERNIGHT_NOTE
+        if auto_check.get("enabled") and not auto_check.get("paused")
+        else _OWN_OVERNIGHT_NOTE
     )
+    overnight_note = f"{base_note} Last check: {short_date}." if short_date else base_note
     return items, overnight_note
 
 
-def _own_brief(workspace: dict[str, Any], today: date, now: datetime) -> DailyBrief:
+def _own_brief(
+    workspace: dict[str, Any],
+    today: date,
+    now: datetime,
+    watchlist_table: dict[str, Any] | None = None,
+) -> DailyBrief:
     onboarding = workspace.get("onboarding")
     if not isinstance(onboarding, dict) or not onboarding.get("completed_at"):
         raise SetupIncompleteError("Finish setup first")
@@ -263,7 +277,7 @@ def _own_brief(workspace: dict[str, Any], today: date, now: datetime) -> DailyBr
             outcomes.append(Outcome.model_validate(item))
         except ValidationError:
             logger.warning("Skipping invalid outcome in own daily brief")
-    watch_items, overnight_note = _own_watch_items(workspace, competitors)
+    watch_items, overnight_note = _own_watch_items(workspace, competitors, watchlist_table)
     return DailyBrief(
         date=today.isoformat(),
         generated_at=now.isoformat(timespec="seconds"),
@@ -558,12 +572,13 @@ def build_daily_brief(
     today: date | None = None,
     now: datetime | None = None,
     account_workspace: dict[str, Any] | None = None,
+    watchlist_table: dict[str, Any] | None = None,
 ) -> DailyBrief:
     now = now or datetime.now(UTC)
     today = today or now.date()
 
     if account_workspace is not None:
-        return _own_brief(account_workspace, today, now)
+        return _own_brief(account_workspace, today, now, watchlist_table=watchlist_table)
 
     items, fresh_count = _guard("watchlist", lambda: _watch_items(today), ([], 0))
     changes, overnight_note = _guard(
@@ -629,7 +644,16 @@ async def daily_brief(
     today = datetime.now(UTC).date()
     if account is not None:
         ws = await load_workspace(account)
-        return build_daily_brief(today, account_workspace=ws.get("document") or {})
+        table_checks = (
+            await watchlist_store.get_checks(account.user_id, with_snapshots=False)
+            if watchlist_store.auto_check_enabled()
+            else None
+        )
+        return build_daily_brief(
+            today,
+            account_workspace=ws.get("document") or {},
+            watchlist_table=table_checks,
+        )
 
     key = {"date": today.isoformat(), "v": BRIEF_VERSION, "account_id": "demo"}
     adapter: TypeAdapter[DailyBrief] = TypeAdapter(DailyBrief)
