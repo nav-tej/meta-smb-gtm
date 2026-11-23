@@ -378,6 +378,18 @@ def test_first_visit_brings_in_the_sellers_listings_e2e(live_server_url: str) ->
                             "is_low_res": False, "provenance": "website",
                         }}],
                     }})
+                if url.endswith("/api/v1/daily-brief") and "workspace=own" in route.request.url:
+                    # The real route needs a server-side session this fixture does not fake.
+                    move = {{"title": "Share one thing you made this week",
+                             "reason": "Uses your saved setup.", "href": "/create?workspace=own",
+                             "impact": "medium",
+                             "recommendation": {{"id": "share",
+                                                "title": "Share one thing you made this week"}}}}
+                    return reply(route, {{
+                        "business_name": "Fern & Kiln", "items": [], "move": move, "focus": move,
+                        "action_items": [move], "overnight_changes": [], "overnight_note": "",
+                        "trends": [], "source": "Saved context. 0 runs spent.",
+                    }})
                 return route.continue_()
 
             page.route("**/api/v1/**", handle)

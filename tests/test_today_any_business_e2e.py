@@ -217,6 +217,18 @@ def test_today_fits_services_and_products_sellers_e2e(live_server_url: str) -> N
                     body = {{"discovered_catalog_items": []}}
                 elif url.endswith("/api/v1/content-plan"):
                     seen["plans"].append(json.loads(route.request.post_data or "{{}}"))
+                elif (url.endswith("/api/v1/daily-brief") and user
+                      and "workspace=own" in route.request.url):
+                    # The real route needs a server-side session this fixture does not fake.
+                    move = {{"title": "Share one thing you made this week",
+                             "reason": "Uses your saved setup.", "href": "/create?workspace=own",
+                             "impact": "medium",
+                             "recommendation": {{"id": "share",
+                                                "title": "Share one thing you made this week"}}}}
+                    body = {{"business_name": onb["business_name"], "items": [], "move": move,
+                            "focus": move, "action_items": [move], "overnight_changes": [],
+                            "overnight_note": "", "trends": [],
+                            "source": "Saved context. 0 runs spent."}}
                 if body is None:
                     return route.continue_()
                 route.fulfill(status=200, content_type="application/json", body=json.dumps(body))

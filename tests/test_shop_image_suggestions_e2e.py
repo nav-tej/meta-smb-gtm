@@ -244,6 +244,9 @@ def shop_images_server(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr("src.api.onboarding.snapshot", fake_snapshot)
     monkeypatch.setattr("src.api.accounts.load_workspace", fake_load)
     monkeypatch.setattr("src.api.accounts.save_workspace", fake_save)
+    # /today asks for the private brief; unpatched, its 401 opens the "session ended" dialog.
+    monkeypatch.setattr("src.api.daily_brief.resolve_account", fake_resolve)
+    monkeypatch.setattr("src.services.daily_brief.load_workspace", fake_load)
     monkeypatch.setattr("src.api.intel.collect_entries", fake_collect)
     monkeypatch.setattr("src.clients.meta.get_meta_client", spy_meta)
     app.dependency_overrides[get_product_reference_service] = lambda: FakeProductReferenceService()

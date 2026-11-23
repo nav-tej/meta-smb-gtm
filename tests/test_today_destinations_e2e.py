@@ -144,6 +144,30 @@ with sync_playwright() as p:
                 }
             elif url.endswith("/ingest-storefront"):
                 raise AssertionError("No listing scan is authorized by this fixture")
+            elif url.endswith("/daily-brief") and "workspace=own" in route.request.url:
+                # The real route needs a server-side session this fixture does not fake; its 401
+                # would open the "session ended" dialog.
+                move = {
+                    "title": "Share one thing you made this week",
+                    "reason": "Uses your saved setup.",
+                    "href": "/create?workspace=own",
+                    "impact": "medium",
+                    "recommendation": {
+                        "id": "share",
+                        "title": "Share one thing you made this week",
+                    },
+                }
+                data = {
+                    "business_name": "Seller Example",
+                    "items": [],
+                    "move": move,
+                    "focus": move,
+                    "action_items": [move],
+                    "overnight_changes": [],
+                    "overnight_note": "",
+                    "trends": [],
+                    "source": "Saved context. 0 runs spent.",
+                }
             if data is None:
                 return route.continue_()
             route.fulfill(status=200, content_type="application/json", body=json.dumps(data))
