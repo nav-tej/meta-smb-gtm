@@ -173,7 +173,8 @@ def test_two_watched_businesses_return_private_200(
     assert brief["focus"] == brief["move"] == brief["action_items"][0]
     assert all("workspace=own" in move["href"] for move in brief["action_items"])
     assert brief["overnight_changes"] == []
-    assert "does not check" in brief["overnight_note"]
+    assert "Check now (free) on your digest" in brief["overnight_note"]
+    assert "Last check:" not in brief["overnight_note"]
     assert brief["trends"] == [] and brief["fresh_analyses"] == 0
     assert brief["outcomes"] == [] and "log a result" in brief["results_note"]
     private_api.loader.assert_awaited_once()

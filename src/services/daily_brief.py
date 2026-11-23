@@ -39,6 +39,7 @@ from src.config import get_settings
 from src.models.outcome import Outcome
 from src.services import competitor_monitor, result_cache
 from src.services.accounts import AccountSession, load_workspace
+from src.services.competitor_checks import _format_short_date, normalize_competitor_url
 from src.services.demo import demo_competitor_brief, snapshot_competitor_brief
 from src.services.seller_memory import _extract_profile_parts, rank_seller_recommendations
 
@@ -57,6 +58,14 @@ class WatchItem(BaseModel):
     where: str
     status: Literal["new", "first", "fresh", "changed", "unchecked"]
     note: str
+    checked_at: str | None = None
+
+    @model_serializer(mode="wrap")
+    def serialize_watch_item(self, handler: SerializerFunctionWrapHandler) -> dict[str, Any]:
+        data = handler(self)
+        if self.checked_at is None:
+            data.pop("checked_at", None)
+        return data
 
 
 class DailyMove(BaseModel):
@@ -126,6 +135,87 @@ class SetupIncompleteError(ValueError):
     """The account has not completed its own workspace setup."""
 
 
+_SAVED_CHECK_STATUS_MAP: dict[str, Literal["first", "changed", "fresh", "unchecked"]] = {
+    "first_check": "first",
+    "changed": "changed",
+    "unchanged": "fresh",
+    "error": "unchecked",
+}
+
+_UNCHECKED_WATCH_NOTE = "Not checked yet. Check now (free) on your digest."
+_OWN_OVERNIGHT_NOTE = "Muse checks your watchlist when you press Check now (free) on your digest."
+
+
+def _parse_iso_timestamp(raw: Any) -> datetime | None:
+    if not isinstance(raw, str) or not raw.strip():
+        return None
+    try:
+        dt = datetime.fromisoformat(raw.strip().replace("Z", "+00:00"))
+        return dt if dt.tzinfo is not None else dt.replace(tzinfo=UTC)
+    except ValueError:
+        return None
+
+
+def _own_watch_items(
+    workspace: dict[str, Any], competitors: list[Any]
+) -> tuple[list[WatchItem], str]:
+    raw_prefs = workspace.get("preferences")
+    saved_checks = (
+        raw_prefs.get("competitor_checks")
+        if isinstance(raw_prefs, dict) and isinstance(raw_prefs.get("competitor_checks"), dict)
+        else {}
+    )
+    items: list[WatchItem] = []
+    latest_dt: datetime | None = None
+    latest_iso = ""
+    for c in competitors:
+        if not c.selected:
+            continue
+        norm_url = normalize_competitor_url(c.url)
+        saved = saved_checks.get(norm_url) if norm_url else None
+        if not isinstance(saved, dict):
+            items.append(
+                WatchItem(
+                    name=c.name or c.url,
+                    url=c.url,
+                    where="Website",
+                    status="unchecked",
+                    note=_UNCHECKED_WATCH_NOTE,
+                )
+            )
+            continue
+        raw_status = str(saved.get("status") or "").strip()
+        mapped_status = _SAVED_CHECK_STATUS_MAP.get(raw_status, "unchecked")
+        if raw_status == "error":
+            note = str(saved.get("error") or "").strip() or "This site could not be read right now."
+        elif raw_status in ("first_check", "changed", "unchanged"):
+            note = str(saved.get("summary") or "").strip() or _UNCHECKED_WATCH_NOTE
+        else:
+            note = _UNCHECKED_WATCH_NOTE
+        raw_checked_at = str(saved.get("checked_at") or "").strip() or None
+        parsed_dt = _parse_iso_timestamp(raw_checked_at)
+        if parsed_dt is not None and (latest_dt is None or parsed_dt > latest_dt):
+            latest_dt = parsed_dt
+            latest_iso = raw_checked_at or ""
+        items.append(
+            WatchItem(
+                name=c.name or c.url,
+                url=c.url,
+                where="Website",
+                status=mapped_status,
+                note=note,
+                checked_at=raw_checked_at,
+            )
+        )
+    short_date = _format_short_date(latest_iso) if latest_iso else ""
+    overnight_note = (
+        f"{_OWN_OVERNIGHT_NOTE} Last check: {short_date}."
+        if short_date
+        else _OWN_OVERNIGHT_NOTE
+    )
+    return items, overnight_note
+
+
 def _own_brief(workspace: dict[str, Any], today: date, now: datetime) -> DailyBrief:
     onboarding = workspace.get("onboarding")
     if not isinstance(onboarding, dict) or not onboarding.get("completed_at"):
@@ -173,26 +263,17 @@ def _own_brief(workspace: dict[str, Any], today: date, now: datetime) -> DailyBr
             outcomes.append(Outcome.model_validate(item))
         except ValidationError:
             logger.warning("Skipping invalid outcome in own daily brief")
+    watch_items, overnight_note = _own_watch_items(workspace, competitors)
     return DailyBrief(
         date=today.isoformat(),
         generated_at=now.isoformat(timespec="seconds"),
         source=f"Built from {business_name}'s saved setup. No runs used.",
         business_name=business_name,
-        items=[
-            WatchItem(
-                name=c.name or c.url,
-                url=c.url,
-                where="Website",
-                status="unchecked",
-                note="Not checked yet. Saved in your watchlist; no new check was made.",
-            )
-            for c in competitors
-            if c.selected
-        ],
+        items=watch_items,
         move=focus or fallback,
         focus=focus,
         action_items=moves,
-        overnight_note="Muse does not check your watched businesses overnight yet.",
+        overnight_note=overnight_note,
         trends_source="Your logged results",
         outcomes=outcomes,
         results_note=(
