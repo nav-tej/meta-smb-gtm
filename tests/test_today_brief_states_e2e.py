@@ -8,7 +8,8 @@ unstyled browser buttons above the page, "Checking device draft…" never went a
 an empty 4:5 photo frame pushed the editor far down.
 
 The sample gets its full brief and triage, keyed to the idea on screen. Finished own workspaces
-get their private brief without triage; signed-out visitors keep the short sample/editor card. The draft row sits under the post actions, says where the draft lives, and
+get their private brief without triage; signed-out visitors keep the short sample/editor card.
+The draft row sits under the post actions, says where the draft lives, and
 offers account saving and recovery only when they apply.
 """
 
@@ -106,12 +107,15 @@ def test_today_brief_and_draft_row_fit_each_state_e2e(live_server_url: str) -> N
                             "competitor_entries": [], "suggested_updates": [],
                             "dismiss_signals": []}}
                 elif url.endswith("/api/v1/daily-brief") and user:
-                    move = {{"title": "Share how you help clients", "reason": "Uses your saved setup.",
-                             "href": "/create?workspace=own", "impact": "high", "over_budget": False,
-                             "recommendation": {{"id": "share", "title": "Share how you help clients"}}}}
+                    move = {{"title": "Share how you help clients",
+                             "reason": "Uses your saved setup.",
+                             "href": "/create?workspace=own", "impact": "high",
+                             "over_budget": False,
+                             "recommendation": {{"id": "share",
+                                                "title": "Share how you help clients"}}}}
                     body = {{"business_name": ONB["business_name"], "items": [], "move": move,
                             "focus": move, "action_items": [move], "overnight_changes": [],
-                            "overnight_note": "Muse does not check these competitors overnight yet.",
+                            "overnight_note": "No overnight checks yet.",
                             "trends": [], "source": "Saved context. 0 runs spent."}}
                 elif url.endswith("/api/v1/ingest-storefront"):
                     body = {{"discovered_catalog_items": []}}
