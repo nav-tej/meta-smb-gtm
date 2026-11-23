@@ -49,6 +49,12 @@ from src.services.seller_memory import (
     suggest_memory_updates,
 )
 from src.services.social_extract import extract_social_handles
+from src.services.youtube_feed import (
+    YouTubeFeedError,
+    extract_youtube_social_url,
+    fetch_youtube_channel_videos,
+    parse_youtube_channel_url,
+)
 from src.utils.sitemap import SitemapError
 
 router = APIRouter(prefix="/seller-memory", tags=["seller-memory"])
@@ -117,6 +123,13 @@ class VoiceTranscribeRequest(BaseModel):
     audio_base64: str = Field(min_length=4)
     filename: str = Field(default="voice_note.webm", max_length=120)
     consent_confirmed: bool = False
+
+
+class YouTubeSourceRequest(BaseModel):
+    url: str = Field(default="", max_length=500)
+    remove: bool = False
+    expected_version: int | None = None
+    expected_owner: str | None = None
 
 
 _PREF_KNOWN_KEYS = set(SellerPreferences.model_fields.keys())
@@ -206,6 +219,8 @@ async def get_seller_memory(
             "competitor_entries": [],
             "suggested_updates": [],
             "dismiss_signals": [],
+            "content_sources": {},
+            "youtube_social_url": "",
         }
 
     verify_workspace_owner(account, x_muse_owner)
@@ -214,6 +229,13 @@ async def get_seller_memory(
     onb = doc.get("onboarding") if isinstance(doc, dict) else None
     biz_name = str(onb.get("business_name") or "") if isinstance(onb, dict) else ""
     biz_type = _business_type(onb)
+    raw_prefs = doc.get("preferences") if isinstance(doc, dict) else None
+    content_sources = (
+        dict(raw_prefs.get("content_sources"))
+        if isinstance(raw_prefs, dict) and isinstance(raw_prefs.get("content_sources"), dict)
+        else {}
+    )
+    youtube_social_url = extract_youtube_social_url(onb)
 
     suggestions = suggest_memory_updates(
         preferences=pref, voice_profile=voice, dismiss_signals=signals
@@ -234,6 +256,8 @@ async def get_seller_memory(
             s.model_dump(mode="json") for s in suggestions if s.status == "pending"
         ],
         "dismiss_signals": [s.model_dump(mode="json") for s in signals],
+        "content_sources": content_sources,
+        "youtube_social_url": youtube_social_url,
     }
 
 
@@ -749,4 +773,83 @@ async def recommend_for_context(
         ),
         "generated_at": datetime.now(UTC).isoformat(),
         "runs_used": 0,
+    }
+
+
+@router.post("/sources/youtube")
+async def sync_youtube_source(
+    body: YouTubeSourceRequest,
+    request: Request,
+    response: Response,
+    x_muse_owner: Annotated[str | None, Header()] = None,
+) -> dict[str, Any]:
+    """Read or remove the seller's public YouTube channel feed (zero Muse runs)."""
+    response.headers["Cache-Control"] = "no-store"
+    account = await resolve_account(request, response, require_verified=True)
+    assert account is not None
+    verify_workspace_owner(account, x_muse_owner, body.expected_owner)
+
+    ws = await load_workspace(account)
+    ws_version = int(ws.get("version") or 0)
+    if body.expected_version is not None and body.expected_version != ws_version:
+        raise HTTPException(
+            status_code=409,
+            detail="Your workspace changed in another tab. Reload and try again.",
+        )
+
+    doc = dict(ws.get("document") or {})
+    prefs = dict(doc.get("preferences") or {}) if isinstance(doc.get("preferences"), dict) else {}
+    content_sources = (
+        dict(prefs.get("content_sources") or {})
+        if isinstance(prefs.get("content_sources"), dict)
+        else {}
+    )
+
+    if body.remove:
+        content_sources.pop("youtube", None)
+        prefs["content_sources"] = content_sources
+        doc["preferences"] = prefs
+        saved = await save_workspace(
+            account,
+            doc,
+            expected_version=ws_version,
+            expected_owner=account.user_id,
+        )
+        return {
+            "success": True,
+            "owner_id": account.user_id,
+            "version": int(saved.get("version") or ws_version + 1),
+            "content_sources": content_sources,
+            "youtube": None,
+        }
+
+    target_url = (body.url or "").strip() or extract_youtube_social_url(doc.get("onboarding"))
+    try:
+        channel_url, _direct_feed = parse_youtube_channel_url(target_url)
+    except YouTubeFeedError as err:
+        raise HTTPException(status_code=err.status_code, detail=err.user_message) from err
+
+    reserve_scan_crawls(request, response, [channel_url], 1)
+
+    try:
+        youtube_data = await fetch_youtube_channel_videos(channel_url)
+    except YouTubeFeedError as err:
+        raise HTTPException(status_code=err.status_code, detail=err.user_message) from err
+
+    content_sources["youtube"] = youtube_data
+    prefs["content_sources"] = content_sources
+    doc["preferences"] = prefs
+
+    saved = await save_workspace(
+        account,
+        doc,
+        expected_version=ws_version,
+        expected_owner=account.user_id,
+    )
+    return {
+        "success": True,
+        "owner_id": account.user_id,
+        "version": int(saved.get("version") or ws_version + 1),
+        "content_sources": content_sources,
+        "youtube": youtube_data,
     }
