@@ -163,6 +163,9 @@ def e2e_server(monkeypatch: pytest.MonkeyPatch):
         monkeypatch.setattr(f"{mod}.save_workspace", fake_save)
     for mod in ("src.api.accounts", "src.api.onboarding"):
         monkeypatch.setattr(f"{mod}.snapshot", fake_snapshot)
+    # /today asks for the private brief; unpatched, its 401 opens the "session ended" dialog.
+    monkeypatch.setattr("src.api.daily_brief.resolve_account", fake_resolve)
+    monkeypatch.setattr("src.services.daily_brief.load_workspace", fake_load)
     monkeypatch.setattr("src.api.intel.collect_entries", fake_collect)
     monkeypatch.setattr("src.api.seller_memory.collect_entries", fake_collect)
 

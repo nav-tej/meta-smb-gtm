@@ -10,8 +10,9 @@ No model is called here, so reading the brief never spends Muse API credit. It c
   labelled as such), computed in Python by the Bid Advisor.
 - Top 3 actions and a focus of the day, ranked from those signals.
 
-The brief is cached per UTC day. `refresh=True` rebuilds it only when its inputs changed (a new
-monitor run or fresh analysis), so it still regenerates at most once per day for the same data.
+Own briefs read only the account workspace and are never cached. The sample is cached per UTC
+day. `refresh=True` rebuilds the sample only when its inputs changed (a new monitor run or fresh
+analysis), so it still regenerates at most once per day for the same data.
 Each section falls back to saved data on its own, so one bad input never breaks the brief.
 """
 
@@ -25,12 +26,21 @@ from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import Response
-from pydantic import BaseModel, Field, TypeAdapter
+from pydantic import (
+    BaseModel,
+    Field,
+    SerializerFunctionWrapHandler,
+    TypeAdapter,
+    ValidationError,
+    model_serializer,
+)
 
 from src.config import get_settings
+from src.models.outcome import Outcome
 from src.services import competitor_monitor, result_cache
 from src.services.accounts import AccountSession, load_workspace
 from src.services.demo import demo_competitor_brief, snapshot_competitor_brief
+from src.services.seller_memory import _extract_profile_parts, rank_seller_recommendations
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +55,7 @@ class WatchItem(BaseModel):
     name: str
     url: str
     where: str
-    status: Literal["new", "first", "fresh", "changed"]
+    status: Literal["new", "first", "fresh", "changed", "unchecked"]
     note: str
 
 
@@ -55,6 +65,17 @@ class DailyMove(BaseModel):
     href: str
     impact: Literal["high", "medium", "low"] = "high"
     source: str = ""
+    over_budget: bool = False
+    recommendation: dict[str, Any] | None = None
+
+    @model_serializer(mode="wrap")
+    def serialize_move(self, handler: SerializerFunctionWrapHandler) -> dict[str, Any]:
+        data = handler(self)
+        if self.recommendation is None:
+            data.pop("recommendation", None)
+            if not self.over_budget:
+                data.pop("over_budget", None)
+        return data
 
 
 class OvernightChange(BaseModel):
@@ -86,6 +107,101 @@ class DailyBrief(BaseModel):
     trends: list[TrendItem] = Field(default_factory=list)
     trends_source: str = ""
     inputs: str = Field(default="", description="Fingerprint of the data the brief was built from.")
+
+    business_name: str | None = None
+    outcomes: list[Outcome] = Field(default_factory=list)
+    results_note: str = ""
+
+    @model_serializer(mode="wrap")
+    def serialize_brief(self, handler: SerializerFunctionWrapHandler) -> dict[str, Any]:
+        data = handler(self)
+        # The sample's public JSON contract predates own-workspace fields.
+        if self.business_name is None:
+            for key in ("business_name", "outcomes", "results_note"):
+                data.pop(key, None)
+        return data
+
+
+class SetupIncompleteError(ValueError):
+    """The account has not completed its own workspace setup."""
+
+
+def _own_brief(workspace: dict[str, Any], today: date, now: datetime) -> DailyBrief:
+    onboarding = workspace.get("onboarding")
+    if not isinstance(onboarding, dict) or not onboarding.get("completed_at"):
+        raise SetupIncompleteError("Finish setup first")
+    business_name = str(onboarding.get("business_name") or "Your business")
+    business_type = onboarding.get("business_type")
+    if business_type not in {"products", "services", "both"}:
+        business_type = None
+    pref, voice, competitors, signals = _extract_profile_parts(workspace)
+    ranked = rank_seller_recommendations(
+        business_name=business_name,
+        business_type=business_type,
+        preferences=pref,
+        voice_profile=voice,
+        competitor_entries=competitors,
+        dismiss_signals=signals,
+    )
+    moves = [
+        DailyMove(
+            title=rec["title"],
+            reason=rec["why_this_fits"],
+            href="/create?workspace=own",
+            impact=rec["priority"],
+            source="Your saved setup",
+            over_budget=rec["over_budget"],
+            recommendation=rec,
+        )
+        for rec in ranked["recommendations"][:3]
+    ]
+    # No channel may be available after dismiss signals. Do not invent a ranked move.
+    focus = moves[0] if moves else None
+    fallback = DailyMove(
+        title="Choose a posting channel",
+        reason="Update your context to choose where you want to post.",
+        href="/today?workspace=own#smStudioContextBar",
+        impact="low",
+        source="Your saved setup",
+    )
+    outcomes: list[Outcome] = []
+    raw_outcomes = workspace.get("outcomes")
+    for item in raw_outcomes if isinstance(raw_outcomes, list) else []:
+        if not isinstance(item, dict):
+            continue
+        try:
+            outcomes.append(Outcome.model_validate(item))
+        except ValidationError:
+            logger.warning("Skipping invalid outcome in own daily brief")
+    return DailyBrief(
+        date=today.isoformat(),
+        generated_at=now.isoformat(timespec="seconds"),
+        source=f"Built from {business_name}'s saved setup. No runs used.",
+        business_name=business_name,
+        items=[
+            WatchItem(
+                name=c.name or c.url,
+                url=c.url,
+                where="Website",
+                status="unchecked",
+                note="Not checked yet. Saved in your watchlist; no new check was made.",
+            )
+            for c in competitors
+            if c.selected
+        ],
+        move=focus or fallback,
+        focus=focus,
+        action_items=moves,
+        overnight_note="Muse does not check your watched businesses overnight yet.",
+        trends_source="Your logged results",
+        outcomes=outcomes,
+        results_note=(
+            "Results you logged. These are not measured automatically."
+            if outcomes
+            else "After posting, log a result to see it here."
+        ),
+        inputs=f"account:{business_name}",
+    )
 
 
 def _matches(url: str, cached_url: str) -> bool:
@@ -365,47 +481,8 @@ def build_daily_brief(
     now = now or datetime.now(UTC)
     today = today or now.date()
 
-    # If building for a verified non-sample account workspace, isolate from sample shop terms
-    if account_workspace and account_workspace.get("onboarding", {}).get("business_name"):
-        onb = account_workspace["onboarding"]
-        shop_name = onb.get("business_name") or "Your Studio"
-        user_comps = onb.get("competitors") or []
-        items = [
-            WatchItem(
-                name=c.get("name") or c.get("url", "Competitor"),
-                url=c.get("url", ""),
-                where="Website",
-                snapshot_age="monitored",
-                fresh=False,
-                summary=c.get("reason") or "Watched competitor shop",
-            )
-            for c in user_comps
-        ]
-        move = DailyMove(
-            title=f"Feature a collection from {shop_name}",
-            reason=(
-                f"Highlight your unique pieces and compare catalog gaps with "
-                f"your {len(user_comps)} watched competitors."
-            ),
-            href="/create",
-            impact="high",
-            source=f"Workspace for {shop_name}",
-        )
-        return DailyBrief(
-            date=today.isoformat(),
-            generated_at=now.isoformat(timespec="seconds"),
-            source=f"Built {today.isoformat()} from workspace for {shop_name}. 0 runs spent.",
-            items=items,
-            move=move,
-            fresh_analyses=0,
-            focus=move,
-            action_items=[move],
-            overnight_changes=[],
-            overnight_note=f"Watching {len(user_comps)} competitors for {shop_name}.",
-            trends=[],
-            trends_source=f"Account workspace for {shop_name}",
-            inputs=f"account:{shop_name}",
-        )
+    if account_workspace is not None:
+        return _own_brief(account_workspace, today, now)
 
     items, fresh_count = _guard("watchlist", lambda: _watch_items(today), ([], 0))
     changes, overnight_note = _guard(
@@ -462,36 +539,21 @@ async def daily_brief(
     response: Response | None = None,
     account: AccountSession | None = None,
 ) -> DailyBrief:
-    """Today's brief: built once per day and reused until its inputs change.
+    """Read own context fresh, or reuse the sample brief until its inputs change.
 
     Every read compares the cached brief's input fingerprint (latest monitor run, fresh cached
     analyses) with the current one, so a new competitor check shows up without regenerating the
     brief for unchanged data. `refresh` is kept for the Re-check button and behaves the same.
     """
     today = datetime.now(UTC).date()
-    account_doc = None
-    account_id = None
-    if account:
-        account_id = account.user_id
-        try:
-            ws = await load_workspace(account)
-            account_doc = ws.get("document") or {}
-        except Exception:
-            pass
+    if account is not None:
+        ws = await load_workspace(account)
+        return build_daily_brief(today, account_workspace=ws.get("document") or {})
 
-    is_custom_account = bool(account_doc and account_doc.get("onboarding", {}).get("business_name"))
-    key = {
-        "date": today.isoformat(),
-        "v": BRIEF_VERSION,
-        "account_id": account_id if is_custom_account else "demo",
-    }
+    key = {"date": today.isoformat(), "v": BRIEF_VERSION, "account_id": "demo"}
     adapter: TypeAdapter[DailyBrief] = TypeAdapter(DailyBrief)
     current = result_cache.load("daily-brief", key, adapter)
-    expected_inputs = (
-        f"account:{account_doc['onboarding']['business_name']}"
-        if (is_custom_account and account_doc)
-        else _guard("inputs", _inputs_fingerprint, "")
-    )
+    expected_inputs = _guard("inputs", _inputs_fingerprint, "")
     if current is not None and current.inputs == expected_inputs:
         if response is not None:
             response.headers[result_cache.CACHE_HEADER] = "hit"
@@ -500,8 +562,6 @@ async def daily_brief(
         return current
 
     async def produce() -> DailyBrief:
-        if is_custom_account and account_doc:
-            return build_daily_brief(today, account_workspace=account_doc)
         return build_daily_brief(today)
 
     return await result_cache.cached(

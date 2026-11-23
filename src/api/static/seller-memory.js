@@ -2718,6 +2718,7 @@
     getOnboardingMemoryEntries: () =>
       (state.onboardingEntries || []).filter((e) => e.status !== 'dismissed'),
     openMemoryModal,
+    createStudioHandoff,
   });
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);

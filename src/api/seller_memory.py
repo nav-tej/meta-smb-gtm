@@ -38,6 +38,7 @@ from src.services.competitor_intel import collect_entries
 from src.services.seller_memory import (
     DEMO_VOICE_FIXTURES,
     BusinessType,
+    _extract_profile_parts,
     compute_rescan_diff,
     extract_scan_proposals,
     forget_memory_entry,
@@ -116,53 +117,6 @@ class VoiceTranscribeRequest(BaseModel):
     audio_base64: str = Field(min_length=4)
     filename: str = Field(default="voice_note.webm", max_length=120)
     consent_confirmed: bool = False
-
-
-def _extract_profile_parts(
-    doc: dict[str, Any],
-) -> tuple[SellerPreferences, VoiceProfile, list[CompetitorEntry], list[DismissSignal]]:
-    raw_pref = doc.get("preferences")
-    pref = (
-        SellerPreferences.model_validate(raw_pref)
-        if isinstance(raw_pref, dict)
-        else SellerPreferences()
-    )
-    raw_voice = doc.get("voice_profile")
-    voice = (
-        VoiceProfile.model_validate(raw_voice) if isinstance(raw_voice, dict) else VoiceProfile()
-    )
-
-    comps: list[CompetitorEntry] = list(pref.competitor_entries)
-    if not comps:
-        onb = doc.get("onboarding")
-        raw_comps = onb.get("competitors") if isinstance(onb, dict) else None
-        if isinstance(raw_comps, list):
-            for c in raw_comps:
-                if isinstance(c, dict) and c.get("url"):
-                    role = c.get("role")
-                    if role not in {"similar_audience", "price_reference", "inspiration"}:
-                        role = "similar_audience"
-                    comps.append(
-                        CompetitorEntry(
-                            name=str(c.get("name") or "")[:140],
-                            url=str(c.get("url"))[:500],
-                            role=role,
-                            rationale=str(c.get("rationale") or c.get("reason") or "")[:280],
-                            reason=str(c.get("reason") or c.get("rationale") or "")[:280],
-                            selected=c.get("selected", True) is not False,
-                        )
-                    )
-
-    raw_signals = doc.get("dismiss_signals") or []
-    signals: list[DismissSignal] = []
-    if isinstance(raw_signals, list):
-        for s in raw_signals:
-            if isinstance(s, dict):
-                try:
-                    signals.append(DismissSignal.model_validate(s))
-                except Exception:
-                    continue
-    return pref, voice, comps, signals
 
 
 _PREF_KNOWN_KEYS = set(SellerPreferences.model_fields.keys())

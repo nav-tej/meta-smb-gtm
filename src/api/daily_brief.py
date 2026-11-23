@@ -1,13 +1,13 @@
-"""GET /daily-brief: today's growth brief for /today (no model call; cached per day)."""
+"""GET /daily-brief: today's growth brief (sample cached per day; own context read fresh)."""
 
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Query, Request, Response
+from fastapi import APIRouter, HTTPException, Query, Request, Response
 
 from src.api.cache_policy import cache_for_everyone, never_cache
 from src.services import durable_state
 from src.services.accounts import resolve_account
-from src.services.daily_brief import DailyBrief, daily_brief
+from src.services.daily_brief import DailyBrief, SetupIncompleteError, daily_brief
 
 router = APIRouter(tags=["daily"])
 
@@ -24,19 +24,20 @@ async def get_daily_brief(
         Query(description="Which brief: the sample shop's (default) or the seller's own."),
     ] = "sample",
 ) -> DailyBrief:
+    if workspace == "own":
+        never_cache(response)
+        headers = {"Cache-Control": "private, no-store"}
+        account = await resolve_account(request, response, require_verified=False)
+        if account is None:
+            raise HTTPException(401, "Sign in to see your brief", headers=headers)
+        try:
+            return await daily_brief(refresh=refresh, response=response, account=account)
+        except SetupIncompleteError as err:
+            raise HTTPException(409, "Finish setup first", headers=headers) from err
+
     await durable_state.hydrate_monitor()
-    # Every page that shows a brief today shows the sample shop's (/today in sample mode, home
-    # notifications, the digest). Building the seller's own brief only on request keeps a signed-in
-    # seller who opens the sample from seeing their own competitors inside the sample's frame.
-    account = (
-        await resolve_account(request, response, require_verified=False)
-        if workspace == "own"
-        else None
-    )
-    # The sample brief is the same for every visitor, so the CDN may answer it; a seller's own
-    # brief and an explicit rebuild never come from a shared cache.
-    if workspace == "own" or refresh:
+    if refresh:
         never_cache(response)
     else:
         cache_for_everyone(response)
-    return await daily_brief(refresh=refresh, response=response, account=account)
+    return await daily_brief(refresh=refresh, response=response)

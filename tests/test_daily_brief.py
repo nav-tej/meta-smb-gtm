@@ -119,12 +119,18 @@ def test_signed_in_seller_gets_the_sample_brief_unless_they_ask_for_their_own(
     text = json.dumps(sample)
     assert "North Star Advisory" not in text and "Rival Advisory" not in text
 
-    # The own-workspace brief is a stub that nothing calls yet (and it fails to build when the
-    # seller watches competitors: WatchItem needs status and note). Only check it is reachable.
-    async def no_competitors(*args: object, **kwargs: object) -> dict[str, object]:
-        return {"document": {"onboarding": {"business_name": "North Star Advisory"}}}
+    # Finished setup now builds a real own brief with watched competitors.
+    async def completed_workspace(*args: object, **kwargs: object) -> dict[str, object]:
+        result = await workspace()
+        result["document"]["onboarding"]["completed_at"] = "2026-11-21T12:00:00Z"
+        return result
 
-    monkeypatch.setattr(daily_brief_service, "load_workspace", no_competitors)
-    own = client.get("/api/v1/daily-brief?workspace=own").json()
-    assert own["inputs"] == "account:North Star Advisory"
+    monkeypatch.setattr(daily_brief_service, "load_workspace", completed_workspace)
+    own_response = client.get("/api/v1/daily-brief?workspace=own")
+    assert own_response.status_code == 200
+    own = own_response.json()
+    assert own["business_name"] == "North Star Advisory"
+    assert own["items"][0]["name"] == "Rival Advisory"
+    assert own["items"][0]["status"] == "unchecked"
+    assert own["move"]["recommendation"]["id"]
     assert client.get("/api/v1/daily-brief?workspace=other").status_code == 422
