@@ -255,6 +255,32 @@ def test_big_site_window_shift_never_invents_removed_or_new_pages() -> None:
     insight = compute_top_insight([res3], "2026-11-22T10:00:00Z")
     assert insight["title"] == "Big Co has 1 new or updated page"
 
+    # A price read on one check and missing on the next is not a price change; nor is spacing.
+    with_prices = entries_to_snapshot_pages(
+        [
+            SitemapEntry(loc="https://small.test/a", title="A", price_hint="$500"),
+            SitemapEntry(loc="https://small.test/b", title="B", price_hint="$ 90"),
+        ]
+    )
+    without_one = entries_to_snapshot_pages(
+        [
+            SitemapEntry(loc="https://small.test/a", title="A"),
+            SitemapEntry(loc="https://small.test/b", title="B", price_hint="$90"),
+        ]
+    )
+    _, small_snap = diff_competitor_pages(
+        None, with_prices, name="Small", url="https://small.test", checked_at="2026-11-20T10:00:00Z"
+    )
+    res_prices, _ = diff_competitor_pages(
+        small_snap,
+        without_one,
+        name="Small",
+        url="https://small.test",
+        checked_at="2026-11-21T10:00:00Z",
+    )
+    assert res_prices["counts"]["price_change"] == 0
+    assert res_prices["status"] == "unchanged"
+
     # A snapshot saved before the flag existed is still treated as a full window.
     legacy = {k: v for k, v in snap1.items() if k != "partial"}
     res_legacy, _ = diff_competitor_pages(

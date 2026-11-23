@@ -274,7 +274,11 @@ def diff_competitor_pages(
             continue
         old_price = prev_by_loc[loc].get("price_hint", "").strip()
         new_price = curr.get("price_hint", "").strip()
-        if old_price != new_price and (old_price or new_price):
+        # A price Muse could not read this time is not a change (same rule as the monitor's
+        # diff_snapshots): both checks must show a price, and spacing or case alone is no change.
+        if not old_price or not new_price:
+            continue
+        if re.sub(r"\s+", "", old_price).lower() != re.sub(r"\s+", "", new_price).lower():
             all_price_changes.append(
                 {
                     "loc": loc,
