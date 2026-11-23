@@ -36,3 +36,7 @@
 - No-ranked-move state opens context editing instead of constructing a pretend recommendation handoff. Updated existing UI fixture with its recommendation payload; state regression **1 passed**, 5.49 seconds (`context-fallback.log`).
 - Chromium worker still owns only the new test; next checkpoint will integrate it before upstream merge and final verification.
 - Checkpoint lint note: a new service-docstring line exceeded Ruff's 100-character limit in the previous checkpoint. Wrapped that docstring; targeted Ruff check and format check now both pass (3 files). No behavior changed.
+
+## Resume checkpoint — November 23, 2026
+- Jason stopped with an explicit usage-limit error; coordinator takes ownership of the saved Chromium test. Its process finished successfully after interruption: **16 passed in 37.76s**, covering 375/1440 services, products, budget, signed out, unfinished setup, sample, retry and in-flight switches. Evidence: `chromium-scoped.log` and `chromium/` in the durable validation folder.
+- Next: commit this completed test, merge requested upstream pass 18, bump seller-memory loaders, run full final verification and mutation checks. No release/deployment actions.
