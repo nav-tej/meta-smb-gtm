@@ -35,3 +35,4 @@
 - Moved helper source equality independently verified via AST source extraction against `740d1fe`.
 - No-ranked-move state opens context editing instead of constructing a pretend recommendation handoff. Updated existing UI fixture with its recommendation payload; state regression **1 passed**, 5.49 seconds (`context-fallback.log`).
 - Chromium worker still owns only the new test; next checkpoint will integrate it before upstream merge and final verification.
+- Checkpoint lint note: a new service-docstring line exceeded Ruff's 100-character limit in the previous checkpoint. Wrapped that docstring; targeted Ruff check and format check now both pass (3 files). No behavior changed.

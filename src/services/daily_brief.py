@@ -10,8 +10,9 @@ No model is called here, so reading the brief never spends Muse API credit. It c
   labelled as such), computed in Python by the Bid Advisor.
 - Top 3 actions and a focus of the day, ranked from those signals.
 
-The sample brief is cached per UTC day. Own briefs read only the account workspace and are never cached. `refresh=True` rebuilds it only when its inputs changed (a new
-monitor run or fresh analysis), so it still regenerates at most once per day for the same data.
+Own briefs read only the account workspace and are never cached. The sample is cached per UTC
+day. `refresh=True` rebuilds the sample only when its inputs changed (a new monitor run or fresh
+analysis), so it still regenerates at most once per day for the same data.
 Each section falls back to saved data on its own, so one bad input never breaks the brief.
 """
 
