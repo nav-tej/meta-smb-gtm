@@ -44,6 +44,7 @@
     suggestedUpdates: [],
     dismissSignals: [],
     contentSources: {},
+    youtubeHandle: '',
     draftOverride: null,
     scope: 'draft', // 'draft' | 'shop_default'
     draftId: 'default',
@@ -228,6 +229,7 @@
     state.suggestedUpdates = [];
     state.dismissSignals = [];
     state.contentSources = {};
+    state.youtubeHandle = '';
     state.draftOverride = null;
     state.recommendResult = null;
     state.previousTopId = null;
@@ -416,6 +418,9 @@
       state.contentSources = (res.data.content_sources && typeof res.data.content_sources === 'object')
         ? res.data.content_sources
         : {};
+      state.youtubeHandle = typeof res.data.youtube_handle === 'string'
+        ? res.data.youtube_handle
+        : '';
       state.serverBaseline = cloneDeep({
         preferences: state.preferences,
         voiceProfile: state.voiceProfile,
@@ -735,6 +740,9 @@
         preferences: activePref,
         voice_profile: state.voiceProfile || {},
         competitor_entries: state.competitorEntries || [],
+        content_videos: !expectedSample && Array.isArray(state.contentSources?.youtube?.videos)
+          ? state.contentSources.youtube.videos
+          : undefined,
         draft_override: state.draftOverride || null,
         dismiss_signals: state.dismissSignals || [],
         previous_top_id: state.previousTopId || null,
@@ -1866,6 +1874,8 @@
       business_name: moveDef.business_name || state.businessName || '',
       product_name: moveDef.product_name || '',
       destination: moveDef.destination || state.draftOverride?.destination || '',
+      destination_url: moveDef.destination_url || moveDef.product_link || rec?.destination_url || '',
+      product_link: moveDef.product_link || moveDef.destination_url || rec?.destination_url || '',
       price_claim: moveDef.price_claim || rec?.price_claim || '',
       caption_length: moveDef.caption_length || 'medium',
       tone: moveDef.tone || 'neutral',
@@ -2178,7 +2188,9 @@
     wrap.appendChild(el('p', {
       class: 'sm-sub',
       style: 'margin:0 0 6px;',
-    }, 'Muse reads the title of each video you paste.'));
+    }, state.youtubeHandle
+      ? `Muse reads the title of each video you paste. Paste links from your channel (${state.youtubeHandle}).`
+      : 'Muse reads the title of each video you paste.'));
 
     if (savedVideos.length) {
       const ul = el('ul', {
@@ -2653,6 +2665,8 @@
             business_name: handoff.business_name,
             product_name: handoff.product_name,
             destination: handoff.destination,
+            destination_url: handoff.destination_url || handoff.product_link || '',
+            product_link: handoff.product_link || handoff.destination_url || '',
             channel: handoff.channel,
             goal: handoff.goal,
             cta: handoff.cta,
@@ -2746,9 +2760,13 @@
     const { handoff, def } = resolveActiveStudioContext();
     if (!def || !Object.keys(def).length) return;
     if (handoff && !force) return;
+    const linkUrl = def.destination_url || def.product_link || '';
+    const isVideoMove = (def.recommendation_id || '') === 'move-share-video' && Boolean(linkUrl);
     const fields = [
       ['sellerName', def.business_name],
       ['productName', def.product_name],
+      ['productLink', linkUrl],
+      ['destinationUrl', linkUrl],
       ['productPrice', def.price_claim],
       ['price', def.price_claim],
       ['goal', def.goal],
@@ -2763,7 +2781,16 @@
           node.dataset.smUserEdited = '1';
         });
       }
-      if (force || !node.value || BANNED_SAMPLE_TERMS.some((t) => node.value.toLowerCase().includes(t))) {
+      const isVideoMoveOverride =
+        isVideoMove &&
+        (id === 'productName' || id === 'productLink' || id === 'destinationUrl') &&
+        node.dataset.smUserEdited !== '1';
+      if (
+        force ||
+        isVideoMoveOverride ||
+        !node.value ||
+        BANNED_SAMPLE_TERMS.some((t) => node.value.toLowerCase().includes(t))
+      ) {
         node.value = val;
         node.dispatchEvent(new Event('change', { bubbles: true }));
       }

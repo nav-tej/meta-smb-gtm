@@ -625,6 +625,11 @@
     } else if (isGenericProduct && handoff.business_name) {
       state.product.name = `${handoff.business_name} featured work`;
     }
+    const isVideoHandoff = (handoff.recommendation_id || handoff.id) === 'move-share-video';
+    const handoffLink = isVideoHandoff ? safeLink(handoff.destination_url || handoff.product_link || '') : '';
+    if (handoffLink) {
+      state.product.link = handoffLink;
+    }
     if (handoff.price_claim !== undefined) {
       state.product.price = handoff.price_claim || '';
     }
@@ -633,6 +638,12 @@
       state.product.destination = destKey;
       syncDestinationOptions();
       $('promotionDestination').value = destKey;
+    }
+    if (handoffLink && state.product.destination) {
+      offers[state.product.destination] = {
+        price: state.product.price || '',
+        link: handoffLink,
+      };
     }
     const mappedGoal = Object.hasOwn(goals, handoff.goal) ? handoff.goal : 'story';
     state.goal = mappedGoal;

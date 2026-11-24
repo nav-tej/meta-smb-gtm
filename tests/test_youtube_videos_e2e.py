@@ -17,8 +17,10 @@ import uvicorn
 from fastapi import HTTPException
 
 from src.api import accounts as accounts_api
+from src.api import daily_brief as brief_api
 from src.api import seller_memory as memory_api
 from src.api.main import app
+from src.services import daily_brief as brief_service
 from src.services import youtube_videos as yv
 from src.services.accounts import AccountSession
 from tests.e2e_helpers import with_cpu_throttle
@@ -60,6 +62,7 @@ def youtube_links_server(monkeypatch: pytest.MonkeyPatch):
                 "business_type": "services",
                 "website_url": "https://northstar.test",
                 "completed_at": "2026-11-20T10:00:00Z",
+                "socials": [{"platform": "youtube", "handle": "@northstaradvisory"}],
                 "competitors": [{"name": "Summit Consulting", "url": "https://summit.test"}],
             },
             "preferences": {
@@ -143,6 +146,8 @@ def youtube_links_server(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(memory_api, "load_workspace", fake_load)
     monkeypatch.setattr(memory_api, "save_workspace", fake_save)
     monkeypatch.setattr(memory_api, "fetch_video_info", fake_fetch_video_info)
+    monkeypatch.setattr(brief_api, "resolve_account", fake_resolve)
+    monkeypatch.setattr(brief_service, "load_workspace", fake_load)
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.bind(("127.0.0.1", 0))
@@ -208,6 +213,9 @@ def test_youtube_pasted_links_memory_modal_375_and_1440_own_and_sample_e2e(
                     block_text = page.locator("#smYouTubeSourceBlock").inner_text()
                     assert "Your YouTube videos" in block_text, block_text
                     assert "Muse reads the title of each video you paste." in block_text, block_text
+                    assert (
+                        "Paste links from your channel (@northstaradvisory)" in block_text
+                    ), block_text
                     assert "automatically" not in block_text.lower(), block_text
                     assert "watches" not in block_text.lower(), block_text
 
@@ -240,6 +248,41 @@ def test_youtube_pasted_links_memory_modal_375_and_1440_own_and_sample_e2e(
                     assert "sarabjit" not in body_lower
                     assert "ek onkar" not in body_lower
 
+                    # 2. /today?workspace=own shows the video move -> /create has title + link
+                    page.goto(f"{{BASE}}/today?workspace=own", wait_until="networkidle")
+                    page.wait_for_function(
+                        "() => (document.getElementById('msBrief')?.innerText || '')"
+                        ".includes('Share your video')"
+                    )
+                    assert not page.evaluate(
+                        "() => document.documentElement.scrollWidth > window.innerWidth"
+                    ), f"/today horizontal overflow at {{width}}px"
+
+                    # Click the video move's Create link -> /create?workspace=own
+                    video_link = page.locator(
+                        "#msBrief .ms-action:has-text('Share your video') a, "
+                        "#msBrief .ms-move:has-text('Share your video') a"
+                    ).first
+                    video_link.click()
+                    page.wait_for_url("**/create**")
+                    page.wait_for_function(
+                        "() => (document.getElementById('productLink')?.value || '')"
+                        ".includes('youtube.com/watch?v=')"
+                    )
+                    assert "Q4 B2B Pipeline Audit" in page.locator("#productName").input_value()
+                    assert page.locator("#productLink").input_value() == (
+                        f"https://www.youtube.com/watch?v={{VID_1}}"
+                    )
+
+                    # 3. Return to / and remove saved videos cleanly
+                    page.goto(f"{{BASE}}/", wait_until="domcontentloaded")
+                    page.wait_for_function(
+                        "() => document.body.classList.contains('ms-staged') && "
+                        "document.documentElement.getAttribute('data-muse-mode') === 'account_own'"
+                    )
+                    page.wait_for_selector("#smOpenMemoryBtn")
+                    page.click("#smOpenMemoryBtn")
+                    page.wait_for_selector("#smYouTubeRemoveBtn")
                     page.click("#smYouTubeRemoveBtn")
                     page.wait_for_function(
                         "() => document.getElementById('smYouTubeVideoList') === null"
@@ -247,7 +290,7 @@ def test_youtube_pasted_links_memory_modal_375_and_1440_own_and_sample_e2e(
                     assert page.locator("#smYouTubeRemoveBtn").count() == 0
                     ctx.close()
 
-                    # 2. Sample workspace never shows the YouTube block
+                    # 4. Sample workspace never shows the YouTube block or video move
                     ctx_s = browser.new_context(viewport={{"width": width, "height": 844}})
                     ps = ctx_s.new_page()
                     ps.goto(f"{{BASE}}/?workspace=sample", wait_until="domcontentloaded")
@@ -259,6 +302,8 @@ def test_youtube_pasted_links_memory_modal_375_and_1440_own_and_sample_e2e(
                     ps.click("#smOpenMemoryBtn")
                     ps.wait_for_selector("#smMemoryModalBackdrop:not([hidden])")
                     assert ps.locator("#smYouTubeSourceBlock").count() == 0
+                    ps.goto(f"{{BASE}}/today?workspace=sample", wait_until="networkidle")
+                    assert "Share your video" not in ps.locator("#msBrief").inner_text()
                     ctx_s.close()
             finally:
                 browser.close()
