@@ -487,3 +487,235 @@ def test_youtube_route_plain_errors_and_five_link_cap(
     )
     assert unavail.status_code == 502
     assert unavail.json()["detail"] == yv.ERR_UNAVAILABLE
+
+
+# ---------------------------------------------------------------------------
+# Part A handoff additions & Part B ranker / recommend / own-brief tests
+# ---------------------------------------------------------------------------
+
+from datetime import UTC, datetime  # noqa: E402
+
+from src.models.seller import (  # noqa: E402
+    AccessPreferences,
+    DismissSignal,
+    SellerPreferences,
+)
+from src.services.daily_brief import _own_brief  # noqa: E402
+from src.services.seller_memory import (  # noqa: E402
+    _js_action_id,
+    rank_seller_recommendations,
+)
+
+
+def test_parse_video_id_accepts_m_youtu_be() -> None:
+    assert yv.parse_video_id(f"https://m.youtu.be/{VID_2}") == VID_2
+
+
+@pytest.mark.asyncio
+async def test_fetch_video_info_refuses_redirect_to_non_youtube_host() -> None:
+    scan_guard.reset()
+    oembed_url = yv.oembed_url_for_video(VID_1)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        url = str(request.url)
+        if url.endswith("/robots.txt"):
+            return httpx.Response(200, text="User-agent: *\nAllow: /\n")
+        if url == oembed_url:
+            return httpx.Response(302, headers={"Location": "https://evil.example/oembed.json"})
+        if url == "https://evil.example/oembed.json":
+            return httpx.Response(200, json={"title": "Spoofed", "author_name": "Evil"})
+        return httpx.Response(404)
+
+    async def fake_resolver(_host: str) -> list[str]:
+        return ["93.184.216.34"]
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        with pytest.raises(yv.YouTubeVideoError) as exc_info:
+            await yv.fetch_video_info(VID_1, client=client, resolver=fake_resolver)
+        assert exc_info.value.user_message == yv.ERR_UNAVAILABLE
+
+
+def test_get_seller_memory_returns_youtube_handle(
+    yt_route_harness: SimpleNamespace,
+) -> None:
+    yt_route_harness.state["doc"]["onboarding"]["socials"] = [
+        {"platform": "youtube", "handle": "@northstaradvisory"}
+    ]
+    got = yt_route_harness.client.get("/api/v1/seller-memory", headers={"X-Test-Auth": "verified"})
+    assert got.status_code == 200
+    body = got.json()
+    assert body["youtube_handle"] == "@northstaradvisory"
+    assert body["content_sources"] == {}
+
+
+@pytest.mark.parametrize("business_type", ["products", "services", "both"])
+def test_ranker_offers_video_move_with_business_type_wording_and_editor_defaults(
+    business_type: str,
+) -> None:
+    videos = [
+        {
+            "video_id": VID_1,
+            "title": "How we scope retainers",
+            "author_name": "Northstar Advisory",
+            "added_at": "2026-11-23T12:00:00Z",
+        }
+    ]
+    pref = SellerPreferences(
+        goal="Grow inquiries",
+        access=AccessPreferences(minutes_per_week=30, channels=["instagram", "website"]),
+    )
+    res = rank_seller_recommendations(
+        business_name="Northstar Advisory",
+        business_type=business_type,  # type: ignore[arg-type]
+        preferences=pref,
+        content_videos=videos,
+    )
+    video_moves = [m for m in res["recommendations"] if m["id"] == "move-share-video"]
+    assert len(video_moves) == 1
+    move = video_moves[0]
+    assert move["title"] == "Share your video “How we scope retainers” as a post"
+    assert "link to the video" in move["action"]
+    assert "https://www.youtube.com/watch?v=" not in move["action"]
+    assert move["over_budget"] is False
+    assert "How we scope retainers" in move["why_this_fits"]
+    ed = move["editor_defaults"]
+    assert ed["product_name"] == "How we scope retainers"
+    assert ed["destination_url"] == f"https://www.youtube.com/watch?v={VID_1}"
+    assert ed["product_link"] == f"https://www.youtube.com/watch?v={VID_1}"
+
+    # Over-budget when minutes_per_week < 10
+    tight_pref = SellerPreferences(
+        goal="Grow inquiries",
+        access=AccessPreferences(minutes_per_week=5, channels=["instagram"]),
+    )
+    tight_res = rank_seller_recommendations(
+        business_name="Northstar Advisory",
+        business_type=business_type,  # type: ignore[arg-type]
+        preferences=tight_pref,
+        content_videos=videos,
+    )
+    tight_video = next(m for m in tight_res["recommendations"] if m["id"] == "move-share-video")
+    assert tight_video["over_budget"] is True
+
+
+def test_ranker_never_offers_video_move_to_sample_or_without_videos() -> None:
+    videos = [
+        {
+            "video_id": VID_1,
+            "title": "Studio tour",
+            "author_name": "Sample",
+            "added_at": "2026-11-23T12:00:00Z",
+        }
+    ]
+    pref = SellerPreferences(access=AccessPreferences(minutes_per_week=60, channels=["instagram"]))
+    # business_type=None (sample artist) must NEVER get move-share-video
+    sample_res = rank_seller_recommendations(
+        business_name="Art of Sarabjit Singh",
+        business_type=None,
+        preferences=pref,
+        content_videos=videos,
+    )
+    assert all(m["id"] != "move-share-video" for m in sample_res["recommendations"])
+
+    # No saved videos -> no video move
+    no_vid_res = rank_seller_recommendations(
+        business_name="Northstar Advisory",
+        business_type="services",
+        preferences=pref,
+        content_videos=[],
+    )
+    assert all(m["id"] != "move-share-video" for m in no_vid_res["recommendations"])
+
+
+def test_ranker_video_dismissal_exact_match_no_substring_false_positive() -> None:
+    videos = [
+        {
+            "video_id": VID_1,
+            "title": "Art",
+            "author_name": "Studio",
+            "added_at": "2026-11-23T12:00:00Z",
+        },
+        {
+            "video_id": VID_2,
+            "title": "Packaging tips",
+            "author_name": "Studio",
+            "added_at": "2026-11-20T12:00:00Z",
+        },
+    ]
+    pref = SellerPreferences(access=AccessPreferences(minutes_per_week=60, channels=["instagram"]))
+
+    # A dismissed move whose title merely contains "art" must NOT hide video titled "Art"
+    res_keep = rank_seller_recommendations(
+        business_name="Studio",
+        business_type="products",
+        preferences=pref,
+        content_videos=videos,
+        dismiss_signals=[DismissSignal(id="other-move", title="Post an art studio tip")],
+    )
+    mv = next(m for m in res_keep["recommendations"] if m["id"] == "move-share-video")
+    assert mv["title"] == "Share your video “Art” as a post"
+
+    # Dismissing by exact move title, actionId, or move-share-video:<id> falls back to VID_2
+    exact_title = "Share your video “Art” as a post"
+    for sig in (
+        DismissSignal(id="x", title=exact_title),
+        DismissSignal(id=_js_action_id(exact_title), title=""),
+        DismissSignal(id=f"move-share-video:{VID_1}", title=""),
+    ):
+        res_next = rank_seller_recommendations(
+            business_name="Studio",
+            business_type="products",
+            preferences=pref,
+            content_videos=videos,
+            dismiss_signals=[sig],
+        )
+        mv2 = next(m for m in res_next["recommendations"] if m["id"] == "move-share-video")
+        assert mv2["title"] == "Share your video “Packaging tips” as a post"
+
+
+def test_recommend_route_and_own_brief_include_saved_video_move(
+    yt_route_harness: SimpleNamespace,
+) -> None:
+    saved_videos = [
+        {
+            "video_id": VID_1,
+            "title": "Q4 Pipeline Audit",
+            "author_name": "Northstar Advisory",
+            "added_at": "2026-11-23T12:00:00Z",
+        }
+    ]
+    yt_route_harness.state["doc"]["preferences"]["content_sources"] = {
+        "youtube": {"videos": saved_videos, "updated_at": "2026-11-23T12:00:00Z"}
+    }
+
+    # 1. POST /api/v1/seller-memory/recommend reads saved videos from workspace
+    rec_res = yt_route_harness.client.post(
+        "/api/v1/seller-memory/recommend",
+        headers={"X-Test-Auth": "verified"},
+        json={"business_name": "Northstar Advisory", "business_type": "services"},
+    )
+    assert rec_res.status_code == 200
+    recs = rec_res.json()["recommendations"]
+    vid_move = next((m for m in recs if m["id"] == "move-share-video"), None)
+    assert vid_move is not None
+    assert (
+        vid_move["editor_defaults"]["destination_url"] == f"https://www.youtube.com/watch?v={VID_1}"
+    )
+
+    # 2. _own_brief passes saved videos into rank_seller_recommendations
+    now = datetime(2026, 11, 23, 12, tzinfo=UTC)
+    brief = _own_brief(yt_route_harness.state["doc"], now.date(), now)
+    brief_vid = next(
+        (
+            m
+            for m in brief.action_items
+            if m.recommendation and m.recommendation["id"] == "move-share-video"
+        ),
+        None,
+    )
+    assert brief_vid is not None
+    assert brief_vid.title == "Share your video “Q4 Pipeline Audit” as a post"
+    assert (
+        brief_vid.recommendation["editor_defaults"]["destination_url"]
+        == f"https://www.youtube.com/watch?v={VID_1}"
+    )

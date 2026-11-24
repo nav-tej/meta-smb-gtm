@@ -27,7 +27,7 @@ from src.utils.sitemap import (
 )
 
 YOUTUBE_WATCH_HOSTS = frozenset({"youtube.com", "www.youtube.com", "m.youtube.com"})
-YOUTUBE_SHORT_HOSTS = frozenset({"youtu.be", "www.youtu.be"})
+YOUTUBE_SHORT_HOSTS = frozenset({"youtu.be", "www.youtu.be", "m.youtu.be"})
 VIDEO_ID_RE = re.compile(r"^[A-Za-z0-9_-]{11}$")
 _HTML_TAG_RE = re.compile(r"<[^>]+>")
 _WHITESPACE_RE = re.compile(r"\s+")
@@ -103,6 +103,26 @@ def parse_video_id(raw: str) -> str:
             raise YouTubeVideoError(ERR_INVALID_LINK, status_code=400)
 
     raise YouTubeVideoError(ERR_INVALID_LINK, status_code=400)
+
+
+def extract_youtube_social_handle(onboarding: object) -> str:
+    """Return a saved YouTube handle (e.g. `@northstar`) from `onboarding.socials`, or ''."""
+    if not isinstance(onboarding, dict):
+        return ""
+    socials = onboarding.get("socials")
+    if not isinstance(socials, list):
+        return ""
+    for item in socials:
+        if not isinstance(item, dict):
+            continue
+        if str(item.get("platform") or "").strip().lower() != "youtube":
+            continue
+        raw = str(item.get("handle") or "").strip()
+        if raw:
+            clean = raw.lstrip("@").split("?")[0].split("#")[0].strip("/")
+            if clean:
+                return f"@{clean[:100]}"
+    return ""
 
 
 def build_video_urls(video_id: str) -> tuple[str, str]:
@@ -195,7 +215,7 @@ async def fetch_video_info(
                 raise YouTubeVideoError(ERR_UNAVAILABLE, status_code=502)
 
             try:
-                status, body, _final_url = await _fetch_bytes_guarded(
+                status, body, final_url = await _fetch_bytes_guarded(
                     oembed_url,
                     active_client,
                     max_bytes=MAX_OEMBED_BYTES,
@@ -208,6 +228,10 @@ async def fetch_video_info(
                 raise YouTubeVideoError(ERR_UNAVAILABLE, status_code=502) from err
 
             if status in {401, 403, 404} or status != 200 or not body:
+                raise YouTubeVideoError(ERR_UNAVAILABLE, status_code=502)
+
+            final_host = (urlsplit(final_url).hostname or "").lower().rstrip(".")
+            if final_host not in YOUTUBE_WATCH_HOSTS or not policy.is_allowed(final_url):
                 raise YouTubeVideoError(ERR_UNAVAILABLE, status_code=502)
 
             parsed = parse_oembed_payload(body, video_id)

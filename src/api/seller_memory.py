@@ -53,6 +53,7 @@ from src.services.youtube_videos import (
     ERR_TOO_MANY,
     MAX_VIDEOS,
     YouTubeVideoError,
+    extract_youtube_social_handle,
     fetch_video_info,
     oembed_url_for_video,
     parse_video_id,
@@ -102,6 +103,7 @@ class RecommendRequest(BaseModel):
     draft_override: dict[str, Any] | None = None
     dismiss_signals: list[DismissSignal] = Field(default_factory=list)
     previous_top_id: str | None = Field(default=None, max_length=120)
+    content_videos: list[dict[str, Any]] | None = None
 
 
 _BUSINESS_TYPES: dict[str, BusinessType] = {
@@ -222,6 +224,7 @@ async def get_seller_memory(
             "suggested_updates": [],
             "dismiss_signals": [],
             "content_sources": {},
+            "youtube_handle": "",
         }
 
     verify_workspace_owner(account, x_muse_owner)
@@ -236,6 +239,7 @@ async def get_seller_memory(
         if isinstance(raw_prefs, dict) and isinstance(raw_prefs.get("content_sources"), dict)
         else {}
     )
+    youtube_handle = extract_youtube_social_handle(onb)
 
     suggestions = suggest_memory_updates(
         preferences=pref, voice_profile=voice, dismiss_signals=signals
@@ -257,6 +261,7 @@ async def get_seller_memory(
         ],
         "dismiss_signals": [s.model_dump(mode="json") for s in signals],
         "content_sources": content_sources,
+        "youtube_handle": youtube_handle,
     }
 
 
@@ -737,8 +742,9 @@ async def recommend_for_context(
     signals = list(body.dismiss_signals)
     biz_name = body.business_name
     biz_type = body.business_type
+    content_videos = body.content_videos
 
-    if pref is None or comps is None:
+    if pref is None or comps is None or (content_videos is None and biz_type is not None):
         account = await resolve_account(request, response, require_verified=False)
         if account is not None:
             verify_workspace_owner(account, x_muse_owner)
@@ -752,9 +758,18 @@ async def recommend_for_context(
                     comps = ws_comps
                 if not signals:
                     signals = ws_signals
-                onb = (ws.get("document") or {}).get("onboarding")
+                ws_doc = ws.get("document") or {}
+                onb = ws_doc.get("onboarding")
                 if isinstance(onb, dict) and onb.get("business_name") and biz_name == "Your Studio":
                     biz_name = str(onb["business_name"])
+                if content_videos is None and isinstance(ws_doc, dict):
+                    raw_prefs = ws_doc.get("preferences")
+                    raw_sources = (
+                        raw_prefs.get("content_sources") if isinstance(raw_prefs, dict) else None
+                    )
+                    raw_yt = raw_sources.get("youtube") if isinstance(raw_sources, dict) else None
+                    if isinstance(raw_yt, dict) and isinstance(raw_yt.get("videos"), list):
+                        content_videos = [v for v in raw_yt["videos"] if isinstance(v, dict)]
             except Exception:
                 pass
 
@@ -769,6 +784,7 @@ async def recommend_for_context(
             draft_override=body.draft_override,
             dismiss_signals=signals,
             previous_top_id=body.previous_top_id,
+            content_videos=content_videos,
         ),
         "generated_at": datetime.now(UTC).isoformat(),
         "runs_used": 0,
