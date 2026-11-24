@@ -66,4 +66,54 @@
 
 - Live network calls to `https://www.youtube.com/oembed` or live Supabase persistence (all tests run offline with fakes).
 
+---
+
+## Part B: Handoff from Argon (Nov 23 Evening)
+
+- **Merged base:** `origin/claude/ux-gap-ad-loop-nov17` at `7e4cabf` (merge commit `2d2f79e`).
+- **Checkpoints:**
+  - `a9cd4ba`: Part A ports (`m.youtu.be`, post-redirect host/robots check, `youtube_handle` from `onboarding.socials`) + Part B ranker (`move-share-video`), `/api/v1/seller-memory/recommend` + `_own_brief` wiring, and unit/route/ranker/brief tests.
+  - `201b814`: Part B frontend handoff (`seller-memory.js?v=20261124-ag2`, `creator.js?v=20261124-ag1`), version pins (`index.html`, `today.html`, `welcome.html`, `creator.html`, `tests/test_ad_loop_links.py`, `tests/test_create_any_business.py`, `AGENTS.md`), and extended 375px/1440px Chromium E2E.
+  - This commit: final Part B report update.
+
+### What Was Ported from Argon (`0b92018` + uncommitted Part B diff in `/Users/nav/muse-worktrees/youtube-videos`)
+
+- **Part A additions:**
+  - `m.youtu.be` added to `YOUTUBE_SHORT_HOSTS` in `src/services/youtube_videos.py`.
+  - Post-redirect `final_url` host check (`final_host in YOUTUBE_WATCH_HOSTS` and `policy.is_allowed(final_url)`) in `fetch_video_info`.
+  - `extract_youtube_social_handle(onboarding)` returning `youtube_handle` on `GET /api/v1/seller-memory`, surfaced in `seller-memory.js` as `"Paste links from your channel (@handle)."` (never fetching the channel).
+- **Part B (`move-share-video`):**
+  - `rank_seller_recommendations` (`src/services/seller_memory.py`): takes optional `content_videos`; for non-sample workspaces (`business_type is not None`) with saved videos, adds `move-share-video` (`"Share your video “<title>” as a post"`) using the newest undismissed video, ranking with existing scoring and `over_budget` rules, and carrying the video title (`product_name`) and rebuilt watch URL (`destination_url`, `product_link`) through `_build_editor_defaults_for_move`.
+  - Passed saved videos from both `POST /api/v1/seller-memory/recommend` (`src/api/seller_memory.py`) and `_own_brief` (`src/services/daily_brief.py`, leaving `_own_watch_items` untouched).
+  - Forwarded `content_videos`, `destination_url`, and `product_link` through `seller-memory.js` and `creator.js`.
+
+### What Was Dropped / Fixed vs. Argon's Diff (and Why)
+
+1. **Dropped `_dump_preserving_workspace_extras` on `GET /api/v1/seller-memory`:** kept `pref.model_dump(mode="json")` so `GET /api/v1/seller-memory` never adds unknown preference extras (such as up-to-64 KB `competitor_checks` snapshots) to every memory load.
+2. **Dropped substring dismissal rule in `_select_undismissed_video`:** removed `title_lower in sig_title` so a short video title like `"Art"` cannot be hidden by an unrelated dismissed move containing `"art"`. Matches only exact move title, shell `actionId` of that title, `move-share-video:<video_id>`, or generic `move-share-video` without a conflicting title.
+3. **Scoped `creator.js` handoff link strictly to `move-share-video`:** `offers[state.product.destination]` and `state.product.link` are only set when `(handoff.recommendation_id || handoff.id) === 'move-share-video'`, preventing other handoffs from clobbering the seller's saved offer link.
+4. **Protected seller-edited fields in `seller-memory.js` `applyEditorDefaults`:** `isVideoMoveOverride` checks `node.dataset.smUserEdited !== '1'` and `def.recommendation_id === 'move-share-video'`, so it never overwrites fields the seller edited.
+5. **Shortened `move-share-video` action copy for 375 px:** action sentence says `"link to the video"` instead of printing the raw watch URL inline, while keeping the full rebuilt watch URL in `editor_defaults` (`destination_url` and `product_link`).
+6. **Left Argon's worktree (`/Users/nav/muse-worktrees/youtube-videos`) completely untouched** (read-only inspection only).
+
+### Mutation Check 3 (Part B — Sample Artist Isolation)
+
+- **Offer `move-share-video` to the sample artist (`src/services/seller_memory.py`):** temporarily removed `business_type is not None` from the `move-share-video` guard in `rank_seller_recommendations`.
+  - Command: `DEMO_MODE=true META_MODEL_API_KEY= DEMO_KEY= .venv/bin/pytest -q tests/test_youtube_videos.py`
+  - Result: **1 failed, 52 passed** — caught by `test_ranker_never_offers_video_move_to_sample_or_without_videos`. Restored immediately.
+- (Mutation Checks 1 and 2 — storing oEmbed `thumbnail_url` and skipping the robots check — were already verified and recorded above.)
+
+### Part B Verification Results (Sequential, Offline)
+
+1. **Node contracts (10/10 standalone + `portal_demo_smoke.cjs` via pytest):** all **PASS** (`account_ui_contract`, `creator_artist_feedback`, `creator_import_sprint`, `creator_journey_smoke`, `creator_studio_contract`, `editor_drafts_contract`, `muse_shell_resilience`, `shared_get_contract`, `today_studio_contract`, `ui_polish_contract`).
+2. **Full offline gate:**
+   - Command: `DEMO_MODE=true META_MODEL_API_KEY= DEMO_KEY= make PY=/Users/nav/meta-smb-gtm/.venv/bin check`
+   - Result: `ruff check .` passed; `ruff format --check .` (329 files formatted); **`816 passed, 2 skipped, 0 failed`** (5m 12s), including `tests/test_youtube_videos.py` (53/53) and extended `tests/test_youtube_videos_e2e.py` (375px & 1440px: paste 2 links with `@northstaradvisory` hint → `/today?workspace=own` shows video move → `/create?workspace=own` pre-fills title + watch URL → Remove clears → sample shows none).
+3. **Launch account audit:**
+   - Command: `DEMO_MODE=true META_MODEL_API_KEY= DEMO_KEY= /usr/bin/python3 tests/launch_account_audit.py`
+   - Result: **`27 passed, 0 failed`**.
+4. **Launch browser audit:**
+   - Command: `DEMO_MODE=true META_MODEL_API_KEY= DEMO_KEY= /usr/bin/python3 tests/launch_browser_audit.py`
+   - Result: **`20 passed, 0 failed`**.
+
 Ownership released.
