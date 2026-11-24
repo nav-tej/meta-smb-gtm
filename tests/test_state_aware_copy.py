@@ -239,18 +239,15 @@ def test_four_visitor_states_and_sample_freshness_e2e(state_copy_server: str) ->
                 pr.wait_for_function(
                     "() => document.documentElement.dataset.museMode === 'account_own' && "
                     "(document.querySelector('#addCompetitorBtn') || {{}})"
-                    ".textContent.includes('Add and analyze') && "
-                    "[...document.querySelectorAll('#jrSteerChips .jr-chip-btn')]"
-                    ".some((b) => b.textContent.includes('How do my prices compare?'))"
+                    ".textContent.includes('Add and analyze')"
                 )
                 assert "Uses 1 run." in pr.locator("#addCompetitorCost").inner_text()
                 snap_note_r = pr.locator("#competitorSnapshotsNote").inner_text()
                 assert "Muse Spark brief" not in snap_note_r
                 assert "SikhiArt" not in snap_note_r
-                own_chips = pr.locator("#jrSteerChips .jr-chip-btn").all_inner_texts()
-                assert "How do my prices compare?" in own_chips, own_chips
-                assert "Gift ideas" in own_chips, own_chips
-                assert all("$59.99" not in c and "$50" not in c for c in own_chips), own_chips
+                # "Ask Muse what to do next" belongs to the sample shop; it is not in an own
+                # workspace, so the sample's $59.99 and gift questions never show there.
+                assert not pr.locator("#jrSteerResearch").is_visible()
                 assert not pr.evaluate("document.documentElement.scrollWidth > window.innerWidth")
 
                 # 4. Signed in viewing sample shop with monitor error injected

@@ -309,11 +309,25 @@ async def unexpected_error_handler(request: Request, exc: Exception) -> JSONResp
     )
 
 
+SITE_BLOCKS_READING = (
+    "That site doesn't allow automated reading, so Muse can't read it. "
+    "Try the business's own website or another page."
+)
+SITE_UNREADABLE = (
+    "Muse couldn't read that site's public pages. "
+    "Check the address, or try the business's own website."
+)
+
+
 @app.exception_handler(SitemapError)
 async def sitemap_error_handler(request: Request, exc: SitemapError) -> JSONResponse:
+    # The exception text is for logs: it can carry robots.txt rules, resolver output or the
+    # full address, none of which helps a seller.
+    blocked = "robots" in str(exc).lower()
+    logger.info("Site read refused on %s (%s)", request.url.path, "robots" if blocked else "fetch")
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-        content={"detail": f"Could not read competitor site: {exc}"},
+        content={"detail": SITE_BLOCKS_READING if blocked else SITE_UNREADABLE},
     )
 
 

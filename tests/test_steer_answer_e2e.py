@@ -169,31 +169,16 @@ def test_steer_card_answers_with_actionable_moves_e2e(live_server_url: str) -> N
                 assert not errors, errors
                 ctx.close()
 
-            # Own workspace: one move that points to the tool to start with, not sample data.
+            # Own workspace: the card is the sample shop's. In a seller's own workspace it only
+            # pointed back to /today and the studio and knew nothing about their competitors or
+            # offer (Nav, Nov 24), so it is not shown there.
             ctx, page, errors = open_page(browser, 1440, signed_in=True)
             page.goto(BASE + "/", wait_until="networkidle")
             page.wait_for_function(
                 "document.documentElement.dataset.museMode === 'account_own'", timeout=15000)
-            page.locator("#jrSteerResearch").wait_for(state="visible", timeout=10000)
-            moves = ask(page, "Weekly post ideas")
-            assert moves == [{{"href": "/today", "title": "Plan this week’s posts"}}], moves
-            # The sample shop's prices are not offered as questions in a seller's own workspace.
-            chips = page.locator(".jr-chip-btn").all_inner_texts()
-            assert not any("$" in c for c in chips), chips
-            moves = ask(page, "How do my prices compare?")
-            assert moves == [{{"href": "#loop-research",
-                               "title": "Compare prices with a competitor"}}], moves
-            # A service business asking about leads gets a leads answer, not a pricing one.
-            page.fill("#jrSteerInput", "How can i get more leads from clutch or toptal traffic")
-            page.click("#jrSteerSubmitBtn")
-            page.wait_for_function(
-                "(() => {{ const a = document.getElementById('jrSteerAnswer');"
-                " const t = a && a.querySelector('.jr-steer-move strong');"
-                " return t && t.textContent === 'Compare how a competitor wins clients'; }})()",
-                timeout=8000,
-            )
-            summary = page.locator("#jrDirectiveSummary").inner_text()
-            assert "Focus: Leads" in summary and "Pricing" not in summary, summary
+            page.wait_for_timeout(500)
+            assert not page.locator("#jrSteerResearch").is_visible()
+            assert not page.locator(".jr-chip-btn").first.is_visible()
             assert not errors, errors
             ctx.close()
             browser.close()
