@@ -116,4 +116,23 @@
    - Command: `DEMO_MODE=true META_MODEL_API_KEY= DEMO_KEY= /usr/bin/python3 tests/launch_browser_audit.py`
    - Result: **`20 passed, 0 failed`**.
 
+---
+
+## Review fixes (Nov 24)
+
+- **Merged base:** `origin/claude/ux-gap-ad-loop-nov17` at `5ebc99c` (merge commit `b434bc9`).
+- **Fixes (`b928c96`):**
+  1. **`_js_action_id` UTF-16 parity (`src/services/seller_memory.py`):** encodes cleaned title to `utf-16-le`, slices the first 120 UTF-16 code units, walks code points (advancing 2 units on surrogate pairs, 1 unit on BMP/lone surrogates), and adds the first UTF-16 code unit — matching `muse-shell.js`'s `actionId(itemTitle(item))` identically. Verified by `test_js_action_id_matches_muse_shell_js_via_node`, which parses `actionId` directly from `src/api/static/muse-shell.js` and compares Python vs Node on plain titles, emoji titles (`"Glaze day 🔥 new mugs"` → `a17tqlor`), >120 UTF-16 units with an emoji across the cut, repeated whitespace, and curly quotes, plus end-to-end dismissal with `{id, title: ""}`.
+  2. **Video move destination `"other"` + offer preservation (`src/services/seller_memory.py`, `src/api/static/creator.js`):** `_build_editor_defaults_for_move` sets `destination: "other"` for `move-share-video`. In `creator.js`, any handoff that sets `destination` first preserves the current offer if needed and loads `offers[destKey]` (`price` and `link`), then applies the video watch URL only for `move-share-video`. Verified by `test_video_move_uses_other_destination_and_preserves_website_offer_link` (website link survives opening `move-share-video` then another `website` move).
+  3. **`RecommendRequest.content_videos` cap (`src/api/seller_memory.py`):** capped at `max_length=5` (`422` on 6 videos, `200` on 5). Verified by `test_recommend_route_caps_content_videos_at_five`.
+- **Mutation checks (all 3 confirmed failing, then restored):**
+  1. Revert `_js_action_id` to `ord(ch)` on `cleaned[:120]` → `pytest -q tests/test_youtube_videos.py -k "action_id"` failed (`'a1fb6n8z' != 'a17tqlor'`).
+  2. Remove `offers[destKey]` reload in `creator.js` → `pytest -q tests/test_youtube_videos.py -k "preserves_website_offer_link"` failed (`'https://www.youtube.com/watch?v=AbCdEfGh123' !== 'https://northstar.test/services'`).
+  3. Remove `max_length=5` on `RecommendRequest.content_videos` → `pytest -q tests/test_youtube_videos.py -k "caps_content_videos"` failed (`assert 200 == 422`).
+- **Verification results (Nov 24):**
+  - Node contracts: **10/10 passed** (plus `portal_demo_smoke.cjs` via pytest).
+  - Full gate (`make check`): `ruff check .` passed; `ruff format --check .` (331 files formatted); **832 passed, 2 skipped** on the full run with 1 transient Playwright timeout in `tests/test_today_destinations_e2e.py[1440]` (`#postCaption` fill), which passed **2/2** on immediate re-run (`31.53s`), including all 56 tests in `tests/test_youtube_videos.py` and `tests/test_youtube_videos_e2e.py`.
+  - `tests/launch_account_audit.py`: **27 passed, 0 failed**.
+  - `tests/launch_browser_audit.py`: **20 passed, 0 failed**.
+
 Ownership released.
