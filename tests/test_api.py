@@ -81,7 +81,9 @@ def test_analyze_competitors_unreadable_site(client: TestClient) -> None:
     response = client.post("/api/v1/analyze-competitors", json={"competitor_url": "nope.test"})
 
     assert response.status_code == 422
-    assert "No competitor URLs" in response.json()["detail"]
+    # A plain sentence for the seller; the internal reason stays in the logs.
+    assert response.json()["detail"].startswith("Muse couldn't read that site's public pages.")
+    assert "No competitor URLs" not in response.json()["detail"]
 
 
 def test_generate_ads_returns_creative_set(client: TestClient, brief_json: dict[str, Any]) -> None:

@@ -1305,7 +1305,9 @@
             <p class="jr-note">Prices from public listing snapshots (Nov 3): 40 Manjot, 35 Gurinderpreet and 39 SikhiArt prices. Gurdish Pannu sells originals with no USD prices listed.</p>
           </article>
 
-          <article class="jr-card c2 jr-steer-card" id="jrSteerResearch" style="grid-column:1 / -1;margin-top:0.5rem;">
+          <!-- Sample shop only: in a seller's own workspace it only pointed back to /today and the
+               studio, and its answers knew nothing about their competitors or offer. -->
+          <article class="jr-card c2 jr-steer-card" id="jrSteerResearch" data-sample-only style="grid-column:1 / -1;margin-top:0.5rem;">
             <header>
               <div style="display:flex;justify-content:space-between;align-items:center;">
                 <h3>Ask Muse what to do next</h3>
@@ -2564,7 +2566,8 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
       const li = btn.closest('.jr-seller');
       // A shop the seller added keeps its own address; its only link is the Meta Ad Library one.
       if (li?.dataset?.url) return li.dataset.url;
-      const link = li?.querySelector('a');
+      // Never the Meta Ad Library link: it is a search page, not the seller's site.
+      const link = li?.querySelector('a:not(.jr-meta-ad-link)');
       const raw = (link?.href || li?.querySelector('strong')?.textContent || '').trim();
       return raw.includes('://') ? raw : `https://${raw}`;
     };

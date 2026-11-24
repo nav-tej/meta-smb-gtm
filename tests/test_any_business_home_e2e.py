@@ -236,11 +236,8 @@ with sync_playwright() as p:
             " && document.body.innerText.includes('Top next move')",
             timeout=20000,
         )
-        page.wait_for_function(
-            "Array.from(document.querySelectorAll('#jrSteerChips .jr-chip-btn'))"
-            ".some(b => b.textContent.trim() === 'More inquiries')",
-            timeout=10000,
-        )
+        # The sample shop's "Ask Muse" card is not part of an own workspace.
+        assert not page.locator("#jrSteerResearch").is_visible()
         body = text(page)
         # The saved goal and minutes, not "Nothing saved yet".
         assert "your goal (more client inquiries) and your 30 minutes a week" in body, body
@@ -292,14 +289,14 @@ with sync_playwright() as p:
         assert not errors, errors
         ctx.close()
 
-    # A products seller keeps the shop words and the gift chip.
+    # A products seller keeps the shop words.
     ctx = browser.new_context(viewport={{"width": 1440, "height": 900}})
     ctx.add_cookies([{{"name": "muse_e2e_user", "value": "prod", "url": BASE}}])
     page = ctx.new_page()
     page.goto(BASE + "/", wait_until="domcontentloaded")
     page.wait_for_function(
-        "Array.from(document.querySelectorAll('#jrSteerChips .jr-chip-btn'))"
-        ".some(b => b.textContent.trim() === 'Gift ideas')",
+        "(document.getElementById('activeWorkspaceKicker')?.textContent || '')"
+        ".trim().toLowerCase() === 'your shop'",
         timeout=20000,
     )
     assert page.locator("#activeWorkspaceKicker").inner_text().strip().lower() == "your shop"

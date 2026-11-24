@@ -89,6 +89,22 @@ def get_competitor_intel_service() -> CompetitorIntelService:
     return CompetitorIntelService()
 
 
+SOCIAL_LINK_HOSTS = ("facebook.com", "fb.com", "fb.me", "instagram.com")
+SOCIAL_LINK_REFUSAL = (
+    "That is a Facebook or Instagram link. Muse can't read those pages, so use the "
+    "competitor's own website instead. No run was used."
+)
+
+
+def is_social_link(raw_url: str | None) -> bool:
+    """True for a Facebook or Instagram address, including a Meta Ad Library search."""
+    text = str(raw_url or "").strip()
+    if not text:
+        return False
+    host = (urlparse(text if "://" in text else f"https://{text}").hostname or "").lower()
+    return any(host == name or host.endswith(f".{name}") for name in SOCIAL_LINK_HOSTS)
+
+
 @router.post("/analyze-competitors", response_model=CompetitorBrief)
 async def analyze_competitors(
     request: CompetitorIntelRequest,
@@ -96,6 +112,10 @@ async def analyze_competitors(
     live: LiveMode,
     response: Response,
 ) -> CompetitorBrief:
+    # A Meta Ad Library search or a social page is not a competitor's website. Refuse it before
+    # any crawl; a refused live request finishes as failed, so the run is given back.
+    if is_social_link(request.competitor_url):
+        raise HTTPException(status_code=422, detail=SOCIAL_LINK_REFUSAL)
     if not live:
         return demo.demo_competitor_brief_for(request.competitor_url)
     return await result_cache.cached(
