@@ -95,4 +95,32 @@
 
 - Applying `supabase/migrations/watchlist_checks.sql` on hosted Supabase or running `GET /api/v1/watchlist/run` against live Supabase / live Vercel Cron (held for Claude's SQL review and Nav's approval per brief).
 
+---
+
+## Review fixes (Nov 24)
+
+- **Merged base:** `origin/claude/ux-gap-ad-loop-nov17` at `5ebc99c` (merge commit `66a6f54`).
+- **Fixes (`07a35b2`):**
+  1. **Auth lookup error raises — never prunes rows (`src/services/watchlist_store.py`):** `is_email_confirmed` no longer swallows `SupabaseError` into `False`. Transient Auth failures raise, are caught by the per-seller handler in `GET /api/v1/watchlist/run`, increment `errors`, and leave all saved rows untouched. Verified by `test_auth_lookup_error_raises_and_never_prunes_rows`.
+  2. **Per-site crawl timeout, worst-case seller run budget, and leftover-lease-last claim order (`src/services/competitor_checks.py`, `src/api/intel.py`, `supabase/migrations/watchlist_checks.sql`):**
+     - `run_watchlist_checks` wraps each site's `scan_guard.crawl(...)` in `asyncio.wait_for(..., timeout=20.0)` (`PER_SITE_CRAWL_TIMEOUT_SECONDS`), mapping timeouts to `"This site took too long to respond."` for both the button and the cron run.
+     - `WATCHLIST_RUN_MAX_SECONDS = 280.0`, `WATCHLIST_WORST_CASE_SELLER_SECONDS = 6 * 20.0 = 120.0`, `WATCHLIST_RUN_BUDGET_SECONDS = 160.0` (stops claiming when elapsed + one worst-case seller would exceed 280 s inside Vercel's 300 s `maxDuration`).
+     - `muse_watchlist_claim_due` orders by `(s.claimed_until is not null) asc, s.next_check_at asc, s.user_id asc` so expired leftover leases go last behind fresh due sellers.
+     - Verified by `test_per_site_crawl_timeout_and_worst_case_run_budget` and `tests/watchlist_sql.mjs`.
+  3. **Failed table read during a check saves nothing (`src/services/watchlist_store.py`, `src/api/intel.py`):** added `raise_on_error: bool = False` to `get_checks`. Check/write paths pass `raise_on_error=True` (display reads keep fallback). On failure, `POST /api/v1/competitors/check` returns `503` `"Muse couldn't check your watchlist right now. Try again in a few minutes."` without saving; `GET /api/v1/watchlist/run` counts `errors += 1` without saving. Verified by `test_failed_table_read_during_check_returns_503_and_saves_nothing`.
+  4. **Size-safe rows (`src/services/watchlist_store.py`, `supabase/migrations/watchlist_checks.sql`):** raised SQL `result` check constraint to `<= 32768` bytes; `build_db_check_rows` trims `new_pages`/`removed_pages`/`price_changes` until UTF-8 JSON `<= 30,000` bytes and `snapshot.pages` until `<= 60,000` bytes (`loc` already capped at 500 chars by `normalize_competitor_url`). Verified by `test_oversized_30_pages_and_45_changes_trim_to_size_safe_rows` and `tests/watchlist_sql.mjs` (24 KB `result` accepted, > 32 KB refused).
+  5. **`last_auto_check_at` only when something was checked (`supabase/migrations/watchlist_checks.sql`):** `muse_watchlist_save` stamps `last_auto_check_at = now()` only when `p_source = 'auto' and v_saved > 0`. Verified in `tests/watchlist_sql.mjs`.
+- **Mutation checks (all 5 confirmed failing, then restored):**
+  1. Swallow `SupabaseError` in `is_email_confirmed` returning `False` → `pytest -q tests/test_auto_watchlist.py -k "auth_lookup_error"` failed (`FAILED test_auth_lookup_error_raises_and_never_prunes_rows`).
+  2. Drop `(s.claimed_until is not null) asc,` in `muse_watchlist_claim_due` → `node tests/watchlist_sql.mjs` failed (`AssertionError: Expected values to be strictly equal`).
+  3. Allow failed table read in `POST /api/v1/competitors/check` to fall back instead of 503 → `pytest -q tests/test_auto_watchlist.py -k "failed_table_read"` failed (`FAILED test_failed_table_read_during_check_returns_503_and_saves_nothing`).
+  4. Skip `_trim_result_to_budget` in `build_db_check_rows` → `pytest -q tests/test_auto_watchlist.py -k "oversized_30_pages"` failed (`FAILED test_oversized_30_pages_and_45_changes_trim_to_size_safe_rows`).
+  5. Drop `and v_saved > 0` in `muse_watchlist_save` → `node tests/watchlist_sql.mjs` failed (`AssertionError: Expected values to be strictly equal`).
+- **Verification results (Nov 24):**
+  - `BILLING_PGLITE_DIR=/Users/nav/muse-tools/pglite/node_modules/@electric-sql/pglite node tests/watchlist_sql.mjs`: **6 watchlist SQL checks passed**.
+  - Node contracts: **10/10 passed** (plus `portal_demo_smoke.cjs` via pytest).
+  - Full gate (`make check` with PGlite enabled): `ruff check .` passed; `ruff format --check .` (331 files formatted); **788 passed, 0 failed, 0 skipped** (5m 27s).
+  - `tests/launch_account_audit.py`: **27 passed, 0 failed**.
+  - `tests/launch_browser_audit.py`: **20 passed, 0 failed**.
+
 Ownership released.
