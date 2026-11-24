@@ -15,7 +15,7 @@ create table if not exists muse_private.watchlist_checks (
     error text not null default '' check (length(error) <= 300),
     partial boolean not null default false,
     result jsonb not null default '{}'::jsonb
-        check (jsonb_typeof(result) = 'object' and octet_length(result::text) <= 16384),
+        check (jsonb_typeof(result) = 'object' and octet_length(result::text) <= 32768),
     snapshot jsonb not null default '{}'::jsonb
         check (jsonb_typeof(snapshot) = 'object' and octet_length(snapshot::text) <= 65536),
     updated_at timestamptz not null default now(),
@@ -184,7 +184,7 @@ begin
     values (
         p_user_id,
         now() + interval '7 days',
-        case when p_source = 'auto' then now() else null end,
+        case when p_source = 'auto' and v_saved > 0 then now() else null end,
         null,
         false,
         now()
@@ -192,7 +192,7 @@ begin
     on conflict (user_id) do update set
         next_check_at = now() + interval '7 days',
         last_auto_check_at = case
-            when p_source = 'auto' then now()
+            when p_source = 'auto' and v_saved > 0 then now()
             else muse_private.watchlist_schedule.last_auto_check_at
         end,
         claimed_until = null,
@@ -228,14 +228,14 @@ begin
     on conflict (user_id) do nothing;
 
     with due as (
-        select s.user_id
+        select s.user_id, (s.claimed_until is not null) as had_lease, s.next_check_at
         from muse_private.watchlist_schedule s
         join public.muse_workspaces w on w.user_id = s.user_id
         where not s.paused
           and s.next_check_at <= now()
           and (s.claimed_until is null or s.claimed_until < now())
           and nullif(trim(coalesce(w.document->'onboarding'->>'completed_at', '')), '') is not null
-        order by s.next_check_at asc, s.user_id asc
+        order by (s.claimed_until is not null) asc, s.next_check_at asc, s.user_id asc
         limit v_limit
         for update of s skip locked
     ),
@@ -245,7 +245,7 @@ begin
             updated_at = now()
         from due
         where s.user_id = due.user_id
-        returning s.user_id, s.next_check_at
+        returning s.user_id, due.had_lease, s.next_check_at
     )
     select coalesce(
         jsonb_agg(
@@ -257,7 +257,7 @@ begin
                     coalesce(w.document->'preferences'->'competitor_entries', '[]'::jsonb)
                 )
             )
-            order by c.next_check_at asc, c.user_id asc
+            order by c.had_lease asc, c.next_check_at asc, c.user_id asc
         ),
         '[]'::jsonb
     )

@@ -23,6 +23,7 @@ from src.clients.ad_library import (
     load_sample_ad_library_signals,
 )
 from src.clients.meta import MetaAPIError
+from src.clients.supabase import SupabaseError
 from src.config import Settings, get_settings
 from src.models.intel import (
     CompetitorAdSignalsResponse,
@@ -39,7 +40,9 @@ from src.models.seller import (
 from src.services import demo, result_cache, scan_guard, watchlist_store
 from src.services.accounts import load_workspace, resolve_account, save_workspace
 from src.services.competitor_checks import (
+    MAX_COMPETITORS_PER_CHECK,
     MAX_PAGES_PER_COMPETITOR,
+    PER_SITE_CRAWL_TIMEOUT_SECONDS,
     compute_top_insight,
     extract_selected_competitors,
     normalize_competitor_url,
@@ -334,7 +337,9 @@ class WatchlistAutoCheckRequest(BaseModel):
     paused: bool
 
 
-WATCHLIST_RUN_BUDGET_SECONDS = 200.0
+WATCHLIST_RUN_MAX_SECONDS = 280.0
+WATCHLIST_WORST_CASE_SELLER_SECONDS = MAX_COMPETITORS_PER_CHECK * PER_SITE_CRAWL_TIMEOUT_SECONDS
+WATCHLIST_RUN_BUDGET_SECONDS = WATCHLIST_RUN_MAX_SECONDS - WATCHLIST_WORST_CASE_SELLER_SECONDS
 WATCHLIST_LEASE_SECONDS = 600
 
 
@@ -494,7 +499,20 @@ async def check_own_competitors(
     )
 
     if use_table:
-        table_data = await watchlist_store.get_checks(account.user_id, with_snapshots=True)
+        try:
+            table_data = await watchlist_store.get_checks(
+                account.user_id, with_snapshots=True, raise_on_error=True
+            )
+        except SupabaseError as err:
+            raise HTTPException(
+                status_code=503,
+                detail="Muse couldn't check your watchlist right now. Try again in a few minutes.",
+            ) from err
+        if table_data is None:
+            raise HTTPException(
+                status_code=503,
+                detail="Muse couldn't check your watchlist right now. Try again in a few minutes.",
+            )
         existing_checks = _merge_previous_snapshots(table_data, legacy_checks)
     else:
         existing_checks = legacy_checks
@@ -626,7 +644,11 @@ async def run_scheduled_watchlist_checks(
                 if isinstance(doc.get("preferences"), dict)
                 else None
             )
-            table_data = await watchlist_store.get_checks(user_id, with_snapshots=True)
+            table_data = await watchlist_store.get_checks(
+                user_id, with_snapshots=True, raise_on_error=True
+            )
+            if table_data is None:
+                raise RuntimeError("Watchlist table read unavailable")
             existing_checks = _merge_previous_snapshots(table_data, legacy_checks)
 
             checked_at = now_iso_utc()

@@ -8,6 +8,7 @@ diff summaries. Zero Muse calls and zero runs used.
 
 from __future__ import annotations
 
+import asyncio
 import re
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
@@ -24,6 +25,7 @@ MAX_CHANGES_PER_KIND = 15
 MAX_TITLE_LENGTH = 140
 MAX_PRICE_HINT_LENGTH = 40
 MAX_URL_LENGTH = 500
+PER_SITE_CRAWL_TIMEOUT_SECONDS = 20.0
 
 
 def normalize_competitor_url(raw_url: str) -> str:
@@ -496,6 +498,7 @@ async def run_watchlist_checks(
     scan_url_fn: Callable[[str], tuple[str, str, bool]],
     collect_entries_fn: Callable[..., Awaitable[tuple[list[SitemapEntry], list[str]]]],
     source: Literal["manual", "auto"] = "manual",
+    per_site_timeout: float = PER_SITE_CRAWL_TIMEOUT_SECONDS,
 ) -> tuple[list[dict[str, Any]], dict[str, dict[str, Any]], int]:
     """Check up to 6 selected competitors through scan_guard + collect_entries and diff snapshots.
 
@@ -530,12 +533,15 @@ async def run_watchlist_checks(
             continue
 
         try:
-            entries, _sitemaps = await scan_guard.crawl(
-                normalized,
-                MAX_PAGES_PER_COMPETITOR,
-                lambda target=normalized: collect_entries_fn(
-                    target, max_urls=MAX_PAGES_PER_COMPETITOR
+            entries, _sitemaps = await asyncio.wait_for(
+                scan_guard.crawl(
+                    normalized,
+                    MAX_PAGES_PER_COMPETITOR,
+                    lambda target=normalized: collect_entries_fn(
+                        target, max_urls=MAX_PAGES_PER_COMPETITOR
+                    ),
                 ),
+                timeout=per_site_timeout,
             )
             total_pages_fetched += len(entries)
             pages = entries_to_snapshot_pages(entries)
@@ -559,6 +565,16 @@ async def run_watchlist_checks(
                     # The crawl stops at the cap, so a full window means a bigger site.
                     truncated=len(entries) >= MAX_PAGES_PER_COMPETITOR,
                 )
+        except TimeoutError:
+            err_kind, err_msg = classify_check_error("timed out")
+            item_res, stored = error_competitor_result(
+                prev,
+                name=name,
+                url=key,
+                checked_at=checked_at,
+                error_kind=err_kind,
+                error_message=err_msg,
+            )
         except Exception as err:
             err_kind, err_msg = classify_check_error(err)
             item_res, stored = error_competitor_result(

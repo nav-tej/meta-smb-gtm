@@ -7,6 +7,7 @@ is off, nothing here calls Supabase.
 
 from __future__ import annotations
 
+import json
 import logging
 from typing import Any, Literal
 
@@ -15,6 +16,10 @@ from src.config import get_settings
 from src.services.competitor_checks import MAX_STORED_PAGES_PER_COMPETITOR, normalize_competitor_url
 
 logger = logging.getLogger(__name__)
+
+# Margins under SQL's 32,768-byte result cap and 65,536-byte snapshot cap.
+MAX_RESULT_JSON_BYTES = 30_000
+MAX_SNAPSHOT_JSON_BYTES = 60_000
 
 
 def auto_check_enabled() -> bool:
@@ -48,11 +53,18 @@ def _normalize_table_checks(raw_checks: Any) -> dict[str, dict[str, Any]]:
     return by_url
 
 
-async def get_checks(user_id: str, *, with_snapshots: bool = False) -> dict[str, Any] | None:
+async def get_checks(
+    user_id: str,
+    *,
+    with_snapshots: bool = False,
+    raise_on_error: bool = False,
+) -> dict[str, Any] | None:
     """Read one seller's saved watchlist checks and schedule from Supabase.
 
-    Returns None when the feature flag is off or the table is unavailable, so callers
-    can fall back cleanly to legacy `preferences.competitor_checks`.
+    For display reads (`raise_on_error=False`), returns None when the flag is off or
+    the table is unavailable so callers can fall back to legacy workspace data.
+    For check/write reads (`raise_on_error=True`), raises `SupabaseError` on failure
+    so callers never silently overwrite real baselines as "First check".
     """
     if not auto_check_enabled():
         return None
@@ -63,6 +75,8 @@ async def get_checks(user_id: str, *, with_snapshots: bool = False) -> dict[str,
         )
     except SupabaseError as err:
         logger.warning("Watchlist store get_checks unavailable (HTTP %s)", err.status_code)
+        if raise_on_error:
+            raise
         return None
 
     sched_raw = data.get("schedule") if isinstance(data.get("schedule"), dict) else {}
@@ -115,11 +129,12 @@ async def set_paused(user_id: str, paused: bool) -> dict[str, Any]:
 
 
 async def is_email_confirmed(user_id: str) -> bool:
-    """Check `email_confirmed_at` via the Supabase Auth admin API (read-only, never logged)."""
-    try:
-        data = await get_supabase_client().auth(f"admin/users/{user_id}", method="GET", secret=True)
-    except SupabaseError:
-        return False
+    """Check `email_confirmed_at` via the Supabase Auth admin API (read-only, never logged).
+
+    Raises `SupabaseError` on lookup failure so a transient Auth outage never deletes
+    a seller's saved watchlist rows.
+    """
+    data = await get_supabase_client().auth(f"admin/users/{user_id}", method="GET", secret=True)
     return bool(str(data.get("email_confirmed_at") or "").strip())
 
 
@@ -135,6 +150,37 @@ async def load_workspace_document(user_id: str) -> dict[str, Any] | None:
     return doc if isinstance(doc, dict) else None
 
 
+def _json_byte_len(obj: Any) -> int:
+    return len(json.dumps(obj, separators=(",", ":"), ensure_ascii=False).encode("utf-8"))
+
+
+def _trim_result_to_budget(result: dict[str, Any], max_bytes: int) -> dict[str, Any]:
+    trimmed = dict(result)
+    for key in ("new_pages", "removed_pages", "price_changes"):
+        if isinstance(trimmed.get(key), list):
+            trimmed[key] = list(trimmed[key])
+    while _json_byte_len(trimmed) > max_bytes:
+        candidates = [
+            k
+            for k in ("new_pages", "removed_pages", "price_changes")
+            if isinstance(trimmed.get(k), list) and trimmed[k]
+        ]
+        if not candidates:
+            break
+        longest = max(candidates, key=lambda k: len(trimmed[k]))
+        trimmed[longest].pop()
+    return trimmed
+
+
+def _trim_snapshot_to_budget(snapshot: dict[str, Any], max_bytes: int) -> dict[str, Any]:
+    trimmed = dict(snapshot)
+    pages = list(trimmed.get("pages") or []) if isinstance(trimmed.get("pages"), list) else []
+    trimmed["pages"] = pages
+    while pages and _json_byte_len(trimmed) > max_bytes:
+        pages.pop()
+    return trimmed
+
+
 def build_db_check_rows(
     results: list[dict[str, Any]],
     stored_by_url: dict[str, dict[str, Any]],
@@ -147,7 +193,18 @@ def build_db_check_rows(
             continue
         stored = stored_by_url.get(site_url) or {}
         pages = stored.get("pages") if isinstance(stored.get("pages"), list) else []
-        display_result = {k: v for k, v in item.items() if k != "pages"}
+        display_result = _trim_result_to_budget(
+            {k: v for k, v in item.items() if k != "pages"},
+            MAX_RESULT_JSON_BYTES,
+        )
+        snapshot_obj = _trim_snapshot_to_budget(
+            {
+                "pages": pages[:MAX_STORED_PAGES_PER_COMPETITOR],
+                "checked_at": str(stored.get("checked_at") or item.get("checked_at") or ""),
+                "partial": bool(stored.get("partial", item.get("partial", False))),
+            },
+            MAX_SNAPSHOT_JSON_BYTES,
+        )
         rows.append(
             {
                 "site_url": site_url,
@@ -157,11 +214,7 @@ def build_db_check_rows(
                 "error": str(item.get("error") or "")[:300],
                 "partial": bool(item.get("partial", False)),
                 "result": display_result,
-                "snapshot": {
-                    "pages": pages[:MAX_STORED_PAGES_PER_COMPETITOR],
-                    "checked_at": str(stored.get("checked_at") or item.get("checked_at") or ""),
-                    "partial": bool(stored.get("partial", item.get("partial", False))),
-                },
+                "snapshot": snapshot_obj,
             }
         )
     return rows

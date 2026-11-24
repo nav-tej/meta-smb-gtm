@@ -175,7 +175,41 @@ try {
     assert.equal(afterPrune.checks[0].status, 'unchanged');
   });
 
-  await test('size caps refuse oversized snapshot, summary, error, and site_url', async () => {
+  await test('expired lease is claimed after a fresh due seller, and empty auto save does not stamp last_auto_check_at', async () => {
+    await seedUser(U1, { onboarding: { completed_at: '2026-11-20T00:00:00Z' } });
+    await seedUser(U2, { onboarding: { completed_at: '2026-11-21T00:00:00Z' } });
+
+    // U1 is older due (-2 days) but has a leftover expired lease (-1 hour).
+    // U2 is fresher due (-1 hour) with no leftover lease (claimed_until is null).
+    await db.query(
+      `insert into muse_private.watchlist_schedule (user_id, next_check_at, claimed_until, paused)
+       values ($1, now() - interval '2 days', now() - interval '1 hour', false),
+              ($2, now() - interval '1 hour', null, false)`,
+      [U1, U2],
+    );
+
+    const firstClaim = await call('public.muse_watchlist_claim_due(1, 600)');
+    assert.equal(firstClaim.sellers.length, 1);
+    assert.equal(firstClaim.sellers[0].user_id, U2);
+
+    const secondClaim = await call('public.muse_watchlist_claim_due(1, 600)');
+    assert.equal(secondClaim.sellers.length, 1);
+    assert.equal(secondClaim.sellers[0].user_id, U1);
+
+    // Empty auto save (e.g. unconfirmed or 0 competitors) pushes next_check_at out
+    // WITHOUT stamping last_auto_check_at
+    const emptyAuto = await call('public.muse_watchlist_save($1, $2, $3::jsonb, $4)', [
+      U2,
+      'auto',
+      '[]',
+      [],
+    ]);
+    assert.equal(emptyAuto.saved, 0);
+    assert.equal(emptyAuto.last_auto_check_at, null);
+    assert.ok(new Date(emptyAuto.next_check_at).getTime() > Date.now() + 6 * 86400 * 1000);
+  });
+
+  await test('size caps allow 24 KB result (up to 32 KB) and refuse oversized snapshot, result, summary, error, and site_url', async () => {
     await seedUser(U1, { onboarding: { completed_at: '2026-11-20T00:00:00Z' } });
     const baseCheck = {
       site_url: 'https://alpha.example',
@@ -187,6 +221,27 @@ try {
       result: { name: 'Alpha' },
       snapshot: { pages: [] },
     };
+
+    // 24 KB result saves cleanly under the raised 32 KB cap
+    const ok24k = await call('public.muse_watchlist_save($1, $2, $3::jsonb, $4)', [
+      U1,
+      'manual',
+      JSON.stringify([{ ...baseCheck, result: { blob: 'r'.repeat(24000) } }]),
+      ['https://alpha.example'],
+    ]);
+    assert.equal(ok24k.saved, 1);
+
+    // Oversized result (> 32768 bytes) refused
+    await db.exec('savepoint cap_result');
+    await assert.rejects(
+      call('public.muse_watchlist_save($1, $2, $3::jsonb, $4)', [
+        U1,
+        'manual',
+        JSON.stringify([{ ...baseCheck, result: { blob: 'r'.repeat(33000) } }]),
+        ['https://alpha.example'],
+      ]),
+    );
+    await db.exec('rollback to savepoint cap_result');
 
     // Oversized snapshot (> 65536 bytes)
     await db.exec('savepoint cap_snap');
