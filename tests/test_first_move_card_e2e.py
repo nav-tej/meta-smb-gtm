@@ -170,6 +170,25 @@ def test_first_move_card_e2e(live_server_url: str) -> None:
                     assert "Mountain Pottery Studio" in context, context
                     assert "Speckled stoneware mug" in context and "$28-$64" in context, context
                     assert "Sikh" not in context and "artist" not in context, context
+                    # The row's own button reads the site too, never the row's Meta Ad Library
+                    # link, even when the row has lost its saved address. (Nov 24: production
+                    # sent the Ad Library search for a watched competitor and hit robots.txt.)
+                    row_btn = page.locator("#sellerList .js-live-brief").first
+                    with page.expect_request(lambda r: "analyze-competitors" in r.url,
+                                             timeout=20000):
+                        row_btn.click()
+                    page.wait_for_timeout(300)
+                    assert s["analyzed"][-1]["competitor_url"] == "https://kilnrow.example", (
+                        s["analyzed"])
+                    page.evaluate(
+                        "document.querySelector('#sellerList .jr-seller')"
+                        ".removeAttribute('data-url')")
+                    with page.expect_request(lambda r: "analyze-competitors" in r.url,
+                                             timeout=20000):
+                        row_btn.click()
+                    page.wait_for_timeout(300)
+                    assert "facebook.com" not in s["analyzed"][-1]["competitor_url"], (
+                        s["analyzed"])
                 assert not errors, errors
                 ctx.close()
 
