@@ -1,5 +1,53 @@
 # Argon brief: the seller's own videos become their next post (Nov 23)
 
+## Handoff to Antigravity (Nov 23, evening): Argon ran out of usage
+
+Claude checked the branches at 18:40. Where things stand:
+- **Part A exists twice.** `gemini/youtube-links-nov23` (`c6e88df`, Antigravity, from the earlier
+  version of this brief) is tested and gated: 44 unit and route tests, Chromium E2E, 807 passed,
+  both audits. `argon/youtube-videos-nov23` (`0b92018`) is a rewrite of it with no tests.
+- **Part B exists only as uncommitted edits** in `/Users/nav/muse-worktrees/youtube-videos`.
+  Read them with `git -C /Users/nav/muse-worktrees/youtube-videos diff`. Do not edit, commit or
+  clean that worktree; it is Argon's.
+
+Finish on your own branch: `gemini/youtube-links-nov23` in `/Users/nav/muse-worktrees/youtube-links`.
+First push `gemini/auto-watchlist-nov23` with its report. Then merge
+`origin/claude/ux-gap-ad-loop-nov17` into your YouTube branch and do the following.
+
+1. Port three things from Argon's Part A:
+   - The channel hint from brief item 3, which your branch lacks: `youtube_handle` from
+     `onboarding.socials` and "Paste links from your channel".
+   - The host check after redirects.
+   - `m.youtu.be`.
+
+   Do not port Argon's change that makes `GET /api/v1/seller-memory` return
+   `_dump_preserving_workspace_extras` preferences. It would add unknown preference keys to every
+   memory load, including `competitor_checks` snapshots of up to 64 KB per site.
+2. Port Part B (items 4 to 6 below) from Argon's diff, with these fixes:
+   - `_select_undismissed_video`: drop the substring rule (`title_lower in sig_title`). A video
+     titled "Art" would be hidden by any dismissed move whose title contains "art". Match only the
+     exact move title, the shell's `actionId` of that title, or `move-share-video:<video_id>`.
+   - `creator.js`: apply the handoff link only when `recommendation_id` is `move-share-video`.
+     Argon's version writes `offers[destination]` for any handoff that carries a link, which can
+     replace the seller's saved offer link.
+   - `seller-memory.js` `isVideoMoveOverride`: never overwrite a field the seller edited
+     (`dataset.smUserEdited`).
+   - Keep the full watch URL in the editor defaults. The move's action sentence can say "link to
+     the video" instead of printing the URL, which runs long at 375 px.
+3. Versions: bump `seller-memory.js` to `20261124-ag2`, since your branch already uses `-ag1` for
+   it. Bump `creator.js` to `20261124-ag1` if you change it.
+4. Tests:
+   - The Part B unit tests listed below, plus a `/seller-memory/recommend` route test and an
+     `_own_brief` test with saved videos.
+   - Extend your E2E: paste two links, see the move on `/today`, open `/create` and see the title
+     and link. The sample shows none of it.
+   - Run all three mutation checks, including "offer the video move to the sample artist".
+5. Report: add a "Part B" section to `ANTIGRAVITY_YOUTUBE_LINKS_NOV23.md`. Say what you took from
+   Argon, what you dropped and why, and the gate results.
+
+`daily_brief.py` is also edited by your auto-watchlist branch, in a different function
+(`_own_watch_items`). Leave that function alone here.
+
 Coordinator: Claude. Nav assigned this to Argon on Nov 23. Report:
 `docs/launch/ARGON_YOUTUBE_VIDEOS_NOV23.md`.
 Base: `origin/claude/ux-gap-ad-loop-nov17` (the commit that adds this brief, or later).
