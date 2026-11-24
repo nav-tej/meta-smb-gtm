@@ -103,7 +103,7 @@ class RecommendRequest(BaseModel):
     draft_override: dict[str, Any] | None = None
     dismiss_signals: list[DismissSignal] = Field(default_factory=list)
     previous_top_id: str | None = Field(default=None, max_length=120)
-    content_videos: list[dict[str, Any]] | None = None
+    content_videos: list[dict[str, Any]] | None = Field(default=None, max_length=5)
 
 
 _BUSINESS_TYPES: dict[str, BusinessType] = {

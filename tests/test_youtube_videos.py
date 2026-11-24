@@ -719,3 +719,241 @@ def test_recommend_route_and_own_brief_include_saved_video_move(
         brief_vid.recommendation["editor_defaults"]["destination_url"]
         == f"https://www.youtube.com/watch?v={VID_1}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Review fixes (Nov 24): actionId UTF-16 parity, destination "other" + offer
+# preservation, and RecommendRequest.content_videos cap at 5
+# ---------------------------------------------------------------------------
+
+import re as _re  # noqa: E402
+import shutil as _shutil  # noqa: E402
+import subprocess as _subprocess  # noqa: E402
+from pathlib import Path as _Path  # noqa: E402
+
+_REPO_ROOT = _Path(__file__).resolve().parents[1]
+
+
+def test_js_action_id_matches_muse_shell_js_via_node() -> None:
+    node = _shutil.which("node")
+    assert node is not None, "node is required for muse-shell.js parity test"
+
+    shell_src = (_REPO_ROOT / "src/api/static/muse-shell.js").read_text(encoding="utf-8")
+    action_match = _re.search(r"const actionId\s*=\s*\(text\)\s*=>\s*\{[^\n]+\};", shell_src)
+    assert action_match is not None, "Could not locate actionId definition in muse-shell.js"
+    title_match = _re.search(
+        r"return\s*\([^)]+\)\.trim\(\)\.replace\(/\\s\+/g,\s*' '\)\.slice\(0,\s*120\);",
+        shell_src,
+    )
+    assert title_match is not None, "Could not locate itemTitle normalization in muse-shell.js"
+
+    cases = [
+        "Share your video “Studio tour” as a post",
+        "Share your video “Glaze day 🔥 new mugs” as a post",
+        ("A" * 119) + "🔥" + "tail after 120 UTF-16 units",
+        ("B" * 118) + "🔥" + "exact boundary",
+        "  Share   your\t\nvideo  “Test”  as a post  ",
+        "Share your video “Q4’s ‘Best’ Launch” as a post",
+    ]
+    js_script = f"""
+    {action_match.group(0)}
+    const normalizeTitle = (s) => s.trim().replace(/\\s+/g, ' ').slice(0, 120);
+    const cases = {json.dumps(cases)};
+    console.log(JSON.stringify(cases.map((t) => actionId(normalizeTitle(t)))));
+    """
+    proc = _subprocess.run([node, "-e", js_script], capture_output=True, text=True, check=True)
+    js_ids = json.loads(proc.stdout)
+    py_ids = [_js_action_id(t) for t in cases]
+    assert py_ids == js_ids
+    # Confirmed value from Claude's review for the emoji title
+    assert py_ids[1] == "a17tqlor"
+
+    # End-to-end dismissal with shell signal {id, reason, at} (no title) on emoji title
+    emoji_title = "Glaze day 🔥 new mugs"
+    move_title = f"Share your video “{emoji_title}” as a post"
+    pref = SellerPreferences(access=AccessPreferences(minutes_per_week=60, channels=["instagram"]))
+    res = rank_seller_recommendations(
+        business_name="Cedar Kiln",
+        business_type="products",
+        preferences=pref,
+        content_videos=[
+            {
+                "video_id": VID_1,
+                "title": emoji_title,
+                "author_name": "Cedar Kiln",
+                "added_at": "2026-11-23T12:00:00Z",
+            }
+        ],
+        dismiss_signals=[DismissSignal(id=_js_action_id(move_title), title="")],
+    )
+    assert all(m["id"] != "move-share-video" for m in res["recommendations"])
+
+
+def test_video_move_uses_other_destination_and_preserves_website_offer_link() -> None:
+    # 1. Ranker editor defaults set destination="other" for move-share-video
+    pref = SellerPreferences(
+        goal="Grow visits",
+        access=AccessPreferences(minutes_per_week=60, channels=["instagram", "website"]),
+    )
+    res = rank_seller_recommendations(
+        business_name="Northstar Advisory",
+        business_type="services",
+        preferences=pref,
+        content_videos=[
+            {
+                "video_id": VID_1,
+                "title": "How we scope retainers",
+                "author_name": "Northstar Advisory",
+                "added_at": "2026-11-23T12:00:00Z",
+            }
+        ],
+    )
+    vid_move = next(m for m in res["recommendations"] if m["id"] == "move-share-video")
+    assert vid_move["editor_defaults"]["destination"] == "other"
+
+    # 2. In creator.js: website link X survives opening video move then another website move
+    node = _shutil.which("node")
+    assert node is not None
+    creator_js_path = str(_REPO_ROOT / "src/api/static/creator.js")
+    js_test = f"""
+    const fs = require('node:fs');
+    const vm = require('node:vm');
+    const assert = require('node:assert/strict');
+
+    const els = new Map();
+    const makeEl = (id) => ({{
+      id,
+      value: '',
+      textContent: '',
+      innerHTML: '',
+      hidden: false,
+      checked: false,
+      disabled: false,
+      style: {{}},
+      dataset: {{}},
+      options: [],
+      classList: {{ toggle() {{}}, add() {{}}, remove() {{}} }},
+      setAttribute() {{}},
+      removeAttribute() {{}},
+      getAttribute() {{ return ''; }},
+      addEventListener() {{}},
+      querySelector() {{ return null; }},
+      querySelectorAll() {{ return []; }},
+      appendChild() {{}},
+      append() {{}},
+      focus() {{}},
+      scrollIntoView() {{}},
+      replaceChildren() {{}},
+    }});
+    const getEl = (id) => {{
+      if (!els.has(id)) els.set(id, makeEl(id));
+      return els.get(id);
+    }};
+    const storage = new Map();
+    const ctx = {{
+      console,
+      URL,
+      URLSearchParams,
+      setTimeout: () => 0,
+      clearTimeout() {{}},
+      fetch: async () => ({{
+        ok: false, status: 500, json: async () => ({{}}), text: async () => '',
+      }}),
+      localStorage: {{
+        getItem: (k) => (storage.has(k) ? storage.get(k) : null),
+        setItem: (k, v) => storage.set(k, String(v)),
+        removeItem: (k) => storage.delete(k),
+      }},
+      location: {{ pathname: '/create', search: '?workspace=own', hash: '' }},
+      document: {{
+        readyState: 'loading',
+        documentElement: {{ getAttribute: () => 'account_own', dataset: {{}} }},
+        getElementById: getEl,
+        querySelector: (sel) => makeEl(sel),
+        querySelectorAll: () => [],
+        createElement: () => makeEl('dyn'),
+        addEventListener() {{}},
+      }},
+      window: null,
+    }};
+    ctx.window = ctx;
+    const src = fs.readFileSync({json.dumps(creator_js_path)}, 'utf8').replace(
+      /\\}}\\)\\(\\)\\s*;?\\s*$/,
+      '; window.__test = {{ state, offers, applyRecommendationHandoff }}; }})();',
+    );
+    vm.runInNewContext(src, ctx);
+
+    const {{ state, offers, applyRecommendationHandoff }} = ctx.__test;
+    const websiteLink = 'https://northstar.test/services';
+    state.custom = true;
+    state.workspace = 'custom';
+    state.product.destination = 'website';
+    state.product.link = websiteLink;
+    state.product.price = '$500';
+    offers.website = {{ link: websiteLink, price: '$500' }};
+
+    // Open video move -> Other link gets watch URL, website offer stays intact
+    applyRecommendationHandoff({{
+      recommendation_id: 'move-share-video',
+      title: 'Share your video “How we scope retainers” as a post',
+      business_name: 'Northstar Advisory',
+      product_name: 'How we scope retainers',
+      destination: 'other',
+      destination_url: 'https://www.youtube.com/watch?v={VID_1}',
+      channel: 'instagram',
+      goal: 'story',
+    }});
+    assert.equal(state.product.destination, 'other');
+    assert.equal(state.product.link, 'https://www.youtube.com/watch?v={VID_1}');
+    assert.equal(offers.website.link, websiteLink);
+
+    // Open another move targeting website -> link restores to websiteLink
+    applyRecommendationHandoff({{
+      recommendation_id: 'move-services-intro',
+      title: 'Introduce your advisory offer',
+      business_name: 'Northstar Advisory',
+      product_name: 'Advisory Retainer',
+      destination: 'website',
+      channel: 'instagram',
+      goal: 'visit',
+    }});
+    assert.equal(state.product.destination, 'website');
+    assert.equal(state.product.link, websiteLink);
+    assert.equal(offers.website.link, websiteLink);
+    console.log('CREATOR_HANDOFF_OFFER_OK');
+    """
+    proc = _subprocess.run([node, "-e", js_test], capture_output=True, text=True, check=False)
+    assert proc.returncode == 0, f"STDOUT:\n{proc.stdout}\nSTDERR:\n{proc.stderr}"
+    assert "CREATOR_HANDOFF_OFFER_OK" in proc.stdout
+
+
+def test_recommend_route_caps_content_videos_at_five(
+    yt_route_harness: SimpleNamespace,
+) -> None:
+    make_vid = lambda i: {  # noqa: E731
+        "video_id": f"VidCap0000{i}",
+        "title": f"Video {i}",
+        "author_name": "Northstar",
+        "added_at": "2026-11-23T12:00:00Z",
+    }
+    res_six = yt_route_harness.client.post(
+        "/api/v1/seller-memory/recommend",
+        headers={"X-Test-Auth": "verified"},
+        json={
+            "business_name": "Northstar Advisory",
+            "business_type": "services",
+            "content_videos": [make_vid(i) for i in range(6)],
+        },
+    )
+    assert res_six.status_code == 422
+
+    res_five = yt_route_harness.client.post(
+        "/api/v1/seller-memory/recommend",
+        headers={"X-Test-Auth": "verified"},
+        json={
+            "business_name": "Northstar Advisory",
+            "business_type": "services",
+            "content_videos": [make_vid(i) for i in range(5)],
+        },
+    )
+    assert res_five.status_code == 200

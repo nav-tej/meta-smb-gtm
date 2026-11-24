@@ -1198,10 +1198,19 @@ def _to_base36(num: int) -> str:
 
 
 def _js_action_id(text: str) -> str:
-    cleaned = re.sub(r"\s+", " ", text.strip())[:120]
+    """Mirror `muse-shell.js` `actionId(itemTitle(item))`: UTF-16 120-unit slice + first unit."""
+    cleaned = re.sub(r"\s+", " ", text.strip())
+    raw = cleaned.encode("utf-16-le")
+    units = [int.from_bytes(raw[i : i + 2], "little") for i in range(0, len(raw), 2)][:120]
     h = 0
-    for ch in cleaned:
-        h = (h * 31 + ord(ch)) & 0xFFFFFFFF
+    i = 0
+    while i < len(units):
+        unit = units[i]
+        h = (h * 31 + unit) & 0xFFFFFFFF
+        if 0xD800 <= unit <= 0xDBFF and i + 1 < len(units) and 0xDC00 <= units[i + 1] <= 0xDFFF:
+            i += 2
+        else:
+            i += 1
     return f"a{_to_base36(h)}"
 
 
@@ -1296,13 +1305,14 @@ def _build_editor_defaults_for_move(
     )
     move_video_title = str(move.get("video_title") or "").strip() if move else ""
     move_dest_url = str(move.get("destination_url") or "").strip() if move else ""
+    is_video_move = bool(move and move.get("id") == "move-share-video")
     defaults: dict[str, Any] = {
         "recommendation_id": move["id"] if move else None,
         "recommendation_title": move["title"] if move else "",
         "recommendation_action": move["action"] if move else "",
         "business_name": business_name,
         "product_name": move_video_title or effective_product or business_name,
-        "destination": effective_destination or "website",
+        "destination": "other" if is_video_move else (effective_destination or "website"),
         "channel": move["channel"] if move else primary_channel,
         "goal": mapped_goal,
         "cta": move["cta"] if move else "Visit shop",

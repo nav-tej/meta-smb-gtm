@@ -627,23 +627,32 @@
     }
     const isVideoHandoff = (handoff.recommendation_id || handoff.id) === 'move-share-video';
     const handoffLink = isVideoHandoff ? safeLink(handoff.destination_url || handoff.product_link || '') : '';
-    if (handoffLink) {
-      state.product.link = handoffLink;
-    }
-    if (handoff.price_claim !== undefined) {
-      state.product.price = handoff.price_claim || '';
-    }
+    const prevDest = state.product.destination;
     if (handoff.destination) {
+      if (prevDest && (state.product.link || state.product.price) && !offers[prevDest]) {
+        offers[prevDest] = { price: state.product.price || '', link: state.product.link || '' };
+      }
       const destKey = normalizeDestination(handoff.destination);
       state.product.destination = destKey;
+      const savedOffer = offers[destKey] || { price: '', link: '' };
+      state.product.price = savedOffer.price || '';
+      state.product.link = savedOffer.link || '';
       syncDestinationOptions();
       $('promotionDestination').value = destKey;
     }
-    if (handoffLink && state.product.destination) {
-      offers[state.product.destination] = {
-        price: state.product.price || '',
-        link: handoffLink,
-      };
+    if (handoff.price_claim) {
+      state.product.price = handoff.price_claim;
+    } else if (!handoff.destination && handoff.price_claim !== undefined) {
+      state.product.price = handoff.price_claim || '';
+    }
+    if (handoffLink) {
+      state.product.link = handoffLink;
+      if (state.product.destination) {
+        offers[state.product.destination] = {
+          price: state.product.price || '',
+          link: handoffLink,
+        };
+      }
     }
     const mappedGoal = Object.hasOwn(goals, handoff.goal) ? handoff.goal : 'story';
     state.goal = mappedGoal;
