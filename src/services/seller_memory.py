@@ -1182,6 +1182,92 @@ def _parse_excluded_channels_from_text(text: str) -> set[str]:
     return {ch for ch in _KNOWN_CHANNELS if re.search(rf"\b{re.escape(ch)}\b", lower)}
 
 
+_VIDEO_ID_RE = re.compile(r"^[A-Za-z0-9_-]{11}$")
+
+
+def _to_base36(num: int) -> str:
+    if num == 0:
+        return "0"
+    chars = "0123456789abcdefghijklmnopqrstuvwxyz"
+    out: list[str] = []
+    n = num & 0xFFFFFFFF
+    while n:
+        n, rem = divmod(n, 36)
+        out.append(chars[rem])
+    return "".join(reversed(out))
+
+
+def _js_action_id(text: str) -> str:
+    """Mirror `muse-shell.js` `actionId(itemTitle(item))`: UTF-16 120-unit slice + first unit."""
+    cleaned = re.sub(r"\s+", " ", text.strip())
+    raw = cleaned.encode("utf-16-le")
+    units = [int.from_bytes(raw[i : i + 2], "little") for i in range(0, len(raw), 2)][:120]
+    h = 0
+    i = 0
+    while i < len(units):
+        unit = units[i]
+        h = (h * 31 + unit) & 0xFFFFFFFF
+        if 0xD800 <= unit <= 0xDBFF and i + 1 < len(units) and 0xDC00 <= units[i + 1] <= 0xDFFF:
+            i += 2
+        else:
+            i += 1
+    return f"a{_to_base36(h)}"
+
+
+def _select_undismissed_video(
+    raw_videos: list[dict[str, Any]] | None,
+    signals: list[DismissSignal],
+) -> dict[str, str] | None:
+    """Return the newest saved video not dismissed by exact move title, actionId, or video ID."""
+    if not raw_videos:
+        return None
+    for sig in signals:
+        if (sig.id or "").strip().lower() == "move-share-video" and not (sig.title or "").strip():
+            return None
+
+    valid: list[dict[str, str]] = []
+    for item in raw_videos:
+        if not isinstance(item, dict):
+            continue
+        vid = str(item.get("video_id") or "").strip()
+        title = str(item.get("title") or "").strip()[:140]
+        if not _VIDEO_ID_RE.fullmatch(vid) or not title:
+            continue
+        valid.append(
+            {
+                "video_id": vid,
+                "title": title,
+                "author_name": str(item.get("author_name") or "").strip()[:80],
+                "added_at": str(item.get("added_at") or "").strip(),
+            }
+        )
+    if not valid:
+        return None
+
+    valid.sort(key=lambda v: v["added_at"], reverse=True)
+    for video in valid:
+        vid_lower = video["video_id"].lower()
+        move_title = f"Share your video “{video['title']}” as a post"
+        move_title_lower = move_title.lower()
+        act_id_lower = _js_action_id(move_title).lower()
+        dismissed = False
+        for sig in signals:
+            sig_id = (sig.id or "").strip().lower()
+            sig_title = (sig.title or "").strip().lower()
+            if sig_id in {f"move-share-video:{vid_lower}", act_id_lower}:
+                dismissed = True
+                break
+            if sig_title == move_title_lower:
+                dismissed = True
+                break
+            if sig_id == "move-share-video" and (not sig_title or sig_title == move_title_lower):
+                dismissed = True
+                break
+        if not dismissed:
+            return video
+    return None
+
+
 def _build_editor_defaults_for_move(
     *,
     move: dict[str, Any] | None,
@@ -1217,13 +1303,16 @@ def _build_editor_defaults_for_move(
         if (move and move.get("channel") == "facebook") or primary_channel == "facebook"
         else "instagram_feed"
     )
-    return {
+    move_video_title = str(move.get("video_title") or "").strip() if move else ""
+    move_dest_url = str(move.get("destination_url") or "").strip() if move else ""
+    is_video_move = bool(move and move.get("id") == "move-share-video")
+    defaults: dict[str, Any] = {
         "recommendation_id": move["id"] if move else None,
         "recommendation_title": move["title"] if move else "",
         "recommendation_action": move["action"] if move else "",
         "business_name": business_name,
-        "product_name": effective_product or business_name,
-        "destination": effective_destination or "website",
+        "product_name": move_video_title or effective_product or business_name,
+        "destination": "other" if is_video_move else (effective_destination or "website"),
         "channel": move["channel"] if move else primary_channel,
         "goal": mapped_goal,
         "cta": move["cta"] if move else "Visit shop",
@@ -1255,6 +1344,10 @@ def _build_editor_defaults_for_move(
         "placement": move.get("placement", default_placement) if move else default_placement,
         "placement_note": "App export preset (not verified Meta policy)",
     }
+    if move_dest_url:
+        defaults["destination_url"] = move_dest_url
+        defaults["product_link"] = move_dest_url
+    return defaults
 
 
 _SERVICES_INQUIRY_WORDS = ("lead", "client", "inquir", "enquir", "call", "book", "consult")
@@ -1388,6 +1481,7 @@ def rank_seller_recommendations(
     draft_override: dict[str, Any] | None = None,
     dismiss_signals: list[DismissSignal] | None = None,
     previous_top_id: str | None = None,
+    content_videos: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Compute context-aware ranked recommendations, clear explanations, and editor defaults.
 
@@ -1399,6 +1493,13 @@ def rank_seller_recommendations(
     voice = voice_profile or VoiceProfile()
     override = draft_override or {}
     signals = dismiss_signals or []
+    raw_videos = content_videos
+    if raw_videos is None:
+        raw_sources = getattr(pref, "content_sources", None)
+        if isinstance(raw_sources, dict):
+            raw_yt = raw_sources.get("youtube")
+            if isinstance(raw_yt, dict) and isinstance(raw_yt.get("videos"), list):
+                raw_videos = [v for v in raw_yt["videos"] if isinstance(v, dict)]
 
     # Step 1: Resolve draft_override identity scope & ignored entries BEFORE deriving defaults.
     effective_product = str(override.get("product_name") or product_name or "").strip()
@@ -1678,6 +1779,51 @@ def rank_seller_recommendations(
                 }
             )
 
+    if business_type is not None and primary_channel is not None:
+        selected_video = _select_undismissed_video(raw_videos, signals)
+        if selected_video is not None:
+            v_id = selected_video["video_id"]
+            v_title = selected_video["title"]
+            v_watch_url = f"https://www.youtube.com/watch?v={v_id}"
+            channel_title = _channel_name(primary_channel)
+            if business_type == "services":
+                v_action = (
+                    f"Post on {channel_title} about what you cover in “{v_title}”, who the "
+                    "service helps, and link to the video so prospective clients can watch "
+                    "and get in touch."
+                )
+            elif business_type == "both":
+                v_action = (
+                    f"Post on {channel_title} sharing a takeaway from “{v_title}”, how it "
+                    "connects to your products and services, and link to the video."
+                )
+            else:
+                v_action = (
+                    f"Post on {channel_title} introducing what you show in “{v_title}”, "
+                    f"connect it to {subject_label}, and link to the video for buyers "
+                    "who want a closer look."
+                )
+            candidates.append(
+                {
+                    "id": "move-share-video",
+                    "category": "inspiration",
+                    "title": f"Share your video “{v_title}” as a post",
+                    "action": v_action,
+                    "channel": primary_channel,
+                    "goal": "story",
+                    "estimated_minutes": 10,
+                    "base_score": 64.0,
+                    "competitor_used": None,
+                    "competitor_role": None,
+                    "competitor_rationale": "",
+                    "price_claim": "",
+                    "cta": "Watch the video",
+                    "video_id": v_id,
+                    "video_title": v_title,
+                    "destination_url": v_watch_url,
+                }
+            )
+
     already_tried = {
         s.title.lower().strip() for s in signals if s.reason == "already_tried" and s.title
     }
@@ -1690,9 +1836,22 @@ def rank_seller_recommendations(
         reasons: list[str] = []
         used_entries: list[dict[str, str]] = []
 
-        # 1. Competitor role & rationale boost
+        # 1. Competitor role & rationale boost (or saved video grounding)
         cat = move["category"]
-        if cat in {"price_reference", "similar_audience", "inspiration"}:
+        if move["id"] == "move-share-video":
+            reasons.append(
+                f"Uses your saved video “{move['video_title']}” on {_channel_name(move['channel'])}"
+            )
+            used_entries.append(
+                {
+                    "id": f"video:{move['video_id']}",
+                    "label": "Saved YouTube video",
+                    "value": str(move["video_title"]),
+                    "source": "user_input",
+                    "scope": "shop_default",
+                }
+            )
+        elif cat in {"price_reference", "similar_audience", "inspiration"}:
             role_match = comp_by_role.get(cat)  # type: ignore[arg-type]
             if role_match is not None:
                 score += 55.0

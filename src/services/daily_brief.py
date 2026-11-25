@@ -225,6 +225,14 @@ def _own_brief(workspace: dict[str, Any], today: date, now: datetime) -> DailyBr
     if business_type not in {"products", "services", "both"}:
         business_type = None
     pref, voice, competitors, signals = _extract_profile_parts(workspace)
+    raw_prefs = workspace.get("preferences")
+    raw_sources = raw_prefs.get("content_sources") if isinstance(raw_prefs, dict) else None
+    raw_yt = raw_sources.get("youtube") if isinstance(raw_sources, dict) else None
+    content_videos = (
+        [v for v in raw_yt.get("videos", []) if isinstance(v, dict)]
+        if isinstance(raw_yt, dict) and isinstance(raw_yt.get("videos"), list)
+        else None
+    )
     ranked = rank_seller_recommendations(
         business_name=business_name,
         business_type=business_type,
@@ -232,6 +240,7 @@ def _own_brief(workspace: dict[str, Any], today: date, now: datetime) -> DailyBr
         voice_profile=voice,
         competitor_entries=competitors,
         dismiss_signals=signals,
+        content_videos=content_videos,
     )
     moves = [
         DailyMove(

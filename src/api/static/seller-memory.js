@@ -43,6 +43,8 @@
     competitorEntries: [],
     suggestedUpdates: [],
     dismissSignals: [],
+    contentSources: {},
+    youtubeHandle: '',
     draftOverride: null,
     scope: 'draft', // 'draft' | 'shop_default'
     draftId: 'default',
@@ -226,6 +228,8 @@
     state.competitorEntries = [];
     state.suggestedUpdates = [];
     state.dismissSignals = [];
+    state.contentSources = {};
+    state.youtubeHandle = '';
     state.draftOverride = null;
     state.recommendResult = null;
     state.previousTopId = null;
@@ -411,6 +415,12 @@
       state.competitorEntries = res.data.competitor_entries || [];
       state.suggestedUpdates = res.data.suggested_updates || [];
       state.dismissSignals = res.data.dismiss_signals || [];
+      state.contentSources = (res.data.content_sources && typeof res.data.content_sources === 'object')
+        ? res.data.content_sources
+        : {};
+      state.youtubeHandle = typeof res.data.youtube_handle === 'string'
+        ? res.data.youtube_handle
+        : '';
       state.serverBaseline = cloneDeep({
         preferences: state.preferences,
         voiceProfile: state.voiceProfile,
@@ -730,6 +740,9 @@
         preferences: activePref,
         voice_profile: state.voiceProfile || {},
         competitor_entries: state.competitorEntries || [],
+        content_videos: !expectedSample && Array.isArray(state.contentSources?.youtube?.videos)
+          ? state.contentSources.youtube.videos
+          : undefined,
         draft_override: state.draftOverride || null,
         dismiss_signals: state.dismissSignals || [],
         previous_top_id: state.previousTopId || null,
@@ -1861,6 +1874,8 @@
       business_name: moveDef.business_name || state.businessName || '',
       product_name: moveDef.product_name || '',
       destination: moveDef.destination || state.draftOverride?.destination || '',
+      destination_url: moveDef.destination_url || moveDef.product_link || rec?.destination_url || '',
+      product_link: moveDef.product_link || moveDef.destination_url || rec?.destination_url || '',
       price_claim: moveDef.price_claim || rec?.price_claim || '',
       caption_length: moveDef.caption_length || 'medium',
       tone: moveDef.tone || 'neutral',
@@ -2148,6 +2163,148 @@
     facebook: 'Facebook', website: 'Website', email: 'Email', pinterest: 'Pinterest',
   };
 
+  function safeYouTubeWatchUrl(video) {
+    const vid = video && typeof video.video_id === 'string' ? video.video_id.trim() : '';
+    if (!/^[A-Za-z0-9_-]{11}$/.test(vid)) return '';
+    return `https://www.youtube.com/watch?v=${vid}`;
+  }
+
+  function renderYouTubeSourceBlock(parent) {
+    if (isSampleMode() || !state.authenticated) return;
+    const savedYoutube = state.contentSources && typeof state.contentSources.youtube === 'object'
+      ? state.contentSources.youtube
+      : null;
+    const savedVideos = (savedYoutube && Array.isArray(savedYoutube.videos) ? savedYoutube.videos : [])
+      .filter((v) => Boolean(safeYouTubeWatchUrl(v)));
+
+    const wrap = el('div', {
+      id: 'smYouTubeSourceBlock',
+      class: 'sm-youtube-source',
+      style: 'margin-top:10px;padding-top:10px;border-top:1px solid var(--border,#e5e1d8);max-width:100%;box-sizing:border-box;',
+    });
+    wrap.appendChild(el('div', {
+      style: 'font-weight:600;font-size:0.86rem;margin:0 0 4px;',
+    }, 'Your YouTube videos'));
+    wrap.appendChild(el('p', {
+      class: 'sm-sub',
+      style: 'margin:0 0 6px;',
+    }, state.youtubeHandle
+      ? `Muse reads the title of each video you paste. Paste links from your channel (${state.youtubeHandle}).`
+      : 'Muse reads the title of each video you paste.'));
+
+    if (savedVideos.length) {
+      const ul = el('ul', {
+        id: 'smYouTubeVideoList',
+        style: 'margin:0 0 8px;padding-left:18px;font-size:0.84rem;display:grid;gap:4px;',
+      });
+      savedVideos.forEach((video) => {
+        const watchUrl = safeYouTubeWatchUrl(video);
+        if (!watchUrl) return;
+        const li = el('li', { style: 'overflow-wrap:anywhere;' });
+        li.appendChild(el('a', {
+          href: watchUrl,
+          target: '_blank',
+          rel: 'noopener noreferrer',
+          class: 'sm-link',
+        }, String(video.title || 'Untitled video')));
+        if (video.author_name) {
+          li.appendChild(el('span', { class: 'sm-sub' }, ` · ${String(video.author_name)}`));
+        }
+        ul.appendChild(li);
+      });
+      wrap.appendChild(ul);
+    }
+
+    const label = el('label', {
+      for: 'smYouTubeLinksInput',
+      style: 'display:block;font-size:0.82rem;font-weight:600;margin:0 0 4px;',
+    }, 'Paste links to your videos (one per line, up to 5)');
+    const textarea = el('textarea', {
+      id: 'smYouTubeLinksInput',
+      class: 'sm-memory-input',
+      rows: '3',
+      placeholder: 'https://www.youtube.com/watch?v=...\nhttps://youtu.be/...',
+      'aria-label': 'Paste links to your videos (one per line, up to 5)',
+      style: 'width:100%;max-width:100%;box-sizing:border-box;resize:vertical;font-family:inherit;',
+    });
+    textarea.value = savedVideos.map((v) => safeYouTubeWatchUrl(v)).filter(Boolean).join('\n');
+
+    const actions = el('div', { style: 'display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;' });
+    const saveBtn = el('button', {
+      type: 'button',
+      id: 'smYouTubeSaveBtn',
+      class: 'sm-btn',
+    }, 'Save videos (free)');
+    const removeBtn = savedVideos.length
+      ? el('button', { type: 'button', id: 'smYouTubeRemoveBtn', class: 'sm-btn' }, 'Remove')
+      : null;
+
+    const statusEl = el('div', {
+      id: 'smYouTubeStatus',
+      class: 'sm-sub',
+      role: 'status',
+      'aria-live': 'polite',
+      style: 'margin-top:6px;overflow-wrap:anywhere;',
+    });
+
+    async function runYouTubeAction(payload, controls) {
+      const boundGen = state.activeGeneration;
+      const boundOwner = currentOwnerId();
+      const boundSample = isSampleMode();
+      controls.forEach((c) => { if (c) c.disabled = true; });
+      statusEl.textContent = payload.remove ? 'Removing YouTube videos…' : 'Reading video titles…';
+      try {
+        const res = await apiJson('/api/v1/seller-memory/sources/youtube', {
+          method: 'POST',
+          body: JSON.stringify({
+            ...payload,
+            expected_version: state.version,
+            expected_owner: boundOwner,
+          }),
+        });
+        if (!isCurrentRequestContext(boundGen, boundOwner, boundSample)) return;
+        if (!res.ok) {
+          statusEl.textContent = (res.data && res.data.detail)
+            ? String(res.data.detail)
+            : 'Could not read those video links right now.';
+          controls.forEach((c) => { if (c) c.disabled = false; });
+          if (res.status === 409) {
+            await loadServerMemory(true);
+            if (currentOwnerId() === boundOwner && isSampleMode() === boundSample) renderMemoryModalBody();
+          }
+          return;
+        }
+        await loadServerMemory(true);
+        if (currentOwnerId() === boundOwner && isSampleMode() === boundSample) renderMemoryModalBody();
+      } catch (_err) {
+        if (!isCurrentRequestContext(boundGen, boundOwner, boundSample)) return;
+        statusEl.textContent = 'Could not reach Muse right now. Try again shortly.';
+        controls.forEach((c) => { if (c) c.disabled = false; });
+      }
+    }
+
+    const controls = [saveBtn, removeBtn, textarea];
+    saveBtn.addEventListener('click', () => {
+      const urls = textarea.value
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean);
+      if (!urls.length) {
+        statusEl.textContent = 'Paste at least one YouTube video link.';
+        return;
+      }
+      runYouTubeAction({ urls }, controls);
+    });
+    actions.appendChild(saveBtn);
+    if (removeBtn) {
+      removeBtn.addEventListener('click', () => runYouTubeAction({ remove: true }, controls));
+      actions.appendChild(removeBtn);
+    }
+
+    wrap.append(label, textarea, actions, statusEl);
+    parent.appendChild(wrap);
+  }
+
   // What setup told Muse, shown first so "What Muse remembers" is never empty for a seller who
   // finished setup. Read-only here; setup is where it changes (saving uses no runs).
   function renderSetupFacts() {
@@ -2166,15 +2323,17 @@
       ['Channels', channels.join(', ')],
       ['Competitors you watch', comps.map((c) => c.name || c.url).join(', ')],
     ].filter(([, value]) => value);
-    if (!rows.length) return;
     const section = el('div', { id: 'smSetupFacts', class: 'sm-setup-facts' });
     section.appendChild(el('h3', { style: 'font-size:0.9rem;margin:4px 0 6px;' }, 'From your setup'));
-    const list = el('dl', { class: 'sm-setup-list', style: 'display:grid;grid-template-columns:max-content 1fr;gap:4px 12px;margin:0 0 6px;font-size:0.86rem;' });
-    rows.forEach(([label, value]) => {
-      list.append(el('dt', { style: 'color:var(--muted,#6b6b6b);' }, label), el('dd', { style: 'margin:0;overflow-wrap:anywhere;' }, value));
-    });
-    section.appendChild(list);
-    section.appendChild(el('a', { href: '/welcome', class: 'sm-link', id: 'smEditSetupLink' }, 'Change these in setup →'));
+    if (rows.length) {
+      const list = el('dl', { class: 'sm-setup-list', style: 'display:grid;grid-template-columns:max-content 1fr;gap:4px 12px;margin:0 0 6px;font-size:0.86rem;' });
+      rows.forEach(([label, value]) => {
+        list.append(el('dt', { style: 'color:var(--muted,#6b6b6b);' }, label), el('dd', { style: 'margin:0;overflow-wrap:anywhere;' }, value));
+      });
+      section.appendChild(list);
+      section.appendChild(el('a', { href: '/welcome', class: 'sm-link', id: 'smEditSetupLink' }, 'Change these in setup →'));
+    }
+    renderYouTubeSourceBlock(section);
     modalBodyEl.appendChild(section);
   }
 
@@ -2506,6 +2665,8 @@
             business_name: handoff.business_name,
             product_name: handoff.product_name,
             destination: handoff.destination,
+            destination_url: handoff.destination_url || handoff.product_link || '',
+            product_link: handoff.product_link || handoff.destination_url || '',
             channel: handoff.channel,
             goal: handoff.goal,
             cta: handoff.cta,
@@ -2599,9 +2760,13 @@
     const { handoff, def } = resolveActiveStudioContext();
     if (!def || !Object.keys(def).length) return;
     if (handoff && !force) return;
+    const linkUrl = def.destination_url || def.product_link || '';
+    const isVideoMove = (def.recommendation_id || '') === 'move-share-video' && Boolean(linkUrl);
     const fields = [
       ['sellerName', def.business_name],
       ['productName', def.product_name],
+      ['productLink', linkUrl],
+      ['destinationUrl', linkUrl],
       ['productPrice', def.price_claim],
       ['price', def.price_claim],
       ['goal', def.goal],
@@ -2616,7 +2781,16 @@
           node.dataset.smUserEdited = '1';
         });
       }
-      if (force || !node.value || BANNED_SAMPLE_TERMS.some((t) => node.value.toLowerCase().includes(t))) {
+      const isVideoMoveOverride =
+        isVideoMove &&
+        (id === 'productName' || id === 'productLink' || id === 'destinationUrl') &&
+        node.dataset.smUserEdited !== '1';
+      if (
+        force ||
+        isVideoMoveOverride ||
+        !node.value ||
+        BANNED_SAMPLE_TERMS.some((t) => node.value.toLowerCase().includes(t))
+      ) {
         node.value = val;
         node.dispatchEvent(new Event('change', { bubbles: true }));
       }
