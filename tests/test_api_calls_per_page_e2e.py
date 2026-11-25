@@ -41,13 +41,14 @@ PAGES = ["/", "/today", "/create", "/first-ad", "/progress", "/digest", "/welcom
 
 # Calls on one load, measured Nov 20 2026 after the in-flight GET sharing (before: 145 in total).
 # Own /today adds one free daily-brief read from the account workspace (Nov 21).
+# Own /digest adds one GET /api/v1/competitors/checks call for weekly auto-check status (Nov 23).
 CEILINGS: dict[str, dict[str, int]] = {
     "signed_out": {
         "/": 8, "/today": 4, "/create": 5, "/first-ad": 3, "/progress": 3, "/digest": 7,
         "/welcome": 3,
     },
     "own": {
-        "/": 12, "/today": 9, "/create": 9, "/first-ad": 5, "/progress": 5, "/digest": 7,
+        "/": 12, "/today": 9, "/create": 9, "/first-ad": 5, "/progress": 5, "/digest": 8,
         "/welcome": 4,
     },
     "sample": {

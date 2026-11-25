@@ -58,7 +58,7 @@ def test_digest_script_versions_and_copy_contracts() -> None:
     """Verify cache-busting pins and removal of old digest wording."""
     digest_html = (REPO_ROOT / "src/api/static/digest.html").read_text(encoding="utf-8")
     digest_js = (REPO_ROOT / "src/api/static/digest.js").read_text(encoding="utf-8")
-    assert "digest.js?v=20261123-uxgap21" in digest_html
+    assert "digest.js?v=20261124-ag1" in digest_html
     assert "digest-signup.js?v=20261122-ag1" in digest_html
     assert "Canonical preview topics" not in digest_html
     assert "What to include" in digest_html
