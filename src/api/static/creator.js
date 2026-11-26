@@ -768,6 +768,19 @@
   function syncWorkspaceCopy(isOwn) {
     const svc = isOwn && isServices();
     syncDestinationOptions();
+    if ($('artistChannels')) $('artistChannels').hidden = isOwn || !isSampleArtist();
+    const collectionList = $('collectionSuggestions');
+    if (collectionList && typeof collectionList.replaceChildren === 'function' && typeof document.createElement === 'function') {
+      collectionList.replaceChildren();
+      if (!isOwn && isSampleArtist()) {
+        for (const label of ['Empowering Women', 'Abstracts']) {
+          const opt = document.createElement('option');
+          opt.value = label;
+          if (typeof collectionList.append === 'function') collectionList.append(opt);
+          else if (typeof collectionList.appendChild === 'function') collectionList.appendChild(opt);
+        }
+      }
+    }
     if ($('creatorStep1Eyebrow')) $('creatorStep1Eyebrow').textContent = isOwn ? 'START WITH WHAT YOU OFFER' : 'START WITH WHAT YOU MAKE';
     if ($('creatorStep1Intro')) {
       $('creatorStep1Intro').textContent = isOwn
@@ -1736,6 +1749,7 @@
     state.original = '';
     state.image = '';
     state.sampleImage = '';
+    if ($('artistChannels')) $('artistChannels').hidden = true;
     if (!preserveShopInput && $('shopUrl') && state.shopWebsiteUrl) $('shopUrl').value = state.shopWebsiteUrl;
     $('productFactNote').textContent = 'Your photo and edits stay on this device until you save or request live Muse AI.';
     $('productImageCaption').textContent = 'Your photo will appear here.';

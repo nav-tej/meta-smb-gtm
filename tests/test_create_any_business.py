@@ -44,8 +44,8 @@ def test_script_versions_and_zero_em_dashes_in_first_ad() -> None:
     first_ad_html = (REPO_ROOT / "src/api/static/first-ad.html").read_text(encoding="utf-8")
     first_ad_js = (REPO_ROOT / "src/api/static/first-ad.js").read_text(encoding="utf-8")
 
-    assert "creator.js?v=20261124-ag1" in creator_html
-    assert "first-ad.js?v=20261121-uxgap19" in first_ad_html
+    assert "creator.js?v=20261126-ag1" in creator_html
+    assert "first-ad.js?v=20261126-ag1" in first_ad_html
     assert "—" not in first_ad_html
     assert "—" not in first_ad_js
 
