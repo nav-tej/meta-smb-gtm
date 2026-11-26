@@ -1016,8 +1016,8 @@
   <script src="/static/reco-actions.js?v=20261121-uxgap19" defer></script>
   <script src="/static/account.js?v=20261120-uxgap17" defer></script>
   <script src="/static/workspace-modes.js?v=20261117-uxgap6" defer></script>
-  <script src="/static/muse-shell.js?v=20261123-uxgap22" defer></script>
-  <script src="/static/welcome.js?v=20261122-uxgap20" defer></script>
+  <script src="/static/muse-shell.js?v=20261125-uxgap23" defer></script>
+  <script src="/static/welcome.js?v=20261125-uxgap23" defer></script>
   <script src="/static/seller-memory.js?v=20261124-ag2" defer></script>
 </head>
 <body>
@@ -1197,7 +1197,7 @@
       <div class="jr-hero">
         <div>
           <p class="jr-eyebrow">Art of Sarabjit Singh · growth loop</p>
-          <h1>Research, create, improve, repeat: every post learns from the last.</h1>
+          <h1 id="journeyTitle">Research, create, improve, repeat: every post learns from the last.</h1>
 
           <div class="jr-stats" role="list">
             <div role="listitem"><strong>300</strong><span>competitor pages read</span></div>
@@ -1206,7 +1206,8 @@
             <div role="listitem"><strong>4</strong><span>saved Muse Image ads</span></div>
           </div>
         </div>
-        <aside class="jr-estimate" aria-label="Estimated time saved">
+        <!-- Sample only: the estimate is about the sample artist's 300 pages, not a seller's own work. -->
+        <aside class="jr-estimate" aria-label="Estimated time saved" data-sample-only>
           <span class="jr-estimate-tag">Estimated</span>
           <strong>~12 hours of competitor research and ad copywriting, done in minutes.</strong>
           <small>Estimate, not measured: ~1.5 min per competitor page by hand (300 pages ≈ 7.5 h), ~2.5 h to write a brief, ~2 h to draft and design one post.</small>

@@ -50,6 +50,29 @@ assert.deepEqual(plain(shell.competitorStatus('Gurinderpreet Kaur', run).badges)
 assert.equal(shell.competitorStatus('Gurdish Pannu', run).badges[0][1], 'Couldn’t check');
 assert.equal(shell.competitorStatus('Gurdish Pannu', run).note, 'Could not read this shop.');
 assert.equal(shell.competitorStatus('their-shop.com', run).badges[0][1], 'Added by you');
+
+// A seller's own workspace: their own saved check (from their daily brief) wins, with the same
+// chips as /today and /digest, so the home never says "Not checked yet" after a check.
+const ownBrief = {
+  business_name: 'North Star Advisory',
+  items: [
+    { name: 'Demand Curve', status: 'changed', note: '2 new or updated pages', checked_at: '2026-11-24T16:00:00Z' },
+    { name: 'GrowthMentor', status: 'unchanged', note: 'No change', checked_at: '2026-11-24T16:00:00Z' },
+    { name: 'Refine Labs', status: 'failed', note: 'This site took too long to respond.', checked_at: '2026-11-24T16:00:00Z' },
+    { name: 'Brightpath', status: 'unchecked', note: 'Not checked yet. Check now (free) on your digest.' },
+  ],
+};
+let own = shell.competitorStatus('Demand Curve', run, ownBrief);
+assert.equal(own.source, 'own');
+assert.deepEqual(plain(own.badges), [['new', 'Changed']]);
+assert.match(own.when, /^Checked .+ · 2 new or updated pages$/);
+own = shell.competitorStatus('GrowthMentor', run, ownBrief);
+assert.deepEqual(plain(own.badges), [['none', 'No change']]);
+assert.doesNotMatch(own.when, /·/);
+assert.match(shell.competitorStatus('Refine Labs', run, ownBrief).when, /took too long/);
+// Not checked yet, or the sample brief (no business_name): unchanged behavior.
+assert.equal(shell.competitorStatus('Brightpath', run, ownBrief).when, 'Not checked yet');
+assert.equal(shell.competitorStatus('SikhiArt.com', run, { items: ownBrief.items }).source, 'monitor');
 assert.equal(shell.watchlist.length, 4);
 
 // No monitor run yet: the saved snapshot's real change is the only competitor notification.

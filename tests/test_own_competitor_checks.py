@@ -577,7 +577,9 @@ def own_digest_server(monkeypatch: pytest.MonkeyPatch):
         "src.api.intel",
         "src.api.digest_email",
         "src.api.seller_memory",
+        "src.api.daily_brief",
         "src.services.accounts",
+        "src.services.daily_brief",
         "src.services.digest_preview",
     ):
         mod = importlib.import_module(mod_name)
@@ -684,6 +686,24 @@ def test_own_digest_competitor_checks_e2e(own_digest_server: tuple[str, dict[str
                 assert not page.evaluate(
                     "document.documentElement.scrollWidth > window.innerWidth"
                 )
+
+                # Home: the watched row shows the same saved check, never "Not checked yet"
+                # (pass 19; it used to read only the sample competitor monitor).
+                page.goto(BASE + "/", wait_until="domcontentloaded")
+                page.wait_for_function(
+                    "() => [...document.querySelectorAll('#sellerList .jr-seller')].some((li) =>"
+                    " li.textContent.includes('Summit Growth')"
+                    " && (li.querySelector('.ms-watch-badges')?.textContent || '') === 'Changed'"
+                    " && (li.querySelector('.ms-watch-time')?.textContent || '')"
+                    ".startsWith('Checked '))",
+                    timeout=15000,
+                )
+                row = page.locator("#sellerList .jr-seller", has_text="Summit Growth").first
+                assert "Not checked yet" not in row.inner_text(), row.inner_text()
+                assert page.locator("#journeyTitle").inner_text() == (
+                    "Your week at n Plus Alpha Consulting"
+                )
+                assert not page.locator(".jr-estimate").is_visible()
                 ctx.close()
 
                 # 2. Mobile 375px own workspace (reads saved check from workspace, no overflow)

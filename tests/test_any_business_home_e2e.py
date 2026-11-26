@@ -83,12 +83,21 @@ def _old_example_document() -> dict[str, Any]:
     return doc
 
 
+def _malformed_document() -> dict[str, Any]:
+    """A workspace whose socials is an object and whose competitors hold a stray string."""
+    doc = _document("Kiln Row Studio", "products", "More sales", ["instagram"])
+    doc["onboarding"]["socials"] = {"instagram": "kilnrow"}
+    doc["onboarding"]["competitors"].insert(0, "not-an-entry")
+    return doc
+
+
 USERS = {
     "svc": _document(
         "North Star Advisory", "services", "More client inquiries", ["linkedin", "website"]
     ),
     "prod": _document("Wild Meadow Prints", "products", "More sales", ["instagram", "website"]),
     "oldex": _old_example_document(),
+    "bad": _malformed_document(),
 }
 
 
@@ -414,5 +423,47 @@ print("OWN_NO_SAMPLE_OK")
         [python_bin, "-c", script], capture_output=True, text=True, timeout=240, check=False
     )
     assert proc.returncode == 0 and "OWN_NO_SAMPLE_OK" in proc.stdout, (
+        f"STDOUT:\n{proc.stdout}\nSTDERR:\n{proc.stderr}"
+    )
+
+
+def test_malformed_setup_fields_still_render_the_own_home_e2e(any_business_server: str) -> None:
+    """One malformed field used to stop welcome.js mid-render and leave the sample shop showing."""
+    python_bin = _find_playwright_python()
+    if not python_bin:
+        pytest.skip("Playwright runtime not installed")
+    script = f"""
+from playwright.sync_api import sync_playwright
+
+BASE = {any_business_server!r}
+with sync_playwright() as p:
+    browser = p.chromium.launch()
+    for width in (1440, 375):
+        ctx = browser.new_context(viewport={{"width": width, "height": 900}})
+        ctx.add_cookies([{{"name": "muse_e2e_user", "value": "bad", "url": BASE}}])
+        page = ctx.new_page()
+        errors = []
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.goto(BASE + "/", wait_until="domcontentloaded")
+        page.wait_for_function(
+            "(document.getElementById('journeyTitle')?.textContent || '')"
+            " === 'Your week at Kiln Row Studio'",
+            timeout=20000,
+        )
+        page.wait_for_timeout(800)
+        label = page.locator("#activeWorkspaceLabel").inner_text()
+        assert label == "Kiln Row Studio", label
+        rows = page.locator("#sellerList").inner_text()
+        assert "Brightpath Consulting" in rows and "SikhiArt" not in rows, rows
+        assert not page.locator(".jr-estimate").is_visible()
+        assert not errors, errors
+        ctx.close()
+    browser.close()
+print("MALFORMED_OK")
+"""
+    proc = subprocess.run(
+        [python_bin, "-c", script], capture_output=True, text=True, timeout=180, check=False
+    )
+    assert proc.returncode == 0 and "MALFORMED_OK" in proc.stdout, (
         f"STDOUT:\n{proc.stdout}\nSTDERR:\n{proc.stderr}"
     )

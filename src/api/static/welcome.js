@@ -1328,7 +1328,7 @@
     const textTargets = [];
     [
       '#activeWorkspaceKicker', '.workspace-kicker', '#activeWorkspaceLabel', '#activeAvatar',
-      '.jr-eyebrow', '#actionablePlaybookTitle', '#heroTitle', '#heroCategory', '#heroDesc',
+      '.jr-eyebrow', '#journeyTitle', '#actionablePlaybookTitle', '#heroTitle', '#heroCategory', '#heroDesc',
       '#kpiArtworks', '#kpiPriceGap', '#kpiRoas', '#compDomainBadge', '#compSummaryText',
     ].forEach((sel) => {
       const el = document.querySelector(sel);
@@ -1432,8 +1432,10 @@
     document.documentElement.dataset.ownBusinessType = onboarding?.business_type || '';
     window.dispatchEvent(new CustomEvent('muse:own-business-type'));
     const summary = onboarding?.crawl_summary || null;
-    const socials = (onboarding?.socials || []).filter((s) => s.confirmed !== false);
-    const competitors = (onboarding?.competitors || []).filter((c) => c.selected !== false);
+    // A malformed field must not stop this render: the page would keep the sample shop's content.
+    const asList = (value) => (Array.isArray(value) ? value.filter((v) => v && typeof v === 'object') : []);
+    const socials = asList(onboarding?.socials).filter((s) => s.confirmed !== false);
+    const competitors = asList(onboarding?.competitors).filter((c) => c.selected !== false);
     const priceRange = summary?.price_range || '';
     const pagesCrawled = summary?.pages_crawled || 0;
 
@@ -1498,6 +1500,8 @@
     // 3. Growth loop hero stats — honest counts from user's workspace only
     const eyebrow = document.querySelector('.jr-eyebrow');
     if (eyebrow) eyebrow.textContent = `${shopName} · your growth workspace`;
+    const journeyTitle = document.getElementById('journeyTitle');
+    if (journeyTitle) journeyTitle.textContent = `Your week at ${shopName}`;
     const statsBoxes = document.querySelectorAll('.jr-stats > div');
     if (statsBoxes.length >= 4) {
       statsBoxes[0].innerHTML = '';
@@ -1960,7 +1964,7 @@
       card.hidden = true;
       return;
     }
-    const first = (onboarding?.competitors || []).find((c) => c && c.url && c.selected !== false) || null;
+    const first = (Array.isArray(onboarding?.competitors) ? onboarding.competitors : []).find((c) => c && c.url && c.selected !== false) || null;
     const firstUrl = first ? competitorUrl(first.url) : '';
     const name = first ? (first.name || first.url) : '';
     const analyzed = Boolean(first && (doc?.briefs || {})[firstUrl]);

@@ -1423,10 +1423,22 @@
       .sort((a, b) => Number(b[1]) - Number(a[1]))
       .map(([kind, n]) => [KIND_BADGE[kind][0], plural(Number(n), KIND_BADGE[kind][1])]);
   }
-  // One watched shop: the latest monitor check when there is one, else the saved Nov 3 snapshot.
-  // In the sample shop, always show the saved Nov 3 snapshot so stale monitor errors never leak into sample mode.
-  function competitorStatus(name, run) {
+  // A seller's own saved check (the free "Check now" on the digest, or the weekly run when it is
+  // on), as their own daily brief reports it: the same chips /today and /digest show.
+  const OWN_CHECK_BADGE = { first: ['first', 'First check'], changed: ['new', 'Changed'], unchanged: ['none', 'No change'], failed: ['error', 'Couldn’t check'] };
+  // One watched shop. In a seller's own workspace, their own saved check comes first; then the
+  // latest monitor check, else the saved Nov 3 snapshot. In the sample shop, always show the saved
+  // Nov 3 snapshot so stale monitor errors never leak into sample mode.
+  function competitorStatus(name, run, ownBrief = null) {
     const inSample = !!window.museModes?.isSampleMode?.();
+    const ownItems = !inSample && ownBrief?.business_name && Array.isArray(ownBrief.items) ? ownBrief.items : [];
+    const own = ownItems.find((item) => item?.name === name && OWN_CHECK_BADGE[item.status]);
+    if (own) {
+      const day = fmtWhen(own.checked_at);
+      const note = String(own.note || '');
+      const detail = own.status === 'changed' || own.status === 'failed' ? note : '';
+      return { badges: [OWN_CHECK_BADGE[own.status]], when: [day ? `Checked ${day}` : 'Checked', detail].filter(Boolean).join(' · '), source: 'own', note };
+    }
     const check = !inSample && Array.isArray(run?.competitors) ? run.competitors.find((c) => c?.name === name) : null;
     if (check) {
       const badges = check.status === 'error' ? [['error', 'Couldn’t check']] : changeBadges(check.counts);
@@ -1445,6 +1457,38 @@
   const readPaused = () => { try { const v = JSON.parse(store.get(ownerKey(PAUSE_KEY)) || '{}'); return v && typeof v === 'object' ? v : {}; } catch { return {}; } };
   function setPaused(name, paused) { const v = readPaused(); if (paused) v[name] = true; else delete v[name]; store.set(ownerKey(PAUSE_KEY), JSON.stringify(v)); }
   const sellerPainters = new Map();
+  // The seller's own brief carries their saved checks by competitor name. The shared signals hold
+  // the cached sample brief, so the own one is a separate private read, once per account.
+  let ownBrief = null;
+  let ownBriefOwner = null;
+  let ownBriefPromise = null;
+  function currentOwnBrief() {
+    const cur = window.museModes?.current?.();
+    return cur?.isOwnWorkspace && cur.ownerId && cur.ownerId === ownBriefOwner ? ownBrief : null;
+  }
+  function loadOwnBrief() {
+    const cur = window.museModes?.current?.();
+    if (!cur?.isOwnWorkspace || !cur.ownerId) return Promise.resolve(null);
+    if (ownBriefOwner === cur.ownerId && ownBriefPromise) return ownBriefPromise;
+    const owner = cur.ownerId;
+    ownBriefOwner = owner;
+    ownBrief = null;
+    // A quiet read: it only decorates rows, so a 401 or 409 here never opens a dialog (museFetch
+    // would); the rows keep today's labels instead.
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timer = controller ? setTimeout(() => controller.abort(), 15000) : null;
+    ownBriefPromise = Promise.resolve()
+      .then(() => fetch('/api/v1/daily-brief?workspace=own', { credentials: 'same-origin', signal: controller?.signal }))
+      .then((response) => (response.ok ? response.json() : null))
+      .catch(() => null)
+      .then((data) => {
+        if (timer) clearTimeout(timer);
+        if (ownBriefOwner === owner) ownBrief = data && data.business_name ? data : null;
+        return ownBrief;
+      });
+    return ownBriefPromise;
+  }
+  const repaintSellers = () => sellerPainters.forEach((paint) => paint());
   function decorateSeller(li) {
     if (li.querySelector('.ms-watchmeta')) return;
     const info = li.querySelector(':scope > div');
@@ -1465,7 +1509,7 @@
       input.checked = !paused;
       li.classList.toggle('ms-paused', paused);
       state.textContent = paused ? 'Paused' : 'Active';
-      const status = competitorStatus(name, signals?.run);
+      const status = competitorStatus(name, signals?.run, currentOwnBrief());
       when.textContent = status.when;
       badges.title = status.note;
       badges.replaceChildren(...status.badges.map(([tone, label]) => el('span', { class: `ms-badge ${tone}` }, label)));
@@ -1495,8 +1539,10 @@
         }
       }
     });
+    loadOwnBrief().then(repaintSellers);
     window.addEventListener?.('muse:mode-change', () => {
-      sellerPainters.forEach((paint) => paint());
+      repaintSellers();
+      loadOwnBrief().then(repaintSellers);
     });
   }
 

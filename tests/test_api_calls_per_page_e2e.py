@@ -47,8 +47,10 @@ CEILINGS: dict[str, dict[str, int]] = {
         "/": 8, "/today": 4, "/create": 5, "/first-ad": 3, "/progress": 3, "/digest": 7,
         "/welcome": 3,
     },
+    # Own "/" is 13 since pass 19: one private /daily-brief?workspace=own read so the watchlist
+    # rows show the seller's own saved checks (the shared signals hold the cached sample brief).
     "own": {
-        "/": 12, "/today": 9, "/create": 9, "/first-ad": 5, "/progress": 5, "/digest": 8,
+        "/": 13, "/today": 9, "/create": 9, "/first-ad": 5, "/progress": 5, "/digest": 8,
         "/welcome": 4,
     },
     "sample": {
