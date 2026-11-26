@@ -159,12 +159,40 @@
       return cleaned;
     }
   };
+  const AD_PAGE_ID_RE = /^[0-9]{5,20}$/;
+  const validAdPageId = (raw) => {
+    const cleaned = String(raw || '').trim();
+    return AD_PAGE_ID_RE.test(cleaned) ? cleaned : '';
+  };
+  const adLibraryQuery = (name, url) => {
+    const n = String(name || '').trim();
+    if (n && !/^https?:\/\//i.test(n) && n.split(/\s+/).length <= 2 && !n.includes('.')) return n;
+    const raw = String(url || (n.includes('.') ? n : '') || '').trim();
+    try {
+      const host = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`).hostname.replace(/^www\./i, '');
+      const label = host.split('.')[0];
+      if (label) return label.charAt(0).toUpperCase() + label.slice(1);
+    } catch {}
+    return n || raw;
+  };
+  const adLibraryPageUrl = (pageId) => (
+    `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=ALL&view_all_page_id=${encodeURIComponent(pageId)}&search_type=page&media_type=all`
+  );
+  const adLibrarySearchUrl = (query) => (
+    `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=ALL&q=${encodeURIComponent(query)}&search_type=keyword_unordered&media_type=all`
+  );
   const extractWatchlist = (wsDoc) => {
     const prefs = wsDoc?.preferences && typeof wsDoc.preferences === 'object' ? wsDoc.preferences : {};
     const onb = wsDoc?.onboarding && typeof wsDoc.onboarding === 'object' ? wsDoc.onboarding : {};
-    const rawList = Array.isArray(prefs.competitor_entries) && prefs.competitor_entries.length
-      ? prefs.competitor_entries
-      : (Array.isArray(onb.competitors) ? onb.competitors : []);
+    const prefEntries = Array.isArray(prefs.competitor_entries) ? prefs.competitor_entries : [];
+    const onbEntries = Array.isArray(onb.competitors) ? onb.competitors : [];
+    const rawList = prefEntries.length ? prefEntries : onbEntries;
+    const supplemental = new Map();
+    for (const item of (prefEntries.length ? onbEntries : prefEntries)) {
+      if (!item || typeof item !== 'object') continue;
+      const norm = normalizeCompetitorUrl(item.url);
+      if (norm && !supplemental.has(norm)) supplemental.set(norm, item);
+    }
     const seen = new Set();
     const out = [];
     for (const item of rawList) {
@@ -177,7 +205,20 @@
       seen.add(norm);
       let host = norm;
       try { host = new URL(norm).hostname.replace(/^www\./i, ''); } catch {}
-      out.push({ name: rawName || host, url: norm });
+      const extra = supplemental.get(norm) || {};
+      const obj = typeof item === 'object' && item ? item : {};
+      const adPageId = validAdPageId(obj.ad_library_page_id || extra.ad_library_page_id);
+      const note = String(
+        obj.rationale || extra.rationale || obj.reason || extra.reason || ''
+      ).trim();
+      const analyzedAt = String(obj.analyzed_at || extra.analyzed_at || '').trim();
+      out.push({
+        name: rawName || host,
+        url: norm,
+        ad_library_page_id: adPageId,
+        note,
+        analyzed_at: analyzedAt,
+      });
       if (out.length >= 6) break;
     }
     return out;
@@ -464,6 +505,20 @@
           card.appendChild(head);
           card.appendChild(el('p', { class: 'dg-where' }, String(comp.url)));
 
+          if (comp.note) {
+            card.appendChild(el('p', { class: 'dg-detail dg-comp-note' }, comp.note));
+          }
+          if (comp.analyzed_at) {
+            const analyzedDate = shortDate(comp.analyzed_at);
+            const analysisLabel = analyzedDate ? `From your analysis, ${analyzedDate}` : 'From your analysis';
+            card.appendChild(el(
+              'p',
+              { class: 'dg-when dg-analysis-meta', style: 'display:flex;flex-wrap:wrap;gap:0.25rem 0.6rem;align-items:baseline;margin:0.15rem 0 0;' },
+              el('span', {}, analysisLabel),
+              el('a', { href: '/#loop-research', class: 'dg-view-analysis' }, 'View analysis')
+            ));
+          }
+
           if (!check) {
             card.appendChild(el('p', { class: 'dg-detail' }, 'Not checked yet. Click Check now (free) above to save a baseline of their public pages.'));
           } else {
@@ -495,6 +550,41 @@
               card.appendChild(el('p', { class: 'dg-when' }, whenStr ? `Checked ${whenStr}` : 'Checked'));
             }
           }
+
+          const adLinksRow = el('p', {
+            class: 'dg-when dg-ad-links',
+            style: 'display:flex;flex-wrap:wrap;gap:0.25rem 0.75rem;align-items:baseline;margin:0.3rem 0 0;overflow-wrap:anywhere;',
+          });
+          if (comp.ad_library_page_id) {
+            adLinksRow.appendChild(el(
+              'a',
+              {
+                href: adLibraryPageUrl(comp.ad_library_page_id),
+                target: '_blank',
+                rel: 'noopener noreferrer',
+                class: 'dg-meta-ad-link',
+              },
+              'See their ads on Meta ↗'
+            ));
+          } else {
+            const query = adLibraryQuery(comp.name, comp.url);
+            adLinksRow.appendChild(el(
+              'a',
+              {
+                href: adLibrarySearchUrl(query),
+                target: '_blank',
+                rel: 'noopener noreferrer',
+                class: 'dg-meta-ad-link',
+              },
+              `Search Meta ads for “${query}” (all advertisers) ↗`
+            ));
+            adLinksRow.appendChild(el(
+              'a',
+              { href: '/#loop-research', class: 'dg-link-exact-page' },
+              'Link their exact page'
+            ));
+          }
+          card.appendChild(adLinksRow);
           grid.appendChild(card);
         }
       } else {

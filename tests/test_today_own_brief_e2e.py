@@ -465,7 +465,10 @@ with sync_playwright() as p:
                     page.locator(selector).click()
                     page.wait_for_url("**/create?workspace=own&sm_handoff=*")
                     page.wait_for_function(
-                        "document.documentElement.dataset.museMode === 'account_own'"
+                        "() => document.documentElement.dataset.museMode === 'account_own'"
+                        " && document.getElementById('nextButton')?.textContent?.trim()"
+                        " === 'Make it yours →'"
+                        " && !document.getElementById('handoffGuidanceBox')?.hidden"
                     )
                     hid = parse_qs(urlparse(page.url).query)["sm_handoff"][0]
                     payload = page.evaluate(
