@@ -46,3 +46,11 @@
 - The prior integrated gate failed **6 tests, 747 passed, 2 skipped** because older sign-in fixtures did not answer the new own-brief route and triggered the session-expiry dialog. Claude's five-file fixture patch adds the missing mocked account readers or own response; it does not change runtime behavior.
 - Final full gate now running as exec session 89648, evidence `final-gate.log`. All **8/8 Node contracts passed again** on this exact source, individual `final-<contract>.log` files.
 - No deployment, alias change, .env read, live Muse call, settings change or database mutation. Next: finish gate/audits/mutations, finalize report and push checkpoint.
+
+## Mutation and visual evidence checkpoint — November 25, 2026
+- Mutations ran in isolated detached worktree `today-own-brief-mutation-nov25`, never in the branch under full-gate testing. All mutated files restored; `git diff --exit-code` clean afterward.
+- Route mutation serving sample data for own: API regression **1 failed (expected), 0.35s**; real Chromium services/375 regression **1 failed, 15 deselected (expected), 16.93s**. Evidence: `mutation-sample-api.log`, `mutation-sample-browser.log`.
+- Frontend mutation replacing over-budget Heads up with Why this fits: Chromium budget/375 regression **1 failed, 15 deselected (expected), 1.65s**. Evidence: `mutation-budget-label.log`.
+- After restoring source, the exact three selected tests **3 passed in 7.20s** (`mutation-restored.log`). No mutation left in application source.
+- Coordinator actually viewed services and products captures at both 375px and 1440px: `chromium/{375,1440}-own-{services,products}-loaded.png`. Reviewed readable mobile wrapping, desktop columns, own-business titles/moves, logged results and honest unchecked competitors. Original visual review occurred during November 22–23 execution.
+- Both final audits running sequentially in exec session 61125; full gate session 89648 still running. Next inspect exact counts, finalize report and release ownership.
