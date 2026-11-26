@@ -265,16 +265,23 @@ with sync_playwright() as p:
                 ctx = browser.new_context(viewport={{"width": width, "height": 900}})
                 ctx.add_cookies([{{"name": "muse_e2e_user", "value": uid, "url": BASE}}])
                 page = ctx.new_page()
-                # Prevent auto-import crawl trigger on first visit (guarded for sandboxed iframes)
-                page.add_init_script("try {{ localStorage.setItem('muse.autoimport.tried.v1:" + uid + "', '1'); }} catch (_) {{}}")
+                # Prevent auto-import crawl on first visit (guarded for sandboxed iframes)
+                init_js = (
+                    "try {{ localStorage.setItem('muse.autoimport.tried.v1:"
+                    + uid
+                    + "', '1'); }} catch (_) {{}}"
+                )
+                page.add_init_script(init_js)
                 for path in PAGES:
                     errors = []
                     page.on("pageerror", lambda e, errs=errors: errs.append(str(e)))
                     page.goto(BASE + path, wait_until="networkidle", timeout=20000)
                     page.wait_for_timeout(400)
 
-                    # Expand any <details> panels so hidden-until-opened leaks are caught
-                    page.evaluate("document.querySelectorAll('details').forEach(d => d.open = true)")
+                    # Expand <details> panels so hidden-until-opened leaks are caught
+                    page.evaluate(
+                        "document.querySelectorAll('details').forEach(d => d.open = true)"
+                    )
                     page.wait_for_timeout(150)
 
                     tag = f"{{uid}}@{{width}} {{path}}"
@@ -288,7 +295,8 @@ with sync_playwright() as p:
                             const r = el.getBoundingClientRect();
                             if (r.width === 0 && r.height === 0) return;
                             if (el.tagName === 'SELECT') {{
-                                parts.push(Array.from(el.options).map(o => o.textContent).join(' '));
+                                const opts = Array.from(el.options).map(o => o.textContent);
+                                parts.push(opts.join(' '));
                             }} else {{
                                 parts.push((el.value || '') + ' ' + (el.placeholder || ''));
                             }}
@@ -299,19 +307,29 @@ with sync_playwright() as p:
 
                     # Check visible images for sample paths
                     img_blob = page.evaluate('''() => {{
-                        return Array.from(document.querySelectorAll('img')).filter(el => {{
+                        const imgs = Array.from(document.querySelectorAll('img')).filter(el => {{
                             const r = el.getBoundingClientRect();
                             return r.width > 0 && r.height > 0;
-                        }}).map(el => (el.getAttribute('src') || '') + ' ' + (el.alt || '')).join(' | ');
+                        }});
+                        return imgs.map(
+                            el => (el.getAttribute('src') || '') + ' ' + (el.alt || '')
+                        ).join(' | ');
                     }}''')
                     check_no_sample(tag + " imgs", img_blob)
-                    assert "/samples/" not in img_blob.lower(), f"{{tag}} showed sample image: {{img_blob}}"
+                    assert "/samples/" not in img_blob.lower(), f"{{tag}} sample img: {{img_blob}}"
 
                     # Page-specific deep checks (modals, datalists, wizard steps)
                     if path == "/create":
-                        assert not page.locator("#artistChannels").is_visible(), f"{{tag}} #artistChannels leaked"
-                        dl_vals = page.evaluate("Array.from(document.querySelectorAll('#collectionSuggestions option')).map(o => o.value)")
-                        assert "Empowering Women" not in dl_vals, f"{{tag}} datalist leaked: {{dl_vals}}"
+                        assert not page.locator("#artistChannels").is_visible(), (
+                            f"{{tag}} #artistChannels leaked"
+                        )
+                        dl_vals = page.evaluate(
+                            "Array.from(document.querySelectorAll('#collectionSuggestions option'))"
+                            ".map(o => o.value)"
+                        )
+                        assert "Empowering Women" not in dl_vals, (
+                            f"{{tag}} datalist leaked: {{dl_vals}}"
+                        )
                     elif path == "/first-ad":
                         page.click("[data-fa-step='3']")
                         page.wait_for_timeout(100)
@@ -328,24 +346,36 @@ with sync_playwright() as p:
                         modal_text = page.locator("#setup").inner_text()
                         check_no_sample(tag + " setup modal", modal_text)
                         if uid in ("svc", "rich"):
-                            assert "Use this listing" not in modal_text, f"{{tag}} services modal said Use this listing"
-                            assert "Shop or product link" not in modal_text, f"{{tag}} services modal said Shop or product link"
+                            assert "Use this listing" not in modal_text, (
+                                f"{{tag}} services modal said Use this listing"
+                            )
+                            assert "Shop or product link" not in modal_text, (
+                                f"{{tag}} services modal said Shop or product link"
+                            )
                         page.click("#closeSetup")
                     elif path == "/welcome?edit=1":
                         focus_ph = page.locator("#wkPrefFocus").get_attribute("placeholder") or ""
                         check_no_sample(tag + " wkPrefFocus placeholder", focus_ph)
-                        assert "prints" not in focus_ph.lower(), f"{{tag}} wkPrefFocus placeholder mentioned prints"
+                        assert "prints" not in focus_ph.lower(), (
+                            f"{{tag}} wkPrefFocus placeholder mentioned prints"
+                        )
                     elif path == "/digest":
-                        signup_lede = page.locator("#digestSignup .dg-sub-lede").text_content() or ""
+                        signup_lede = (
+                            page.locator("#digestSignup .dg-sub-lede").text_content() or ""
+                        )
                         check_no_sample(tag + " digestSignup lede", signup_lede)
 
                     if width == 375:
-                        sw, iw = page.evaluate("[document.documentElement.scrollWidth, window.innerWidth]")
-                        assert sw <= iw + 1, f"{{tag}} horizontal overflow: scrollWidth={{sw}} > innerWidth={{iw}}"
+                        sw, iw = page.evaluate(
+                            "[document.documentElement.scrollWidth, window.innerWidth]"
+                        )
+                        assert sw <= iw + 1, (
+                            f"{{tag}} overflow: scrollWidth={{sw}} > innerWidth={{iw}}"
+                        )
                     assert not errors, f"{{tag}} page errors: {{errors}}"
                 ctx.close()
 
-        # Sample shop checks: one check per page that ?workspace=sample still shows its sample content
+        # Sample shop checks: verify ?workspace=sample keeps its sample content
         sctx = browser.new_context(viewport={{"width": 1440, "height": 900}})
         spage = sctx.new_page()
 
