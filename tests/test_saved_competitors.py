@@ -21,9 +21,12 @@ from src.api.main import app
 from src.models.intel import CompetitorBrief
 from src.services.accounts import AccountSession
 from src.services.saved_competitors import (
+    AD_LIBRARY_KEYWORD_LINK,
     MAX_SAVED_BRIEFS,
+    ad_library_page_url,
     analysis_takeaway,
     merge_saved_competitor,
+    parse_ad_library_page_id,
 )
 from src.services.seller_memory import rank_seller_recommendations
 
@@ -216,3 +219,52 @@ def test_route_guards(saved_route: _Store) -> None:
     assert social.status_code == 422 and "Facebook or Instagram" in social.json()["detail"]
     assert _put({"competitor_url": "clutch dot co"}).status_code == 422
     assert saved_route.saves == []
+
+
+PAGE_LINK = (
+    "https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=ALL"
+    "&view_all_page_id=104958162837&search_type=page&media_type=all"
+)
+KEYWORD_LINK = (
+    "https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=ALL"
+    "&q=Clutch&search_type=keyword_unordered&media_type=all"
+)
+
+
+def test_only_an_advertiser_page_link_or_id_counts() -> None:
+    assert parse_ad_library_page_id(PAGE_LINK) == "104958162837"
+    assert parse_ad_library_page_id(" 104958162837 ") == "104958162837"
+    assert parse_ad_library_page_id(PAGE_LINK.replace("https://www.", "")) == "104958162837"
+    with pytest.raises(ValueError, match="keyword search"):
+        parse_ad_library_page_id(KEYWORD_LINK)
+    for bad in (
+        "https://clutch.co/",
+        "https://www.facebook.com/clutchco",
+        "12",
+        "evil.com/ads/library?view_all_page_id=104958162837",
+    ):
+        with pytest.raises(ValueError):
+            parse_ad_library_page_id(bad)
+    assert "view_all_page_id=104958162837" in ad_library_page_url("104958162837")
+
+
+def test_page_link_is_kept_on_both_lists_and_can_be_removed() -> None:
+    doc, entry, _ = merge_saved_competitor(
+        _doc(), url="https://clutch.co/", ad_library_page_id="104958162837", now_iso=NOW
+    )
+    assert entry["ad_library_page_id"] == "104958162837"
+    assert doc["onboarding"]["competitors"][0]["ad_library_page_id"] == "104958162837"
+    doc, entry, _ = merge_saved_competitor(
+        doc, url="https://clutch.co", ad_library_page_id="", now_iso=NOW
+    )
+    assert "ad_library_page_id" not in entry
+    assert "ad_library_page_id" not in doc["onboarding"]["competitors"][0]
+
+
+def test_route_links_a_page_and_refuses_a_keyword_search(saved_route: _Store) -> None:
+    ok = _put({"competitor_url": "https://clutch.co/", "ad_library_url": PAGE_LINK})
+    assert ok.status_code == 200, ok.text
+    assert ok.json()["competitor"]["ad_library_page_id"] == "104958162837"
+    assert "view_all_page_id=104958162837" in ok.json()["competitor"]["ad_library_url"]
+    bad = _put({"competitor_url": "https://clutch.co/", "ad_library_url": KEYWORD_LINK})
+    assert bad.status_code == 422 and bad.json()["detail"] == AD_LIBRARY_KEYWORD_LINK

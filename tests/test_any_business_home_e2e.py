@@ -517,6 +517,13 @@ with sync_playwright() as p:
     page.wait_for_function(
         "document.body.innerText.includes('Analysis saved to your workspace')", timeout=10000
     )
+    # The competitor card's note shows the takeaway right away, before any reload.
+    page.wait_for_function(
+        "(t) => [...document.querySelectorAll('#sellerList .sm-comp-rationale')]"
+        ".some((i) => i.value === t)",
+        arg=TAKEAWAY,
+        timeout=15000,
+    )
     # A reload keeps it: "View analysis" (free), and the takeaway is the competitor's note.
     page.goto(BASE + "/", wait_until="domcontentloaded")
     page.wait_for_function(ROW_HAS, arg="View analysis", timeout=20000)
@@ -534,5 +541,71 @@ print("ANALYSIS_SAVED_OK")
         [python_bin, "-c", script], capture_output=True, text=True, timeout=180, check=False
     )
     assert proc.returncode == 0 and "ANALYSIS_SAVED_OK" in proc.stdout, (
+        f"STDOUT:\n{proc.stdout}\nSTDERR:\n{proc.stderr}"
+    )
+
+
+def test_a_competitor_row_links_their_exact_meta_ad_library_page_e2e(
+    any_business_server: str,
+) -> None:
+    """Nov 25: "See their ads" was a keyword search (every advertiser saying the name). Pasting
+    the advertiser's Ad Library page links their own ads, and it stays after a reload."""
+    python_bin = _find_playwright_python()
+    if not python_bin:
+        pytest.skip("Playwright runtime not installed")
+    script = f"""
+from playwright.sync_api import sync_playwright
+
+BASE = {any_business_server!r}
+PAGE = ("https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=ALL"
+        "&view_all_page_id=104958162837&search_type=page&media_type=all")
+KEYWORD = ("https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=ALL"
+           "&q=Brightpath&search_type=keyword_unordered&media_type=all")
+with sync_playwright() as p:
+    browser = p.chromium.launch()
+    for width in (375, 1440):
+        ctx = browser.new_context(viewport={{"width": width, "height": 900}})
+        ctx.add_cookies([{{"name": "muse_e2e_user", "value": "svc", "url": BASE}}])
+        page = ctx.new_page()
+        errors = []
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.route(lambda u: not u.startswith(BASE) and not u.startswith("data:"),
+                   lambda r: r.abort())
+        page.goto(BASE + "/", wait_until="domcontentloaded")
+        row = page.locator("#sellerList .jr-seller", has_text="Brightpath Consulting").first
+        link = row.locator(".jr-meta-ad-link").first
+        link.wait_for(state="visible", timeout=20000)
+        if width == 375:
+            assert "(all advertisers)" in link.inner_text(), link.inner_text()
+            assert "q=Brightpath" in (link.get_attribute("href") or "")
+            row.get_by_role("button", name="Link their exact page").click()
+            row.locator(".jr-ad-link-form input").fill(KEYWORD)
+            row.get_by_role("button", name="Save link").click()
+            row.locator(".jr-ad-link-status", has_text="keyword search").wait_for(timeout=10000)
+            row.locator(".jr-ad-link-form input").fill(PAGE)
+            row.get_by_role("button", name="Save link").click()
+            page.wait_for_function(
+                "() => [...document.querySelectorAll('#sellerList .jr-meta-ad-link')].some((a) =>"
+                " a.href.includes('view_all_page_id=104958162837'))",
+                timeout=10000,
+            )
+            assert not page.evaluate("document.documentElement.scrollWidth > window.innerWidth")
+        else:
+            # A new visit (the saved link is in the workspace now).
+            page.wait_for_function(
+                "() => [...document.querySelectorAll('#sellerList .jr-meta-ad-link')].some((a) =>"
+                " a.href.includes('view_all_page_id=104958162837')"
+                " && a.textContent.startsWith('See their ads on Meta'))",
+                timeout=20000,
+            )
+        assert not errors, errors
+        ctx.close()
+    browser.close()
+print("AD_LIBRARY_LINK_OK")
+"""
+    proc = subprocess.run(
+        [python_bin, "-c", script], capture_output=True, text=True, timeout=180, check=False
+    )
+    assert proc.returncode == 0 and "AD_LIBRARY_LINK_OK" in proc.stdout, (
         f"STDOUT:\n{proc.stdout}\nSTDERR:\n{proc.stderr}"
     )

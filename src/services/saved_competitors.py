@@ -17,8 +17,9 @@ Pure functions over a document copy; the route in src/api/intel.py loads and sav
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 
 from src.models.intel import CompetitorBrief
 from src.services.competitor_checks import MAX_COMPETITORS_PER_CHECK, normalize_competitor_url
@@ -30,6 +31,45 @@ SUMMARY_MAX_CHARS = 600
 ADDED_REASON = "Added by you"
 # Notes setup wrote for the seller, which an analysis may replace. Anything else is the seller's.
 _SETUP_NOTES = {"example", "watched competitor", "added by you"}
+
+
+_PAGE_ID_RE = re.compile(r"^[0-9]{5,20}$")
+_AD_LIBRARY_HOSTS = {"facebook.com", "www.facebook.com", "m.facebook.com", "web.facebook.com"}
+AD_LIBRARY_KEYWORD_LINK = (
+    "That link is a keyword search, which shows every advertiser that mentions the name. In "
+    "Meta's Ad Library, type their name, pick their page from the suggestions, then copy the link."
+)
+AD_LIBRARY_NOT_A_LINK = (
+    "Paste the link of their page in Meta's Ad Library (it starts with "
+    "facebook.com/ads/library and includes view_all_page_id)."
+)
+
+
+def parse_ad_library_page_id(raw: str) -> str:
+    """The advertiser's Facebook Page ID from an Ad Library link, or the ID itself.
+
+    Only `view_all_page_id` names one advertiser; a keyword search (`q=`) does not.
+    Raises ValueError with a plain sentence otherwise.
+    """
+    text = str(raw or "").strip()
+    if _PAGE_ID_RE.fullmatch(text):
+        return text
+    parts = urlsplit(text if "://" in text else f"https://{text}")
+    host = (parts.hostname or "").lower()
+    if host not in _AD_LIBRARY_HOSTS or not parts.path.rstrip("/").endswith("/ads/library"):
+        raise ValueError(AD_LIBRARY_NOT_A_LINK)
+    page_id = (parse_qs(parts.query).get("view_all_page_id") or [""])[0].strip()
+    if _PAGE_ID_RE.fullmatch(page_id):
+        return page_id
+    raise ValueError(AD_LIBRARY_KEYWORD_LINK)
+
+
+def ad_library_page_url(page_id: str) -> str:
+    """Meta's Ad Library showing one advertiser's active ads."""
+    return (
+        "https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=ALL"
+        f"&view_all_page_id={page_id}&search_type=page&media_type=all"
+    )
 
 
 def analysis_takeaway(brief: CompetitorBrief) -> str:
@@ -78,6 +118,7 @@ def merge_saved_competitor(
     url: str,
     name: str = "",
     brief: CompetitorBrief | None = None,
+    ad_library_page_id: str | None = None,
     now_iso: str,
 ) -> tuple[dict[str, Any], dict[str, Any], bool]:
     """Return `(new_document, competitor_entry, added)` with the competitor saved.
@@ -149,6 +190,15 @@ def merge_saved_competitor(
                 "selected": entry.get("selected", True) is not False,
             }
         )
+
+    if ad_library_page_id is not None:
+        # "" unlinks; the home's rows read setup's list, seller memory reads the entries.
+        targets = [entry] + [c for c in onb_list if same(c)]
+        for item in targets:
+            if ad_library_page_id:
+                item["ad_library_page_id"] = ad_library_page_id
+            else:
+                item.pop("ad_library_page_id", None)
 
     if brief is not None:
         takeaway = analysis_takeaway(brief)

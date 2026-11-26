@@ -56,7 +56,11 @@ from src.services.competitor_checks import (
 )
 from src.services.competitor_intel import CompetitorIntelService, collect_entries
 from src.services.research_cache import NAMESPACE_AD_PREVIEWS, cached_research
-from src.services.saved_competitors import merge_saved_competitor
+from src.services.saved_competitors import (
+    ad_library_page_url,
+    merge_saved_competitor,
+    parse_ad_library_page_id,
+)
 from src.services.seller_audit import (
     analyze_social_screenshots,
     audit_seller_footprint,
@@ -118,6 +122,8 @@ class SaveCompetitorRequest(BaseModel):
     competitor_url: str = Field(min_length=1, max_length=500)
     name: str = Field(default="", max_length=140)
     brief: CompetitorBrief | None = None
+    # Their page in Meta's Ad Library (a view_all_page_id link or the Page ID); "" unlinks.
+    ad_library_url: str | None = Field(default=None, max_length=1000)
 
 
 @router.put("/competitors/saved")
@@ -144,6 +150,14 @@ async def save_competitor_to_workspace(
             status_code=422,
             detail="Use the competitor's website address, like https://their-site.com.",
         )
+    page_id: str | None = None
+    if body.ad_library_url is not None:
+        try:
+            page_id = (
+                parse_ad_library_page_id(body.ad_library_url) if body.ad_library_url.strip() else ""
+            )
+        except ValueError as err:
+            raise HTTPException(status_code=422, detail=str(err)) from err
     for attempt in (1, 2):
         ws = await load_workspace(account)
         version = int(ws.get("version") or 0)
@@ -153,6 +167,7 @@ async def save_competitor_to_workspace(
                 url=raw_url,
                 name=body.name,
                 brief=body.brief,
+                ad_library_page_id=page_id,
                 now_iso=now_iso_utc(),
             )
         except ValueError as err:
@@ -172,9 +187,23 @@ async def save_competitor_to_workspace(
             "version": int(saved.get("version") or version + 1),
             "competitor": {
                 key: entry.get(key)
-                for key in ("name", "url", "rationale", "analysis_takeaway", "analyzed_at")
+                for key in (
+                    "name",
+                    "url",
+                    "rationale",
+                    "analysis_takeaway",
+                    "analyzed_at",
+                    "ad_library_page_id",
+                )
             }
-            | {"selected": entry.get("selected", True) is not False},
+            | {
+                "selected": entry.get("selected", True) is not False,
+                "ad_library_url": (
+                    ad_library_page_url(str(entry["ad_library_page_id"]))
+                    if entry.get("ad_library_page_id")
+                    else None
+                ),
+            },
         }
     raise HTTPException(status_code=409, detail="Your workspace changed. Reload and try again.")
 

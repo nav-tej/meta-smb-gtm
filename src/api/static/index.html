@@ -984,6 +984,12 @@
       code, .channel-chip, .finding-item a, .journey a { overflow-wrap: anywhere; }
     }
   /* "Ask Muse what to do next": the answer shows the moves to start with. */
+  .jr-ad-links { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; min-width: 0; }
+  .jr-link-btn { background: none; border: 0; padding: 0; font: inherit; font-size: 0.8rem; color: #1b6e44; text-decoration: underline; cursor: pointer; }
+  .jr-ad-link-form { display: grid; gap: 6px; width: 100%; margin-top: 4px; }
+  .jr-ad-link-form[hidden] { display: none; }
+  .jr-ad-link-form input { width: 100%; min-width: 0; box-sizing: border-box; padding: 6px 8px; border: 1px solid #d9d4c8; border-radius: 8px; font: inherit; font-size: 0.85rem; }
+  .jr-ad-link-form .jr-note { margin: 0; overflow-wrap: anywhere; }
   .jr-steer-answer { display: grid; gap: 10px; margin-top: 12px; }
   .jr-steer-answer[hidden] { display: none; }
   .jr-steer-answer-lead { margin: 0; font-weight: 700; }
@@ -1017,7 +1023,7 @@
   <script src="/static/account.js?v=20261120-uxgap17" defer></script>
   <script src="/static/workspace-modes.js?v=20261117-uxgap6" defer></script>
   <script src="/static/muse-shell.js?v=20261125-uxgap23" defer></script>
-  <script src="/static/welcome.js?v=20261125-uxgap23" defer></script>
+  <script src="/static/welcome.js?v=20261125-uxgap24" defer></script>
   <script src="/static/seller-memory.js?v=20261125-uxgap24" defer></script>
 </head>
 <body>
@@ -2777,24 +2783,35 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
     // wrote one, so the ranker cites it and the seller can edit it on the card. The server merges
     // it into the saved workspace (PUT /api/v1/competitors/saved); this page never writes the whole
     // document. Returns the saved competitor, or null.
-    async function saveCompetitor(url, name, brief = null) {
+    async function putCompetitor(body) {
       const ownerId = liveSnapshot()?.user?.id;
-      if (!ownerId || window.museModes?.isSampleMode?.()) return null;
+      if (!ownerId || window.museModes?.isSampleMode?.()) return { ok: false, detail: 'Sign in to save competitors.' };
       try {
         const resp = await fetch('/api/v1/competitors/saved', {
           method: 'PUT',
           credentials: 'same-origin',
           headers: { 'Content-Type': 'application/json', 'X-Muse-Owner': ownerId },
-          body: JSON.stringify({ competitor_url: url, name: name || '', brief }),
+          body: JSON.stringify(body),
         });
-        if (!resp.ok) return null;
-        const data = await resp.json();
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok) {
+          return { ok: false, detail: typeof data?.detail === 'string' ? data.detail : 'Muse could not save this. Try again.' };
+        }
         try { await window.museSellerMemory?.reload?.(); } catch {}
-        return data?.competitor || null;
+        return { ok: true, competitor: data?.competitor || null };
       } catch {
-        return null;
+        return { ok: false, detail: 'Muse could not save this. Check your connection and try again.' };
       }
     }
+    async function saveCompetitor(url, name, brief = null) {
+      const result = await putCompetitor({ competitor_url: url, name: name || '', brief });
+      return result.ok ? result.competitor : null;
+    }
+    // The home rows (welcome.js) link a competitor's own page in Meta's Ad Library through this.
+    window.museCompetitors = Object.freeze({
+      linkAdLibrary: (url, name, adLibraryUrl) =>
+        putCompetitor({ competitor_url: url, name: name || '', ad_library_url: adLibraryUrl }),
+    });
     const sellerName = (btn) => (btn?.closest?.('.jr-seller')?.querySelector('strong')?.textContent || '').trim();
     const DEMO_BRIEFS_KEY = 'muse.demoBriefs';
     async function requestDemoBrief(url, btn) {
