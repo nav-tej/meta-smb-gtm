@@ -269,7 +269,10 @@ with sync_playwright() as p:
         kicker = page.locator("#activeWorkspaceKicker").inner_text().strip().lower()
         assert kicker == "your business", kicker
         assert "Many service businesses quote on request" in body
-        # The watch-role menus sit inside their competitor row.
+        # The watch-role menus sit inside their competitor row (opened with "Edit").
+        page.evaluate(
+            "document.querySelectorAll('#sellerList .sm-comp-edit').forEach((b) => b.click())"
+        )
         clipped = page.evaluate('''() => Array.from(document.querySelectorAll(
             '#sellerList .jr-seller > .sm-comp-role-wrap select')).map((s) => {{
               const row = s.closest('.jr-seller').getBoundingClientRect();
@@ -521,6 +524,28 @@ with sync_playwright() as p:
     page.wait_for_function(
         "(t) => [...document.querySelectorAll('#sellerList .sm-comp-rationale')]"
         ".some((i) => i.value === t)",
+        arg=TAKEAWAY,
+        timeout=15000,
+    )
+    # The card shows it as one line, and the seller can change it.
+    note_line = page.locator("#sellerList .jr-seller", has_text="Brightpath").locator(
+        ".sm-comp-note-text"
+    )
+    assert note_line.inner_text() == "Your note: " + TAKEAWAY, note_line.inner_text()
+    row = page.locator("#sellerList .jr-seller", has_text="Brightpath")
+    row.locator(".sm-comp-edit").click()
+    row.locator(".sm-comp-rationale").fill("They win on fixed fees; we win on speed")
+    row.locator(".sm-comp-rationale").dispatch_event("change")
+    page.wait_for_function(
+        "() => [...document.querySelectorAll('#sellerList .sm-comp-note-text')].some((n) =>"
+        " n.textContent === 'Your note: They win on fixed fees; we win on speed')",
+        timeout=15000,
+    )
+    row.locator(".sm-comp-rationale").fill(TAKEAWAY)
+    row.locator(".sm-comp-rationale").dispatch_event("change")
+    page.wait_for_function(
+        "(t) => [...document.querySelectorAll('#sellerList .sm-comp-note-text')]"
+        ".some((n) => n.textContent === 'Your note: ' + t)",
         arg=TAKEAWAY,
         timeout=15000,
     )
