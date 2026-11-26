@@ -40,3 +40,9 @@
 ## Resume checkpoint — November 23, 2026
 - Jason stopped with an explicit usage-limit error; coordinator takes ownership of the saved Chromium test. Its process finished successfully after interruption: **16 passed in 37.76s**, covering 375/1440 services, products, budget, signed out, unfinished setup, sample, retry and in-flight switches. Evidence: `chromium-scoped.log` and `chromium/` in the durable validation folder.
 - Next: commit this completed test, merge requested upstream pass 18, bump seller-memory loaders, run full final verification and mutation checks. No release/deployment actions.
+
+## Resume checkpoint — November 25, 2026
+- Previous approval review hit the usage limit before the November 23 integration log could be written. Claude subsequently completed/pushed merge `f450087` of exact upstream `4ac4396`, then committed/pushed fixture corrections `de8804a`. Coordinator found a clean worktree at `de8804a`; preserves both commits.
+- The prior integrated gate failed **6 tests, 747 passed, 2 skipped** because older sign-in fixtures did not answer the new own-brief route and triggered the session-expiry dialog. Claude's five-file fixture patch adds the missing mocked account readers or own response; it does not change runtime behavior.
+- Final full gate now running as exec session 89648, evidence `final-gate.log`. All **8/8 Node contracts passed again** on this exact source, individual `final-<contract>.log` files.
+- No deployment, alias change, .env read, live Muse call, settings change or database mutation. Next: finish gate/audits/mutations, finalize report and push checkpoint.
