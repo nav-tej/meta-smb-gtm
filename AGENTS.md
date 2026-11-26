@@ -1,13 +1,13 @@
 # AGENTS.md
 
-## Current coordination — November 16
+## Production and releases — November 25
 
-Read `docs/launch/HANDOFF_CURRENT.md` on branch `codex/coordination-nov16` first (`git fetch origin && git show origin/codex/coordination-nov16:docs/launch/HANDOFF_CURRENT.md`). That branch is documentation only; never deploy or reset an implementation branch to it. Older assignments below are historical.
-
-- Release candidate: `27c1f50` (`gemini/account-audit-fixtures-nov16`), deployed only to a protected preview. Production is unchanged.
-- Latest work on top of it: `claude/ux-gap-nov16`, report `docs/launch/CLAUDE_UX_GAP_NOV16.md`. It is not integrated or deployed until the coordinator says so.
+- Production (`meta-smb-gtm.vercel.app`) runs `6d4efc0` from `claude/ux-gap-ad-loop-nov17`, deployment `dpl_EvxE86oWVgYmef2edoygCM4SuFug`, released Nov 25 at about 22:40 PT by Claude with Nav's explicit approval (`vercel deploy --prod` from a clean detached checkout). Previous production: `dpl_8deG8F3rw1CtKSxU3kBA5Bz3idor` (`b3f11c3`, Nov 10). Rollback: `vercel rollback meta-smb-ey7g1mcto-navtejs-6321s-projects.vercel.app --scope navtejs-6321s-projects`.
+- Integration branch: `claude/ux-gap-ad-loop-nov17` (Claude coordinates). Agents branch from it and never push to it.
+- The GitHub repo is connected, so every branch push builds a protected preview. **Vercel's production branch is still `main`: a push or merge to `main` deploys production.** Nav will switch it to an unused `production` branch. After that, a release is a push of a tested commit to `production`. Never push to `main` or `production`, and never deploy or promote, without Nav's explicit approval for that release.
+- Not applied to hosted Supabase: `watchlist_checks.sql`, `ad_account_connections.sql` and `research_cache.sql`; their features are off or don't use those tables. Applied: `run_refunds.sql`, `billing_repair.sql` and the earlier schema.
 - The main Mac checkout is detached and dirty. Preserve it and work in an isolated worktree from an exact ref.
-- `/Users/nav/Downloads/UX_GAP_BRIEF.md` describes old production, not the candidate. Check `docs/launch/UX_GAP_RECONCILIATION.md` (coordination branch) and the Claude report before acting on any item in it.
+- Historical: the Nov 16 coordination handoff is `docs/launch/HANDOFF_CURRENT.md` on `codex/coordination-nov16`. It is documentation only; never deploy or reset an implementation branch to it.
 
 
 ## Active launch sprint, November 7–8, 2026
