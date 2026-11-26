@@ -161,6 +161,12 @@
       prompt.dataset.defaultPrompt = nextPrompt;
     }
     swap($('productName'), services ? 'Name the service or offer' : 'Name the item you are sharing', 'placeholder');
+    swap(find('label[for="shopUrl"]'), services ? 'Website or page link' : 'Shop or product link');
+    swap($('readListing'), services ? 'Use this page' : 'Use this listing');
+    swap($('shopUrl'), services ? 'https://your-website.com' : 'https://your-shop.com', 'placeholder');
+    swap($('quickShopUrl'), services ? 'https://your-website.com' : 'https://your-shop.com', 'placeholder');
+    swap($('researchSavedLink'), 'Open your full workspace →');
+    swap($('researchSavedLink'), '/', 'href');
   }
   const deviceKey = () => `muse-editor-v1:${draftNamespace}:${isEffectiveSample() ? 'sample' : (draftOwner ? 'account:' + encodeURIComponent(draftOwner) : 'guest')}`;
   function persistDraft() {
