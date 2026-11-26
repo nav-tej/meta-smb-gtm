@@ -17,6 +17,7 @@ import socket
 import subprocess
 import threading
 import time
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -98,6 +99,7 @@ USERS = {
     "prod": _document("Wild Meadow Prints", "products", "More sales", ["instagram", "website"]),
     "oldex": _old_example_document(),
     "bad": _malformed_document(),
+    "live": _document("Northwind Growth", "services", "More client inquiries", ["linkedin"]),
 }
 
 
@@ -141,7 +143,8 @@ def any_business_server(monkeypatch: pytest.MonkeyPatch):
             "user": {"id": session.user_id, "email": session.email, "email_verified": True},
             "usage": {"plan": "starter", "used": 0, "limit": 3, "remaining": 3},
             "runs_remaining": 3,
-            "live_available": False,
+            # "live" can run an analysis (the page is told so); Muse itself is faked in the page.
+            "live_available": session.user_id == "live",
         }
 
     async def no_crawl(*_args: Any, **_kwargs: Any) -> tuple[list[Any], list[str]]:
@@ -465,5 +468,71 @@ print("MALFORMED_OK")
         [python_bin, "-c", script], capture_output=True, text=True, timeout=180, check=False
     )
     assert proc.returncode == 0 and "MALFORMED_OK" in proc.stdout, (
+        f"STDOUT:\n{proc.stdout}\nSTDERR:\n{proc.stderr}"
+    )
+
+
+def test_a_finished_analysis_is_saved_and_becomes_the_competitor_note_e2e(
+    any_business_server: str,
+) -> None:
+    """Nov 25: the home saved analyses with a request the server refused (405), so a reload lost
+    them and nothing reached the seller's notes. Now it is saved and editable."""
+    python_bin = _find_playwright_python()
+    if not python_bin:
+        pytest.skip("Playwright runtime not installed")
+    brief = json.loads((Path(__file__).parent / "fixtures" / "competitor_brief.json").read_text())
+    brief["summary"] = "Brightpath sells fixed-fee growth audits to B2B founders."
+    brief["competitor_url"] = "https://brightpath.test"
+    script = f"""
+from playwright.sync_api import sync_playwright
+
+BASE = {any_business_server!r}
+BRIEF = {json.dumps(brief)!r}
+TAKEAWAY = "Brightpath sells fixed-fee growth audits to B2B founders."
+ROW_HAS = (
+    "(want) => [...document.querySelectorAll('#sellerList .jr-seller')].some((li) =>"
+    " li.textContent.includes('Brightpath') && (li.querySelector('.js-live-brief')?.textContent"
+    " || '').includes(want))"
+)
+with sync_playwright() as p:
+    browser = p.chromium.launch()
+    ctx = browser.new_context(viewport={{"width": 1440, "height": 900}})
+    ctx.add_cookies([{{"name": "muse_e2e_user", "value": "live", "url": BASE}}])
+    page = ctx.new_page()
+    errors = []
+    page.on("pageerror", lambda e: errors.append(str(e)))
+    page.route(
+        "**/api/v1/analyze-competitors**",
+        lambda r: r.fulfill(status=200, content_type="application/json", body=BRIEF),
+    )
+    page.goto(BASE + "/", wait_until="domcontentloaded")
+    page.wait_for_function(ROW_HAS, arg="Request analysis", timeout=20000)
+    btn = page.locator("#sellerList .jr-seller", has_text="Brightpath").locator(".js-live-brief")
+    with page.expect_response(
+        lambda r: r.url.endswith("/api/v1/competitors/saved") and r.request.method == "PUT",
+        timeout=30000,
+    ) as saved:
+        btn.click()
+    assert saved.value.status == 200, saved.value.text()
+    page.wait_for_function(
+        "document.body.innerText.includes('Analysis saved to your workspace')", timeout=10000
+    )
+    # A reload keeps it: "View analysis" (free), and the takeaway is the competitor's note.
+    page.goto(BASE + "/", wait_until="domcontentloaded")
+    page.wait_for_function(ROW_HAS, arg="View analysis", timeout=20000)
+    page.wait_for_function(
+        "(t) => [...document.querySelectorAll('#sellerList .sm-comp-rationale')]"
+        ".some((i) => i.value === t)",
+        arg=TAKEAWAY,
+        timeout=20000,
+    )
+    assert not errors, errors
+    browser.close()
+print("ANALYSIS_SAVED_OK")
+"""
+    proc = subprocess.run(
+        [python_bin, "-c", script], capture_output=True, text=True, timeout=180, check=False
+    )
+    assert proc.returncode == 0 and "ANALYSIS_SAVED_OK" in proc.stdout, (
         f"STDOUT:\n{proc.stdout}\nSTDERR:\n{proc.stderr}"
     )

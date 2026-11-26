@@ -38,7 +38,12 @@ from src.models.seller import (
     SellerProfile,
 )
 from src.services import demo, result_cache, scan_guard, watchlist_store
-from src.services.accounts import load_workspace, resolve_account, save_workspace
+from src.services.accounts import (
+    load_workspace,
+    resolve_account,
+    save_workspace,
+    verify_workspace_owner,
+)
 from src.services.competitor_checks import (
     MAX_COMPETITORS_PER_CHECK,
     MAX_PAGES_PER_COMPETITOR,
@@ -51,6 +56,7 @@ from src.services.competitor_checks import (
 )
 from src.services.competitor_intel import CompetitorIntelService, collect_entries
 from src.services.research_cache import NAMESPACE_AD_PREVIEWS, cached_research
+from src.services.saved_competitors import merge_saved_competitor
 from src.services.seller_audit import (
     analyze_social_screenshots,
     audit_seller_footprint,
@@ -106,6 +112,71 @@ def is_social_link(raw_url: str | None) -> bool:
         return False
     host = (urlparse(text if "://" in text else f"https://{text}").hostname or "").lower()
     return any(host == name or host.endswith(f".{name}") for name in SOCIAL_LINK_HOSTS)
+
+
+class SaveCompetitorRequest(BaseModel):
+    competitor_url: str = Field(min_length=1, max_length=500)
+    name: str = Field(default="", max_length=140)
+    brief: CompetitorBrief | None = None
+
+
+@router.put("/competitors/saved")
+async def save_competitor_to_workspace(
+    body: SaveCompetitorRequest,
+    http_request: Request,
+    response: Response,
+    x_muse_owner: Annotated[str | None, Header()] = None,
+) -> dict[str, Any]:
+    """Keep a competitor, and its latest analysis when given, in the seller's workspace.
+
+    The analysis's takeaway becomes the competitor's note unless the seller wrote one, so the
+    ranker cites it and the seller can edit it on the competitor card. No runs, no crawls.
+    """
+    never_cache(response)
+    account = await resolve_account(http_request, response, require_verified=True)
+    assert account is not None
+    verify_workspace_owner(account, x_muse_owner, require_binding=True)
+    raw_url = body.competitor_url.strip()
+    if is_social_link(raw_url):
+        raise HTTPException(status_code=422, detail=SOCIAL_LINK_REFUSAL)
+    if not raw_url.lower().startswith(("http://", "https://")):
+        raise HTTPException(
+            status_code=422,
+            detail="Use the competitor's website address, like https://their-site.com.",
+        )
+    for attempt in (1, 2):
+        ws = await load_workspace(account)
+        version = int(ws.get("version") or 0)
+        try:
+            doc, entry, added = merge_saved_competitor(
+                ws.get("document") or {},
+                url=raw_url,
+                name=body.name,
+                brief=body.brief,
+                now_iso=now_iso_utc(),
+            )
+        except ValueError as err:
+            raise HTTPException(status_code=422, detail=str(err)) from err
+        try:
+            saved = await save_workspace(
+                account, doc, expected_version=version, expected_owner=account.user_id
+            )
+        except HTTPException as err:
+            # Another tab saved in between: reload once and merge again.
+            if err.status_code == 409 and attempt == 1:
+                continue
+            raise
+        return {
+            "saved": True,
+            "added": added,
+            "version": int(saved.get("version") or version + 1),
+            "competitor": {
+                key: entry.get(key)
+                for key in ("name", "url", "rationale", "analysis_takeaway", "analyzed_at")
+            }
+            | {"selected": entry.get("selected", True) is not False},
+        }
+    raise HTTPException(status_code=409, detail="Your workspace changed. Reload and try again.")
 
 
 @router.post("/analyze-competitors", response_model=CompetitorBrief)

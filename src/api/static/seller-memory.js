@@ -1762,7 +1762,6 @@
     if (!items.length) return;
 
     items.forEach((li, idx) => {
-      if (li.querySelector('.sm-comp-role-wrap')) return;
       // Match competitor entry by URL/name or index
       const text = (li.textContent || '').toLowerCase();
       const comp =
@@ -1770,6 +1769,14 @@
           (c) => (c.url && text.includes(c.url.replace(/^https?:\/\//, '').toLowerCase())) ||
             (c.name && text.includes(c.name.toLowerCase()))
         ) || state.competitorEntries[idx];
+      const existing = li.querySelector('.sm-comp-role-wrap');
+      if (existing) {
+        // After a reload (a saved analysis updates the note), show the saved note unless the
+        // seller is typing in it.
+        const input = existing.querySelector('.sm-comp-rationale');
+        if (comp && input && document.activeElement !== input) input.value = comp.rationale || comp.reason || '';
+        return;
+      }
       if (!comp) return;
 
       const wrap = el('div', { class: 'sm-comp-role-wrap' });
