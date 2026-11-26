@@ -1,4 +1,76 @@
-# Own-workspace daily brief — Codex checkpoint log
+# Own-workspace daily brief — completed November 25, 2026
+
+**Assignment complete; ownership released.** Branch `codex/today-own-brief-nov21`, durable worktree `/Users/nav/muse-worktrees/today-own-brief-nov21`. This report closes the original brief against runtime/test source **de8804a**. Subsequent commits on this branch change this report only.
+
+## Integration and other agents: checked against origin November 25
+
+- Original base `740d1fe`; upstream pass 18 `4ac4396` integrated in `f450087`. Preserved pass-18 behavior and bumped all seller-memory loaders to `20261122-cx1`; shell loaders remain `20261121-cx1`.
+- Our implementation checkpoints: `0401eed` frontend, `8022604` state regression, `d9f4f3a` private backend and outcomes rendering, `ae6e572` API contracts, `afb8720` documentation formatting, `19af8ac` real-route Chromium coverage. Claude completed the merge `f450087` and repaired older test fixtures in `de8804a` while Codex was interrupted.
+- **Already merged upstream:** Claude merged this entire implementation through `de8804a` into `claude/ux-gap-ad-loop-nov17` at **764f737** on November 23. Do not reimplement or overwrite it with this older branch.
+- Current integration tip fetched November 25 is **6d4efc0cd887ad234f07abd3e9025ebca546d85c**. Later commits add saved own competitor checks (`89d11dc`, `9c2b38e`), safer analysis targets/errors (`cdb5b88`), YouTube link import and video recommendation handoff (merge `2d7e286`, reviewed fixes `b928c96`), and weekly automatic watchlist checks (merge `6d4efc0`, reviewed fixes `07a35b2`). Argon began YouTube Part A; Antigravity completed it and Claude integrated it.
+- Weekly automatic checks remain **flagged off; migration not applied**, according to the merge and agent report. No activation or migration performed here.
+- Read the published YouTube and automatic-watchlist reports: their authors report audits 27/27 and 20/20 and additional contracts. Those are **other-agent evidence**, not this coordinator's independent verification of current combined tip `6d4efc0`. YouTube's report records one transient Chromium failure followed by a targeted pass; do not describe that original full run as completely clean.
+- This task did not deploy, move an alias, merge main, alter release/nov19 or PR #4, change settings, read .env, send email, mutate hosted databases or make live Muse calls. Current integration tip requires its own combined release gate/acceptance before any release claim.
+
+## Independent final results
+
+All testing used `DEMO_MODE=true META_MODEL_API_KEY= DEMO_KEY=`. Durable evidence directory: `/Users/nav/muse-worktrees/validation-today-own-brief`.
+
+| Check | Final result | Evidence |
+|---|---|---|
+| `make PY=/Users/nav/meta-smb-gtm/.venv/bin check` | **753 passed, 2 skipped, 1 expected Pillow oversized-image warning; 318.74s**. Ruff lint clean; 317 files formatted. | `final-gate.log` |
+| `/usr/bin/python3 tests/launch_account_audit.py` | **27 passed, 0 failed** | `final-account/report.json` |
+| `/usr/bin/python3 tests/launch_browser_audit.py` | **20 passed, 0 failed** | `final-guest/report.json` |
+| Eight Node contract runners | **8 passed, 0 failed** | `final-<runner>.log` |
+| New private-brief API tests (included in gate) | **12 passed** | `tests/test_daily_brief_own.py` |
+| New real-route Chromium tests (included in gate) | **16 passed**; 375/1440 services, products, five-minute budget, guest, setup, sample, failure/retry and in-flight switches | `tests/test_today_own_brief_e2e.py`; earlier scoped run `chromium-scoped.log`, 37.76s |
+| Mutation restoration | **3 passed in 7.20s** after restoring both files | `mutation-restored.log` |
+
+Node commands: `node tests/<runner>.cjs` for `editor_drafts_contract`, `account_ui_contract`, `today_studio_contract`, `muse_shell_resilience`, `ui_polish_contract`, `shared_get_contract`, `creator_journey_smoke`; and `node tests/creator_studio_contract.cjs src/api/static/creator.js`. Creator journey covers 7/7 criteria. Before-change evidence: full gate 724 passed/2 skipped, account 27/27, guest 20/20, contracts 8/8.
+
+The two final skips are optional billing/digest PGlite SQL checks requiring `BILLING_PGLITE_DIR`; they were not enabled in this run. Hosted authentication, Supabase persistence, production/preview behavior, real crawls and paid model calls remain unverified by this assignment. The machine's Node security hook reported an installed-version upgrade requirement; no host runtime upgrade was performed.
+
+## Regression evidence and visual review
+
+- Own endpoint: signed out 401; incomplete setup 409; one workspace read per request; current saved preferences and dismiss signals; no shared analysis cache/monitor/sample reads; zero Muse construction; account A/B isolation. Fixed-date sample API JSON exactly matches baseline `740d1fe` SHA-256.
+- Own UI: business header, top move matching context bar, Heads up for over-budget moves, full own-workspace studio handoffs, no local triage on own moves, logged outcomes, free re-check, failure retry and stale-request guards. Only own `/today` call ceiling changed 8→9 for the one additional brief read; signed-out 4/sample 9 unchanged. Full call-budget test passed.
+- Sample-substitution mutation: API **1 expected failure (0.35s)** and Chromium services/375 **1 expected failure, 15 deselected (16.93s)**. Incorrect budget-label mutation: Chromium budget/375 **1 expected failure, 15 deselected (1.65s)**. Logs `mutation-sample-api.log`, `mutation-sample-browser.log`, `mutation-budget-label.log`. Mutations ran in a separate detached worktree, restored cleanly, and the temporary worktree was removed after restoration passed.
+- Coordinator actually viewed `chromium/375-own-services-loaded.png`, `chromium/1440-own-services-loaded.png`, `chromium/375-own-products-loaded.png`, `chromium/1440-own-products-loaded.png`. Mobile wrapping/cards and desktop columns were readable; account-specific moves, logged results and unchecked competitors were visible without sample leakage. Captures are in the durable evidence directory, not committed media.
+
+## Files in this assignment relative to pass 18
+
+- `AGENTS.md`
+- `docs/launch/CODEX_TODAY_OWN_BRIEF_NOV21.md`
+- `src/api/daily_brief.py`
+- `src/api/seller_memory.py`
+- `src/api/static/creator.html`
+- `src/api/static/digest.html`
+- `src/api/static/first-ad.html`
+- `src/api/static/index.html`
+- `src/api/static/muse-shell.js`
+- `src/api/static/progress.html`
+- `src/api/static/seller-memory.js`
+- `src/api/static/today.html`
+- `src/api/static/welcome.html`
+- `src/services/daily_brief.py`
+- `src/services/seller_memory.py`
+- `tests/test_api_calls_per_page_e2e.py`
+- `tests/test_daily_brief.py`
+- `tests/test_daily_brief_own.py`
+- `tests/test_first_visit_import_e2e.py`
+- `tests/test_seller_memory_e2e.py`
+- `tests/test_shared_api_cache.py`
+- `tests/test_shop_image_suggestions_e2e.py`
+- `tests/test_state_aware_copy.py`
+- `tests/test_today_any_business_e2e.py`
+- `tests/test_today_brief_states_e2e.py`
+- `tests/test_today_destinations_e2e.py`
+- `tests/test_today_own_brief_e2e.py`
+
+Only loader versions changed in HTML. Seller-memory JavaScript differs from pass 18 by its single handoff export; the extraction helper moved unchanged between API/service layers. The five older Chromium fixture repairs are Claude’s preserved work.
+
+## Restart history
+
 
 ## Resume checkpoint — November 22, 2026
 - Branch: codex/today-own-brief-nov21. Base740d1fe3d1fb43f4e18af36c80179fe9ce4c7c2c (fetched current tip). Durable worktree /Users/nav/muse-worktrees/today-own-brief-nov21; evidence /Users/nav/muse-worktrees/validation-today-own-brief.
