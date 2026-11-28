@@ -1,8 +1,8 @@
 # AGENTS.md
 
-## Production and releases — November 25
+## Production and releases — November 28
 
-- Production (`meta-smb-gtm.vercel.app`) runs `6c7da99` from `claude/ux-gap-ad-loop-nov17`, deployment `dpl_DkUMsPbSio6bW7w5hEp2Fa3kukxq`, released Nov 25 at about 23:25 PT by Claude with Nav's explicit approval (`vercel deploy --prod` from a clean detached checkout). Previous: `dpl_EvxE86oWVgYmef2edoygCM4SuFug` (`6d4efc0`, Nov 25 22:30); before that `dpl_8deG8F3rw1…` (`b3f11c3`, Nov 10). Rollback: `vercel rollback meta-smb-ak5vsv67r-navtejs-6321s-projects.vercel.app --scope navtejs-6321s-projects`.
+- Production (`meta-smb-gtm.vercel.app`) runs `3fb9707` from `claude/ux-gap-ad-loop-nov17`, deployment `dpl_5UxecFkkRrgQqphRwsB8rRMSjapW` (`meta-smb-pby68o0is`), released Nov 28 at about 00:15 PT by Claude with Nav's explicit approval (`vercel deploy --prod` from a clean detached checkout). Previous: `dpl_DkUMsPbSio6bW7w5hEp2Fa3kukxq` (`6c7da99`, Nov 25 23:25); `dpl_EvxE86oWVgYmef2edoygCM4SuFug` (`6d4efc0`, Nov 25 22:30); `dpl_8deG8F3rw1…` (`b3f11c3`, Nov 10). Rollback: `vercel rollback meta-smb-8k71amikr-navtejs-6321s-projects.vercel.app --scope navtejs-6321s-projects` (back to `6c7da99`).
 - Integration branch: `claude/ux-gap-ad-loop-nov17` (Claude coordinates). Agents branch from it and never push to it.
 - The GitHub repo is connected, so every branch push builds a protected preview. **Vercel's production branch is still `main`: a push or merge to `main` deploys production.** Nav will switch it to an unused `production` branch. After that, a release is a push of a tested commit to `production`. Never push to `main` or `production`, and never deploy or promote, without Nav's explicit approval for that release.
 - Not applied to hosted Supabase: `watchlist_checks.sql`, `ad_account_connections.sql` and `research_cache.sql`; their features are off or don't use those tables. Applied: `run_refunds.sql`, `billing_repair.sql` and the earlier schema.
