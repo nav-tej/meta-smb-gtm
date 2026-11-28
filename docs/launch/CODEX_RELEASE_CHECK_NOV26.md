@@ -29,3 +29,9 @@
 ## Account audit checkpoint — November 28, 2026 (PT)
 - `DEMO_MODE=true META_MODEL_API_KEY= DEMO_KEY= /usr/bin/python3 tests/launch_account_audit.py --output /tmp/codex-release-account-nov28`: exit 0, **27 passed, 0 failed**, real Chromium with offline fixtures. Frozen static/sample files only; no hosted service validation. Report `/tmp/codex-release-account-nov28/report.json`.
 - Full gate remains active (session 11501), no failures reported yet. Next: run browser audit, then collect full gate result. Node contracts already complete; no reason to repeat them absent source changes.
+
+## Browser/log-format checkpoint — November 28, 2026 (PT)
+- `DEMO_MODE=true META_MODEL_API_KEY= DEMO_KEY= /usr/bin/python3 tests/launch_browser_audit.py --output /tmp/codex-release-browser-nov28`: exit 0, **20 passed, 0 failed**, offline real Chromium. Report `/tmp/codex-release-browser-nov28/report.json`. Account audit already 27/0; both suites exercised unchanged merged UI.
+- Static inspection of the installed CLI (`/usr/local/lib/node_modules/vercel/dist/commands-deployments.js`, chunks/chunk-UFXIPUNI.js and chunk-QROI2U32.js) established request-log NDJSON `{type:"request",data:{httpStatus,requestMethod,requestPath}}` followed by a summary. No CLI/auth/hosted calls were used for this inspection. Added request envelope/httpStatus parsing and fail-closed handling for warnings, pagination and excluded intervals; unknown/dynamic log paths are redacted.
+- Targeted checker suite now **39 passed in 6.71s**, Ruff lint/format clean. Tests added after the running full gate collected tests; rerun the full gate on the final source after this checkpoint. Existing gate session 11501 is still running; collect its result first. Browser audit session 77984 completed exit 0. No active audit sessions.
+- Next: full final-source gate, final durable results, clean commit/push and release own scope to Claude. Part 3 remains deferred under this session's read-only-check boundary.

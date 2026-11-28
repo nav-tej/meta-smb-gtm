@@ -340,7 +340,18 @@ def check_logs() -> Check:
         for item in parsed:
             if not isinstance(item, dict):
                 raise ValueError("Unknown log entry")
-            status = item.get("statusCode", item.get("status", item.get("responseStatusCode")))
+            if item.get("type") == "summary":
+                if item.get("pagination", {}).get("hasMore") or item.get("excludedIntervals"):
+                    raise ValueError("Log window incomplete")
+                continue
+            if "type" in item:
+                if item["type"] != "request" or not isinstance(item.get("data"), dict):
+                    raise ValueError("Unknown record type or incomplete logs")
+                item = item["data"]
+            status = item.get(
+                "httpStatus",
+                item.get("statusCode", item.get("status", item.get("responseStatusCode"))),
+            )
             if status is None:
                 raise ValueError("Missing request status")
             if 500 <= int(status) <= 599:

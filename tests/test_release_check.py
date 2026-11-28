@@ -451,3 +451,48 @@ def test_oauth_unknown_parameters_not_echoed(checker: dict[str, Any]) -> None:
     assert result.ok
     for private in (SECRET_STATE, SECRET_CHALLENGE, "private", "login_hint", "state"):
         assert private not in result.detail
+
+
+@pytest.mark.parametrize(
+    ("records", "ok"),
+    [
+        (
+            [
+                {"type": "request", "data": {"httpStatus": 200, "requestPath": "/"}},
+                {"type": "summary", "pagination": {"hasMore": False}, "excludedIntervals": []},
+            ],
+            True,
+        ),
+        (
+            [
+                {
+                    "type": "request",
+                    "data": {
+                        "httpStatus": 503,
+                        "requestMethod": "GET",
+                        "requestPath": "/today?private=token",
+                    },
+                }
+            ],
+            False,
+        ),
+        ([{"type": "summary", "pagination": {"hasMore": True}}], False),
+        ([{"type": "summary", "excludedIntervals": [{"start": "private"}]}], False),
+        ([{"type": "warning", "message": "private"}], False),
+    ],
+)
+def test_logs_current_cli_ndjson(
+    checker: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
+    records: list[dict[str, Any]],
+    ok: bool,
+) -> None:
+    payload = "\n".join(json.dumps(record) for record in records)
+    monkeypatch.setattr(
+        subprocess, "run", lambda *args, **kwargs: subprocess.CompletedProcess(args[0], 0, payload)
+    )
+    result = checker["check_logs"]()
+    assert result.ok is ok
+    assert "private" not in result.detail
+    if any(record.get("data", {}).get("httpStatus") == 503 for record in records):
+        assert result.detail == "GET /today"
