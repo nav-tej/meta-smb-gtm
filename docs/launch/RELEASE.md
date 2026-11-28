@@ -1,5 +1,8 @@
 # Release runbook
 
+> Nov 28 (Claude, at merge): `scripts/release_check.py` passed 9/9 against production
+> (`3fb9707`, with `--logs`) and 8/8 against its protected preview (`--transport vercel`).
+
 For the coordinator. Commands below are release instructions, not authorization to run them.
 Use [AGENTS.md — Production and releases](../../AGENTS.md) and
 [the Nov 26 assignment](codex-release-check-nov26.md) as the release policy.
@@ -8,8 +11,8 @@ Use [AGENTS.md — Production and releases](../../AGENTS.md) and
 
 These are steps for Nav, not actions authorized for this checker assignment.
 
-1. Create `production` at the current production commit `6c7da99`, or approve Claude doing
-   it. Pushing that branch before the tracking switch only builds a preview.
+1. Create `production` at the current production commit (`3fb9707` since Nov 28; AGENTS.md's
+   top section always has the current one), or approve Claude doing it. Pushing that branch before the tracking switch only builds a preview.
 2. In Vercel's dashboard, open `meta-smb-gtm` → Settings → Environments → Production →
    Branch Tracking and set it to `production`. The dashboard asks for two-factor setup first;
    that is Nav's choice. Verify the actual setting before using the Git release path.
@@ -108,7 +111,7 @@ test -z "$(git status --porcelain)"
 : "${VERCEL_ORG_ID:?set the verified organization ID}"
 : "${VERCEL_PROJECT_ID:?set the verified project ID}"
 VERCEL_ORG_ID="$VERCEL_ORG_ID" VERCEL_PROJECT_ID="$VERCEL_PROJECT_ID" \
-  vercel deploy --prod --scope navtejs-6321s-projects
+  vercel deploy --prod --yes --cwd "$RELEASE_DIR" --scope navtejs-6321s-projects
 ```
 
 `--prod` creates a production deployment: [Vercel deploy](https://vercel.com/docs/cli/deploy).
@@ -130,15 +133,16 @@ same `--transport vercel` option; never disable protection to run the check.
 
 Use the approved rollback plan if the new production fails the checker, serves the wrong
 commit/assets, breaks sign-in, or causes customer-facing regressions or 5xx errors. Pause
-further releases. The rollback command recorded in AGENTS for the Nov 25 release is:
+further releases. AGENTS.md's top section records the rollback command for the current
+release; it changes with every release. On Nov 28 (production `3fb9707`) it was:
 
 ```sh
-vercel rollback meta-smb-ak5vsv67r-navtejs-6321s-projects.vercel.app --scope navtejs-6321s-projects
+vercel rollback meta-smb-8k71amikr-navtejs-6321s-projects.vercel.app --scope navtejs-6321s-projects
 ```
 
-This recorded target is `6d4efc0`, deployment `dpl_EvxE86oWVgYmef2edoygCM4SuFug`.
-Before each new release, select and verify its appropriate known-good target rather than
-blindly reusing this older one. After rollback completes, verify the production alias and
+That target is `6c7da99`, deployment `dpl_DkUMsPbSio6bW7w5hEp2Fa3kukxq`. Before each new
+release, record the outgoing production deployment as the new rollback target rather than
+reusing an older one. After rollback completes, verify the production alias and
 rerun the production checker with `--logs`; the 15-minute window can still contain the
 failed release's errors, which must be attributed rather than hidden. Record recovery
 separately from a clean log result. Rollback affects production domain auto-assignment;
@@ -155,9 +159,8 @@ uncertainty. The documentation worker does not edit either record.
 ## Evidence boundary for this document
 
 Repository-verified: the assignment, production instructions, Makefile and eight contract
-paths above. AGENTS reports Nov 25 production as `6c7da99`, deployment
-`dpl_DkUMsPbSio6bW7w5hEp2Fa3kukxq`, with `main` still configured for production; these are
-recorded facts, not a fresh hosted inspection. Official CLI syntax was checked against the
+paths above. AGENTS.md records the current production deployment and that `main` is still configured
+for production; these are recorded facts, not a fresh hosted inspection. Official CLI syntax was checked against the
 linked Vercel documentation. The checker and its Vercel transport are covered by local tests;
 every hosted result still requires coordinator verification. Local execution results are in
 [the release-check report](CODEX_RELEASE_CHECK_NOV26.md). No release SHA is certified by
