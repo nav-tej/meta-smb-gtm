@@ -12,3 +12,10 @@
 - Implemented initial stdlib checker in `scripts/release_check.py`; next update tests for Nov 27 checks and run local regression/mutations. Implementation not yet verified. Part 3 deferred until mandatory gates finish.
 - Local hook reported Node 24.14.0 vulnerable and recommended >=24.22.1; informed Nav. No Node runtime changes performed.
 - No hosted target requests, deployments, service changes or secret output. No running test processes. Next: targeted checker tests, then full offline gate, both audits and eight Node contracts.
+
+## Implementation checkpoint — November 28, 2026 (PT)
+- Completed Parts 1/2 implementation in scripts/release_check.py, tests/test_release_check.py, docs/launch/RELEASE.md. Added Nav's one-time steps, current production/rollback references, watchlist off/on and signed-out save gate.
+- Local command: `DEMO_MODE=true META_MODEL_API_KEY= DEMO_KEY= /Users/nav/meta-smb-gtm/.venv/bin/pytest tests/test_release_check.py -q`: 34 passed. New files pass targeted Ruff lint/format. Early fixture-only failures corrected: nonexistent AccountError import and shallow-copied router retaining the original dispatch method; runtime source unchanged.
+- Required in-memory mutations missing_progress, script_version, guard_200 each produce checker exit 1 and precisely the intended failed check (pages/versions/ad_library). Additional broken link/asset, account state, save 200/500, watchlist mode/status and OAuth host/callback regressions are covered.
+- Mocked Vercel CLI transport and request-log tests verify expected non-2xx statuses, no redirect following, query/identity redaction and fail-closed unknown schemas. No Vercel command/request actually executed by these tests.
+- Next executable step: full `DEMO_MODE=true META_MODEL_API_KEY= DEMO_KEY= make PY=/Users/nav/meta-smb-gtm/.venv/bin check`; both system-Python Chromium audits with separate /tmp outputs; eight Node contracts. Node v24.14.0 is the available runtime (warning already reported); no untrusted media decoding is part of these local contracts. No active processes at this checkpoint.

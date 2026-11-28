@@ -4,6 +4,22 @@ For the coordinator. Commands below are release instructions, not authorization 
 Use [AGENTS.md — Production and releases](../../AGENTS.md) and
 [the Nov 26 assignment](codex-release-check-nov26.md) as the release policy.
 
+## Nav's one-time steps
+
+These are steps for Nav, not actions authorized for this checker assignment.
+
+1. Create `production` at the current production commit `6c7da99`, or approve Claude doing
+   it. Pushing that branch before the tracking switch only builds a preview.
+2. In Vercel's dashboard, open `meta-smb-gtm` → Settings → Environments → Production →
+   Branch Tracking and set it to `production`. The dashboard asks for two-factor setup first;
+   that is Nav's choice. Verify the actual setting before using the Git release path.
+3. To enable weekly watchlist checks, obtain Nav's approval for each action and do these
+   in order: apply `supabase/migrations/watchlist_checks.sql` to hosted Supabase; Nav adds
+   `CRON_SECRET` in Vercel; release; set `WATCHLIST_AUTO_CHECK_ENABLED=true`; then run the
+   checker with `--watchlist on` (expects signed-out 401). The default `--watchlist off`
+   expects 404. Neither mode accepts 200 or 5xx. The checker also requires signed-out
+   `PUT /api/v1/competitors/saved` to return 401 before workspace reads/writes.
+
 ## 1. Pick and verify the exact commit
 
 Choose a full commit SHA on `claude/ux-gap-ad-loop-nov17` after integration, including the
@@ -51,8 +67,7 @@ Require exit 0 and every applicable check PASS. `--skip-oauth` is for local deve
 never a preview or production release gate. A preview OAuth callback mismatch blocks release;
 do not waive it to get a green result. Save only the checker's sanitized output.
 
-The parent checker implementation must support this transport before this step is usable.
-Its per-request command shape is `vercel curl PATH --deployment BASE -- --request METHOD
+The checker supports the protected-preview transport. Its per-request command shape is `vercel curl PATH --deployment BASE -- --request METHOD
 --include --max-redirs 0 ...` (curl options after `--`, explicit base, no redirect following).
 It must parse the response internally, including expected 302/422/404/401 responses, without
 printing raw headers, cookies, OAuth state or code challenges. `--json` above belongs to the
@@ -118,10 +133,10 @@ commit/assets, breaks sign-in, or causes customer-facing regressions or 5xx erro
 further releases. The rollback command recorded in AGENTS for the Nov 25 release is:
 
 ```sh
-vercel rollback meta-smb-ey7g1mcto-navtejs-6321s-projects.vercel.app --scope navtejs-6321s-projects
+vercel rollback meta-smb-ak5vsv67r-navtejs-6321s-projects.vercel.app --scope navtejs-6321s-projects
 ```
 
-This historical target is `b3f11c3`, deployment `dpl_8deG8F3rw1CtKSxU3kBA5Bz3idor`.
+This recorded target is `6d4efc0`, deployment `dpl_EvxE86oWVgYmef2edoygCM4SuFug`.
 Before each new release, select and verify its appropriate known-good target rather than
 blindly reusing this older one. After rollback completes, verify the production alias and
 rerun the production checker with `--logs`; the 15-minute window can still contain the
@@ -140,10 +155,10 @@ uncertainty. The documentation worker does not edit either record.
 ## Evidence boundary for this document
 
 Repository-verified: the assignment, production instructions, Makefile and eight contract
-paths above. AGENTS reports Nov 25 production as `6d4efc0`, deployment
-`dpl_EvxE86oWVgYmef2edoygCM4SuFug`, with `main` still configured for production; these are
+paths above. AGENTS reports Nov 25 production as `6c7da99`, deployment
+`dpl_DkUMsPbSio6bW7w5hEp2Fa3kukxq`, with `main` still configured for production; these are
 recorded facts, not a fresh hosted inspection. Official CLI syntax was checked against the
-linked Vercel documentation. The parent is implementing the checker and its Vercel transport;
-that interface and every hosted result still require coordinator verification. No release
+linked Vercel documentation. The checker and its Vercel transport are covered by local tests;
+every hosted result still requires coordinator verification. No release
 SHA is certified by this document, and no env read, hosted request, push, settings change
 or deployment was performed to write it.

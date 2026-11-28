@@ -23,7 +23,16 @@ from fastapi.responses import JSONResponse
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "release_check.py"
-CHECKS = {"pages", "assets", "versions", "account", "oauth", "ad_library", "watchlist"}
+CHECKS = {
+    "pages",
+    "assets",
+    "versions",
+    "account",
+    "oauth",
+    "ad_library",
+    "watchlist",
+    "saved_competitor",
+}
 SECRET_STATE = "fixture-private-oauth-state"
 SECRET_CHALLENGE = "fixture-private-code-challenge"
 
@@ -52,7 +61,7 @@ def release_server(
     monkeypatch.setenv("DEMO_KEY", "")
     monkeypatch.setenv("OUTPUT_DIR", str(tmp_path / "outputs"))
     monkeypatch.setenv("WATCHLIST_AUTO_CHECK_ENABLED", "false")
-    from src.api import accounts
+    from src.api import accounts, intel
     from src.api.main import app
     from src.clients.meta import MetaClient
     from src.config import get_settings
@@ -71,6 +80,8 @@ def release_server(
     async def resolve_account(*args: Any, **kwargs: Any) -> None:
         return None
 
+    monkeypatch.setattr(intel, "load_workspace", forbidden)
+    monkeypatch.setattr(intel, "save_workspace", forbidden)
     monkeypatch.setattr(accounts, "snapshot", snapshot)
     monkeypatch.setattr(accounts, "resolve_account", resolve_account)
     monkeypatch.setattr(httpx.AsyncClient, "send", forbidden)
@@ -87,15 +98,22 @@ def release_server(
         *,
         oauth: str = "valid",
         watchlist_status: int | None = None,
+        watchlist_on: bool = False,
     ) -> tuple[str, list[str]]:
+        monkeypatch.setenv("WATCHLIST_AUTO_CHECK_ENABLED", str(watchlist_on).lower())
+        get_settings.cache_clear()
         fixture_app = copy.copy(app)
         fixture_app.router = copy.copy(app.router)
         fixture_app.router.routes = list(app.router.routes)
+        # A shallow-copied router retains its original bound dispatch method.
+        fixture_app.router.middleware_stack = fixture_app.router.app
         fixture_app.user_middleware = list(app.user_middleware)
         fixture_app.middleware_stack = None
         if mutation == "missing_progress":
             fixture_app.router.routes = [
-                route for route in fixture_app.router.routes if route.path != "/progress"
+                route
+                for route in fixture_app.router.routes
+                if getattr(route, "path", None) != "/progress"
             ]
 
         async def start_google(request: Request, response: Response, next_path: str | None) -> str:
@@ -121,6 +139,9 @@ def release_server(
         async def mutate(request: Request, call_next: Any) -> Response:
             path = request.url.path
             requests.append(f"{request.method} {path}")
+            if mutation.startswith("saved_") and path == "/api/v1/competitors/saved":
+                assert request.method == "PUT"
+                return Response(status_code=int(mutation.removeprefix("saved_")))
             if mutation == "guard_200" and path == "/api/v1/analyze-competitors":
                 assert request.method == "POST"
                 return JSONResponse({"unexpected_success": True})
@@ -173,7 +194,7 @@ def release_server(
 
 
 def run_check(
-    base: str, *, skip_oauth: bool = True, json_output: bool = True
+    base: str, *, skip_oauth: bool = True, json_output: bool = True, watchlist: str = "off"
 ) -> subprocess.CompletedProcess[str]:
     assert SCRIPT.is_file(), (
         "Parent must finish scripts/release_check.py before running these tests"
@@ -188,6 +209,8 @@ def run_check(
         base,
         "--transport",
         "http",
+        "--watchlist",
+        watchlist,
     ]
     if json_output:
         command.append("--json")
@@ -249,6 +272,8 @@ def test_release_check_passes_real_app(release_server: Callable[..., Any]) -> No
         ("broken_asset", "assets"),
         ("auth_unconfigured", "account"),
         ("auth_user", "account"),
+        ("saved_200", "saved_competitor"),
+        ("saved_500", "saved_competitor"),
     ],
 )
 def test_release_mutations_fail_correct_check(
@@ -290,3 +315,139 @@ def test_oauth_validates_redirect_and_never_prints_secrets(
     assert "GET /api/v1/account/oauth/google/callback" not in requests
     for secret in (SECRET_STATE, SECRET_CHALLENGE, "muse_oauth_state"):
         assert secret not in result.stdout + result.stderr
+
+
+@pytest.mark.parametrize(("mode", "status"), [("off", 401), ("on", 404)])
+def test_watchlist_wrong_mode_fails(
+    release_server: Callable[..., Any], mode: str, status: int
+) -> None:
+    base, _ = release_server(watchlist_status=status)
+    checks = report(run_check(base, watchlist=mode))
+    assert checks["watchlist"]["ok"] is False
+
+
+def test_watchlist_on_refuses_without_secret(release_server: Callable[..., Any]) -> None:
+    base, requests = release_server(watchlist_on=True)
+    result = run_check(base, watchlist="on")
+    checks = report(result)
+    assert result.returncode == 0, result.stdout
+    assert checks["watchlist"]["ok"] is True
+    assert "PUT /api/v1/competitors/saved" in requests
+
+
+@pytest.fixture
+def checker() -> dict[str, Any]:
+    import runpy
+
+    return runpy.run_path(str(SCRIPT), run_name="release_check_tests")
+
+
+def test_vercel_transport_keeps_status_and_never_follows_redirects(
+    checker: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    commands = []
+
+    def run(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[bytes]:
+        commands.append(command)
+        assert kwargs["capture_output"] is True
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            b"HTTP/1.1 200 Connection established\r\n\r\n"
+            b"HTTP/2 302 Found\r\nLocation: https://accounts.google.com/?state=private\r\n"
+            b"Set-Cookie: secret=private\r\n\r\n",
+        )
+
+    monkeypatch.setattr(subprocess, "run", run)
+    # This reserved local name is never resolved: the CLI process is fully mocked.
+    transport = checker["Transport"]("https://preview.example.test", "vercel")
+    reply = transport.request("/api/v1/account/oauth/google")
+    assert reply.status == 302
+    command = commands[0]
+    assert command[:5] == [
+        "vercel",
+        "curl",
+        "/api/v1/account/oauth/google",
+        "--deployment",
+        "https://preview.example.test",
+    ]
+    assert command[command.index("--max-redirs") + 1] == "0"
+    assert "--location" not in command
+    assert "--include" in command
+
+
+@pytest.mark.parametrize("status", [401, 404, 422, 500])
+def test_transport_parses_expected_http_errors(checker: dict[str, Any], status: int) -> None:
+    raw = f"HTTP/2 {status} Response\r\nContent-Type: application/json\r\n\r\n{{}}".encode()
+    reply = checker["parse_http"](raw)
+    assert reply.status == status
+    assert reply.data() == {}
+
+
+@pytest.mark.parametrize(
+    ("payload", "ok", "detail"),
+    [
+        ("[]", True, "No 5xx"),
+        ('[{"statusCode":200,"path":"/"}]', True, "No 5xx"),
+        ('{"statusCode":500,"method":"GET","path":"/users/alice"}', False, "GET /[redacted]"),
+        ('{"statusCode":503,"method":"GET","path":"/today?token=private"}', False, "GET /today"),
+        (
+            '{"statusCode":500,"method":"POST","path":"/api/users/alice@example.test"}',
+            False,
+            "POST /[redacted]",
+        ),
+        ('{"email":"private@example.test"}', False, "schema unrecognized"),
+        ("not json containing private", False, "schema unrecognized"),
+    ],
+)
+def test_logs_fail_closed_and_redact(
+    checker: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
+    payload: str,
+    ok: bool,
+    detail: str,
+) -> None:
+    def run(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        assert command == [
+            "vercel",
+            "logs",
+            "requests",
+            "-p",
+            "meta-smb-gtm",
+            "--scope",
+            "navtejs-6321s-projects",
+            "--since",
+            "15m",
+            "--json",
+        ]
+        return subprocess.CompletedProcess(command, 0, payload)
+
+    monkeypatch.setattr(subprocess, "run", run)
+    result = checker["check_logs"]()
+    assert result.ok is ok
+    assert detail in result.detail
+    assert "private" not in result.detail
+    assert "alice" not in result.detail
+
+
+def test_oauth_unknown_parameters_not_echoed(checker: dict[str, Any]) -> None:
+    from types import SimpleNamespace
+
+    callback = "http://localhost/api/v1/account/oauth/google/callback"
+    location = "https://accounts.google.com/o/oauth2/v2/auth?" + urlencode(
+        {
+            "redirect_uri": callback,
+            "state": SECRET_STATE,
+            "code_challenge": SECRET_CHALLENGE,
+            "login_hint": "private@example.test",
+            "unknown": "private-token",
+        }
+    )
+    transport = SimpleNamespace(
+        base="http://localhost",
+        request=lambda path: checker["Reply"](302, {"location": location}, b""),
+    )
+    result = checker["check_oauth"](transport)
+    assert result.ok
+    for private in (SECRET_STATE, SECRET_CHALLENGE, "private", "login_hint", "state"):
+        assert private not in result.detail
