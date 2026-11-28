@@ -127,7 +127,14 @@ and approved SHA, and verify the production alias resolves to it. Then run:
 ```
 
 Require exit 0, all checks PASS and no 5xx in the requested log window. `--logs` uses
-`vercel logs requests -p meta-smb-gtm --scope navtejs-6321s-projects --since 15m --json`;
+`vercel logs requests -p meta-smb-gtm --scope navtejs-6321s-projects --since 15m
+--query 'httpStatus >= 500' --limit 1000 --json`. It follows each summary's
+`pagination.next` with `vercel logs requests --next <cursor> --limit 1000 --json` until
+`hasMore` is false, up to 10 pages. The cursor preserves the original team, project,
+filter and time window; those flags cannot be repeated with `--next`. A filtered empty
+summary with `recordsReturned: 0`, `hasMore: false` and no excluded intervals passes.
+Missing/repeated cursors, incomplete summaries, excluded intervals, CLI failures or more
+than 10 pages fail closed. Never save or print the cursor;
 retain only sanitized checker results (failure method/path, no query strings or identities).
 An unavailable log check is incomplete verification. If production is protected, use the
 same `--transport vercel` option; never disable protection to run the check.
