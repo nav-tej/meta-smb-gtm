@@ -25,3 +25,7 @@
 - Full gate currently running (exec session 11501; log `/tmp/release-check-gate.log`): Ruff check passed, 349 files format-clean; pytest not yet complete.
 - Account audit currently running (exec session 96494; log `/tmp/release-check-account.log`; evidence `/tmp/codex-release-account-nov28`). No failures reported so far; not a final result. Browser audit pending, to avoid unnecessary concurrent Chromium load.
 - No app/runtime/static edits. Part 3 remains deferred; read-only inventory identified technical messages but no changes are authorized by this run's read-only-check constraint. Next: collect gate/account exit statuses and run the second audit. Required mutation evidence is already in 34 passing tests; record explicit verbose results at handoff.
+
+## Account audit checkpoint — November 28, 2026 (PT)
+- `DEMO_MODE=true META_MODEL_API_KEY= DEMO_KEY= /usr/bin/python3 tests/launch_account_audit.py --output /tmp/codex-release-account-nov28`: exit 0, **27 passed, 0 failed**, real Chromium with offline fixtures. Frozen static/sample files only; no hosted service validation. Report `/tmp/codex-release-account-nov28/report.json`.
+- Full gate remains active (session 11501), no failures reported yet. Next: run browser audit, then collect full gate result. Node contracts already complete; no reason to repeat them absent source changes.
