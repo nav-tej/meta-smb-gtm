@@ -206,7 +206,8 @@ def services_walkthrough_server(monkeypatch: pytest.MonkeyPatch):
     async def fake_snapshot(session: AccountSession | None) -> dict[str, Any]:
         if session is None:
             return {"configured": True, "user": None, "usage": None, "live_available": False}
-        plan = "free" if session.user_id == "npa" else "starter"
+        # A free account is stored as "trial"; "free" never reaches this code in production.
+        plan = "trial" if session.user_id == "npa" else "starter"
         return {
             "configured": True,
             "user": {"id": session.user_id, "email": session.email, "email_verified": True},

@@ -48,11 +48,12 @@ async def _get_account_plan_cost(account: AccountSession | None) -> float:
 
         snap = await snapshot(account)
         plan = (snap.get("usage") or {}).get("plan")
-        if plan == "free":
+        # A free account is stored as "trial" (3 free runs); it costs nothing.
+        if plan in ("trial", "free"):
             return 0.0
-        if plan in ("pro", "unlimited"):
+        if plan == "unlimited":
             return 29.0
-        if plan in ("starter", "trial"):
+        if plan == "starter":
             return 12.0
     except Exception:
         pass
