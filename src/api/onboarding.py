@@ -118,7 +118,10 @@ def _onboarding_record(
 
 def _require_json(request: Request) -> None:
     if request.headers.get("content-type", "").split(";", 1)[0].lower() != "application/json":
-        raise HTTPException(415, "Send onboarding requests as JSON.")
+        logger.warning("Setup request refused (expected JSON)")
+        raise HTTPException(
+            415, "Muse couldn't read your setup details. Reload the page and try saving again."
+        )
 
 
 @router.get("/status")

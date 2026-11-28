@@ -6,6 +6,7 @@ Live Muse routes spend credits through the live gate (src/api/demo.py), not this
 
 from __future__ import annotations
 
+import logging
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Header, HTTPException, Request, Response
@@ -14,6 +15,8 @@ from pydantic import BaseModel, Field
 from src.api.demo import credit_holder, valid_demo_key
 from src.config import get_settings
 from src.services import credits
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["credits"])
 
@@ -48,7 +51,10 @@ class AddRequest(BaseModel):
 def _require_json(request: Request) -> None:
     # A JSON content type forces a CORS preflight, so other sites cannot post silently.
     if request.headers.get("content-type", "").split(";", 1)[0].lower() != "application/json":
-        raise HTTPException(415, "Send credit requests as JSON.")
+        logger.warning("Run credit request refused (expected JSON)")
+        raise HTTPException(
+            415, "Muse couldn't read this request for more runs. Reload the page and try again."
+        )
 
 
 def _status(holder: credits.Holder) -> CreditStatus:
@@ -120,14 +126,18 @@ def add_credits(
     if settings.accounts_required:
         raise HTTPException(409, "Runs on Muse accounts are added through checkout.")
     if (body.plan is None) == (body.amount is None):
-        raise HTTPException(422, "Send either a plan or an amount.")
+        logger.warning("Run credit request refused (plan/amount selection)")
+        raise HTTPException(422, "Choose a plan or a number of runs, then try again.")
     admin = valid_demo_key(x_demo_key)
     holder = credit_holder(request, response, presenter=admin)
     if body.plan is not None:
         credits.add(holder.id, credits.DEMO_PLAN_RUNS[body.plan], f"Demo purchase: {body.plan}")
         return _status(holder)
     if not (admin or not settings.hosted_environment):
-        raise HTTPException(403, "Adding a custom number of credits needs the presenter key.")
+        logger.warning("Run credit request refused (custom top-up authorization)")
+        raise HTTPException(
+            403, "This session can't add a custom number of runs. Choose a plan instead."
+        )
     assert body.amount is not None
     credits.add(holder.id, body.amount, "Admin top-up")
     return _status(holder)

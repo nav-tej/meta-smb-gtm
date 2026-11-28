@@ -8,6 +8,7 @@ the latest stored run is returned with `X-Muse-Monitor: cooldown`.
 from __future__ import annotations
 
 import hmac
+import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Header, HTTPException, Query, Request, Response
@@ -17,6 +18,8 @@ from src.api.demo import valid_demo_key
 from src.config import get_settings
 from src.services import competitor_monitor as monitor
 from src.services import durable_state
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["monitor"])
 
@@ -71,10 +74,17 @@ async def cron_check(
     if secret:
         expected = f"Bearer {secret}"
         if not (authorization and hmac.compare_digest(authorization, expected)):
-            raise HTTPException(401, "This scheduled check needs the cron secret.")
+            logger.warning("Scheduled monitor check refused (authorization)")
+            raise HTTPException(
+                401,
+                "This scheduled check needs authorization. Open Muse to start a check yourself.",
+            )
         return await _run_or_cooldown(response, bypass=True, trigger="cron")
     if not request.headers.get("user-agent", "").startswith("vercel-cron"):
-        raise HTTPException(403, "Use POST /api/v1/monitor to run a check.")
+        logger.warning("Scheduled monitor check refused (caller)")
+        raise HTTPException(
+            403, "This address is for scheduled checks. Open Muse to start a check yourself."
+        )
     return await _run_or_cooldown(response, bypass=False, trigger="cron")
 
 

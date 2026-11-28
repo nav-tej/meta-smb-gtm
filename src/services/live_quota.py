@@ -7,11 +7,14 @@ result cache, no Muse call happens, so the slot is handed back. The cap is per r
 
 from __future__ import annotations
 
+import logging
 import time
 from collections import deque
 from contextvars import ContextVar
 
 from fastapi import HTTPException, status
+
+logger = logging.getLogger(__name__)
 
 WINDOW_SECONDS = 3600
 _live_calls: deque[float] = deque()
@@ -24,9 +27,13 @@ def reserve(limit: int) -> int:
     while _live_calls and now - _live_calls[0] > WINDOW_SECONDS:
         _live_calls.popleft()
     if len(_live_calls) >= limit:
+        logger.warning("Presenter hourly request limit reached (%d)", limit)
         raise HTTPException(
             status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=f"Live call limit reached ({limit} per hour). Cached demo results still work.",
+            detail=(
+                f"You've reached the limit of {limit} live requests per hour. "
+                "Try again later, or view saved results."
+            ),
         )
     _live_calls.append(now)
     _reserved_here.set(now)

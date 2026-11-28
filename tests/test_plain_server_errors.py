@@ -697,3 +697,212 @@ def test_business_details_conflict_keeps_recovery_payload(monkeypatch: pytest.Mo
     assert response.json()["server_version"] == 2
     assert "server_memory_entries" in response.json()
     assert "explicit version" not in response.text
+
+
+@pytest.mark.parametrize(
+    ("kind", "expected"),
+    [
+        ("setup", "Muse couldn't read your setup details. Reload the page and try saving again."),
+        ("account", "Muse couldn't read your account request. Reload the page and try again."),
+        ("runs", "Muse couldn't read this request for more runs. Reload the page and try again."),
+    ],
+)
+def test_wrong_content_type_is_plain(kind: str, expected: str) -> None:
+    from fastapi import Request
+
+    from src.api import credits
+    from src.services import accounts
+
+    request = Request(
+        {
+            "type": "http",
+            "headers": [(b"content-type", b"text/plain"), (b"origin", b"http://localhost")],
+        }
+    )
+    actions = {
+        "setup": onboarding._require_json,
+        "runs": credits._require_json,
+        "account": accounts.trusted_mutation,
+    }
+    response = error_response(lambda: actions[kind](request))
+    assert response.status_code == 415
+    assert_plain(response.json()["detail"], expected)
+    assert "JSON" not in response.text
+
+
+@pytest.mark.parametrize(
+    ("kind", "has_secret", "expected"),
+    [
+        (
+            "monitor",
+            True,
+            "This scheduled check needs authorization. Open Muse to start a check yourself.",
+        ),
+        (
+            "monitor",
+            False,
+            "This address is for scheduled checks. Open Muse to start a check yourself.",
+        ),
+        (
+            "digest",
+            True,
+            "This email delivery needs authorization. Return to your digest settings.",
+        ),
+        (
+            "digest",
+            False,
+            "This address is for scheduled email delivery. Return to your digest settings.",
+        ),
+    ],
+)
+def test_scheduled_route_refusals_are_plain(
+    monkeypatch: pytest.MonkeyPatch,
+    kind: str,
+    has_secret: bool,
+    expected: str,
+) -> None:
+    from types import SimpleNamespace
+
+    from src.api import digest_email, monitor
+
+    module = monitor if kind == "monitor" else digest_email
+    monkeypatch.setattr(
+        module, "get_settings", lambda: SimpleNamespace(cron_secret="fixture" if has_secret else "")
+    )
+    path = "/api/v1/monitor/run" if kind == "monitor" else "/api/v1/digest/send"
+    response = TestClient(app).get(path)
+    assert response.status_code == (401 if has_secret else 403)
+    assert_plain(response.json()["detail"], expected)
+    for technical in ("cron", "secret", "POST /api"):
+        assert technical not in response.text
+
+
+@pytest.mark.parametrize("custom_denied", [False, True])
+def test_add_runs_input_and_access_messages_are_plain(
+    monkeypatch: pytest.MonkeyPatch,
+    custom_denied: bool,
+) -> None:
+    from types import SimpleNamespace
+
+    from src.api import credits
+
+    monkeypatch.setattr(
+        credits,
+        "get_settings",
+        lambda: SimpleNamespace(accounts_required=False, hosted_environment=True),
+    )
+    monkeypatch.setattr(credits, "valid_demo_key", lambda key: False)
+    monkeypatch.setattr(
+        credits, "credit_holder", lambda *args, **kwargs: SimpleNamespace(id="fixture")
+    )
+    response = TestClient(app).post(
+        "/api/v1/credits/add", json={"amount": 1} if custom_denied else {}
+    )
+    assert response.status_code == (403 if custom_denied else 422)
+    assert_plain(
+        response.json()["detail"],
+        "This session can't add a custom number of runs. Choose a plan instead."
+        if custom_denied
+        else "Choose a plan or a number of runs, then try again.",
+    )
+    assert "presenter" not in response.text
+
+
+@pytest.mark.parametrize("failure", ["configuration", "signature", "apply"])
+def test_payment_update_errors_are_plain(
+    monkeypatch: pytest.MonkeyPatch,
+    failure: str,
+) -> None:
+    from types import SimpleNamespace
+
+    import stripe
+
+    from src.api import billing
+
+    async def fail(*args: Any, **kwargs: Any) -> None:
+        raise RuntimeError(RAW)
+
+    def verify(*args: Any, **kwargs: Any) -> Any:
+        if failure == "signature":
+            raise ValueError(RAW)
+        return {"id": "fixture", "type": "fixture"}
+
+    async def no_alert(*args: Any, **kwargs: Any) -> bool:
+        return False
+
+    monkeypatch.setattr(
+        billing,
+        "get_settings",
+        lambda: SimpleNamespace(
+            stripe_webhook_secret="" if failure == "configuration" else "fixture"
+        ),
+    )
+    monkeypatch.setattr(stripe.Webhook, "construct_event", verify)
+    monkeypatch.setattr(billing, "_stripe", lambda: object())
+    monkeypatch.setattr(billing, "_billing_event", fail)
+    monkeypatch.setattr(billing.alerts, "alert", no_alert)
+    response = TestClient(app).post("/api/v1/billing/webhook", content=b"{}")
+    expected = {
+        "configuration": (
+            "Muse can't receive payment updates right now. Contact support if a payment is missing."
+        ),
+        "signature": (
+            "Muse couldn't verify this payment update. Contact support if a payment is missing."
+        ),
+        "apply": "Muse couldn't record this payment update. Please try again later.",
+    }
+    assert response.status_code == (400 if failure == "signature" else 503)
+    assert_plain(response.json()["detail"], expected[failure])
+    assert "webhook" not in response.json()["detail"]
+
+
+def test_image_delivery_limit_preserves_size_fields(
+    monkeypatch: pytest.MonkeyPatch, competitor_brief: Any
+) -> None:
+    from src.api import creative
+    from src.api.demo import live_mode
+    from src.api.media_delivery import MediaResponseTooLargeError
+
+    async def fail(*args: Any, **kwargs: Any) -> None:
+        raise MediaResponseTooLargeError(5_000_000, 4_000_000)
+
+    monkeypatch.setattr(creative.result_cache, "cached", fail)
+    app.dependency_overrides[live_mode] = lambda: True
+    try:
+        response = TestClient(app).post(
+            "/api/v1/generate-ads",
+            json={
+                "product": {"title": "Handmade cup", "description": "Blue cup"},
+                "competitor_brief": competitor_brief.model_dump(mode="json"),
+                "placements": ["facebook_feed"],
+            },
+        )
+    finally:
+        app.dependency_overrides.pop(live_mode, None)
+    assert response.status_code == 413
+    detail = response.json()["detail"]
+    assert_plain(
+        detail["message"],
+        "Muse couldn't send all of these images together. Try fewer placements or image versions.",
+    )
+    assert detail["estimated_bytes"] == 5_000_000
+    assert detail["limit_bytes"] == 4_000_000
+
+
+def test_hourly_limit_preserves_the_number(monkeypatch: pytest.MonkeyPatch) -> None:
+    import time
+    from collections import deque
+
+    from src.services import live_quota
+
+    monkeypatch.setattr(live_quota, "_live_calls", deque([time.monotonic()] * 2))
+    response = error_response(lambda: live_quota.reserve(2))
+    assert response.status_code == 429
+    assert_plain(
+        response.json()["detail"],
+        (
+            "You've reached the limit of 2 live requests per hour. "
+            "Try again later, or view saved results."
+        ),
+    )
+    assert "Cached" not in response.text

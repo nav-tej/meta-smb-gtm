@@ -100,9 +100,15 @@ async def weekly_send(
     secret = get_settings().cron_secret
     if secret:
         if not (authorization and hmac.compare_digest(authorization, f"Bearer {secret}")):
-            raise HTTPException(401, "This scheduled job needs the cron secret.")
+            logger.warning("Scheduled email delivery refused (authorization)")
+            raise HTTPException(
+                401, "This email delivery needs authorization. Return to your digest settings."
+            )
     elif not request.headers.get("user-agent", "").startswith("vercel-cron"):
-        raise HTTPException(403, "Scheduled job only.")
+        logger.warning("Scheduled email delivery refused (caller)")
+        raise HTTPException(
+            403, "This address is for scheduled email delivery. Return to your digest settings."
+        )
     await durable_state.hydrate_monitor()
     try:
         summary = await digest_email.run_weekly()

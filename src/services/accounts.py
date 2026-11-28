@@ -106,7 +106,10 @@ def trusted_mutation(request: Request) -> None:
     if not valid:
         raise HTTPException(403, "Open Muse in its own tab to manage your account.")
     if request.headers.get("content-type", "").split(";", 1)[0].lower() != "application/json":
-        raise HTTPException(415, "Send account requests as JSON.")
+        logger.warning("Account request refused (expected JSON)")
+        raise HTTPException(
+            415, "Muse couldn't read your account request. Reload the page and try again."
+        )
 
 
 def _hashed(value: str) -> str:

@@ -326,7 +326,14 @@ async def webhook(request: Request) -> dict[str, bool]:
 
     settings = get_settings()
     if not settings.stripe_webhook_secret:
-        raise HTTPException(503, "Billing webhooks are not configured yet.")
+        logger.warning("Payment update endpoint unavailable (missing configuration)")
+        raise HTTPException(
+            503,
+            (
+                "Muse can't receive payment updates right now. "
+                "Contact support if a payment is missing."
+            ),
+        )
     payload = await request.body()
     try:
         event = stripe_sdk.Webhook.construct_event(
@@ -334,7 +341,10 @@ async def webhook(request: Request) -> dict[str, bool]:
         )
     except Exception as err:
         logger.warning("Rejected a Stripe webhook with an invalid signature.")
-        raise HTTPException(400, "Invalid webhook signature.") from err
+        raise HTTPException(
+            400,
+            ("Muse couldn't verify this payment update. Contact support if a payment is missing."),
+        ) from err
     try:
         data = await _billing_event(_plain(event), _stripe())
         if data is not None:
@@ -355,7 +365,9 @@ async def webhook(request: Request) -> dict[str, bool]:
             f"Event {getattr(event, 'id', '?')} ({getattr(event, 'type', '?')}) failed with "
             f"{type(err).__name__}. Stripe retries for 3 days; check Supabase and Vercel logs.",
         )
-        raise HTTPException(503, "Billing event could not be applied. Retry later.") from err
+        raise HTTPException(
+            503, "Muse couldn't record this payment update. Please try again later."
+        ) from err
     if data is not None and not result.get("duplicate"):
         await _report_billing_event(data)
     return {"received": True}

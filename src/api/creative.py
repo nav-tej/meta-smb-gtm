@@ -3,6 +3,7 @@
 import base64
 import binascii
 import json
+import logging
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -17,6 +18,8 @@ from src.clients.meta import MetaAPIError, get_meta_client
 from src.models.creative import CreativeSet, EditableCreativeBrief, GenerateAdsRequest
 from src.services import demo, media_store, result_cache, usage_meter
 from src.services.ad_creative import AdCreativeService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["creative"])
 
@@ -135,11 +138,17 @@ async def generate_ads(
     try:
         result = await result_cache.cached("generate-ads", request, CreativeSet, render, response)
     except MediaResponseTooLargeError as err:
+        logger.warning(
+            "Creative delivery exceeds byte budget (estimated=%d limit=%d)",
+            err.estimated_bytes,
+            err.limit_bytes,
+        )
         raise HTTPException(
             status.HTTP_413_CONTENT_TOO_LARGE,
             detail={
                 "error": "media_response_too_large",
-                "message": f"{err} Try fewer placements or variants.",
+                "message": "Muse couldn't send all of these images together. "
+                "Try fewer placements or image versions.",
                 "estimated_bytes": err.estimated_bytes,
                 "limit_bytes": err.limit_bytes,
             },
