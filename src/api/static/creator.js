@@ -820,6 +820,22 @@
         : 'Use an existing series or type your own. This labels this promotion only; it does not move artwork in your shops.';
     }
     if ($('sellerName')) $('sellerName').placeholder = svc ? 'Your business name' : 'Your shop';
+    const sellerLabel = document.querySelector?.('label[for="sellerName"]');
+    if (sellerLabel) sellerLabel.textContent = svc ? 'Your business name' : 'Your shop or name';
+    if ($('shopUrl')) $('shopUrl').placeholder = svc ? 'https://your-website.com' : 'https://your-shop.com';
+    if ($('exportFilesNote')) {
+      $('exportFilesNote').textContent = svc
+        ? 'Downloads use your current edits. Nothing is posted automatically.'
+        : 'Downloads use your current edits. Images are social previews, not production print files. Nothing is posted automatically.';
+    }
+    if (typeof document !== 'undefined' && typeof document.title === 'string') {
+      document.title = svc
+        ? 'Create Your Next Post | Muse Growth Studio'
+        : 'Create Your Next Shop Post | Muse Growth Studio';
+    }
+    if ($('generateButton') && !state.live) {
+      $('generateButton').textContent = svc ? 'Preview an AI background' : 'Preview a room scene';
+    }
     if ($('productLink')) $('productLink').placeholder = svc ? 'https://your-website.com/book' : 'https://your-shop.com/product';
     if ($('productDescription')) {
       $('productDescription').placeholder = svc
@@ -843,6 +859,13 @@
       const badge = document.createElement('span');
       badge.textContent = '1';
       step0Btn.replaceChildren(badge, document.createTextNode(svc ? ' Your offer' : ' Your product'));
+    }
+    const giftGoalBtn = document.querySelector?.('[data-goal="gift"]');
+    if (giftGoalBtn?.querySelector) {
+      const strongEl = giftGoalBtn.querySelector('strong');
+      const pEl = giftGoalBtn.querySelector('p');
+      if (strongEl) strongEl.textContent = svc ? 'Highlight a client outcome' : 'Offer a thoughtful gift';
+      if (pEl) pEl.textContent = svc ? 'Explain what you help with and what working with you looks like.' : 'Help someone picture who they might give it to.';
     }
     const visitGoalBtn = document.querySelector?.('[data-goal="visit"]');
     if (visitGoalBtn?.querySelector) {
@@ -1247,7 +1270,7 @@
   function go(step) {
     if (state.busy || (step > 0 && !validateProduct())) return;
     if (step === 3 && !postingChannels().length) { notify('Choose Instagram or Facebook for this post before sharing.', 'error'); go(0); return; }
-    if (step === 3 && (!$('reviewed').checked || !state.headline || !state.caption)) { notify('Check your wording and product details, then tick the review box before sharing.', 'error'); go(2); return; }
+    if (step === 3 && (!$('reviewed').checked || !state.headline || !state.caption)) { notify(isServices() ? 'Check your wording and offer details, then tick the review box before sharing.' : 'Check your wording and product details, then tick the review box before sharing.', 'error'); go(2); return; }
     state.step = step;
     document.querySelectorAll('[data-panel]').forEach((el) => { el.hidden = Number(el.dataset.panel) !== step; });
     document.querySelectorAll('[data-step]').forEach((el) => { if (Number(el.dataset.step) === step) el.setAttribute('aria-current', 'step'); else el.removeAttribute('aria-current'); });
@@ -1693,7 +1716,7 @@
     updateMode();
   }
   if (typeof window.addEventListener === 'function') window.addEventListener('account-change', (event) => syncAccountLive(event.detail));
-  function updateMode() { const live = state.live; $('modeBadge').textContent = live ? 'Live Muse AI · 1 run per generation' : 'Draft & manual mode · 0 runs used'; $('modeBadge').classList.toggle('live', live); $('generateButton').textContent = live ? 'Create my image (1 run)' : 'Preview a room scene'; $('draftHint').textContent = live ? 'A live draft uses 1 run with your product details. Check every claim before sharing.' : 'Starter & manual editing cost 0 runs. Enable live Muse AI below (1 run) for custom AI writing.'; }
+  function updateMode() { const live = state.live; $('modeBadge').textContent = live ? 'Live Muse AI · 1 run per generation' : 'Draft & manual mode · 0 runs used'; $('modeBadge').classList.toggle('live', live); $('generateButton').textContent = live ? 'Create my image (1 run)' : (isServices() ? 'Preview an AI background' : 'Preview a room scene'); $('draftHint').textContent = live ? 'A live draft uses 1 run with your details. Check every claim before sharing.' : 'Starter & manual editing cost 0 runs. Enable live Muse AI below (1 run) for custom AI writing.'; }
 
   const SAMPLE_ARTWORK_FALLBACKS = {
     ek_onkar: { id: 'ek_onkar', title: 'Ek Onkar · 12×12-inch print', original_image: '/samples/ek_onkar_original.jpg', staged_image: '/samples/ek_onkar_collector_room_live.webp', series: 'Sikh Sacred Word' },

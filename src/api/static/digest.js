@@ -422,6 +422,17 @@
     const watchlist = extractWatchlist(wsDoc);
     const shopUrls = Array.isArray(onboarding.shop_urls) ? onboarding.shop_urls : [];
     const shopName = onboarding.business_name || (shopUrls[0] ? shopUrls[0] : 'My workspace');
+    const isSvc = onboarding.business_type === 'services';
+    if (typeof document !== 'undefined') {
+      document.title = isSvc
+        ? 'Weekly competitor digest | Muse Growth Studio'
+        : 'Weekly competitor digest for small shops | Muse Growth Studio';
+      const listingCb = document.querySelector('#digestDraftForm input[name="draftTopic"][value="listing_changes"]');
+      const listingLabel = listingCb?.parentElement;
+      if (listingLabel && listingLabel.lastChild && listingLabel.lastChild.nodeType === 3) {
+        listingLabel.lastChild.textContent = isSvc ? ' New and removed pages' : ' New and removed listings or pages';
+      }
+    }
 
     prefillDraftShops(watchlist);
     setCheckControls(watchlist.length > 0, document.getElementById('dgCheckStatus')?.textContent || '');
@@ -723,6 +734,14 @@
     }
 
     // Guest or explicit Sample shop view -> render clearly labeled Sample digest
+    if (typeof document !== 'undefined') {
+      document.title = 'Weekly competitor digest for small shops | Muse Growth Studio';
+      const listingCb = document.querySelector('#digestDraftForm input[name="draftTopic"][value="listing_changes"]');
+      const listingLabel = listingCb?.parentElement;
+      if (listingLabel && listingLabel.lastChild && listingLabel.lastChild.nodeType === 3) {
+        listingLabel.lastChild.textContent = ' New and removed listings or pages';
+      }
+    }
     ownState.autoCheck = null;
     ownState.checksMap = null;
     clearAutoCheckBar();

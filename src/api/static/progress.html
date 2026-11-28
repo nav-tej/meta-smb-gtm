@@ -67,12 +67,12 @@
     <div class="pg-head">
       <p class="dg-eyebrow">Outcomes &amp; Lift</p>
       <h1>Progress &amp; ROI Tracker</h1>
-      <p>Measure your returns over time. Every recommendation you mark done can have a 30-second sales result logged to track real return on investment against your plan cost.</p>
+      <p>Measure your returns over time. Every recommendation you mark done can have a 30-second result logged to track real return on investment against your plan cost.</p>
     </div>
 
     <div class="pg-roi-banner">
       <div>
-        <strong>Transparent ROI Rule:</strong> Only seller-logged sales and reach count toward ROI. We never display modeled, hypothetical, or projected revenue.
+        <strong>Transparent ROI Rule:</strong> Only results you log count toward ROI. We never display modeled, hypothetical, or projected revenue.
       </div>
       <button type="button" class="jr-btn-primary" id="pgOpenLogBtn">+ Log a result (30s)</button>
     </div>
@@ -91,7 +91,7 @@
       <div class="pg-kpi-card">
         <span class="pg-kpi-label">Plan Cost</span>
         <span class="pg-kpi-val" id="pgPlanCost">$12/mo</span>
-        <span class="pg-kpi-sub">Starter monthly plan</span>
+        <span class="pg-kpi-sub" id="pgPlanCostSub">Starter monthly plan</span>
       </div>
       <div class="pg-kpi-card">
         <span class="pg-kpi-label">Net Return</span>
@@ -281,6 +281,25 @@
         const count = outcomes.length;
         movesEl.textContent = count;
         revEl.textContent = `$${totalRev.toFixed(0)}`;
+        const revSub = $('pgRevenueSub');
+        if (revSub) {
+          revSub.textContent = (currentUser && currentUser.id && serverSummary)
+            ? 'Saved to your account'
+            : 'Logged on this device';
+        }
+        const planCost = (serverSummary && typeof serverSummary.plan_cost_usd === 'number')
+          ? serverSummary.plan_cost_usd
+          : 12;
+        const planCostEl = $('pgPlanCost');
+        const planCostSub = $('pgPlanCostSub');
+        if (planCostEl) planCostEl.textContent = `$${planCost.toFixed(0)}/mo`;
+        if (planCostSub) {
+          planCostSub.textContent = planCost === 0
+            ? 'Free account'
+            : planCost >= 29
+              ? 'Pro monthly plan'
+              : 'Starter monthly plan';
+        }
 
         if (count === 0) {
           netEl.textContent = '—';
@@ -295,7 +314,6 @@
           emptyEl.hidden = true;
           listEl.hidden = false;
           listEl.textContent = '';
-          const planCost = (serverSummary && typeof serverSummary.plan_cost_usd === 'number') ? serverSummary.plan_cost_usd : 12;
           const net = (serverSummary && typeof serverSummary.net_roi_usd === 'number') ? serverSummary.net_roi_usd : (totalRev - planCost);
           netEl.textContent = `${net >= 0 ? '+' : ''}$${net.toFixed(0)}`;
           netEl.style.color = net >= 0 ? '#2f6f4f' : '#8a5a12';

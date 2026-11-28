@@ -48,7 +48,9 @@ async def _get_account_plan_cost(account: AccountSession | None) -> float:
 
         snap = await snapshot(account)
         plan = (snap.get("usage") or {}).get("plan")
-        if plan == "unlimited":
+        if plan == "free":
+            return 0.0
+        if plan in ("pro", "unlimited"):
             return 29.0
         if plan in ("starter", "trial"):
             return 12.0
