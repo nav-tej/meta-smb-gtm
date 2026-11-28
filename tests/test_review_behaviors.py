@@ -193,9 +193,12 @@ def test_failed_onboarding_save_surfaces_error_and_refunds_hold(
         json=payload,
         headers={"x-muse-owner": user.user_id},
     )
-    # The failure is surfaced directly to the client and does NOT mark workspace completed
+    # The failure reaches the seller as a plain sentence (Codex, Nov 28); the raw database error
+    # stays in the server log, never in the response.
     assert resp.status_code == 500
-    assert "Database connection dropped" in resp.json()["detail"]
+    detail = resp.json()["detail"]
+    assert detail == "Muse couldn't finish saving your setup. Try saving again in a minute."
+    assert "Database connection dropped" not in detail and "RuntimeError" not in detail
     # Zero debits or holds attempted
     assert len(reserved_holds) == 0
 
