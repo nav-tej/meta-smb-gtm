@@ -14,26 +14,65 @@ guards, both off unless configured (Nav decides the values):
   client IP, may start in 10 minutes. A request that needs more than what is left is refused as
   a whole with 429 and Retry-After. Cached websites never count.
 
-Both live in memory, so on serverless hosts they apply per running instance, as the live-call cap
-in src/api/demo.py does. They cut duplicate crawls and runaway loops; they are not a global
-quota, and a refused request still runs the function. Only a platform rule (a firewall rate
-limit) keeps requests from reaching the function at all.
+Cache and fast-path counters live in memory. When hosted and the scan cap is enabled, the
+first cache miss reserves the entire public batch through muse_reserve_public_work before any
+crawl, sharing database limits across instances. That RPC requires abuse_controls.sql first.
+Protected scheduled callers without a public preflight retain their own admission/lease rules.
+In-flight crawls are shared and bounded even with cache settings off. A firewall rule is still
+needed to stop abusive requests before the function runs.
 """
 
 from __future__ import annotations
 
+import asyncio
 import math
+import threading
 import time
 from collections import OrderedDict, deque
 from collections.abc import Awaitable, Callable
+from contextvars import ContextVar
+from dataclasses import dataclass, field
+from functools import wraps
+from typing import ParamSpec, TypeVar
 from urllib.parse import urlsplit, urlunsplit
+
+from fastapi import HTTPException
 
 from src.config import get_settings
 from src.models.intel import SitemapEntry
+from src.utils.sitemap import SitemapError
 
 WINDOW_SECONDS = 600
 MAX_CACHED_SITES = 256
 MAX_VISITORS = 4096
+MAX_INFLIGHT_CRAWLS = 16
+MAX_CRAWL_SECONDS = 20
+_LOCK = threading.RLock()
+_P = ParamSpec("_P")
+_R = TypeVar("_R")
+
+
+def _synchronized(function: Callable[_P, _R]) -> Callable[_P, _R]:
+    @wraps(function)
+    def wrapped(*args: _P.args, **kwargs: _P.kwargs) -> _R:
+        with _LOCK:
+            return function(*args, **kwargs)
+
+    return wrapped
+
+
+@dataclass
+class _ScanBatch:
+    visitor: str
+    count: int
+    remaining: int
+    admitted: bool = False
+    lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+
+
+_batch: ContextVar[_ScanBatch | None] = ContextVar("public_scan_batch", default=None)
+_inflight: dict[tuple[asyncio.AbstractEventLoop, str, int], asyncio.Task] = {}
+
 
 # website -> (stored at, page cap it was crawled with, entries, sitemaps)
 _cache: OrderedDict[str, tuple[float, int, list[dict], list[str]]] = OrderedDict()
@@ -52,6 +91,7 @@ def _key(url: str) -> str:
     return urlunsplit((parts.scheme.lower(), parts.netloc.lower(), path, parts.query, ""))
 
 
+@_synchronized
 def cached_crawl(url: str, max_urls: int) -> tuple[list[SitemapEntry], list[str]] | None:
     """A fresh cached crawl of this website, or None (cache off, missing or expired)."""
     ttl = get_settings().scan_cache_seconds
@@ -71,6 +111,7 @@ def cached_crawl(url: str, max_urls: int) -> tuple[list[SitemapEntry], list[str]
     return [SitemapEntry.model_validate(entry) for entry in entries[:max_urls]], list(sitemaps)
 
 
+@_synchronized
 def remember_crawl(
     url: str, max_urls: int, entries: list[SitemapEntry], sitemaps: list[str]
 ) -> None:
@@ -89,6 +130,7 @@ def remember_crawl(
         _cache.popitem(last=False)
 
 
+@_synchronized
 def reserve_scans(visitor: str, count: int) -> int | None:
     """Reserve `count` fresh crawls for this visitor.
 
@@ -96,9 +138,21 @@ def reserve_scans(visitor: str, count: int) -> int | None:
     enough earlier crawls leave the 10-minute window. Nothing is reserved on a refusal.
     """
     limit = get_settings().scans_per_visitor_per_10_min
-    if limit <= 0 or count <= 0:
+    _batch.set(None)
+    if limit <= 0:
+        return None
+    if count <= 0:
+        _batch.set(_ScanBatch(visitor, 0, 0))
         return None
     now = _now()
+    # Do not evict live rate-limit buckets: rotating identities must not reset an earlier one.
+    if visitor not in _visits and len(_visits) >= MAX_VISITORS:
+        for key in [
+            key for key, times in _visits.items() if not times or now - times[-1] >= WINDOW_SECONDS
+        ]:
+            del _visits[key]
+        if len(_visits) >= MAX_VISITORS:
+            return WINDOW_SECONDS
     times = _visits.pop(visitor, None) or deque()
     while times and now - times[0] >= WINDOW_SECONDS:
         times.popleft()
@@ -113,14 +167,33 @@ def reserve_scans(visitor: str, count: int) -> int | None:
         return max(1, math.ceil(wait))
     times.extend([now] * count)
     _visits[visitor] = times
-    while len(_visits) > MAX_VISITORS:
-        _visits.popitem(last=False)
+    _batch.set(_ScanBatch(visitor, count, count))
     return None
 
 
+@_synchronized
 def fresh_count(urls: list[str], max_urls: int) -> int:
     """How many of these websites a scan would crawl now (not served from the cache)."""
     return sum(1 for url in urls if cached_crawl(url, max_urls) is None)
+
+
+async def _admit_public_batch() -> None:
+    batch = _batch.get()
+    if batch is None or not get_settings().hosted_environment:
+        # Protected scheduled watchlist callers do not use public scan admission.
+        return
+    from src.services.usage_meter import reserve_public_work
+
+    async with batch.lock:
+        if batch.remaining <= 0:
+            raise HTTPException(
+                429, refusal_message(WINDOW_SECONDS), headers={"Retry-After": str(WINDOW_SECONDS)}
+            )
+        if not batch.admitted:
+            # Reserve the entire request before the first crawl, never after partial work.
+            await reserve_public_work("scan", batch.visitor, batch.count)
+            batch.admitted = True
+        batch.remaining -= 1
 
 
 async def crawl(
@@ -128,13 +201,44 @@ async def crawl(
     max_urls: int,
     fetch: Callable[[], Awaitable[tuple[list[SitemapEntry], list[str]]]],
 ) -> tuple[list[SitemapEntry], list[str]]:
-    """The cached crawl of this website when fresh, otherwise `fetch()` (kept on success)."""
+    """Share identical in-flight crawls and reserve hosted public batches before I/O."""
     cached = cached_crawl(url, max_urls)
     if cached is not None:
         return cached
-    entries, sitemaps = await fetch()
-    remember_crawl(url, max_urls, entries, sitemaps)
-    return entries, sitemaps
+    await _admit_public_batch()
+    key = (asyncio.get_running_loop(), _key(url), max_urls)
+
+    async def load() -> tuple[list[SitemapEntry], list[str]]:
+        try:
+            entries, sitemaps = await asyncio.wait_for(fetch(), timeout=MAX_CRAWL_SECONDS)
+        except TimeoutError as err:
+            raise SitemapError(
+                "Muse couldn't finish checking this website in time. "
+                "Try again later, or enter the details yourself."
+            ) from err
+        remember_crawl(url, max_urls, entries, sitemaps)
+        return entries, sitemaps
+
+    def forget(done: asyncio.Task) -> None:
+        with _LOCK:
+            if _inflight.get(key) is done:
+                _inflight.pop(key, None)
+        if not done.cancelled():
+            done.exception()  # Retrieve errors even when every waiting client disconnected.
+
+    with _LOCK:
+        task = _inflight.get(key)
+        if task is None:
+            if len(_inflight) >= MAX_INFLIGHT_CRAWLS:
+                raise HTTPException(
+                    503, "Muse is checking many websites. Please try again shortly."
+                )
+            task = asyncio.create_task(load())
+            _inflight[key] = task
+            task.add_done_callback(forget)
+    # One disconnected client must not cancel work shared with another request.
+    entries, sitemaps = await asyncio.shield(task)
+    return [entry.model_copy(deep=True) for entry in entries], list(sitemaps)
 
 
 def refusal_message(retry_after: int) -> str:
@@ -146,7 +250,10 @@ def refusal_message(retry_after: int) -> str:
     )
 
 
+@_synchronized
 def reset() -> None:
     """Forget every cached crawl and visitor count (tests)."""
     _cache.clear()
     _visits.clear()
+    _inflight.clear()
+    _batch.set(None)

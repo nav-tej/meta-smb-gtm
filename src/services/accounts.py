@@ -8,6 +8,7 @@ import hmac
 import json
 import logging
 import secrets
+import threading
 import time
 from collections import deque
 from dataclasses import dataclass
@@ -31,6 +32,8 @@ EMAIL_SEND_WINDOW_SECONDS = 15 * 60
 EMAIL_SENDS_PER_IP = 8
 EMAIL_SENDS_PER_ADDRESS = 3
 _email_sends: dict[str, deque[float]] = {}
+_EMAIL_LOCK = threading.RLock()
+MAX_EMAIL_BUCKETS = 4096
 
 
 @dataclass(frozen=True)
@@ -113,33 +116,54 @@ def _hashed(value: str) -> str:
     return hashlib.sha256(value.encode()).hexdigest()
 
 
-def throttle_email_send(request: Request, email: str, now: float | None = None) -> None:
-    """Refuse a confirmation/reset email when this network or address asked too often."""
-    now = time.monotonic() if now is None else now
+def request_ip_hash(request: Request) -> str:
+    """Hash the proxy-supplied network identity; production requires Vercel's overwritten XFF."""
     forwarded = request.headers.get("x-forwarded-for", "")
     ip = forwarded.split(",", 1)[0].strip() or (request.client.host if request.client else "")
+    return _hashed(ip)
+
+
+def throttle_email_send(request: Request, email: str, now: float | None = None) -> None:
+    """Atomically bound local sends and memory; hosted sends also reserve in Postgres."""
+    now = time.monotonic() if now is None else now
     buckets = (
-        ("ip:" + _hashed(ip), EMAIL_SENDS_PER_IP),
+        ("ip:" + request_ip_hash(request), EMAIL_SENDS_PER_IP),
         ("email:" + _hashed(email.strip().lower()), EMAIL_SENDS_PER_ADDRESS),
     )
-    cutoff = now - EMAIL_SEND_WINDOW_SECONDS
-    for key in [key for key, times in _email_sends.items() if not times or times[-1] < cutoff]:
-        del _email_sends[key]
-    for key, limit in buckets:
-        times = _email_sends.get(key, deque())
-        while times and times[0] < cutoff:
-            times.popleft()
-        if len(times) >= limit:
+    with _EMAIL_LOCK:
+        cutoff = now - EMAIL_SEND_WINDOW_SECONDS
+        for key in [key for key, times in _email_sends.items() if not times or times[-1] <= cutoff]:
+            del _email_sends[key]
+        new_keys = sum(key not in _email_sends for key, _ in buckets)
+        if len(_email_sends) + new_keys > MAX_EMAIL_BUCKETS:
             raise HTTPException(
                 429, "Too many email requests. Wait a few minutes, then check your inbox."
             )
-    for key, _ in buckets:
-        _email_sends.setdefault(key, deque()).append(now)
+        for key, limit in buckets:
+            times = _email_sends.get(key, deque())
+            while times and times[0] <= cutoff:
+                times.popleft()
+            if len(times) >= limit:
+                raise HTTPException(
+                    429, "Too many email requests. Wait a few minutes, then check your inbox."
+                )
+        for key, _ in buckets:
+            _email_sends.setdefault(key, deque()).append(now)
+
+
+async def authorize_email_send(request: Request, email: str) -> None:
+    """Hosted sign-up/reset/resend share a durable budget across instances and endpoints."""
+    if not get_settings().hosted_environment:
+        return
+    from src.services.usage_meter import reserve_public_work
+
+    await reserve_public_work("email", request_ip_hash(request), 1, _hashed(email.strip().lower()))
 
 
 def reset_email_throttle() -> None:
-    """Forget recorded sends (tests and process restarts)."""
-    _email_sends.clear()
+    """Forget recorded local sends (tests and process restarts)."""
+    with _EMAIL_LOCK:
+        _email_sends.clear()
 
 
 # Signup binding. Supabase keeps the FIRST password when an unconfirmed address is signed up

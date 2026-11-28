@@ -14,6 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from src.clients.supabase import SupabaseError, get_supabase_client
 from src.config import get_settings
 from src.services.accounts import (
+    authorize_email_send,
     bind_signup,
     clear_cookies,
     complete_google_oauth,
@@ -123,6 +124,7 @@ async def signup(
     """
     response.headers["Cache-Control"] = "no-store"
     throttle_email_send(request, body.email)
+    await authorize_email_send(request, body.email)
     try:
         result = await get_supabase_client().auth(
             "signup?" + callback_query(), "POST", body.model_dump()
@@ -151,6 +153,7 @@ async def signup(
 async def resend(body: EmailRequest, request: Request, _: Mutation) -> dict[str, str]:
     """Send a fresh signup confirmation link, without revealing whether the account exists."""
     throttle_email_send(request, body.email)
+    await authorize_email_send(request, body.email)
     try:
         await get_supabase_client().auth(
             "resend?" + callback_query(), "POST", {"type": "signup", "email": body.email}
@@ -285,6 +288,7 @@ async def signout(request: Request, response: Response, _: Mutation) -> dict[str
 @router.post("/recover")
 async def recover(body: EmailRequest, request: Request, _: Mutation) -> dict[str, str]:
     throttle_email_send(request, body.email)
+    await authorize_email_send(request, body.email)
     try:
         await get_supabase_client().auth("recover?" + callback_query(), "POST", body.model_dump())
     except SupabaseError as err:

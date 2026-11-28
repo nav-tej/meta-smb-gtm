@@ -16,7 +16,6 @@ cache hit), failed, or was answered by a cached/demo fallback.
 
 from __future__ import annotations
 
-import hashlib
 import hmac
 import logging
 from collections import deque
@@ -40,9 +39,9 @@ _reserve_live_slot = live_quota.reserve
 
 
 def _client_ip_hash(request: Request) -> str:
-    forwarded = request.headers.get("x-forwarded-for", "")
-    ip = forwarded.split(",", 1)[0].strip() or (request.client.host if request.client else "")
-    return hashlib.sha256(ip.encode()).hexdigest()
+    from src.services.accounts import request_ip_hash
+
+    return request_ip_hash(request)
 
 
 def valid_demo_key(x_demo_key: str | None) -> bool:
@@ -154,6 +153,11 @@ async def live_mode(
             # cache hits and saved fallbacks are given back (supabase/migrations/run_refunds.sql).
             await usage_meter.finish_operation(outcome, operation_id=operation_id)
         return
+    if getattr(settings, "hosted_environment", False):
+        # A presenter secret is not a durable spending reservation across cold starts.
+        raise HTTPException(
+            503, "Live Muse needs a verified account here. Sign in, or use saved examples."
+        )
     if not valid_demo_key(x_demo_key):
         logger.warning("Live request refused (presenter access missing)")
         raise HTTPException(

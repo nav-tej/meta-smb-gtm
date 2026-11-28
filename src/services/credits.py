@@ -30,7 +30,7 @@ import tempfile
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -46,6 +46,8 @@ _COOKIE_RE = re.compile(r"^[A-Za-z0-9_-]{32,64}$")
 # Demo checkout plans (nothing is charged); arbitrary top-ups need the admin key.
 DEMO_PLAN_RUNS = {"starter": 20, "growth": 50, "unlimited": 999}
 HISTORY_LIMIT = 25
+MAX_HOLDERS = 1024
+MAX_PENDING_HOLDS = 32
 
 
 class CreditsExhaustedError(Exception):
@@ -74,6 +76,7 @@ class Hold:
     holder_id: str
     label: str
     settled: bool = False
+    reservation_id: str = field(default_factory=lambda: secrets.token_hex(32))
 
 
 def ledger_dir() -> Path:
@@ -139,9 +142,18 @@ def _account(data: dict[str, Any], holder_id: str) -> dict[str, Any]:
     holders: dict[str, Any] = data["holders"]
     account = holders.get(holder_id)
     if not isinstance(account, dict) or not isinstance(account.get("balance"), int):
+        if holder_id not in holders and len(holders) >= MAX_HOLDERS:
+            raise CreditsUnavailableError("credit holder capacity reached")
         account = {"balance": starting_balance(holder_id), "spent": 0, "added": 0, "history": []}
         holders[holder_id] = account
     return account
+
+
+def _pending(account: dict[str, Any]) -> dict[str, bool]:
+    pending = account.setdefault("holds", {})
+    if not isinstance(pending, dict):
+        raise CreditsUnavailableError("credit hold ledger malformed")
+    return pending
 
 
 def _log(account: dict[str, Any], event: str, amount: int, label: str) -> None:
@@ -173,33 +185,47 @@ def summary(holder_id: str) -> dict[str, Any]:
 
 
 def reserve(holder_id: str, label: str = "Live Muse run") -> Hold:
-    """Take one credit before a live call, or raise CreditsExhaustedError at zero."""
+    """Take one credit and journal a unique hold before any live work."""
+    hold = Hold(holder_id=holder_id, label=label)
     with _locked_ledger() as data:
         account = _account(data, holder_id)
+        pending = _pending(account)
+        if len(pending) >= MAX_PENDING_HOLDS:
+            raise CreditsUnavailableError("credit hold capacity reached")
         if account["balance"] <= 0:
             raise CreditsExhaustedError(0)
+        pending[hold.reservation_id] = True
         account["balance"] -= 1
         account["spent"] = int(account.get("spent", 0)) + 1
         _log(account, "spend", -1, label)
-    return Hold(holder_id=holder_id, label=label)
+    return hold
 
 
 def refund(hold: Hold, reason: str) -> None:
-    """Give a reserved credit back (no billable call happened, or the call failed)."""
+    """Refund a journaled hold at most once, including copied handles and concurrent cleanup."""
     if hold.settled:
         return
-    hold.settled = True
     try:
         with _locked_ledger() as data:
-            account = _account(data, hold.holder_id)
-            account["balance"] += 1
-            account["spent"] = max(0, int(account.get("spent", 0)) - 1)
-            _log(account, "refund", 1, f"{hold.label} ({reason})")
+            account = data["holders"].get(hold.holder_id)
+            if isinstance(account, dict) and _pending(account).pop(hold.reservation_id, None):
+                account["balance"] += 1
+                account["spent"] = max(0, int(account.get("spent", 0)) - 1)
+                _log(account, "refund", 1, f"{hold.label} ({reason})")
+        hold.settled = True
     except CreditsUnavailableError:
+        # A transient write failure must remain retryable; never claim the refund committed.
         logger.warning("Credit refund skipped: ledger unavailable")
 
 
 def commit(hold: Hold) -> None:
+    """Settle the journal before a copied handle can refund a completed action."""
+    if hold.settled:
+        return
+    with _locked_ledger() as data:
+        account = data["holders"].get(hold.holder_id)
+        if isinstance(account, dict):
+            _pending(account).pop(hold.reservation_id, None)
     hold.settled = True
 
 

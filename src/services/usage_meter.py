@@ -13,6 +13,8 @@ from dataclasses import dataclass
 from typing import Any
 from uuid import UUID, uuid4
 
+from fastapi import HTTPException
+
 from src.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -37,9 +39,10 @@ _PUBLIC_RUN_MESSAGES = frozenset(
 class UsageLimitError(Exception):
     """A quota, account, or accounting-store failure blocks a live operation."""
 
-    def __init__(self, status_code: int, detail: str) -> None:
+    def __init__(self, status_code: int, detail: str, *, retry_after: int | None = None) -> None:
         self.status_code = status_code
         self.detail = detail
+        self.retry_after = retry_after
         super().__init__(detail)
 
 
@@ -93,6 +96,12 @@ async def _rpc(name: str, params: dict[str, Any]) -> dict[str, Any]:
                 status = 503
             message = result.get("message")
             messages = {
+                "global_attempt_limit": (
+                    "Live Muse is busy right now. View saved results or try again later."
+                ),
+                "account_attempt_limit": (
+                    "You have started many live requests this hour. Try again later."
+                ),
                 "invalid_operation": LIVE_REQUEST_INVALID,
                 "invalid_provider_reservation": LIVE_REQUEST_INVALID,
                 "invalid_status": RUN_FINISH_FAILED,
@@ -111,7 +120,12 @@ async def _rpc(name: str, params: dict[str, Any]) -> dict[str, Any]:
                 else messages.get(str(result.get("code") or ""), RUNS_UNAVAILABLE)
             )
             logger.warning("Run accounting refused request (HTTP %s)", status)
-            raise UsageLimitError(status, detail)
+            retry = result.get("retry_after")
+            raise UsageLimitError(
+                status,
+                detail,
+                retry_after=retry if type(retry) is int and 1 <= retry <= 3600 else None,
+            )
         logger.warning("Run accounting returned an invalid response")
         raise UsageLimitError(503, RUNS_UNAVAILABLE)
     return result
@@ -187,3 +201,32 @@ async def finish_operation(status: str = "completed", *, operation_id: str | Non
             )
     finally:
         clear_request_context()
+
+
+async def reserve_public_work(
+    kind: str, ip_hash: str, count: int, address_hash: str | None = None
+) -> None:
+    """Reserve free public work durably before crawling or sending an Auth email."""
+    try:
+        await _rpc(
+            "muse_reserve_public_work",
+            {
+                "p_kind": kind,
+                "p_ip_hash": ip_hash,
+                "p_count": count,
+                "p_address_hash": address_hash,
+            },
+        )
+    except UsageLimitError as err:
+        if err.status_code == 429:
+            retry = err.retry_after or (600 if kind == "scan" else 900)
+            detail = (
+                "Muse has received many website checks. "
+                "Try again later, or enter the details yourself."
+                if kind == "scan"
+                else "Too many email requests. Wait a few minutes, then check your inbox."
+            )
+            raise HTTPException(429, detail, headers={"Retry-After": str(retry)}) from err
+        raise HTTPException(
+            503, "Muse can't start this request right now. Please try again shortly."
+        ) from err
