@@ -21,7 +21,10 @@ These are steps for Nav, not actions authorized for this checker assignment.
    `CRON_SECRET` in Vercel; release; set `WATCHLIST_AUTO_CHECK_ENABLED=true`; then run the
    checker with `--watchlist on` (expects signed-out 401). The default `--watchlist off`
    expects 404. Neither mode accepts 200 or 5xx. The checker also requires signed-out
-   `PUT /api/v1/competitors/saved` to return 401 before workspace reads/writes.
+   `PUT /api/v1/competitors/saved` and
+   `POST /api/v1/competitors/saved/remove` (body `{"urls":["https://example.com"]}`)
+   to return 401 before workspace reads/writes. Both fail on any other status, including
+   200 and all 5xx responses.
 
 ## 1. Pick and verify the exact commit
 
@@ -124,7 +127,14 @@ and approved SHA, and verify the production alias resolves to it. Then run:
 ```
 
 Require exit 0, all checks PASS and no 5xx in the requested log window. `--logs` uses
-`vercel logs requests -p meta-smb-gtm --scope navtejs-6321s-projects --since 15m --json`;
+`vercel logs requests -p meta-smb-gtm --scope navtejs-6321s-projects --since 15m
+--query 'httpStatus >= 500' --limit 1000 --json`. It follows each summary's
+`pagination.next` with `vercel logs requests --next <cursor> --limit 1000 --json` until
+`hasMore` is false, up to 10 pages. The cursor preserves the original team, project,
+filter and time window; those flags cannot be repeated with `--next`. A filtered empty
+summary with `recordsReturned: 0`, `hasMore: false` and no excluded intervals passes.
+Missing/repeated cursors, incomplete summaries, excluded intervals, CLI failures or more
+than 10 pages fail closed. Never save or print the cursor;
 retain only sanitized checker results (failure method/path, no query strings or identities).
 An unavailable log check is incomplete verification. If production is protected, use the
 same `--transport vercel` option; never disable protection to run the check.

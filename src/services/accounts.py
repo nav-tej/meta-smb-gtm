@@ -206,7 +206,8 @@ async def settle_signup_binding(
     try:
         user_id = str(UUID(str(user.get("id"))))
     except ValueError as err:
-        raise SupabaseError(503, "Account service returned an invalid user.") from err
+        logger.warning("Signup binding identity invalid (%s)", type(err).__name__)
+        raise SupabaseError(503, "Muse couldn't complete sign-in. Try signing in again.") from err
     nonce = request.cookies.get(SIGNUP_COOKIE, "")
     matches = from_link and bool(nonce) and hmac.compare_digest(_hashed(nonce), str(pending))
     update: dict[str, Any] = {"app_metadata": {SIGNUP_BINDING_KEY: None}}
@@ -239,9 +240,11 @@ def set_cookies(response: Response, tokens: dict[str, Any]) -> None:
     access = tokens.get("access_token")
     refresh = tokens.get("refresh_token")
     if not isinstance(access, str) or not isinstance(refresh, str):
-        raise SupabaseError(503, "Account service returned an invalid session.")
+        logger.warning("Account session response failed token validation")
+        raise SupabaseError(503, "Muse couldn't complete sign-in. Try signing in again.")
     if not access or not refresh or len(access) > 12000 or len(refresh) > 12000:
-        raise SupabaseError(503, "Account service returned an invalid session.")
+        logger.warning("Account session response failed token validation")
+        raise SupabaseError(503, "Muse couldn't complete sign-in. Try signing in again.")
     expires = tokens.get("expires_in", 3600)
     expires = max(60, min(expires, 86400)) if isinstance(expires, int) else 3600
     for name, value, age in (
@@ -335,7 +338,10 @@ async def snapshot(account: AccountSession | None) -> dict[str, Any]:
     if account.email_verified:
         usage = await get_supabase_client().rpc("muse_usage_status", {"p_user_id": account.user_id})
         if usage.get("allowed") is not True:
-            raise SupabaseError(503, "Usage accounting is unavailable. Try again shortly.")
+            logger.warning("Account run status request refused")
+            raise SupabaseError(
+                503, "Muse couldn't check your remaining runs. Try again in a minute."
+            )
         result["usage"] = {
             key: usage.get(key) for key in ("plan", "used", "limit", "remaining", "resets_at")
         }
@@ -413,7 +419,8 @@ def _oauth_secret() -> bytes:
         settings, "google_client_secret", ""
     )
     if not secret:
-        raise HTTPException(503, "Accounts are not configured on this server.")
+        logger.warning("Account sign-in unavailable (missing configuration)")
+        raise HTTPException(503, "Sign-in is unavailable right now. Please try again later.")
     return secret.encode("utf-8")
 
 
@@ -434,11 +441,17 @@ def verify_oauth_state(state: str | None, cookie_state: str | None) -> str:
         raise HTTPException(400, "That Google sign-in request expired. Please try again.")
     parts = state.split(".", 1)
     if len(parts) != 2:
-        raise HTTPException(400, "Invalid Google sign-in state.")
+        logger.warning("Google sign-in state verification failed")
+        raise HTTPException(
+            400, "Muse couldn't confirm that Google sign-in request. Start sign-in again."
+        )
     encoded, sig = parts
     expected = hmac.new(_oauth_secret(), encoded.encode("ascii"), hashlib.sha256).hexdigest()
     if not hmac.compare_digest(sig, expected):
-        raise HTTPException(400, "Invalid Google sign-in state.")
+        logger.warning("Google sign-in state verification failed")
+        raise HTTPException(
+            400, "Muse couldn't confirm that Google sign-in request. Start sign-in again."
+        )
     try:
         padded = encoded + "=" * (-len(encoded) % 4)
         data = json.loads(base64.urlsafe_b64decode(padded))
@@ -446,7 +459,10 @@ def verify_oauth_state(state: str | None, cookie_state: str | None) -> str:
             raise HTTPException(400, "That Google sign-in request expired. Please try again.")
         return safe_next_path(data.get("next"))
     except (ValueError, TypeError) as err:
-        raise HTTPException(400, "Invalid Google sign-in state.") from err
+        logger.warning("Google sign-in state verification failed")
+        raise HTTPException(
+            400, "Muse couldn't confirm that Google sign-in request. Start sign-in again."
+        ) from err
 
 
 async def start_google_oauth(
@@ -455,7 +471,8 @@ async def start_google_oauth(
     """Build a Google OAuth redirect URL via direct Google OAuth or Supabase Auth."""
     settings = get_settings()
     if not (configured() and getattr(settings, "accounts_required", False)):
-        raise HTTPException(503, "Accounts are not configured on this server.")
+        logger.warning("Account sign-in unavailable (missing configuration)")
+        raise HTTPException(503, "Sign-in is unavailable right now. Please try again later.")
     target = safe_next_path(next_path)
     base_url = request_base_url(request)
     client_id = getattr(settings, "google_client_id", "").strip()

@@ -194,7 +194,12 @@ async def save_digest_preferences(
             competitors=body.competitors,
         )
     except ValueError as err:
-        raise HTTPException(422, str(err)) from err
+        logger.warning("Digest settings invalid (%s)", type(err).__name__)
+        raise HTTPException(
+            422,
+            "Muse couldn't use those digest settings. Choose a timezone such as "
+            "America/Los_Angeles and up to 3 public shop links, then try again.",
+        ) from err
     return await digest_preview.save_digest_draft(
         account,
         prefs,
@@ -246,6 +251,11 @@ async def preview_personal_digest(
         try:
             overrides = digest_preview.DigestDraftPreferences.model_validate(merged)
         except ValueError as err:
-            raise HTTPException(422, str(err)) from err
+            logger.warning("Digest preview settings invalid (%s)", type(err).__name__)
+            raise HTTPException(
+                422,
+                "Muse couldn't use those digest settings. Choose a timezone such as "
+                "America/Los_Angeles and up to 3 public shop links, then try again.",
+            ) from err
 
     return await digest_preview.build_personal_digest_preview(account, overrides=overrides)

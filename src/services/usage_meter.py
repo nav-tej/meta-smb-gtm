@@ -7,12 +7,31 @@ on failure because an interrupted or timed-out upstream request can still be bil
 
 from __future__ import annotations
 
+import logging
 from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import Any
 from uuid import UUID, uuid4
 
 from src.config import get_settings
+
+logger = logging.getLogger(__name__)
+RUNS_UNAVAILABLE = "Muse couldn't check your remaining runs. Try again in a minute."
+LIVE_REQUEST_INVALID = "Muse couldn't start that live request. Try again, or use a saved result."
+RUN_FINISH_FAILED = "Muse couldn't finish recording this run. Try again in a minute."
+# Reviewed server copy only; never return arbitrary database response text.
+_PUBLIC_RUN_MESSAGES = frozenset(
+    {
+        "Live Muse is paused. Saved drafts still work.",
+        "This request already started. Check its result.",
+        "Your 3 free Muse runs are used. Pick a plan for more runs.",
+        "Your plan runs are used. Upgrade or wait for renewal.",
+        "Too many requests from this network. Try later.",
+        "Your earlier Muse request is still running.",
+        "Confirm your email to use live Muse.",
+        "Create an account and sign in to use live Muse.",
+    }
+)
 
 
 class UsageLimitError(Exception):
@@ -63,7 +82,8 @@ async def _rpc(name: str, params: dict[str, Any]) -> dict[str, Any]:
 
         result = await get_supabase_client().rpc(name, params)
     except Exception as err:
-        raise UsageLimitError(503, "Usage accounting is unavailable. Try again later.") from err
+        logger.warning("Run accounting request failed (%s)", type(err).__name__)
+        raise UsageLimitError(503, RUNS_UNAVAILABLE) from err
     if isinstance(result, list) and len(result) == 1:
         result = result[0]
     if not isinstance(result, dict) or result.get("allowed") is not True:
@@ -72,9 +92,28 @@ async def _rpc(name: str, params: dict[str, Any]) -> dict[str, Any]:
             if status not in {400, 401, 403, 404, 409, 413, 429, 503}:
                 status = 503
             message = result.get("message")
-            detail = message[:240] if isinstance(message, str) else "Muse is unavailable right now."
+            messages = {
+                "invalid_operation": LIVE_REQUEST_INVALID,
+                "invalid_provider_reservation": LIVE_REQUEST_INVALID,
+                "invalid_status": RUN_FINISH_FAILED,
+                "inactive_operation": "That live request is no longer active. Start it again.",
+                "provider_call_already_reserved": "This request already started. Check its result.",
+                "operation_call_limit": (
+                    "This run reached its request limit. Try a smaller request."
+                ),
+                "operation_not_found": (
+                    "Muse couldn't find that run. Reload and check your saved results."
+                ),
+            }
+            detail = (
+                message
+                if isinstance(message, str) and message in _PUBLIC_RUN_MESSAGES
+                else messages.get(str(result.get("code") or ""), RUNS_UNAVAILABLE)
+            )
+            logger.warning("Run accounting refused request (HTTP %s)", status)
             raise UsageLimitError(status, detail)
-        raise UsageLimitError(503, "Usage accounting returned an invalid response.")
+        logger.warning("Run accounting returned an invalid response")
+        raise UsageLimitError(503, RUNS_UNAVAILABLE)
     return result
 
 
@@ -100,7 +139,8 @@ async def authorize_operation(
     try:
         operation_id = str(UUID(str(result["operation_id"])))
     except (KeyError, ValueError, TypeError, AttributeError) as err:
-        raise UsageLimitError(503, "Usage accounting returned an invalid operation.") from err
+        logger.warning("Run identity response invalid (%s)", type(err).__name__)
+        raise UsageLimitError(503, RUNS_UNAVAILABLE) from err
     _request_context.set(UsageContext(operation_id=operation_id, user_id=user_id))
     return operation_id
 
@@ -118,7 +158,8 @@ async def reserve_provider(kind: str, model: str, amount_micros: int) -> dict[st
         or not 0 < amount_micros <= 20_000_000
         or kind not in _MODEL_KINDS.get(model, ())
     ):
-        raise UsageLimitError(400, "Unsupported model or reservation.")
+        logger.warning("Live request reservation failed model/amount validation")
+        raise UsageLimitError(400, LIVE_REQUEST_INVALID)
     return await _rpc(
         "muse_reserve_provider",
         {
@@ -138,7 +179,8 @@ async def finish_operation(status: str = "completed", *, operation_id: str | Non
     try:
         if target is not None:
             if status not in {"completed", "failed", "refunded"}:
-                raise UsageLimitError(400, "Invalid completion status.")
+                logger.warning("Run completion status invalid")
+                raise UsageLimitError(400, RUN_FINISH_FAILED)
             await _rpc(
                 "muse_finish_operation",
                 {"p_operation_id": target, "p_status": status},

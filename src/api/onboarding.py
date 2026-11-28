@@ -7,6 +7,7 @@ idempotently charging zero runs on retry or re-entry.
 
 from __future__ import annotations
 
+import logging
 import re
 from datetime import UTC, datetime
 from typing import Annotated, Any, Literal
@@ -24,6 +25,8 @@ from src.services.accounts import (
     verify_workspace_owner,
 )
 from src.services.saved_competitors import keep_saved_context
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/onboarding", tags=["onboarding"])
 
@@ -206,7 +209,10 @@ async def complete_onboarding(
             except Exception as err:
                 if isinstance(err, HTTPException):
                     raise
-                raise HTTPException(500, f"Failed to save your setup changes: {err}") from err
+                logger.warning("Setup edit save failed (%s)", type(err).__name__)
+                raise HTTPException(
+                    500, "Muse couldn't save your setup changes. Try saving again in a minute."
+                ) from err
             return {
                 "success": True,
                 "charged": False,
@@ -246,7 +252,10 @@ async def complete_onboarding(
         except Exception as err:
             if isinstance(err, HTTPException):
                 raise
-            raise HTTPException(500, f"Failed to save onboarding workspace: {err}") from err
+            logger.warning("Initial setup save failed (%s)", type(err).__name__)
+            raise HTTPException(
+                500, "Muse couldn't finish saving your setup. Try saving again in a minute."
+            ) from err
 
         return {
             "success": True,

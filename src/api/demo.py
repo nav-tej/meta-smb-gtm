@@ -155,7 +155,11 @@ async def live_mode(
             await usage_meter.finish_operation(outcome, operation_id=operation_id)
         return
     if not valid_demo_key(x_demo_key):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Live calls need a valid X-Demo-Key.")
+        logger.warning("Live request refused (presenter access missing)")
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            detail="This session doesn't have access to live Muse. Use saved examples for now.",
+        )
     remaining = _reserve_live_slot(settings.live_calls_per_hour)
     logger.warning(
         "LIVE Muse call allowed: %s at %s (%d left this hour)",
@@ -171,10 +175,11 @@ LiveMode = Annotated[bool, Depends(live_mode)]
 
 
 def demo_unavailable(feature: str) -> HTTPException:
+    logger.warning("Saved example feature unavailable")
     return HTTPException(
         status.HTTP_403_FORBIDDEN,
         detail=(
-            f"{feature} has no saved demo result. This deployment is in demo mode; "
-            "add ?live=true with a valid X-Demo-Key header to run it live."
+            f"{feature} isn't available in the saved example. "
+            "Use the example without it, or try again with live Muse access."
         ),
     )

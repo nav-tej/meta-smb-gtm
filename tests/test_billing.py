@@ -876,7 +876,7 @@ def test_unpriced_plan_reports_pricing_not_generic_outage(
     finally:
         get_settings.cache_clear()
     assert response.status_code == 503
-    assert "not priced yet" in response.json()["detail"]
+    assert "plan isn't available to buy yet. Try again later." in response.json()["detail"]
 
 
 @pytest.mark.parametrize(

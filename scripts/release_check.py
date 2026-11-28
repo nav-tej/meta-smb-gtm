@@ -246,7 +246,14 @@ def check_oauth(transport: Transport) -> Check:
 
 def check_api(transport: Transport, watchlist: str, skip_oauth: bool) -> list[Check]:
     checks = []
-    for name in ("account", "oauth", "ad_library", "watchlist", "saved_competitor"):
+    for name in (
+        "account",
+        "oauth",
+        "ad_library",
+        "watchlist",
+        "saved_competitor",
+        "remove_competitor",
+    ):
         try:
             if name == "account":
                 reply = transport.request("/api/v1/account/me")
@@ -289,7 +296,7 @@ def check_api(transport: Transport, watchlist: str, skip_oauth: bool) -> list[Ch
                 check = Check(
                     name, status == expected, f"HTTP {status}; expected {expected} ({watchlist})"
                 )
-            else:
+            elif name == "saved_competitor":
                 status = transport.request(
                     "/api/v1/competitors/saved",
                     "PUT",
@@ -299,6 +306,11 @@ def check_api(transport: Transport, watchlist: str, skip_oauth: bool) -> list[Ch
                     },
                 ).status
                 check = Check(name, status == 401, f"HTTP {status}; expected signed-out 401")
+            else:
+                status = transport.request(
+                    "/api/v1/competitors/saved/remove", "POST", {"urls": ["https://example.com"]}
+                ).status
+                check = Check(name, status == 401, f"HTTP {status}; expected signed-out 401")
         except Exception:
             check = Check(name, False, "Request failed or response was invalid")
         checks.append(check)
@@ -306,75 +318,105 @@ def check_api(transport: Transport, watchlist: str, skip_oauth: bool) -> list[Ch
 
 
 def check_logs() -> Check:
-    """Read CLI JSON internally; emit only a method and pathname for server errors."""
+    """Read the complete filtered window; only method and vetted paths leave the parser."""
+    command = [
+        "vercel",
+        "logs",
+        "requests",
+        "-p",
+        "meta-smb-gtm",
+        "--scope",
+        "navtejs-6321s-projects",
+        "--since",
+        "15m",
+        "--query",
+        "httpStatus >= 500",
+        "--limit",
+        "1000",
+        "--json",
+    ]
+    failures: list[str] = []
+    cursors: set[str] = set()
+    known_paths = set(PAGES) | {
+        "/api/v1/account/me",
+        "/api/v1/account/oauth/google",
+        "/api/v1/analyze-competitors",
+        "/api/v1/watchlist/run",
+        "/api/v1/competitors/saved",
+        "/api/v1/competitors/saved/remove",
+    }
     try:
-        result = subprocess.run(
-            [
-                "vercel",
-                "logs",
-                "requests",
-                "-p",
-                "meta-smb-gtm",
-                "--scope",
-                "navtejs-6321s-projects",
-                "--since",
-                "15m",
-                "--json",
-            ],
-            capture_output=True,
-            text=True,
-            timeout=45,
-            check=False,
-        )
-        if result.returncode:
-            raise ValueError("Log command failed")
-        try:
-            parsed = json.loads(result.stdout)
-        except ValueError:
-            parsed = [json.loads(line) for line in result.stdout.splitlines() if line.strip()]
-        if isinstance(parsed, dict):
-            parsed = parsed.get("logs", parsed.get("requests", [parsed]))
-        if not isinstance(parsed, list):
-            raise ValueError("Unknown log schema")
-        failures = []
-        for item in parsed:
-            if not isinstance(item, dict):
-                raise ValueError("Unknown log entry")
-            if item.get("type") == "summary":
-                if item.get("pagination", {}).get("hasMore") or item.get("excludedIntervals"):
-                    raise ValueError("Log window incomplete")
-                continue
-            if "type" in item:
-                if item["type"] != "request" or not isinstance(item.get("data"), dict):
-                    raise ValueError("Unknown record type or incomplete logs")
-                item = item["data"]
-            status = item.get(
-                "httpStatus",
-                item.get("statusCode", item.get("status", item.get("responseStatusCode"))),
+        for _page in range(10):
+            result = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                timeout=45,
+                check=False,
             )
-            if status is None:
-                raise ValueError("Missing request status")
-            if 500 <= int(status) <= 599:
-                method = item.get("requestMethod", item.get("method", "UNKNOWN"))
-                method = (
-                    method
-                    if method in {"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"}
-                    else "UNKNOWN"
+            if result.returncode:
+                raise ValueError("Log command failed")
+            try:
+                parsed = json.loads(result.stdout)
+            except ValueError:
+                parsed = [json.loads(line) for line in result.stdout.splitlines() if line.strip()]
+            if isinstance(parsed, dict):
+                parsed = parsed.get("logs", parsed.get("requests", [parsed]))
+            if not isinstance(parsed, list):
+                raise ValueError("Unknown log schema")
+            summary = None
+            for item in parsed:
+                if not isinstance(item, dict):
+                    raise ValueError("Unknown log entry")
+                if item.get("type") == "summary":
+                    if summary is not None or item.get("excludedIntervals"):
+                        raise ValueError("Log window incomplete")
+                    summary = item
+                    continue
+                if "type" in item:
+                    if item["type"] != "request" or not isinstance(item.get("data"), dict):
+                        raise ValueError("Unknown record type or incomplete logs")
+                    item = item["data"]
+                status = item.get(
+                    "httpStatus",
+                    item.get("statusCode", item.get("status", item.get("responseStatusCode"))),
                 )
-                raw_path = item.get("requestPath", item.get("path", "/"))
-                path = urlsplit(str(raw_path)).path
-                # Unknown/dynamic paths may contain user identities even without a query.
-                known_paths = set(PAGES) | {
-                    "/api/v1/account/me",
-                    "/api/v1/account/oauth/google",
-                    "/api/v1/analyze-competitors",
-                    "/api/v1/watchlist/run",
-                    "/api/v1/competitors/saved",
-                }
-                if path not in known_paths:
-                    path = "/[redacted]"
-                failures.append(f"{method} {path}")
-        return Check("logs", not failures, "; ".join(failures) or "No 5xx in the last 15 minutes")
+                if status is None:
+                    raise ValueError("Missing request status")
+                if 500 <= int(status) <= 599:
+                    method = item.get("requestMethod", item.get("method", "UNKNOWN"))
+                    method = (
+                        method
+                        if method in {"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"}
+                        else "UNKNOWN"
+                    )
+                    raw_path = item.get("requestPath", item.get("path", "/"))
+                    path = urlsplit(str(raw_path)).path
+                    if path not in known_paths:
+                        path = "/[redacted]"
+                    failures.append(f"{method} {path}")
+            if summary is None or not isinstance(summary.get("pagination"), dict):
+                raise ValueError("Missing log completion summary")
+            pagination = summary["pagination"]
+            if pagination.get("hasMore") is False:
+                return Check(
+                    "logs",
+                    not failures,
+                    "; ".join(failures) or "No 5xx in the last 15 minutes",
+                )
+            cursor = pagination.get("next")
+            if (
+                pagination.get("hasMore") is not True
+                or not isinstance(cursor, str)
+                or not cursor.strip()
+                or cursor in cursors
+            ):
+                raise ValueError("Invalid pagination")
+            cursors.add(cursor)
+            # The CLI cursor carries the original project, team, filter and time window.
+            # --query/--project/--since conflict with --next and must not be repeated.
+            command = ["vercel", "logs", "requests", "--next", cursor, "--limit", "1000", "--json"]
+        return Check("logs", False, "Request logs incomplete (10-page limit)")
     except Exception:
         return Check("logs", False, "Request logs unavailable or schema unrecognized")
 

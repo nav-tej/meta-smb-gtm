@@ -48,10 +48,14 @@ def _stripe() -> Any:
     try:
         import stripe
     except ImportError as err:
-        raise HTTPException(503, "Billing is not installed on this server.") from err
+        logger.warning("Payment client unavailable (%s)", type(err).__name__)
+        raise HTTPException(
+            503, "Payments are unavailable right now. Please try again later."
+        ) from err
     settings = get_settings()
     if not settings.stripe_secret_key:
-        raise HTTPException(503, "Billing is not configured yet.")
+        logger.warning("Payments unavailable (missing configuration)")
+        raise HTTPException(503, "Payments are unavailable right now. Please try again later.")
     client = stripe.StripeClient(settings.stripe_secret_key)
     return getattr(client, "v1", client)
 
@@ -62,7 +66,10 @@ def _price_id(plan: str, interval: str = "month") -> str:
         raise HTTPException(422, f"The {plan.title()} plan has no {interval}ly billing option.")
     price = getattr(get_settings(), field, "")
     if not price:
-        raise HTTPException(503, f"The {plan.title()} plan is not priced yet.")
+        logger.warning("Requested payment plan has no configured price")
+        raise HTTPException(
+            503, f"The {plan.title()} plan isn't available to buy yet. Try again later."
+        )
     return price
 
 

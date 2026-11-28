@@ -32,6 +32,7 @@ CHECKS = {
     "ad_library",
     "watchlist",
     "saved_competitor",
+    "remove_competitor",
 }
 SECRET_STATE = "fixture-private-oauth-state"
 SECRET_CHALLENGE = "fixture-private-code-challenge"
@@ -139,6 +140,10 @@ def release_server(
         async def mutate(request: Request, call_next: Any) -> Response:
             path = request.url.path
             requests.append(f"{request.method} {path}")
+            if mutation.startswith("remove_") and path == "/api/v1/competitors/saved/remove":
+                assert request.method == "POST"
+                assert await request.json() == {"urls": ["https://example.com"]}
+                return Response(status_code=int(mutation.removeprefix("remove_")))
             if mutation.startswith("saved_") and path == "/api/v1/competitors/saved":
                 assert request.method == "PUT"
                 return Response(status_code=int(mutation.removeprefix("saved_")))
@@ -256,6 +261,7 @@ def test_release_check_passes_real_app(release_server: Callable[..., Any]) -> No
     assert result.returncode == 0, result.stdout + result.stderr
     assert "skipped" in checks["oauth"]["detail"].lower()
     assert "GET /api/v1/account/oauth/google" not in requests
+    assert "POST /api/v1/competitors/saved/remove" in requests
     assert "POST /api/v1/analyze-competitors" in requests
     assert "GET /api/v1/watchlist/run" in requests
     for page in ("/progress", "/today", "/create", "/portal", "/api/v1/health"):
@@ -274,6 +280,8 @@ def test_release_check_passes_real_app(release_server: Callable[..., Any]) -> No
         ("auth_user", "account"),
         ("saved_200", "saved_competitor"),
         ("saved_500", "saved_competitor"),
+        ("remove_200", "remove_competitor"),
+        ("remove_500", "remove_competitor"),
     ],
 )
 def test_release_mutations_fail_correct_check(
@@ -418,9 +426,22 @@ def test_logs_fail_closed_and_redact(
             "navtejs-6321s-projects",
             "--since",
             "15m",
+            "--query",
+            "httpStatus >= 500",
+            "--limit",
+            "1000",
             "--json",
         ]
-        return subprocess.CompletedProcess(command, 0, payload)
+        # Flat legacy fixtures still test redaction, with an explicit completed window.
+        try:
+            entries = json.loads(payload)
+            if not isinstance(entries, list):
+                entries = [entries]
+            entries.append({"type": "summary", "pagination": {"hasMore": False}})
+            output = json.dumps(entries)
+        except ValueError:
+            output = payload
+        return subprocess.CompletedProcess(command, 0, output)
 
     monkeypatch.setattr(subprocess, "run", run)
     result = checker["check_logs"]()
@@ -472,7 +493,8 @@ def test_oauth_unknown_parameters_not_echoed(checker: dict[str, Any]) -> None:
                         "requestMethod": "GET",
                         "requestPath": "/today?private=token",
                     },
-                }
+                },
+                {"type": "summary", "pagination": {"hasMore": False}, "excludedIntervals": []},
             ],
             False,
         ),
@@ -496,3 +518,155 @@ def test_logs_current_cli_ndjson(
     assert "private" not in result.detail
     if any(record.get("data", {}).get("httpStatus") == 503 for record in records):
         assert result.detail == "GET /today"
+
+
+@pytest.mark.parametrize("second_page_error", [False, True])
+def test_logs_pages_follow_cursor(
+    checker: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
+    second_page_error: bool,
+) -> None:
+    commands: list[list[str]] = []
+    cursor = "fixture-private-pagination-cursor"
+
+    def run(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        commands.append(command)
+        assert command[command.index("--limit") + 1] == "1000"
+        if len(commands) == 1:
+            assert command[command.index("--query") + 1] == "httpStatus >= 500"
+            assert "--next" not in command
+            records = [
+                {
+                    "type": "summary",
+                    "recordsReturned": 0,
+                    "pagination": {"hasMore": True, "next": cursor},
+                    "excludedIntervals": [],
+                }
+            ]
+        else:
+            assert command == [
+                "vercel",
+                "logs",
+                "requests",
+                "--next",
+                cursor,
+                "--limit",
+                "1000",
+                "--json",
+            ]
+            records = (
+                [
+                    {
+                        "type": "request",
+                        "data": {
+                            "httpStatus": 503,
+                            "requestMethod": "POST",
+                            "requestPath": "/api/v1/competitors/saved/remove?token=private",
+                            "email": "private@example.test",
+                            "cookie": "private",
+                        },
+                    }
+                ]
+                if second_page_error
+                else []
+            )
+            records.append(
+                {
+                    "type": "summary",
+                    "recordsReturned": len(records),
+                    "pagination": {"hasMore": False},
+                    "excludedIntervals": [],
+                }
+            )
+        return subprocess.CompletedProcess(
+            command, 0, "\n".join(json.dumps(record) for record in records)
+        )
+
+    monkeypatch.setattr(subprocess, "run", run)
+    result = checker["check_logs"]()
+    assert len(commands) == 2
+    assert result.ok is (not second_page_error)
+    assert result.detail == (
+        "POST /api/v1/competitors/saved/remove"
+        if second_page_error
+        else "No 5xx in the last 15 minutes"
+    )
+    assert "private" not in result.detail
+
+
+def test_logs_filtered_empty_window_passes(
+    checker: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def run(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        assert command[command.index("--query") + 1] == "httpStatus >= 500"
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            json.dumps(
+                {
+                    "type": "summary",
+                    "recordsReturned": 0,
+                    "pagination": {"hasMore": False},
+                    "excludedIntervals": [],
+                }
+            ),
+        )
+
+    monkeypatch.setattr(subprocess, "run", run)
+    assert checker["check_logs"]().ok is True
+
+
+def test_logs_more_than_ten_pages_fails_closed(
+    checker: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    commands = []
+
+    def run(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        commands.append(command)
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            json.dumps(
+                {
+                    "type": "summary",
+                    "recordsReturned": 0,
+                    "pagination": {"hasMore": True, "next": f"private-cursor-{len(commands)}"},
+                    "excludedIntervals": [],
+                }
+            ),
+        )
+
+    monkeypatch.setattr(subprocess, "run", run)
+    result = checker["check_logs"]()
+    assert result.ok is False
+    assert "10-page limit" in result.detail
+    assert len(commands) == 10
+    assert "private" not in result.detail
+
+
+@pytest.mark.parametrize(
+    "defect", ["missing_cursor", "repeated_cursor", "missing_summary", "cli_failure"]
+)
+def test_logs_incomplete_pages_fail_closed(
+    checker: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
+    defect: str,
+) -> None:
+    def run(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        pagination = {"hasMore": True}
+        if defect == "repeated_cursor":
+            pagination["next"] = "fixture-private-cursor"
+        records = {"type": "summary", "pagination": pagination}
+        return subprocess.CompletedProcess(
+            command,
+            1 if defect == "cli_failure" else 0,
+            "" if defect == "missing_summary" else json.dumps(records),
+            "private diagnostic",
+        )
+
+    monkeypatch.setattr(subprocess, "run", run)
+    result = checker["check_logs"]()
+    assert result.ok is False
+    assert "private" not in result.detail

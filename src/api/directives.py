@@ -91,12 +91,10 @@ async def confirm_directive_endpoint(
     verify_workspace_owner(account, x_muse_owner, require_binding=True)
 
     if not check_directive_rate_limit(account.user_id):
+        logger.warning("Research directive hourly limit reached (10)")
         raise HTTPException(
             status_code=429,
-            detail=(
-                "Research directive rate limit exceeded (maximum 10 per hour). "
-                "Please try again later."
-            ),
+            detail=("You can save up to 10 research requests an hour. Try again in an hour."),
         )
 
     # Log typed directive properties only (never free-text)

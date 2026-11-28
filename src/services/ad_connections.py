@@ -376,7 +376,21 @@ async def _rpc(
     if result.get("allowed") is not True:
         status = result.get("status_code")
         code = str(result.get("code") or "ad_connection_error")
-        msg = str(result.get("message") or "Could not update ad account connection.")[:200]
+        messages = {
+            "invalid_connection": (
+                "Muse couldn't save that Meta ad account connection. Try connecting it again."
+            ),
+            "invalid_status": (
+                "Muse couldn't update that Meta ad account connection. Try again in a minute."
+            ),
+            "not_found": "That ad account is not connected to your workspace.",
+        }
+        msg = messages.get(
+            code, ("Muse couldn't update that Meta ad account connection. Try again in a minute.")
+        )
+        if result.get("message") == "That ad account is not connected to your workspace.":
+            msg = "That ad account is not connected to your workspace."
+        logger.warning("Ad account storage refused request")
         raise AdConnectionError(
             int(status) if isinstance(status, int) and status in {400, 403, 404, 409, 422} else 503,
             msg,
@@ -425,7 +439,10 @@ async def save_meta_connection(
     )
     conn_obj = result.get("connection")
     if not isinstance(conn_obj, dict):
-        raise AdConnectionError(503, "Ad account storage returned an invalid connection record.")
+        logger.warning("Ad account storage returned an invalid connection record")
+        raise AdConnectionError(
+            503, ("Muse couldn't save that Meta ad account connection. Try connecting it again.")
+        )
     return AdConnectionSummary.model_validate(conn_obj)
 
 

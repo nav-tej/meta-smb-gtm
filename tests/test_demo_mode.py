@@ -127,7 +127,10 @@ def test_demo_mode_guarded_seller_audit_screenshot_and_csv_routes(
         },
     )
     assert screenshot_resp.status_code == 403
-    assert "Screenshot analysis has no saved demo result" in screenshot_resp.json()["detail"]
+    assert (
+        "Screenshot analysis isn't available in the saved example."
+        in screenshot_resp.json()["detail"]
+    )
 
     # 3. CSV bid advice serves cached recommendation in demo mode after validating CSV
     valid_csv = (
@@ -167,7 +170,7 @@ def test_csv_validation_edge_cases_return_422_in_demo_mode(
         json={"csv_text": bad_csv, "competitor_brief": brief_json},
     )
     assert resp.status_code == 422
-    assert "Invalid campaign CSV" in resp.json()["detail"]
+    assert "Muse couldn't read the campaign file." in resp.json()["detail"]
 
 
 def test_public_portal_and_all_sample_assets_resolve(demo_client: TestClient) -> None:

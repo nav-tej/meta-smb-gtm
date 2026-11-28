@@ -1,5 +1,6 @@
 """Bid Advisor routes (Flow 3). Advisory only; nothing is written to an ad account."""
 
+import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
@@ -10,6 +11,8 @@ from src.models.bids import BidAdviceRequest, BidRecommendation, PerformanceMetr
 from src.models.intel import CompetitorBrief
 from src.services import demo, result_cache
 from src.services.bid_advisor import BidAdvisorService, compute_metrics, load_campaign_csv
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["bids"])
 
@@ -63,9 +66,14 @@ async def bid_advice_csv(
             currency=request.currency,
         )
     except ValueError as err:
+        logger.warning("Campaign import failed (%s)", type(err).__name__)
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail=f"Invalid campaign CSV: {err}",
+            detail=(
+                "Muse couldn't read the campaign file. Export daily results from Meta Ads Manager "
+                "as a CSV with dates, campaign and ad set names, impressions and spend, "
+                "then try again."
+            ),
         ) from err
 
     if request.deterministic_only or request.competitor_brief is None:
