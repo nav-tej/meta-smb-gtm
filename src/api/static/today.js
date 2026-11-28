@@ -23,6 +23,7 @@
   const sampleProduct = () => ({ title: 'Ek Onkar', description: 'An artwork by Sarabjit Singh exploring connection and equality through color and form.', seller: 'Art of Sarabjit Singh', collection: '', price: '', destination_url: 'https://sarabjit-singh.pixels.com/', destination: 'pixels' });
   // What the signed-in seller offers, from setup ("products", "services", "both" or null).
   let ownBusinessType = null;
+  let ownTone = null;
   const offersServices = () => ownBusinessType === 'services';
   // Until the seller picks an item, the label says so instead of inventing an item name.
   const neutralProduct = (shopName = '', shopUrl = '') => {
@@ -579,7 +580,7 @@
     }
     finally { clearTimeout(timer); }
   }
-  function planPayload(live) { return { product: { title: state.product.title, description: state.product.description, price: state.product.price || undefined, destination_url: safeURL(state.product.destination_url) || undefined, seller: state.product.seller, collection: state.product.collection }, channels: [state.channel], goal: state.goal, business_type: isEffectiveSample() ? undefined : (ownBusinessType || 'products'), sales_goal: state.salesGoal || undefined, performance: state.performance || undefined, use_muse: live }; }
+  function planPayload(live) { return { product: { title: state.product.title, description: state.product.description, price: state.product.price || undefined, destination_url: safeURL(state.product.destination_url) || undefined, seller: state.product.seller, collection: state.product.collection }, channels: [state.channel], goal: state.goal, business_type: isEffectiveSample() ? undefined : (ownBusinessType || 'products'), tone: isEffectiveSample() ? undefined : (ownTone || undefined), sales_goal: state.salesGoal || undefined, performance: state.performance || undefined, use_muse: live }; }
   async function buildPlan(live = false, force = false) {
     if (state.busy) return;
     if (live && !liveReady()) return;
@@ -1454,6 +1455,7 @@
     const ideaSpec = requestedIdea ? findPreviewSpec(requestedIdea) : null;
 
     ownBusinessType = null;
+    ownTone = null;
     if (s.isSample) {
       // Signed in but setup not finished: say this is demo data and point to the wizard.
       if (s.state === 'account_sample') window.museModes?.checkSetupPending?.(s.ownerId);
@@ -1517,6 +1519,8 @@
         const shopUrls = Array.isArray(onb.shop_urls) ? onb.shop_urls.filter(Boolean) : [];
         const shopName = String(onb.business_name || '').trim();
         ownBusinessType = ['products', 'services', 'both'].includes(onb.business_type) ? onb.business_type : null;
+        const rawTone = String(ws?.document?.preferences?.taste?.tone || '').trim();
+        ownTone = rawTone || null;
         state.shopWebsiteUrl = shopUrls[0] || '';
         savedShop = { name: shopName, workspace: ws };
         if ($('savedShopWebsiteNote')) {

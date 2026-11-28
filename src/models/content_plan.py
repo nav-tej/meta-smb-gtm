@@ -47,6 +47,7 @@ class ContentPlanRequest(BaseModel):
     goal: Literal["visits", "inquiries", "sales"] = "visits"
     # From the seller's setup. None is the sample artist and older drafts.
     business_type: Literal["products", "services", "both"] | None = None
+    tone: str | None = Field(default=None, max_length=40)
     sales_goal: int | None = Field(default=None, ge=1, le=1_000_000)
     performance: EnteredPerformance | None = None
     use_muse: bool = False

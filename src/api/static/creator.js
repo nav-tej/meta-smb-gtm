@@ -223,8 +223,21 @@
   const fields = { productName: 'name', productPrice: 'price', sellerName: 'seller', productDescription: 'description', productLink: 'link', productCollection: 'collection' };
   const SAMPLE_DESTINATIONS = { pixels: 'Pixels', fineartamerica: 'Fine Art America', saatchi: 'Saatchi Art', website: 'Artist website', other: 'My shop / inquiry page' };
   const OWN_DESTINATIONS = { website: 'My website', booking: 'Booking or contact page', etsy: 'Etsy shop or listing', shopify: 'Shopify store', other: 'Other link' };
+  const BRAND_TONES = {
+    warm_story: { label: 'Warm & story-led', guide: 'Share the personal story and care behind the work in a friendly, grounded voice.' },
+    expert_clear: { label: 'Expert & clear', guide: 'Lead with plain, practical value and explain clearly how it helps.' },
+    polished_premium: { label: 'Polished & premium', guide: 'Use calm, refined phrasing that highlights craft, detail and quality.' },
+    direct_offer: { label: 'Direct & offer-led', guide: 'State what you offer, who it helps and the next step right away.' },
+  };
+  const LEGACY_TONE_MAP = { collector_gallery: 'polished_premium', direct_gift: 'direct_offer' };
+  function normalizeBrandTone(raw) {
+    const key = String(raw || '').trim().toLowerCase();
+    const mapped = LEGACY_TONE_MAP[key] || key;
+    return Object.hasOwn(BRAND_TONES, mapped) ? mapped : null;
+  }
   let ownBusinessType = null;
   let ownBusinessName = '';
+  let ownTone = null;
   const isSampleArtist = () => !state.custom && state.workspace === 'sarabjit_singh';
   const useSampleDestinations = () => !state.custom && (state.workspace === 'sarabjit_singh' || isEffectiveSample());
   const isServices = () => !useSampleDestinations() && ownBusinessType === 'services';
@@ -598,6 +611,7 @@
       placement_note: handoff.placement_note || 'App export preset (not verified Meta policy)',
       why_this_fits: handoff.why_this_fits || '',
       over_budget: handoff.over_budget === true,
+      tone: normalizeBrandTone(handoff.tone),
     };
     const ownSession = !isSampleMode();
     if (ownSession) {
@@ -1402,12 +1416,17 @@
     parts.push(`Goal: ${goalInfo(state.goal)[0]}.`);
     parts.push(`Destination: ${destLabel}.`);
     if (state.product.collection) parts.push(`Series: ${state.product.collection}.`);
+    const activeTone = normalizeBrandTone(state.handoffActive ? state.handoffContext?.tone : null) || normalizeBrandTone(ownTone);
+    if (activeTone) {
+      const toneMeta = BRAND_TONES[activeTone];
+      parts.push(`Tone: ${toneMeta.label}. ${toneMeta.guide}`);
+    }
     parts.push('Only use supplied facts. Never invent scarcity, materials, reviews, prices or results. Do not state a price unless it is supplied for the selected destination.');
     return {
       title: state.product.name,
       description: state.product.description,
       price: state.product.price || undefined,
-      brand_notes: parts.join(' ')
+      brand_notes: parts.join(' ').slice(0, 1000)
     };
   }
   function researchContext() {
@@ -1854,6 +1873,7 @@
     if (s.isSample) {
       ownBusinessType = null;
       ownBusinessName = '';
+      ownTone = null;
       // Signed in but setup not finished: say this is demo data and point to the wizard.
       if (s.state === 'account_sample') window.museModes?.checkSetupPending?.(s.ownerId);
       let restored = false;
@@ -1890,6 +1910,7 @@
     // account_own or guest_entry
     ownBusinessType = null;
     ownBusinessName = '';
+    ownTone = null;
     let recovered = false;
     applyingDraft = true;
     try {
@@ -1923,6 +1944,7 @@
         const shopName = String(onb.business_name || '').trim();
         ownBusinessType = ['products', 'services', 'both'].includes(onb.business_type) ? onb.business_type : null;
         ownBusinessName = shopName;
+        ownTone = normalizeBrandTone(ws?.document?.preferences?.taste?.tone);
         state.shopWebsiteUrl = shopUrls[0] || '';
         if ($('savedShopWebsiteNote')) {
           $('savedShopWebsiteNote').textContent = state.shopWebsiteUrl

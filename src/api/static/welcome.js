@@ -1182,14 +1182,26 @@
           el.checked = access.channels.includes(el.value);
         });
       }
+      const LEGACY_TONE_MAP = { collector_gallery: 'polished_premium', direct_gift: 'direct_offer' };
+      const VALID_TONES = new Set(['warm_story', 'expert_clear', 'polished_premium', 'direct_offer']);
+      const normalizeToneChoice = (raw) => {
+        const key = String(raw || '').trim().toLowerCase();
+        const mapped = LEGACY_TONE_MAP[key] || key;
+        return VALID_TONES.has(mapped) ? mapped : 'warm_story';
+      };
       const taste = prefs.taste || {};
-      setVal('wkPrefTone', taste.tone);
+      setVal('wkPrefTone', normalizeToneChoice(taste.tone));
       setVal('wkPrefAvoid', taste.subjects_to_avoid);
       setVal('wkPrefFocus', prefs.research_focus);
     }
     if (editing) hydrateStep4(state.preferences);
 
     function collectStep4Preferences() {
+      const LEGACY_TONE_MAP = { collector_gallery: 'polished_premium', direct_gift: 'direct_offer' };
+      const VALID_TONES = new Set(['warm_story', 'expert_clear', 'polished_premium', 'direct_offer']);
+      const rawTone = String(document.getElementById('wkPrefTone')?.value || '').trim().toLowerCase();
+      const mappedTone = LEGACY_TONE_MAP[rawTone] || rawTone;
+      const toneChoice = VALID_TONES.has(mappedTone) ? mappedTone : 'warm_story';
       const channels = [...document.querySelectorAll('#wkPrefChannels input[type="checkbox"]:checked')].map((el) => el.value);
       return {
         experience: document.getElementById('wkPrefExperience')?.value || 'some',
@@ -1200,7 +1212,7 @@
           ads_budget_band: document.getElementById('wkPrefBudget')?.value || 'none',
         },
         taste: {
-          tone: document.getElementById('wkPrefTone')?.value || 'warm_story',
+          tone: toneChoice,
           subjects_to_avoid: String(document.getElementById('wkPrefAvoid')?.value || '').trim().slice(0, 160),
         },
         research_focus: String(document.getElementById('wkPrefFocus')?.value || '').trim().slice(0, 300),
