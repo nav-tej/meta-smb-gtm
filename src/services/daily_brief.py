@@ -287,10 +287,11 @@ def _own_brief(
         except ValidationError:
             logger.warning("Skipping invalid outcome in own daily brief")
     watch_items, overnight_note = _own_watch_items(workspace, competitors, watchlist_table)
+    possessive = f"{business_name}'" if business_name.endswith("s") else f"{business_name}'s"
     return DailyBrief(
         date=today.isoformat(),
         generated_at=now.isoformat(timespec="seconds"),
-        source=f"Built from {business_name}'s saved setup. No runs used.",
+        source=f"Built from {possessive} saved setup. No runs used.",
         business_name=business_name,
         items=watch_items,
         move=focus or fallback,

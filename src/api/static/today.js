@@ -168,6 +168,9 @@
     swap($('quickShopUrl'), services ? 'https://your-website.com' : 'https://your-shop.com', 'placeholder');
     swap($('researchSavedLink'), 'Open your full workspace →');
     swap($('researchSavedLink'), '/', 'href');
+    swap(find('#resultsDetails > p.muted'), services ? 'From your channel insights or website. Saved on this device.' : 'From your channel insights or shop. Saved on this device.');
+    swap(find('label[for="salesGoal"]'), services ? 'Weekly client goal (optional)' : 'Weekly sales target (optional)');
+    swap(find('.sources > p'), services ? 'Starter drafts use your offer and channel guidance. Live Muse can write a fresh plan after you enable it below. A post or a goal does not guarantee client inquiries or sales.' : 'Starter drafts use your item and channel guidance. Live Muse can write a fresh plan after you enable it below. A post or a sales target does not guarantee sales.');
   }
   const deviceKey = () => `muse-editor-v1:${draftNamespace}:${isEffectiveSample() ? 'sample' : (draftOwner ? 'account:' + encodeURIComponent(draftOwner) : 'guest')}`;
   function persistDraft() {
@@ -650,9 +653,10 @@
       });
       $('planCards').append(button);
     }
-    $('insightTitle').textContent = state.performance ? `${state.performance.clicks} shop clicks · ${state.performance.sales} sales` : 'Give people one clear next step.';
+    const svcPerf = !sampleWords && offersServices();
+    $('insightTitle').textContent = state.performance ? `${state.performance.clicks} ${svcPerf ? 'link clicks' : 'shop clicks'} · ${state.performance.sales} ${svcPerf ? 'clients' : 'sales'}` : 'Give people one clear next step.';
     $('insightAction').textContent = plan?.insight?.next_action || 'Post once, then note the visits or inquiries it brings.';
-    $('resultsSource').textContent = (state.performance ? 'Your last-7-days counts · no post-level attribution' : 'No performance data added') + (state.salesGoal ? ` · weekly goal: ${state.salesGoal} sales${plan?.insight?.sales_remaining != null ? ` · ${plan.insight.sales_remaining} to go` : ''}` : '');
+    $('resultsSource').textContent = (state.performance ? 'Your last-7-days counts · no post-level attribution' : 'No performance data added') + (state.salesGoal ? ` · weekly goal: ${state.salesGoal} ${svcPerf ? 'clients' : 'sales'}${plan?.insight?.sales_remaining != null ? ` · ${plan.insight.sales_remaining} to go` : ''}` : '');
     $('sources').replaceChildren();
     for (const source of plan?.sources || []) { const url = safeURL(source.url); if (!url) continue; const a = document.createElement('a'); a.href = url; a.target = '_blank'; a.rel = 'noopener noreferrer'; a.textContent = source.title; $('sources').append(a); }
     paint();

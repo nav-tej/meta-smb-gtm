@@ -90,6 +90,7 @@
   }
 
   let currentOwnerId = null;
+  let ownBusinessType = null;
   let state = freshState(true);
   let hydrating = false;
 
@@ -357,10 +358,13 @@
   }
 
   function syncFirstAdCopy(sample) {
+    const svc = !sample && ownBusinessType === 'services';
     if ($('faOutcomeInquiriesDesc')) {
       $('faOutcomeInquiriesDesc').textContent = sample
         ? 'Best when you take custom orders or sell via DMs without online checkout.'
-        : 'Best when you take custom inquiries, book calls, or sell via messages without online checkout.';
+        : svc
+          ? 'Best when you take custom inquiries, book calls, or start client conversations via messages.'
+          : 'Best when you take custom inquiries, book calls, or sell via messages without online checkout.';
     }
     if ($('faOutcomeVisitsTitle')) $('faOutcomeVisitsTitle').textContent = sample ? 'Bring visitors to your shop' : 'Bring visitors to your website';
     if ($('faOutcomeVisitsDesc')) {
@@ -375,7 +379,7 @@
         : 'Reuses your active photo and draft copy when available, or upload or select an image here.';
     }
     if ($('faProductNameLabel')) $('faProductNameLabel').textContent = sample ? 'Product or artwork name' : 'What are you promoting?';
-    if ($('faProductName')) $('faProductName').placeholder = sample ? 'e.g., Botanical Linocut Print' : 'e.g., AI growth audit, consultation, or featured product';
+    if ($('faProductName')) $('faProductName').placeholder = sample ? 'e.g., Botanical Linocut Print' : svc ? 'e.g., Growth audit, advisory retainer, or consultation' : 'e.g., AI growth audit, consultation, or featured product';
     if ($('faCta')) $('faCta').placeholder = sample ? 'e.g., Shop now, Send message, Learn more' : 'e.g., Learn more, Send message, Book a call';
     if ($('faDestWebsiteOpt')) $('faDestWebsiteOpt').textContent = sample ? 'Studio website / product page' : 'Your website';
     if ($('faDestEtsyOpt')) $('faDestEtsyOpt').textContent = sample ? 'Etsy shop / listing' : 'Etsy shop or listing';
@@ -386,7 +390,9 @@
     if ($('faAudience')) {
       $('faAudience').placeholder = sample
         ? 'e.g., People looking for handmade botanical prints and home gifts'
-        : 'e.g., Small business owners looking for marketing help or local buyers';
+        : svc
+          ? 'e.g., Founders and small business owners looking for marketing help'
+          : 'e.g., Small business owners looking for marketing help or local buyers';
     }
   }
 
@@ -482,6 +488,7 @@
     }
 
     const sample = isSampleMode();
+    if (sample) ownBusinessType = null;
     const contextKey = `${sample ? 'sample' : 'own'}:${currentOwnerId || 'anon'}`;
     if (!initial && contextKey === lastLoadedContextKey) {
       return;
@@ -521,6 +528,7 @@
           const resp = await fetch('/api/v1/seller-memory', { credentials: 'include' });
           if (resp.ok) {
             const sm = await resp.json();
+            ownBusinessType = ['products', 'services', 'both'].includes(sm?.business_type) ? sm.business_type : null;
             if (sm?.business_name && (state.businessName === 'Your business' || state.businessName === 'Your Studio')) state.businessName = sm.business_name;
             if (Array.isArray(sm?.shop_urls) && sm.shop_urls[0] && $('faShopUrl')) {
               $('faShopUrl').value = sm.shop_urls[0];
@@ -534,11 +542,12 @@
 
   async function importShopImages() {
     const shopUrl = $('faShopUrl')?.value.trim() || '';
+    const svc = !isSampleMode() && ownBusinessType === 'services';
     if (!safeUrl(shopUrl)) {
-      notify('Enter a valid http:// or https:// shop or product URL first.', true);
+      notify(svc ? 'Enter a valid http:// or https:// website URL first.' : 'Enter a valid http:// or https:// shop or product URL first.', true);
       return;
     }
-    notify('Loading shop images…');
+    notify(svc ? 'Loading website images…' : 'Loading shop images…');
     try {
       const resp = await fetch('/api/v1/product-reference', {
         method: 'POST',
