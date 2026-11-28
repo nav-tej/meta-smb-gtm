@@ -45,3 +45,61 @@
 - Session 11501 completed exit 0: exact gate command above; Ruff passed, 349 files format-clean; **892 passed, 3 skipped, 1 warning in 411.48s**. Log `/tmp/release-check-gate.log`. It collected tests before the five final log-schema cases were added, so final-source gate session 7540 remains authoritative/pending.
 - Three skipped tests require unset `BILLING_PGLITE_DIR`: `tests/test_auto_watchlist.py::test_watchlist_sql_on_local_postgres`, `tests/test_billing.py::test_billing_sql_regressions_on_local_postgres`, `tests/test_digest_email.py::test_digest_sql_on_local_postgres`. No SQL tests claimed executed. Warning: expected Pillow DecompressionBombWarning in `test_excessive_dimension_image_is_rejected_preserving_listing`. Pytest also emits its existing asyncio fixture-loop-scope deprecation at startup.
 - Next: wait for session 7540, record final 900-test collection outcome, commit/push report and release own assignment scope. No runtime changes or active audit processes.
+
+## Done / handoff to Claude — November 28, 2026 (PT)
+
+**Parts 1 and 2 complete.** Executable source last changed at `cb832f4`; subsequent commits
+change release documentation only. Claude's integration input was merged at `1566341`.
+All results below are independently executed local results, not hosted acceptance.
+
+| Required verification | Command / evidence | Result |
+|---|---|---|
+| Full final-source gate | `DEMO_MODE=true META_MODEL_API_KEY= DEMO_KEY= make PY=/Users/nav/meta-smb-gtm/.venv/bin check` | Exit 0; Ruff clean; 349 files formatted; **897 passed, 3 skipped, 1 warning in 412.85s** |
+| Checker suite | `DEMO_MODE=true META_MODEL_API_KEY= DEMO_KEY= /Users/nav/meta-smb-gtm/.venv/bin/pytest tests/test_release_check.py -q` | **39 passed in 6.71s**; all 39 also passed within final full gate |
+| Account audit | `DEMO_MODE=true META_MODEL_API_KEY= DEMO_KEY= /usr/bin/python3 tests/launch_account_audit.py --output /tmp/codex-release-account-nov28` | Exit 0; **27 passed, 0 failed** |
+| Browser audit | `DEMO_MODE=true META_MODEL_API_KEY= DEMO_KEY= /usr/bin/python3 tests/launch_browser_audit.py --output /tmp/codex-release-browser-nov28` | Exit 0; **20 passed, 0 failed** |
+| Eight Node contracts | Exact commands below; `/tmp/release-check-contracts.log` | **8/8 exit 0** |
+| Three required mutations | Exact command below; `/tmp/release-check-required-mutations.log` | **3 passed in 1.17s**: each asserts checker exit **1** and only its expected failed check |
+
+```sh
+node tests/editor_drafts_contract.cjs
+node tests/account_ui_contract.cjs
+node tests/today_studio_contract.cjs
+node tests/muse_shell_resilience.cjs
+node tests/ui_polish_contract.cjs
+node tests/shared_get_contract.cjs
+node tests/creator_journey_smoke.cjs
+node tests/creator_studio_contract.cjs src/api/static/creator.js
+
+DEMO_MODE=true META_MODEL_API_KEY= DEMO_KEY= /Users/nav/meta-smb-gtm/.venv/bin/pytest -v \
+  'tests/test_release_check.py::test_release_mutations_fail_correct_check[missing_progress-pages]' \
+  'tests/test_release_check.py::test_release_mutations_fail_correct_check[script_version-versions]' \
+  'tests/test_release_check.py::test_release_mutations_fail_correct_check[guard_200-ad_library]'
+```
+
+Mutation outcomes: deleting the copied `/progress` route yields `pages` FAIL; changing
+`/today`'s account.js version yields `versions` FAIL; returning 200 from the Ad Library
+refusal yields `ad_library` FAIL. Each checker exits 1; the detection tests pass because
+they assert that rejection. Mutations are in memory only; no app routes or static files
+were edited on disk. The checker also passes with mocked valid OAuth, refuses bad
+host/callbacks without following them, and never prints OAuth state/challenges/cookies.
+Watchlist off requires 404, on requires 401; signed-out saved-competitor PUT requires 401,
+with real auth refusal and forbidden workspace/crawl/provider calls instrumented locally.
+
+Final gate log: `/tmp/release-check-gate-final.log`. Audit JSON evidence is at the two
+output directories' `report.json`; these temporary artifacts may expire, so commands,
+counts and outcomes are recorded here durably. Skipped tests and warnings are named in
+the prior checkpoint; local SQL and hosted service readiness are not claimed. Node
+contracts used installed v24.14.0; its hook advisory was reported to Nav before continuing.
+
+Scope released: `scripts/release_check.py`, `tests/test_release_check.py`,
+`docs/launch/RELEASE.md`, this report. No active gate/audit/test sessions remain. Part 3
+was deferred to preserve this session's read-only-check boundary; no app runtime,
+static, AGENTS, seller_memory, content_plan or brand_tone edits were authored. The merge
+preserved Claude/Antigravity changes. Main checkout remains untouched.
+
+Only `codex/release-check-nov26` was pushed, with no rebase or force push. No script runs
+against any `*.vercel.app` target, deployment commands, Vercel/Supabase changes, paid AI
+calls or secret output. Claude's next step: review/integrate this task branch, choose an
+exact release candidate, then perform the protected-preview/production checks under the
+assignment's separate coordinator authorization. **Codex release-check assignment done.**
