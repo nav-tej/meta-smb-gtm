@@ -11,8 +11,9 @@ Use [AGENTS.md — Production and releases](../../AGENTS.md) and
 
 These are steps for Nav, not actions authorized for this checker assignment.
 
-1. Create `production` at the current production commit (`3fb9707` since Nov 28; AGENTS.md's
-   top section always has the current one), or approve Claude doing it. Pushing that branch before the tracking switch only builds a preview.
+1. Create `production` at the current production commit from AGENTS.md's top section,
+   or approve Claude doing it. Pushing that branch before the tracking switch only builds
+   a preview.
 2. In Vercel's dashboard, open `meta-smb-gtm` → Settings → Environments → Production →
    Branch Tracking and set it to `production`. The dashboard asks for two-factor setup first;
    that is Nav's choice. Verify the actual setting before using the Git release path.
@@ -173,6 +174,7 @@ paths above. AGENTS.md records the current production deployment and that `main`
 for production; these are recorded facts, not a fresh hosted inspection. Official CLI syntax was checked against the
 linked Vercel documentation. The checker and its Vercel transport are covered by local tests;
 every hosted result still requires coordinator verification. Local execution results are in
-[the release-check report](CODEX_RELEASE_CHECK_NOV26.md). No release SHA is certified by
-this document. This assignment pushed only `codex/release-check-nov26`; no application env
-reads, hosted target checks, settings changes or deployment commands were performed.
+[the original release-check report](CODEX_RELEASE_CHECK_NOV26.md) and
+[the plain-errors/pagination update](CODEX_PLAIN_ERRORS_NOV28.md). No release SHA is certified
+by this document. These authoring assignments pushed task branches only; no hosted target
+checks, settings changes or deployment commands were performed by Codex.
