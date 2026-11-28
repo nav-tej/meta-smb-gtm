@@ -170,6 +170,19 @@
     swap($('researchSavedLink'), '/', 'href');
     swap(find('#resultsDetails > p.muted'), services ? 'From your channel insights or website. Saved on this device.' : 'From your channel insights or shop. Saved on this device.');
     swap(find('label[for="salesGoal"]'), services ? 'Weekly client goal (optional)' : 'Weekly sales target (optional)');
+    swap($('collectionLabel'), 'Collection (optional)');
+    const seriesList = $('series');
+    if (seriesList && typeof seriesList.replaceChildren === 'function' && typeof document.createElement === 'function') {
+      seriesList.replaceChildren();
+      if (sample) {
+        for (const label of ['Featured Collection', 'Abstracts']) {
+          const opt = document.createElement('option');
+          opt.value = label;
+          if (typeof seriesList.append === 'function') seriesList.append(opt);
+          else if (typeof seriesList.appendChild === 'function') seriesList.appendChild(opt);
+        }
+      }
+    }
     swap(find('.sources > p'), services ? 'Starter drafts use your offer and channel guidance. Live Muse can write a fresh plan after you enable it below. A post or a goal does not guarantee client inquiries or sales.' : 'Starter drafts use your item and channel guidance. Live Muse can write a fresh plan after you enable it below. A post or a sales target does not guarantee sales.');
   }
   const deviceKey = () => `muse-editor-v1:${draftNamespace}:${isEffectiveSample() ? 'sample' : (draftOwner ? 'account:' + encodeURIComponent(draftOwner) : 'guest')}`;
@@ -797,7 +810,11 @@
   function formatTodayImageNote(meta) {
     if (!meta) return '';
     const dims = meta.width && meta.height ? `${meta.width} × ${meta.height} px` : 'Size unknown';
-    if (meta.isLowRes) return `Low-res web preview (${dims}): fine for social posts, not for printing.`;
+    if (meta.isLowRes) {
+      return isEffectiveSample()
+        ? `Low-res web preview (${dims}): fine for social posts, not for printing.`
+        : `Low-res web preview (${dims}): best for social posts.`;
+    }
     if (meta.provenance === 'sample_original') return `Original artwork preview (${dims}) · Sample studio.`;
     if (meta.provenance === 'sample_generated') return `Saved AI ad example (${dims}) · Staging example.`;
     if (meta.provenance === 'upload') return `Uploaded photo (${dims}) · Kept on this device.`;
@@ -852,7 +869,9 @@
     if (item.is_low_res) {
       const warn = document.createElement('span');
       warn.className = 'muse-image-warn';
-      warn.textContent = `Low-resolution web preview (${dims}): fine for social posts, not for printing.`;
+      warn.textContent = isEffectiveSample()
+        ? `Low-resolution web preview (${dims}): fine for social posts, not for printing.`
+        : `Low-resolution web preview (${dims}): best for social posts.`;
       card.append(warn);
     }
 
@@ -931,7 +950,7 @@
     const statusEl = $('todayImagePickerStatus');
     if (statusEl) {
       delete statusEl.dataset.explicitMessage;
-      statusEl.textContent = 'Checking this page for product & artwork images…';
+      statusEl.textContent = isEffectiveSample() ? 'Checking this page for product & artwork images…' : 'Checking this page for product images…';
     }
     try {
       const response = await fetch('/api/v1/product-reference', {
@@ -1281,7 +1300,7 @@
         }
       }
       if (ownerEpoch !== draftEpoch) return;
-      state.image = chosenImage; state.imageMode = 'live'; invalidate(); render(); persist(); notice('Muse scene ready. Compare the artwork with your original before using it.');
+      state.image = chosenImage; state.imageMode = 'live'; invalidate(); render(); persist(); notice(isEffectiveSample() ? 'Muse scene ready. Compare the artwork with your original before using it.' : 'Muse scene ready. Compare the image with your original before using it.');
     } catch (error) { notice(error.message, true); } finally { lock(false); }
   }
   for (const id of ['openSetup', 'changeItem']) $(id).addEventListener('click', openSetup);

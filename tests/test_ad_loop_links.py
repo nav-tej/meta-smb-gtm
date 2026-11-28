@@ -127,7 +127,7 @@ def test_ad_loop_copy_and_script_version_contracts() -> None:
     assert "seller-memory.js?v=20261126-uxgap26" in welcome_html
     assert "seller-memory.js?v=20261126-uxgap26" in today_html
     assert "seller-memory.js?v=20261126-uxgap26" in creator_html
-    assert "first-ad.js?v=20261128-ag1" in first_ad_html
+    assert "first-ad.js?v=20261128-ag2" in first_ad_html
     for link_id in ("improveFirstAdLink", "iterateFirstAdLink", "bidsFirstAdLink"):
         assert link_id in index_html
     assert "faBidAdviceLink" in first_ad_html

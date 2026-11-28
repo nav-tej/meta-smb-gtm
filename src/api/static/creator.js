@@ -241,6 +241,7 @@
   const isSampleArtist = () => !state.custom && state.workspace === 'sarabjit_singh';
   const useSampleDestinations = () => !state.custom && (state.workspace === 'sarabjit_singh' || isEffectiveSample());
   const isServices = () => !useSampleDestinations() && ownBusinessType === 'services';
+  const previewSceneButtonLabel = () => (isServices() ? 'Preview an AI background' : (!useSampleDestinations() && ownBusinessType ? 'Preview a product scene' : 'Preview a room scene'));
   const activeDestinations = () => (useSampleDestinations() ? SAMPLE_DESTINATIONS : OWN_DESTINATIONS);
   function destinationLabel(key) {
     const map = activeDestinations();
@@ -339,7 +340,7 @@
       ];
     }
     return [
-      `Review your photo, caption, availability and ${label} offer. A series label here does not change your shop collections.`,
+      `Review your photo, caption, availability and ${label} offer. A collection label here does not change your shop collections.`,
       ...(channels.includes('instagram') ? ['Instagram: upload the feed image and paste your caption. Add the destination to your profile or a Story link sticker; a URL in a feed caption is not a clickable product link.'] : []),
       ...(channels.includes('facebook') ? ['Facebook: upload the image to your page and paste your caption with the destination link. If Instagram shares to your linked page, check that post before posting again.'] : []),
       link ? `Destination (${label}): ${link}. Open it and check it leads to the intended product or page before sharing.` : 'No destination link added. Add one if you want people to visit your shop, or invite an inquiry without promising checkout.',
@@ -736,7 +737,13 @@
     if (state.goal === 'gift') state.caption += isServices() ? ' Share how this helps your clients.' : ' A thoughtful gift starts with a story.';
     if (state.goal === 'visit') state.caption += isServices() ? ' Visit the link to learn more or get in touch.' : ' Visit the product page to learn more.';
     state.caption = state.caption.slice(0, 600);
-    if (!state.sceneEdited) state.scene = isServices() ? 'Clean, bright workspace with soft natural daylight and simple modern styling. Describe only the surroundings; keep the main subject clear.' : 'Warm neutral room, simple light oak console, soft daylight, clean wall and a restrained frame. Describe only the surroundings; do not change the product.';
+    if (!state.sceneEdited) {
+      state.scene = isServices()
+        ? 'Clean, bright workspace with soft natural daylight and simple modern styling. Describe only the surroundings; keep the main subject clear.'
+        : (state.custom && ownBusinessType)
+          ? 'Clean, softly lit surface with natural daylight and simple modern styling. Describe only the surroundings; do not change the product.'
+          : 'Warm neutral room, simple light oak console, soft daylight, clean wall and a restrained frame. Describe only the surroundings; do not change the product.';
+    }
     $('headline').value = state.headline; $('caption').value = state.caption; $('scene').value = state.scene;
   }
   function setProductFields() { for (const [id, key] of Object.entries(fields)) $(id).value = state.product[key] || ''; }
@@ -819,12 +826,30 @@
         ? 'Use an existing label or type your own. This labels this promotion only.'
         : 'Use an existing series or type your own. This labels this promotion only; it does not move artwork in your shops.';
     }
+    const moreDetailsSummary = document.querySelector?.('#moreDetails > summary');
+    if (moreDetailsSummary && typeof moreDetailsSummary.replaceChildren === 'function' && typeof document.createElement === 'function' && typeof document.createTextNode === 'function') {
+      const span = document.createElement('span');
+      span.textContent = isOwn ? '(optional): collection, price, link, your own photo' : '(optional): series, price, link, your own photo';
+      moreDetailsSummary.replaceChildren(document.createTextNode('More details '), span);
+    }
+    const collectionLabel = document.querySelector?.('label[for="productCollection"]');
+    if (collectionLabel && typeof collectionLabel.replaceChildren === 'function' && typeof document.createElement === 'function' && typeof document.createTextNode === 'function') {
+      const span = document.createElement('span');
+      span.textContent = '(optional)';
+      collectionLabel.replaceChildren(document.createTextNode(isOwn ? 'Collection ' : 'Series or collection '), span);
+    }
+    if ($('productCollection')) {
+      $('productCollection').placeholder = isOwn ? 'Leave blank, or add a collection' : 'Leave blank, or add your series';
+    }
+    if ($('saveWebsiteOnlyBtn')) {
+      $('saveWebsiteOnlyBtn').textContent = isOwn ? (svc ? 'Save website' : 'Save website to my shop') : 'Save website to my studio';
+    }
     if ($('sellerName')) $('sellerName').placeholder = svc ? 'Your business name' : 'Your shop';
     const sellerLabel = document.querySelector?.('label[for="sellerName"]');
     if (sellerLabel) sellerLabel.textContent = svc ? 'Your business name' : 'Your shop or name';
     if ($('shopUrl')) $('shopUrl').placeholder = svc ? 'https://your-website.com' : 'https://your-shop.com';
     if ($('exportFilesNote')) {
-      $('exportFilesNote').textContent = svc
+      $('exportFilesNote').textContent = isOwn
         ? 'Downloads use your current edits. Nothing is posted automatically.'
         : 'Downloads use your current edits. Images are social previews, not production print files. Nothing is posted automatically.';
     }
@@ -834,7 +859,7 @@
         : 'Create Your Next Shop Post | Muse Growth Studio';
     }
     if ($('generateButton') && !state.live) {
-      $('generateButton').textContent = svc ? 'Preview an AI background' : 'Preview a room scene';
+      $('generateButton').textContent = previewSceneButtonLabel();
     }
     if ($('productLink')) $('productLink').placeholder = svc ? 'https://your-website.com/book' : 'https://your-shop.com/product';
     if ($('productDescription')) {
@@ -955,7 +980,11 @@
   function formatImageMetaNote(meta) {
     if (!meta) return '';
     const dims = meta.width && meta.height ? `${meta.width} × ${meta.height} px` : 'Size unknown';
-    if (meta.isLowRes) return `Low-res web preview (${dims}): suitable for social preview, not a print master.`;
+    if (meta.isLowRes) {
+      return isEffectiveSample()
+        ? `Low-res web preview (${dims}): suitable for social preview, not a print master.`
+        : `Low-res web preview (${dims}): best for social posts.`;
+    }
     if (meta.provenance === 'sample_original') return `Original artwork preview (${dims}) · Sample studio.`;
     if (meta.provenance === 'sample_generated') return `Saved AI ad example (${dims}) · Staging example.`;
     if (meta.provenance === 'upload') return `Uploaded photo (${dims}) · Kept on this device.`;
@@ -1017,7 +1046,9 @@
     if (item.is_low_res) {
       const warn = document.createElement('span');
       warn.className = 'muse-image-warn';
-      warn.textContent = `Low-resolution web preview (${dims}), not a print master.`;
+      warn.textContent = isEffectiveSample()
+        ? `Low-resolution web preview (${dims}), not a print master.`
+        : `Low-resolution web preview (${dims}): best for social posts.`;
       card.append(warn);
     }
 
@@ -1096,7 +1127,7 @@
     const status = $('imagePickerStatus');
     if (status) {
       delete status.dataset.explicitMessage;
-      status.textContent = 'Checking this page for product & artwork images…';
+      status.textContent = isEffectiveSample() ? 'Checking this page for product & artwork images…' : 'Checking this page for product images…';
     }
     imagePickerSource = 'website';
     try {
@@ -1113,7 +1144,7 @@
         websiteImageCandidates = [];
         if (status) {
           status.dataset.explicitMessage = '1';
-          status.textContent = IMAGE_EMPTY_MSG;
+          status.textContent = isEffectiveSample() ? IMAGE_EMPTY_MSG : 'We couldn’t retrieve an image from this page. Try a product or page link, or upload a photo.';
         }
         renderImagePicker();
         return;
@@ -1438,7 +1469,7 @@
     if (offerType) parts.push(`Offers: ${offerType}.`);
     parts.push(`Goal: ${goalInfo(state.goal)[0]}.`);
     parts.push(`Destination: ${destLabel}.`);
-    if (state.product.collection) parts.push(`Series: ${state.product.collection}.`);
+    if (state.product.collection) parts.push(`Collection: ${state.product.collection}.`);
     const activeTone = normalizeBrandTone(state.handoffActive ? state.handoffContext?.tone : null) || normalizeBrandTone(ownTone);
     if (activeTone) {
       const toneMeta = BRAND_TONES[activeTone];
@@ -1716,7 +1747,7 @@
     updateMode();
   }
   if (typeof window.addEventListener === 'function') window.addEventListener('account-change', (event) => syncAccountLive(event.detail));
-  function updateMode() { const live = state.live; $('modeBadge').textContent = live ? 'Live Muse AI · 1 run per generation' : 'Draft & manual mode · 0 runs used'; $('modeBadge').classList.toggle('live', live); $('generateButton').textContent = live ? 'Create my image (1 run)' : (isServices() ? 'Preview an AI background' : 'Preview a room scene'); $('draftHint').textContent = live ? 'A live draft uses 1 run with your details. Check every claim before sharing.' : 'Starter & manual editing cost 0 runs. Enable live Muse AI below (1 run) for custom AI writing.'; }
+  function updateMode() { const live = state.live; $('modeBadge').textContent = live ? 'Live Muse AI · 1 run per generation' : 'Draft & manual mode · 0 runs used'; $('modeBadge').classList.toggle('live', live); $('generateButton').textContent = live ? 'Create my image (1 run)' : previewSceneButtonLabel(); $('draftHint').textContent = live ? 'A live draft uses 1 run with your details. Check every claim before sharing.' : 'Starter & manual editing cost 0 runs. Enable live Muse AI below (1 run) for custom AI writing.'; }
 
   const SAMPLE_ARTWORK_FALLBACKS = {
     ek_onkar: { id: 'ek_onkar', title: 'Ek Onkar · 12×12-inch print', original_image: '/samples/ek_onkar_original.jpg', staged_image: '/samples/ek_onkar_collector_room_live.webp', series: 'Sikh Sacred Word' },
@@ -1834,7 +1865,7 @@
       await window.museAccount.saveWorkspace(nextDoc, mode.ownerId);
       if (!guard.isCurrent()) return false;
       state.shopWebsiteUrl = clean;
-      if ($('savedShopWebsiteNote')) $('savedShopWebsiteNote').textContent = `Saved studio website: ${clean}`;
+      if ($('savedShopWebsiteNote')) $('savedShopWebsiteNote').textContent = isServices() ? `Saved website: ${clean}` : `Saved shop website: ${clean}`;
       notify(`Saved ${clean} as your shop website in My workspace.`);
       return true;
     } catch (err) {

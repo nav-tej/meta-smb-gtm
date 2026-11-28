@@ -461,7 +461,7 @@ with sync_playwright() as p:
         ppage.click("#nextButton")
         assert "Offer a thoughtful gift" in ppage.locator("[data-panel='1']").inner_text()
         ppage.click("#nextButton")
-        assert ppage.locator("#generateButton").inner_text() == "Preview a room scene"
+        assert ppage.locator("#generateButton").inner_text() == "Preview a product scene"
         pctx.close()
 
         sctx = browser.new_context(viewport={{"width": 1440, "height": 900}})

@@ -359,18 +359,23 @@
 
   function syncFirstAdCopy(sample) {
     const svc = !sample && ownBusinessType === 'services';
+    const prod = !sample && ownBusinessType === 'products';
     if ($('faOutcomeInquiriesDesc')) {
       $('faOutcomeInquiriesDesc').textContent = sample
         ? 'Best when you take custom orders or sell via DMs without online checkout.'
         : svc
           ? 'Best when you take custom inquiries, book calls, or start client conversations via messages.'
-          : 'Best when you take custom inquiries, book calls, or sell via messages without online checkout.';
+          : prod
+            ? 'Best when you take custom orders or sell via messages without online checkout.'
+            : 'Best when you take custom inquiries, book calls, or sell via messages without online checkout.';
     }
-    if ($('faOutcomeVisitsTitle')) $('faOutcomeVisitsTitle').textContent = sample ? 'Bring visitors to your shop' : 'Bring visitors to your website';
+    if ($('faOutcomeVisitsTitle')) $('faOutcomeVisitsTitle').textContent = (sample || prod) ? 'Bring visitors to your shop' : 'Bring visitors to your website';
     if ($('faOutcomeVisitsDesc')) {
       $('faOutcomeVisitsDesc').textContent = sample
         ? 'Best when you want people to browse an Etsy, Shopify, or studio listing.'
-        : 'Best when people should read a page, see your work, or book a call first.';
+        : prod
+          ? 'Best when you want people to browse your Etsy, Shopify, or website product pages.'
+          : 'Best when people should read a page, see your work, or book a call first.';
     }
     if ($('faOutcomeSalesTitle')) $('faOutcomeSalesTitle').textContent = sample ? 'Test a direct product offer' : 'Test a direct offer';
     if ($('faStep2Sub')) {
@@ -379,20 +384,34 @@
         : 'Reuses your active photo and draft copy when available, or upload or select an image here.';
     }
     if ($('faProductNameLabel')) $('faProductNameLabel').textContent = sample ? 'Product or artwork name' : 'What are you promoting?';
-    if ($('faProductName')) $('faProductName').placeholder = sample ? 'e.g., Botanical Linocut Print' : svc ? 'e.g., Growth audit, advisory retainer, or consultation' : 'e.g., AI growth audit, consultation, or featured product';
-    if ($('faCta')) $('faCta').placeholder = sample ? 'e.g., Shop now, Send message, Learn more' : 'e.g., Learn more, Send message, Book a call';
+    if ($('faProductName')) {
+      $('faProductName').placeholder = sample
+        ? 'e.g., Botanical Linocut Print'
+        : svc
+          ? 'e.g., Growth audit, advisory retainer, or consultation'
+          : prod
+            ? 'e.g., Soy candle gift set, bestselling mug, or featured product'
+            : 'e.g., AI growth audit, consultation, or featured product';
+    }
+    if ($('faCta')) {
+      $('faCta').placeholder = (sample || prod)
+        ? 'e.g., Shop now, Send message, Learn more'
+        : 'e.g., Learn more, Send message, Book a call';
+    }
     if ($('faDestWebsiteOpt')) $('faDestWebsiteOpt').textContent = sample ? 'Studio website / product page' : 'Your website';
     if ($('faDestEtsyOpt')) $('faDestEtsyOpt').textContent = sample ? 'Etsy shop / listing' : 'Etsy shop or listing';
     if ($('faDestShopifyOpt')) $('faDestShopifyOpt').textContent = 'Shopify store';
-    if ($('faDestinationUrl')) $('faDestinationUrl').placeholder = sample ? 'https://your-shop.example/product' : 'https://your-site.example/offer';
-    if ($('faShopUrl')) $('faShopUrl').placeholder = sample ? 'https://your-shop.example' : 'https://your-site.example';
+    if ($('faDestinationUrl')) $('faDestinationUrl').placeholder = (sample || prod) ? 'https://your-shop.example/product' : 'https://your-site.example/offer';
+    if ($('faShopUrl')) $('faShopUrl').placeholder = (sample || prod) ? 'https://your-shop.example' : 'https://your-site.example';
     if ($('faImportBtn')) $('faImportBtn').textContent = sample ? 'Load shop images' : 'Load images from your website';
     if ($('faAudience')) {
       $('faAudience').placeholder = sample
         ? 'e.g., People looking for handmade botanical prints and home gifts'
         : svc
           ? 'e.g., Founders and small business owners looking for marketing help'
-          : 'e.g., Small business owners looking for marketing help or local buyers';
+          : prod
+            ? 'e.g., People looking for handmade gifts, home goods, or seasonal favorites'
+            : 'e.g., Small business owners looking for marketing help or local buyers';
     }
   }
 
