@@ -7,6 +7,50 @@ Branch: `codex/release-check-nov26`. Worktree: `/Users/nav/muse-worktrees/releas
 to `main` or `production`, never deploy. Read `AGENTS.md` first, especially the top section
 ("Production and releases").
 
+## Resume, Nov 27 (read this first)
+
+Claude checked on Nov 27. Your run stopped partway through.
+- **Pushed:** `d7f70c7` only.
+- **Uncommitted in `/Users/nav/muse-worktrees/release-check`** (saved Nov 25, 23:01 to 23:03):
+  - `docs/launch/RELEASE.md` (149 lines);
+  - `tests/test_release_check.py` (292 lines).
+- **Missing:** `scripts/release_check.py` does not exist yet.
+
+Next steps, in order:
+1. Commit those two files as a checkpoint and push.
+2. Merge `origin/claude/ux-gap-ad-loop-nov17` into your branch (tip `3fb9707` or later). Merge,
+   don't rebase, and never force push.
+3. Write the script, then finish Parts 1 and 2.
+
+Additions to the brief:
+- **Check 8.** `PUT /api/v1/competitors/saved` signed out, with the body
+  `{"competitor_url": "https://example.com", "name": "Example"}`, answers 401. It is refused
+  before anything is read or saved; fail on 200 or any 5xx.
+- **Check 6** stays "never 200 or 5xx". Also add `--watchlist on|off` (default `off`):
+  - `off` expects 404;
+  - `on` expects 401.
+- **`RELEASE.md` gains "Nav's one-time steps".** List them as steps for Nav; never do them
+  yourself:
+  1. **Create the `production` branch** at the current production commit (`6c7da99`), or approve
+     Claude doing it. Pushing it before the switch only builds a preview.
+  2. **Switch the production branch:** Vercel dashboard, project `meta-smb-gtm`, Settings,
+     Environments, Production, Branch Tracking, set to `production`. The dashboard asks for
+     two-factor setup first, which is Nav's choice.
+  3. **Turn on the weekly watchlist**, in this order, each with Nav's approval:
+     - apply `supabase/migrations/watchlist_checks.sql` to hosted Supabase;
+     - Nav adds `CRON_SECRET` in Vercel;
+     - release;
+     - set `WATCHLIST_AUTO_CHECK_ENABLED=true`;
+     - run the release check with `--watchlist on`.
+- **Antigravity owns these** (brand tone, `antigravity-brand-tone-nov27.md`). Leave them alone,
+  including in Part 3:
+  - `src/api/content_plan.py`, `src/services/content_plan.py`, `src/models/content_plan.py`;
+  - `src/services/brand_tone.py`.
+- **Claude owns** `src/services/seller_memory.py`. Part 3 leaves it alone too.
+- **When you're done,** say so in your report. Claude reviews, then runs the script against a
+  protected preview through `vercel curl` and against production. Don't run it against any
+  `*.vercel.app` host yourself.
+
 ## Why
 
 On Nov 25 Claude released `6d4efc0` to production and checked it by hand:

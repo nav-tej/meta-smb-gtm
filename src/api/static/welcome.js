@@ -24,6 +24,81 @@
   }
   // Older accounts saved the n+α example competitors (directories, not rivals) during setup.
   const OLD_EXAMPLE_HOSTS = ['clutch.co', 'upwork.com', 'toptal.com'];
+  const AD_PAGE_ID_RE = /^[0-9]{5,20}$/;
+  function adLibraryPageUrl(pageId) {
+    return `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=ALL&view_all_page_id=${encodeURIComponent(pageId)}&search_type=page&media_type=all`;
+  }
+  // One competitor's Meta ads: their own Ad Library page once the seller links it
+  // (view_all_page_id, saved with the competitor), else a keyword search labeled as one, since it
+  // shows every advertiser that mentions the name.
+  function competitorAdLinks(comp, rowUrl) {
+    const box = document.createElement('div');
+    box.className = 'jr-ad-links';
+    const link = document.createElement('a');
+    link.className = 'jr-meta-ad-link';
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'jr-link-btn';
+    const query = adLibraryQuery(comp.name, comp.url);
+    const setLinked = (pageId) => {
+      link.href = adLibraryPageUrl(pageId);
+      link.textContent = 'See their ads on Meta ↗';
+      toggle.textContent = 'Change their Ad Library page';
+    };
+    const setSearch = () => {
+      link.href = adLibraryUrl(query);
+      link.textContent = `Search Meta ads for “${query}” (all advertisers) ↗`;
+      toggle.textContent = 'Link their exact page';
+    };
+    const form = document.createElement('form');
+    form.className = 'jr-ad-link-form';
+    form.noValidate = true;
+    form.hidden = true;
+    const help = document.createElement('p');
+    help.className = 'jr-note';
+    help.textContent = 'In Meta’s Ad Library, type their name, pick their page from the suggestions, then copy the link from your browser and paste it here.';
+    const input = document.createElement('input');
+    input.type = 'url';
+    input.maxLength = 1000;
+    input.placeholder = 'https://www.facebook.com/ads/library/?…view_all_page_id=…';
+    input.setAttribute('aria-label', `Meta Ad Library page link for ${comp.name || comp.url}`);
+    const save = document.createElement('button');
+    save.type = 'submit';
+    save.className = 'jr-mini primary';
+    save.textContent = 'Save link';
+    const status = document.createElement('p');
+    status.className = 'jr-note jr-ad-link-status';
+    status.setAttribute('role', 'status');
+    form.append(help, input, save, status);
+    toggle.addEventListener('click', () => {
+      form.hidden = !form.hidden;
+      if (!form.hidden) input.focus();
+    });
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const value = input.value.trim();
+      if (!value) { status.textContent = 'Paste the link first.'; return; }
+      if (!window.museCompetitors?.linkAdLibrary) { status.textContent = 'Saving is not available on this page.'; return; }
+      save.disabled = true;
+      status.textContent = 'Saving…';
+      const result = await window.museCompetitors.linkAdLibrary(rowUrl, comp.name || '', value);
+      save.disabled = false;
+      if (result?.ok && AD_PAGE_ID_RE.test(String(result.competitor?.ad_library_page_id || ''))) {
+        setLinked(String(result.competitor.ad_library_page_id));
+        input.value = '';
+        status.textContent = '';
+        form.hidden = true;
+      } else {
+        status.textContent = result?.detail || 'Muse could not save this link.';
+      }
+    });
+    if (AD_PAGE_ID_RE.test(String(comp.ad_library_page_id || ''))) setLinked(String(comp.ad_library_page_id));
+    else setSearch();
+    box.append(link, toggle, form);
+    return box;
+  }
   function isOldExampleCompetitor(comp) {
     try {
       const host = new URL(String(comp?.url || '')).hostname.replace(/^www\./i, '');
@@ -1664,14 +1739,7 @@
           st.textContent = comp.name || comp.url;
           const sp = document.createElement('span');
           sp.textContent = `${comp.url} · ${comp.reason || 'Watched competitor'}`;
-          const adLink = document.createElement('a');
-          adLink.className = 'jr-meta-ad-link';
-          adLink.target = '_blank';
-          adLink.rel = 'noopener noreferrer';
-          const query = adLibraryQuery(comp.name, comp.url);
-          adLink.href = adLibraryUrl(query);
-          adLink.textContent = `Search Meta ads for “${query}” ↗`;
-          d.append(st, sp, adLink);
+          d.append(st, sp, competitorAdLinks(comp, li.dataset.url));
           const btn = document.createElement('button');
           btn.type = 'button';
           btn.className = 'jr-mini primary js-live-brief';

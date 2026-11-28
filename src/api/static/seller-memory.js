@@ -1762,7 +1762,6 @@
     if (!items.length) return;
 
     items.forEach((li, idx) => {
-      if (li.querySelector('.sm-comp-role-wrap')) return;
       // Match competitor entry by URL/name or index
       const text = (li.textContent || '').toLowerCase();
       const comp =
@@ -1770,6 +1769,17 @@
           (c) => (c.url && text.includes(c.url.replace(/^https?:\/\//, '').toLowerCase())) ||
             (c.name && text.includes(c.name.toLowerCase()))
         ) || state.competitorEntries[idx];
+      const existing = li.querySelector('.sm-comp-role-wrap');
+      if (existing) {
+        // After a reload (a saved analysis updates the note), show the saved note unless the
+        // seller is typing in it.
+        const input = existing.querySelector('.sm-comp-rationale');
+        if (comp && input && document.activeElement !== input) {
+          input.value = comp.rationale || comp.reason || '';
+          existing.paintNote?.();
+        }
+        return;
+      }
       if (!comp) return;
 
       const wrap = el('div', { class: 'sm-comp-role-wrap' });
@@ -1826,7 +1836,12 @@
             await persistToServer({ competitorEntries: state.competitorEntries });
           }
           if (!isCurrentRequestContext(boundGen, boundOwner, boundSample)) return;
-          toast(`Updated watch reason to ${ROLE_LABELS[nextRole]}.`);
+          paintNote();
+          toast(
+            nextRationale !== String(liveComp.rationale || liveComp.reason || '').trim()
+              ? `Saved your note on ${compName || 'this competitor'}.`
+              : `Updated watch reason to ${ROLE_LABELS[nextRole]}.`
+          );
         };
         const queued = (state.compUpdateQueue || Promise.resolve()).then(runUpdate, runUpdate);
         state.compUpdateQueue = queued.catch(() => {});
@@ -1835,7 +1850,35 @@
 
       roleSelect.addEventListener('change', onCompUpdate);
       rationaleInput.addEventListener('change', onCompUpdate);
-      wrap.append(el('label', { class: 'sm-field-inline' }, 'Watch role: ', roleSelect), rationaleInput);
+      // One line by default: the seller's note and an Edit link. The role menu and the note box
+      // open under it, so a watched competitor takes a few lines instead of a form.
+      const noteText = el('span', { class: 'sm-comp-note-text' });
+      function paintNote() {
+        const note = rationaleInput.value.trim();
+        noteText.textContent = note ? `Your note: ${note}` : 'No note yet. Add why you watch them.';
+      }
+      wrap.paintNote = paintNote;
+      const editor = el('div', { class: 'sm-comp-editor', hidden: true });
+      const editBtn = el('button', {
+        type: 'button',
+        class: 'sm-link-btn sm-comp-edit',
+        'aria-expanded': 'false',
+        'aria-label': `Edit your note on ${comp.name || comp.url}`,
+      }, 'Edit');
+      editBtn.addEventListener('click', () => {
+        const opening = editor.hidden;
+        editor.hidden = !opening;
+        editBtn.setAttribute('aria-expanded', String(opening));
+        editBtn.textContent = opening ? 'Done' : 'Edit';
+        if (opening) rationaleInput.focus();
+      });
+      editor.append(
+        el('label', { class: 'sm-field-inline' }, 'Why you watch them: ', roleSelect),
+        el('label', { class: 'sm-comp-note-label' }, 'Your note', rationaleInput),
+        el('p', { class: 'sm-comp-note-hint' }, 'Muse uses this note when it ranks your moves.')
+      );
+      paintNote();
+      wrap.append(el('p', { class: 'sm-comp-note-line' }, noteText, editBtn), editor);
       li.appendChild(wrap);
     });
   }

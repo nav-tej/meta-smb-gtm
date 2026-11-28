@@ -304,7 +304,7 @@ def test_seller_memory_full_mobile_multi_browser_workflow(
             page.wait_for_url(f"{{base_url}}/")
             page.wait_for_selector("#smContextPanel")
             page.wait_for_selector("#smTopMovePreview")
-            page.wait_for_selector("#sellerList .sm-home-comp-role")
+            page.wait_for_selector("#sellerList .sm-comp-edit")
             assert_no_overflow(page, "/ home")
 
             journey_text = page.inner_text("#journey") or ""
@@ -317,7 +317,8 @@ def test_seller_memory_full_mobile_multi_browser_workflow(
             first_why = page.text_content("#smTopMovePreview .sm-why-line") or ""
             assert "Similar audience" in first_why, first_why
 
-            # Change competitor role -> price_reference & update rationale
+            # Change competitor role -> price_reference & update rationale (behind "Edit")
+            page.locator("#sellerList .sm-comp-edit").first.click()
             comp_rationale = page.locator("#sellerList .sm-home-comp-rationale").first
             comp_rationale.fill("Benchmark $40 entry prints")
             comp_rationale.dispatch_event("change")
@@ -343,7 +344,7 @@ def test_seller_memory_full_mobile_multi_browser_workflow(
             # --- 4. Second Browser Context restores profile + tests 409 Conflict ---
             page2 = ctx2.new_page()
             page2.goto(f"{{base_url}}/", wait_until="domcontentloaded")
-            page2.wait_for_selector("#sellerList .sm-home-comp-role")
+            page2.wait_for_selector("#sellerList .sm-home-comp-role", state="attached")
             ctx2_role = page2.locator("#sellerList .sm-home-comp-role").first.input_value()
             assert ctx2_role == "price_reference", ctx2_role
             page2.click("#smOpenMemoryBtn")

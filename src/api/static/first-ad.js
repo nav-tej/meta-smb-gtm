@@ -70,7 +70,7 @@
       step: 1,
       outcome: 'inquiries',
       paidMode: 'organic',
-      businessName: 'Your Studio',
+      businessName: 'Your business',
       productName: '',
       headline: '',
       caption: '',
@@ -78,7 +78,7 @@
       destinationType: 'website',
       destinationUrl: '',
       imageDataUrl: '',
-      audience: 'Unconfirmed starting audience (edit before sharing): Buyers looking for handmade studio work',
+      audience: 'Unconfirmed starting audience (edit before sharing): People looking for what you offer',
       location: 'United States',
       budgetType: 'daily',
       budgetAmount: '10',
@@ -213,13 +213,14 @@
     const hasCopy = Boolean(state.headline.trim() && state.caption.trim());
     items.push({ ok: hasCopy, text: hasCopy ? 'Headline and primary text ready.' : 'Missing prerequisite: Add a headline and primary text in Step 2.' });
 
+    const sample = isSampleMode();
     const needsUrl = state.destinationType !== 'instagram_dm' && (state.outcome === 'visits' || state.outcome === 'sales');
     const urlValid = !state.destinationUrl.trim() ? !needsUrl : Boolean(safeUrl(state.destinationUrl));
     items.push({
       ok: urlValid,
       text: urlValid
         ? (state.destinationUrl.trim() ? `Destination URL formatted: ${state.destinationUrl.trim()}` : 'Destination set to DM / organic inquiry (no URL needed).')
-        : 'Missing prerequisite: Add a valid https:// destination URL for shop visits or sales.',
+        : `Missing prerequisite: Add a valid https:// destination URL for ${sample ? 'shop' : 'website'} visits or sales.`,
     });
 
     if (state.paidMode === 'paid') {
@@ -277,10 +278,10 @@
         ctx.fillRect(0, targetHeight - barH, width, barH);
         ctx.fillStyle = '#ffffff';
         ctx.font = 'bold 40px -apple-system, BlinkMacSystemFont, sans-serif';
-        ctx.fillText((state.headline || state.productName || 'Your studio work').slice(0, 44), 48, targetHeight - barH + 74);
+        ctx.fillText((state.headline || state.productName || 'Your offer').slice(0, 44), 48, targetHeight - barH + 74);
         ctx.font = '28px -apple-system, BlinkMacSystemFont, sans-serif';
         ctx.fillStyle = '#dce8e1';
-        ctx.fillText((state.businessName || 'Your Studio').slice(0, 48), 48, targetHeight - barH + 128);
+        ctx.fillText((state.businessName || 'Your business').slice(0, 48), 48, targetHeight - barH + 128);
         resolve(canvasEl);
       };
 
@@ -398,7 +399,7 @@
     if ($('faContextStatus')) {
       $('faContextStatus').textContent = sample
         ? 'Sample mode (Art of Sarabjit Singh) · Separate from your account drafts.'
-        : `Signed-in workspace (${state.businessName || 'Your Studio'}) · Saved per account on this device.`;
+        : `Signed-in workspace (${state.businessName || 'Your business'}) · Saved per account on this device.`;
     }
 
     document.querySelectorAll('[data-fa-outcome]').forEach((btn) => {
@@ -520,7 +521,7 @@
           const resp = await fetch('/api/v1/seller-memory', { credentials: 'include' });
           if (resp.ok) {
             const sm = await resp.json();
-            if (sm?.business_name && state.businessName === 'Your Studio') state.businessName = sm.business_name;
+            if (sm?.business_name && (state.businessName === 'Your business' || state.businessName === 'Your Studio')) state.businessName = sm.business_name;
             if (Array.isArray(sm?.shop_urls) && sm.shop_urls[0] && $('faShopUrl')) {
               $('faShopUrl').value = sm.shop_urls[0];
             }

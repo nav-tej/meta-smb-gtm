@@ -984,6 +984,12 @@
       code, .channel-chip, .finding-item a, .journey a { overflow-wrap: anywhere; }
     }
   /* "Ask Muse what to do next": the answer shows the moves to start with. */
+  .jr-ad-links { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; min-width: 0; }
+  .jr-link-btn { background: none; border: 0; padding: 0; font: inherit; font-size: 0.8rem; color: #1b6e44; text-decoration: underline; cursor: pointer; }
+  .jr-ad-link-form { display: grid; gap: 6px; width: 100%; margin-top: 4px; }
+  .jr-ad-link-form[hidden] { display: none; }
+  .jr-ad-link-form input { width: 100%; min-width: 0; box-sizing: border-box; padding: 6px 8px; border: 1px solid #d9d4c8; border-radius: 8px; font: inherit; font-size: 0.85rem; }
+  .jr-ad-link-form .jr-note { margin: 0; overflow-wrap: anywhere; }
   .jr-steer-answer { display: grid; gap: 10px; margin-top: 12px; }
   .jr-steer-answer[hidden] { display: none; }
   .jr-steer-answer-lead { margin: 0; font-weight: 700; }
@@ -1011,14 +1017,14 @@
   <link rel="stylesheet" href="/static/pricing-modal.css?v=20261109-ux">
   <link rel="stylesheet" href="/static/account.css?v=20261112-integrated">
   <link rel="stylesheet" href="/static/muse-shell.css?v=20261112-integrated">
-  <link rel="stylesheet" href="/static/seller-memory.css?v=20261121-uxgap19">
+  <link rel="stylesheet" href="/static/seller-memory.css?v=20261126-uxgap26">
   <script src="/static/analytics.js?v=20261109-ux" defer></script>
   <script src="/static/reco-actions.js?v=20261121-uxgap19" defer></script>
   <script src="/static/account.js?v=20261120-uxgap17" defer></script>
   <script src="/static/workspace-modes.js?v=20261117-uxgap6" defer></script>
-  <script src="/static/muse-shell.js?v=20261125-uxgap23" defer></script>
-  <script src="/static/welcome.js?v=20261125-uxgap23" defer></script>
-  <script src="/static/seller-memory.js?v=20261124-ag2" defer></script>
+  <script src="/static/muse-shell.js?v=20261126-uxgap25" defer></script>
+  <script src="/static/welcome.js?v=20261125-uxgap24" defer></script>
+  <script src="/static/seller-memory.js?v=20261126-uxgap26" defer></script>
 </head>
 <body>
   <!-- Top Bar -->
@@ -2604,6 +2610,11 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
       }
       refreshVisitorCopy();
     }
+    // welcome.js redraws the rows for a seller's own workspace after this script has labeled
+    // them; label the new rows too, so a saved analysis reads "View analysis", not a paid run.
+    if (typeof MutationObserver !== 'undefined' && document.getElementById('sellerList')) {
+      new MutationObserver(() => refreshSellerButtons()).observe(document.getElementById('sellerList'), { childList: true });
+    }
     function refreshVisitorCopy() {
       const snap = liveSnapshot();
       const serverOn = !!snap?.configured;
@@ -2767,15 +2778,41 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
         if (statusEl) statusEl.textContent = `Meta ads: ${summary.badge}.`;
       });
     }
-    async function saveBriefCache() {
+    // Keeps a competitor (and its analysis, when there is one) in the seller's workspace: the
+    // full brief for "View analysis", and its takeaway as the competitor's note unless the seller
+    // wrote one, so the ranker cites it and the seller can edit it on the card. The server merges
+    // it into the saved workspace (PUT /api/v1/competitors/saved); this page never writes the whole
+    // document. Returns the saved competitor, or null.
+    async function putCompetitor(body) {
+      const ownerId = liveSnapshot()?.user?.id;
+      if (!ownerId || window.museModes?.isSampleMode?.()) return { ok: false, detail: 'Sign in to save competitors.' };
       try {
-        const cur = await (await fetch('/api/v1/account/workspace', { credentials: 'same-origin' })).json();
-        await fetch('/api/v1/account/workspace', {
-          method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ document: { ...(cur.document || {}), briefs: briefCache }, expected_version: cur.version }),
+        const resp = await fetch('/api/v1/competitors/saved', {
+          method: 'PUT',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', 'X-Muse-Owner': ownerId },
+          body: JSON.stringify(body),
         });
-      } catch {}
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok) {
+          return { ok: false, detail: typeof data?.detail === 'string' ? data.detail : 'Muse could not save this. Try again.' };
+        }
+        try { await window.museSellerMemory?.reload?.(); } catch {}
+        return { ok: true, competitor: data?.competitor || null };
+      } catch {
+        return { ok: false, detail: 'Muse could not save this. Check your connection and try again.' };
+      }
     }
+    async function saveCompetitor(url, name, brief = null) {
+      const result = await putCompetitor({ competitor_url: url, name: name || '', brief });
+      return result.ok ? result.competitor : null;
+    }
+    // The home rows (welcome.js) link a competitor's own page in Meta's Ad Library through this.
+    window.museCompetitors = Object.freeze({
+      linkAdLibrary: (url, name, adLibraryUrl) =>
+        putCompetitor({ competitor_url: url, name: name || '', ad_library_url: adLibraryUrl }),
+    });
+    const sellerName = (btn) => (btn?.closest?.('.jr-seller')?.querySelector('strong')?.textContent || '').trim();
     const DEMO_BRIEFS_KEY = 'muse.demoBriefs';
     async function requestDemoBrief(url, btn) {
       // No live server: build the brief from the saved public snapshot (no Muse call).
@@ -2866,14 +2903,17 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const brief = await resp.json();
         briefCache[url] = brief;
-        saveBriefCache();
+        const saved = await saveCompetitor(url, sellerName(btn), brief);
         try { await window.museAccount?.refresh?.(); } catch {}
         renderCompetitorBrief(brief);
         openStep('tab-intel', 'compSummaryText');
-        showToast('✓ New brief ready · 1 run used');
+        showToast(saved
+          ? '✓ Analysis saved to your workspace · 1 run used. Its takeaway is now this competitor’s note in What Muse remembers; edit it any time.'
+          : '✓ New brief ready · 1 run used. It could not be saved to your workspace, so it lasts until you reload.');
       } catch (err) {
         try { await window.museAccount?.refresh?.(); } catch {}
-        showToast(friendlyPortalError(err));
+        const host = String(url).replace(/^https?:\/\/(www\.)?/, '').split('/')[0];
+        showToast(`${host}: ${friendlyPortalError(err)}`);
       } finally {
         setButtonBusy(btn, false);
         refreshSellerButtons();
@@ -2952,6 +2992,8 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
       document.getElementById('sellerList').appendChild(li);
       input.value = '';
       refreshSellerButtons();
+      // A shop the seller adds stays on their watchlist even if its analysis fails.
+      if (liveSnapshot()?.user?.id) saveCompetitor(url.href, name.textContent);
       if (live) requestBrief(sellerKey(btn), btn);
       else if (onServer) promptForLiveRuns(sellerKey(btn), btn);
       else showToast(`Added ${name.textContent} · analyzing it needs a live server, so no run was used`);

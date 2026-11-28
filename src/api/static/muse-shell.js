@@ -1253,7 +1253,7 @@
       list.replaceChildren();
       setMoveIdea(false);
       go.onclick = null;
-      showBriefFrame('Your shop’s brief is not built yet', 'Today you can make a post from your own website below. The sample shop shows what a full brief looks like.', false);
+      showBriefFrame('Your brief is not built yet', 'Today you can make a post from your own website below. The sample shop shows what a full brief looks like.', false);
       meta.lastChild.textContent = 'My workspace';
       moveChip.textContent = 'Today';
       moveTitle.textContent = 'Start today’s post from your website';

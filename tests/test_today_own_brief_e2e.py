@@ -346,7 +346,7 @@ with sync_playwright() as p:
                 sample_state()
                 assert not own_requests()
             elif USER == "setup":
-                settled("Your shop’s brief is not built yet")
+                settled("Your brief is not built yet")
                 expect(page.locator("#museSetupNotice")).to_be_visible()
                 expect(page.locator("#msBrief .ms-brief-columns")).not_to_be_visible()
                 assert page.locator("#msBrief .ms-triage").count() == 0
@@ -366,7 +366,7 @@ with sync_playwright() as p:
         else:
             page.goto(BASE + "/today?workspace=own", wait_until="networkidle")
             if SCENARIO == "failure":
-                settled("Your shop’s brief is not built yet")
+                settled("Your brief is not built yet")
                 expect(page.locator("#msBrief .ms-brief-retry")).to_be_visible()
                 assert "Could not load your brief" in page.locator("#msBrief").inner_text()
                 private_brief()
@@ -465,7 +465,10 @@ with sync_playwright() as p:
                     page.locator(selector).click()
                     page.wait_for_url("**/create?workspace=own&sm_handoff=*")
                     page.wait_for_function(
-                        "document.documentElement.dataset.museMode === 'account_own'"
+                        "() => document.documentElement.dataset.museMode === 'account_own'"
+                        " && document.getElementById('nextButton')?.textContent?.trim()"
+                        " === 'Make it yours →'"
+                        " && !document.getElementById('handoffGuidanceBox')?.hidden"
                     )
                     hid = parse_qs(urlparse(page.url).query)["sm_handoff"][0]
                     payload = page.evaluate(

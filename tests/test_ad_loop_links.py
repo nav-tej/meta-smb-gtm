@@ -121,13 +121,13 @@ def test_ad_loop_copy_and_script_version_contracts() -> None:
     creator_html = (REPO_ROOT / "src/api/static/creator.html").read_text(encoding="utf-8")
     first_ad_html = (REPO_ROOT / "src/api/static/first-ad.html").read_text(encoding="utf-8")
 
-    assert "welcome.js?v=20261125-uxgap23" in index_html
-    assert "welcome.js?v=20261125-uxgap23" in welcome_html
-    assert "seller-memory.js?v=20261124-ag2" in index_html
-    assert "seller-memory.js?v=20261124-ag2" in welcome_html
-    assert "seller-memory.js?v=20261124-ag2" in today_html
-    assert "seller-memory.js?v=20261124-ag2" in creator_html
-    assert "first-ad.js?v=20261121-uxgap19" in first_ad_html
+    assert "welcome.js?v=20261125-uxgap24" in index_html
+    assert "welcome.js?v=20261125-uxgap24" in welcome_html
+    assert "seller-memory.js?v=20261126-uxgap26" in index_html
+    assert "seller-memory.js?v=20261126-uxgap26" in welcome_html
+    assert "seller-memory.js?v=20261126-uxgap26" in today_html
+    assert "seller-memory.js?v=20261126-uxgap26" in creator_html
+    assert "first-ad.js?v=20261126-ag1" in first_ad_html
     for link_id in ("improveFirstAdLink", "iterateFirstAdLink", "bidsFirstAdLink"):
         assert link_id in index_html
     assert "faBidAdviceLink" in first_ad_html
