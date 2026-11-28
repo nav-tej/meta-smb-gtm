@@ -737,13 +737,7 @@
     if (state.goal === 'gift') state.caption += isServices() ? ' Share how this helps your clients.' : ' A thoughtful gift starts with a story.';
     if (state.goal === 'visit') state.caption += isServices() ? ' Visit the link to learn more or get in touch.' : ' Visit the product page to learn more.';
     state.caption = state.caption.slice(0, 600);
-    if (!state.sceneEdited) {
-      state.scene = isServices()
-        ? 'Clean, bright workspace with soft natural daylight and simple modern styling. Describe only the surroundings; keep the main subject clear.'
-        : (state.custom && ownBusinessType)
-          ? 'Clean, softly lit surface with natural daylight and simple modern styling. Describe only the surroundings; do not change the product.'
-          : 'Warm neutral room, simple light oak console, soft daylight, clean wall and a restrained frame. Describe only the surroundings; do not change the product.';
-    }
+    if (!state.sceneEdited) state.scene = isServices() ? 'Clean, bright workspace with soft natural daylight and simple modern styling. Describe only the surroundings; keep the main subject clear.' : (state.custom && ownBusinessType) ? 'Clean, softly lit surface with natural daylight and simple modern styling. Describe only the surroundings; do not change the product.' : 'Warm neutral room, simple light oak console, soft daylight, clean wall and a restrained frame. Describe only the surroundings; do not change the product.';
     $('headline').value = state.headline; $('caption').value = state.caption; $('scene').value = state.scene;
   }
   function setProductFields() { for (const [id, key] of Object.entries(fields)) $(id).value = state.product[key] || ''; }

@@ -1,4 +1,4 @@
-"""Non-artist products seller walkthrough E2E: /today, /create, /first-ad, /digest, /progress, /account.
+"""Non-artist products seller walkthrough E2E across all main pages.
 
 Walks the app as "Ember & Wick Candle Co." (products, Etsy + Shopify, More sales,
 Instagram + Facebook, 30 min/wk, polished_premium, trial plan, 2 candle competitors
@@ -100,8 +100,13 @@ def _candle_shop_doc() -> dict[str, Any]:
             "destination": "shopify",
         },
         "headline": "Smoked Cedar, poured in small batches",
-        "caption": "Warm cedarwood and soft amber for quiet evenings. Hand-poured in 8oz reusable glass.",
-        "scene": "Clean, softly lit surface with natural daylight and simple modern styling. Describe only the surroundings; do not change the product.",
+        "caption": (
+            "Warm cedarwood and soft amber for quiet evenings. Hand-poured in 8oz reusable glass."
+        ),
+        "scene": (
+            "Clean, softly lit surface with natural daylight and simple modern styling. "
+            "Describe only the surroundings; do not change the product."
+        ),
         "cta": "Shop now",
         "provenance": "Original-photo layout. No personalized image generated.",
         "artwork": None,
@@ -334,12 +339,14 @@ with sync_playwright() as p:
             assert "my shop" in save_btn_txt and "studio" not in save_btn_txt.lower(), save_btn_txt
 
             more_summary = page.locator("#moreDetails > summary").inner_text()
-            assert "collection" in more_summary.lower() and "series" not in more_summary.lower(), more_summary
+            assert "collection" in more_summary.lower(), more_summary
+            assert "series" not in more_summary.lower(), more_summary
             page.evaluate("document.getElementById('moreDetails').open = true")
             prod_col_label = page.locator("label[for='productCollection']").inner_text()
             assert "Collection" in prod_col_label and "Series" not in prod_col_label, prod_col_label
             prod_col_ph = page.locator("#productCollection").get_attribute("placeholder") or ""
-            assert "collection" in prod_col_ph.lower() and "series" not in prod_col_ph.lower(), prod_col_ph
+            assert "collection" in prod_col_ph.lower(), prod_col_ph
+            assert "series" not in prod_col_ph.lower(), prod_col_ph
 
             page.locator("#productPhoto").set_input_files(PHOTO)
             page.wait_for_function(
@@ -355,7 +362,7 @@ with sync_playwright() as p:
             if width == 375:
                 check_no_overflow(page, "/create-step2@375")
 
-            # Step 3: neutral scene prompt (no restrained frame) & product scene button (no room scene)
+            # Step 3: neutral scene prompt (no frame) and product scene button (no room scene)
             page.click("#nextButton")
             gen_btn = page.locator("#generateButton").inner_text()
             assert gen_btn == "Preview a product scene", gen_btn
@@ -372,42 +379,48 @@ with sync_playwright() as p:
             export_note = page.locator("#exportFilesNote").inner_text()
             assert "production print files" not in export_note, export_note
             posting_steps = page.locator("#postingSteps").inner_text()
-            assert "collection label" in posting_steps and "series label" not in posting_steps, posting_steps
+            assert "collection label" in posting_steps, posting_steps
+            assert "series label" not in posting_steps, posting_steps
             if width == 375:
                 check_no_overflow(page, "/create-step4@375")
 
             # Load saved account draft for Smoked Cedar 8oz Soy Candle
             page.click("#loadAccountDraft")
             page.wait_for_function(
-                "() => document.getElementById('productName')?.value === 'Smoked Cedar 8oz Soy Candle'",
+                "() => document.getElementById('productName')?.value === "
+                "'Smoked Cedar 8oz Soy Candle'",
                 timeout=10000,
             )
 
-            # 3. /first-ad — products placeholders & outcomes (no AI growth audit / book calls / prints)
+            # 3. /first-ad — products placeholders & outcomes (no agency/print copy)
             page.goto(BASE + "/first-ad", wait_until="networkidle", timeout=20000)
             page.wait_for_function(
                 "() => (document.getElementById('faContextStatus')?.textContent || '')"
                 ".includes('Ember & Wick Candle Co.')",
                 timeout=15000,
             )
-            assert page.locator("#faOutcomeVisitsTitle").inner_text() == "Bring visitors to your shop"
+            visits_title = page.locator("#faOutcomeVisitsTitle").inner_text()
+            assert visits_title == "Bring visitors to your shop", visits_title
             visits_desc = page.locator("#faOutcomeVisitsDesc").inner_text()
             assert "Etsy, Shopify, or website product pages" in visits_desc, visits_desc
-            assert "book a call" not in visits_desc.lower() and "studio" not in visits_desc.lower(), visits_desc
+            assert "book a call" not in visits_desc.lower(), visits_desc
+            assert "studio" not in visits_desc.lower(), visits_desc
             inq_desc = page.locator("#faOutcomeInquiriesDesc").inner_text()
             assert "custom orders" in inq_desc and "book calls" not in inq_desc.lower(), inq_desc
 
             page.click("[data-fa-step='2']")
             prod_ph = page.locator("#faProductName").get_attribute("placeholder") or ""
             assert "candle" in prod_ph.lower() or "featured product" in prod_ph.lower(), prod_ph
-            assert "growth audit" not in prod_ph.lower() and "consultation" not in prod_ph.lower(), prod_ph
+            assert "growth audit" not in prod_ph.lower(), prod_ph
+            assert "consultation" not in prod_ph.lower(), prod_ph
             cta_ph = page.locator("#faCta").get_attribute("placeholder") or ""
             assert "Shop now" in cta_ph and "Book a call" not in cta_ph, cta_ph
 
             page.click("[data-fa-step='3']")
             aud_ph = page.locator("#faAudience").get_attribute("placeholder") or ""
             assert "handmade gifts" in aud_ph.lower(), aud_ph
-            assert "marketing help" not in aud_ph.lower() and "botanical" not in aud_ph.lower(), aud_ph
+            assert "marketing help" not in aud_ph.lower(), aud_ph
+            assert "botanical" not in aud_ph.lower(), aud_ph
             if width == 375:
                 check_no_overflow(page, "/first-ad@375")
 
@@ -476,7 +489,8 @@ with sync_playwright() as p:
         assert "Pixels, Fine Art America and Saatchi" in spage.locator("#importHint").inner_text()
         assert "series" in spage.locator("#moreDetails > summary").inner_text().lower()
         spage.evaluate("document.getElementById('moreDetails').open = true")
-        assert "Series or collection" in spage.locator("label[for='productCollection']").inner_text()
+        sample_col_label = spage.locator("label[for='productCollection']").inner_text()
+        assert "Series or collection" in sample_col_label, sample_col_label
         spage.click("#nextButton")
         spage.click("#nextButton")
         assert spage.locator("#generateButton").inner_text() == "Preview a room scene"
@@ -495,9 +509,11 @@ with sync_playwright() as p:
             timeout=15000,
         )
         spage.click("[data-fa-step='2']")
-        assert spage.locator("#faProductName").get_attribute("placeholder") == "e.g., Botanical Linocut Print"
+        sample_prod_ph = spage.locator("#faProductName").get_attribute("placeholder")
+        assert sample_prod_ph == "e.g., Botanical Linocut Print", sample_prod_ph
         spage.click("[data-fa-step='3']")
-        assert "botanical prints" in (spage.locator("#faAudience").get_attribute("placeholder") or "")
+        sample_aud_ph = spage.locator("#faAudience").get_attribute("placeholder") or ""
+        assert "botanical prints" in sample_aud_ph, sample_aud_ph
         sctx.close()
     finally:
         browser.close()
