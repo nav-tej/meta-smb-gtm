@@ -159,6 +159,7 @@ paths above. AGENTS reports Nov 25 production as `6c7da99`, deployment
 `dpl_DkUMsPbSio6bW7w5hEp2Fa3kukxq`, with `main` still configured for production; these are
 recorded facts, not a fresh hosted inspection. Official CLI syntax was checked against the
 linked Vercel documentation. The checker and its Vercel transport are covered by local tests;
-every hosted result still requires coordinator verification. No release
-SHA is certified by this document, and no env read, hosted request, push, settings change
-or deployment was performed to write it.
+every hosted result still requires coordinator verification. Local execution results are in
+[the release-check report](CODEX_RELEASE_CHECK_NOV26.md). No release SHA is certified by
+this document. This assignment pushed only `codex/release-check-nov26`; no application env
+reads, hosted target checks, settings changes or deployment commands were performed.
