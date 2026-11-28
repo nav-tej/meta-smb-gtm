@@ -121,8 +121,8 @@ def test_ad_loop_copy_and_script_version_contracts() -> None:
     creator_html = (REPO_ROOT / "src/api/static/creator.html").read_text(encoding="utf-8")
     first_ad_html = (REPO_ROOT / "src/api/static/first-ad.html").read_text(encoding="utf-8")
 
-    assert "welcome.js?v=20261128-uxgap27" in index_html
-    assert "welcome.js?v=20261128-uxgap27" in welcome_html
+    assert "welcome.js?v=20261128-uxgap28" in index_html
+    assert "welcome.js?v=20261128-uxgap28" in welcome_html
     assert "seller-memory.js?v=20261126-uxgap26" in index_html
     assert "seller-memory.js?v=20261126-uxgap26" in welcome_html
     assert "seller-memory.js?v=20261126-uxgap26" in today_html

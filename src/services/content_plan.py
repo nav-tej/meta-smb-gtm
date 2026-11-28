@@ -15,6 +15,7 @@ from src.models.content_plan import (
     ContentPost,
     GuidanceSource,
 )
+from src.services.brand_tone import normalize_tone, tone_prompt_line
 
 GUIDANCE = {
     "instagram": GuidanceSource(
@@ -143,24 +144,56 @@ def _tip(request: ContentPlanRequest, channel: Channel) -> str:
 
 
 def _cta(request: ContentPlanRequest, channel: Channel) -> str:
+    if request.business_type is None:
+        if request.goal == "inquiries" or not request.product.destination_url:
+            return "Ask me about this piece."
+        return (
+            "Explore the work through my profile link."
+            if channel == "instagram"
+            else "Explore the work in my shop."
+        )
     services = request.business_type == "services"
-    if request.goal == "inquiries" or not request.product.destination_url:
-        if services:
-            return "Message me to ask how this could work for you."
-        return "Ask me about this piece." if request.business_type is None else "Ask me about it."
+    tone = normalize_tone(request.tone)
+    inquiry_only = request.goal == "inquiries" or not request.product.destination_url
+    if tone == "expert_clear":
+        if inquiry_only:
+            return (
+                "Send a message with your questions."
+                if services
+                else "Message me with any questions about it."
+            )
+        if channel == "instagram":
+            return "Read the details through my profile link."
+        return (
+            "Read the full details on my website." if services else "See full details on my site."
+        )
+    if tone == "polished_premium":
+        if inquiry_only:
+            return (
+                "Inquire by message to discuss details."
+                if services
+                else "Message me for full details."
+            )
+        if channel == "instagram":
+            return "View details through my profile link."
+        return "View details on my website." if services else "View the collection on my site."
+    if tone == "direct_offer":
+        if inquiry_only:
+            return "Message me to get started." if services else "Message me to order or ask."
+        if channel == "instagram":
+            return "Check availability through my profile link."
+        return (
+            "Book or learn more on my website." if services else "Order or learn more on my site."
+        )
+    if inquiry_only:
+        return "Message me to ask how this could work for you." if services else "Ask me about it."
     if services:
         return (
             "Learn more through my profile link."
             if channel == "instagram"
             else "Learn more on my website."
         )
-    if request.business_type is not None:
-        return "See it through my profile link." if channel == "instagram" else "See it in my shop."
-    return (
-        "Explore the work through my profile link."
-        if channel == "instagram"
-        else "Explore the work in my shop."
-    )
+    return "See it through my profile link." if channel == "instagram" else "See it in my shop."
 
 
 class _StarterWords(NamedTuple):
@@ -169,10 +202,71 @@ class _StarterWords(NamedTuple):
     visuals: dict[str, str]
 
 
+def _tone_hooks(business_type: str, tone: str | None, title: str) -> tuple[str, str, str]:
+    if business_type == "services":
+        if tone == "expert_clear":
+            return (
+                f"Questions people ask about {title}.",
+                f"What to expect from {title}.",
+                f"Key steps inside {title}.",
+            )
+        if tone == "polished_premium":
+            return (
+                f"Introducing {title}.",
+                f"A closer look at {title}.",
+                f"The craft behind {title}.",
+            )
+        if tone == "direct_offer":
+            return (
+                f"What you get with {title}.",
+                f"Ready for {title}?",
+                f"Start with {title} today.",
+            )
+        return (f"Meet {title}.", f"Who {title} is for.", f"How {title} works.")
+    if tone == "expert_clear":
+        return (
+            f"What makes {title} useful.",
+            f"Inside the details of {title}.",
+            f"How to choose {title}.",
+        )
+    if tone == "polished_premium":
+        return (
+            f"Introducing {title}.",
+            f"Crafted details in {title}.",
+            f"A closer look at {title}.",
+        )
+    if tone == "direct_offer":
+        return (
+            f"Here is {title}.",
+            f"See {title} up close.",
+            f"Get started with {title}.",
+        )
+    return (f"Meet {title}.", f"A closer look at {title}.", f"The story behind {title}.")
+
+
 def _starter_words(request: ContentPlanRequest, title: str) -> _StarterWords:
+    if request.business_type is None:
+        return _StarterWords(
+            (f"Meet {title}.", f"A closer look at {title}.", f"The story behind {title}."),
+            "A piece of my work, shared with you.",
+            {
+                "video": (
+                    "Record three short vertical shots: the full work, an uncropped detail, "
+                    "and you sharing one sentence about it. Add captions; "
+                    "no video has been generated."
+                ),
+                "image": (
+                    "Use the original artwork with padding so its edges and signature "
+                    "remain visible."
+                ),
+                "text": "A text post is enough. Use one personal observation about this work.",
+            },
+        )
+    tone = normalize_tone(request.tone)
+    hooks = _tone_hooks(request.business_type, tone, title)
     if request.business_type == "services":
         return _StarterWords(
-            (f"Meet {title}.", f"Who {title} is for.", f"How {title} works."),
+            hooks,
             "A short note on what I offer and who it helps.",
             {
                 "video": (
@@ -187,34 +281,18 @@ def _starter_words(request: ContentPlanRequest, title: str) -> _StarterWords:
                 "text": "A text post is enough. Answer one question clients often ask you.",
             },
         )
-    hooks = (f"Meet {title}.", f"A closer look at {title}.", f"The story behind {title}.")
-    if request.business_type is not None:
-        return _StarterWords(
-            hooks,
-            "Something I make, shared with you.",
-            {
-                "video": (
-                    "Record three short vertical shots: the whole item, one close-up detail, and "
-                    "you sharing one sentence about it. Add captions; no video has been generated."
-                ),
-                "image": (
-                    "Use your clearest photo of the item, with space so nothing important is cut."
-                ),
-                "text": "A text post is enough. Share one personal note about this item.",
-            },
-        )
     return _StarterWords(
         hooks,
-        "A piece of my work, shared with you.",
+        "Something I make, shared with you.",
         {
             "video": (
-                "Record three short vertical shots: the full work, an uncropped detail, "
-                "and you sharing one sentence about it. Add captions; no video has been generated."
+                "Record three short vertical shots: the whole item, one close-up detail, and "
+                "you sharing one sentence about it. Add captions; no video has been generated."
             ),
             "image": (
-                "Use the original artwork with padding so its edges and signature remain visible."
+                "Use your clearest photo of the item, with space so nothing important is cut."
             ),
-            "text": "A text post is enough. Use one personal observation about this work.",
+            "text": "A text post is enough. Share one personal note about this item.",
         },
     )
 
@@ -275,6 +353,11 @@ class ContentPlanService:
     async def generate(self, request: ContentPlanRequest) -> ContentPlan:
         """Ask Muse for copy after the route authorizes this explicit live request."""
         client = self._client or get_meta_client()
+        trusted_guidance: dict[str, str] = {channel: TIPS[channel] for channel in request.channels}
+        if request.business_type is not None:
+            tone_line = tone_prompt_line(request.tone)
+            if tone_line:
+                trusted_guidance["brand_tone"] = tone_line
         draft = await client.chat_structured(
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
@@ -282,7 +365,7 @@ class ContentPlanService:
                     "role": "user",
                     "content": (
                         "<trusted_guidance>\n"
-                        + json.dumps({channel: TIPS[channel] for channel in request.channels})
+                        + json.dumps(trusted_guidance)
                         + "\n</trusted_guidance>\n<untrusted_seller_data>\n"
                         + request.model_dump_json(exclude={"use_muse", "performance", "sales_goal"})
                         + "\n</untrusted_seller_data>"
