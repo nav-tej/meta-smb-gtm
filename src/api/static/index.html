@@ -1023,7 +1023,7 @@
   <script src="/static/account.js?v=20261120-uxgap17" defer></script>
   <script src="/static/workspace-modes.js?v=20261117-uxgap6" defer></script>
   <script src="/static/muse-shell.js?v=20261126-uxgap25" defer></script>
-  <script src="/static/welcome.js?v=20261125-uxgap24" defer></script>
+  <script src="/static/welcome.js?v=20261128-uxgap27" defer></script>
   <script src="/static/seller-memory.js?v=20261126-uxgap26" defer></script>
 </head>
 <body>
@@ -2808,9 +2808,32 @@ comfy --workspace ~/ComfyUI launch -- --listen 127.0.0.1 --port 8188
       return result.ok ? result.competitor : null;
     }
     // The home rows (welcome.js) link a competitor's own page in Meta's Ad Library through this.
+    // Takes competitors off the watchlist on the server (both lists). Returns the saved setup
+    // record, which the home redraws its rows from.
+    async function removeCompetitors(urls) {
+      const ownerId = liveSnapshot()?.user?.id;
+      if (!ownerId || window.museModes?.isSampleMode?.()) return { ok: false, detail: 'Sign in to change your watchlist.' };
+      try {
+        const resp = await fetch('/api/v1/competitors/saved/remove', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', 'X-Muse-Owner': ownerId },
+          body: JSON.stringify({ urls }),
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok) {
+          return { ok: false, detail: typeof data?.detail === 'string' ? data.detail : 'Muse could not remove them. Try again.' };
+        }
+        try { await window.museSellerMemory?.reload?.(); } catch {}
+        return { ok: true, removed: Array.isArray(data?.removed) ? data.removed : [], onboarding: data?.onboarding || null };
+      } catch {
+        return { ok: false, detail: 'Muse could not remove them. Check your connection and try again.' };
+      }
+    }
     window.museCompetitors = Object.freeze({
       linkAdLibrary: (url, name, adLibraryUrl) =>
         putCompetitor({ competitor_url: url, name: name || '', ad_library_url: adLibraryUrl }),
+      removeSaved: (urls) => removeCompetitors(urls),
     });
     const sellerName = (btn) => (btn?.closest?.('.jr-seller')?.querySelector('strong')?.textContent || '').trim();
     const DEMO_BRIEFS_KEY = 'muse.demoBriefs';

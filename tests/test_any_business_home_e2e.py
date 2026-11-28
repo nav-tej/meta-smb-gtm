@@ -92,6 +92,46 @@ def _malformed_document() -> dict[str, Any]:
     return doc
 
 
+def _old_example_plus_real_document() -> dict[str, Any]:
+    """The old example competitors next to one the seller added and wrote a note on."""
+    doc = _old_example_document()
+    real = {"name": "Demand Curve", "url": "https://demandcurve.test", "reason": "Added by you"}
+    doc["onboarding"]["competitors"].append(dict(real))
+    doc["preferences"]["competitor_entries"].append(
+        {**real, "role": "inspiration", "rationale": "Their founder newsletter", "selected": True}
+    )
+    doc["preferences"]["watch"] = {
+        "competitor_urls": [c["url"] for c in doc["onboarding"]["competitors"]]
+    }
+    return doc
+
+
+def _saved_context_document() -> dict[str, Any]:
+    """A finished setup, then a linked Ad Library page, an analysis, a note and a role on the home,
+    a competitor added in seller memory only, and an hour a week set after setup."""
+    doc = _document("Ridge Line Advisory", "services", "More client inquiries", ["linkedin"])
+    onb = doc["onboarding"]
+    onb["competitors"][0]["ad_library_page_id"] = "104958162837"
+    onb["preferences"] = {"access": {"minutes_per_week": 30, "channels": ["linkedin"]}}
+    doc["preferences"]["access"]["minutes_per_week"] = 60
+    doc["preferences"]["competitor_entries"] = [
+        {
+            **onb["competitors"][0],
+            "role": "price_reference",
+            "rationale": "They undercut us on retainers",
+            "selected": True,
+            "analysis_takeaway": "They lead with a free growth audit.",
+            "analysis_summary": "They lead with a free growth audit and publish case studies.",
+            "analyzed_at": "2026-11-25T08:00:00Z",
+        },
+        {**onb["competitors"][1], "role": "similar_audience", "rationale": "Similar offer",
+         "selected": True},
+        {"name": "Lumen Labs", "url": "https://lumenlabs.test", "role": "inspiration",
+         "rationale": "Great webinars", "reason": "Added by you", "selected": True},
+    ]  # fmt: skip
+    return doc
+
+
 USERS = {
     "svc": _document(
         "North Star Advisory", "services", "More client inquiries", ["linkedin", "website"]
@@ -100,6 +140,8 @@ USERS = {
     "oldex": _old_example_document(),
     "bad": _malformed_document(),
     "live": _document("Northwind Growth", "services", "More client inquiries", ["linkedin"]),
+    "oldrm": _old_example_plus_real_document(),
+    "keep": _saved_context_document(),
 }
 
 
@@ -632,5 +674,132 @@ print("AD_LIBRARY_LINK_OK")
         [python_bin, "-c", script], capture_output=True, text=True, timeout=180, check=False
     )
     assert proc.returncode == 0 and "AD_LIBRARY_LINK_OK" in proc.stdout, (
+        f"STDOUT:\n{proc.stdout}\nSTDERR:\n{proc.stderr}"
+    )
+
+
+def test_old_example_competitors_are_removed_in_one_click_e2e(any_business_server: str) -> None:
+    """Nov 28: the note on Clutch, Upwork and Toptal only linked to setup. One button now takes
+    every example off both lists; the seller's own competitor and its note stay."""
+    python_bin = _find_playwright_python()
+    if not python_bin:
+        pytest.skip("Playwright runtime not installed")
+    script = f"""
+import json
+from playwright.sync_api import sync_playwright
+
+BASE = {any_business_server!r}
+with sync_playwright() as p:
+    browser = p.chromium.launch()
+    ctx = browser.new_context(viewport={{"width": 375, "height": 900}})
+    ctx.add_cookies([{{"name": "muse_e2e_user", "value": "oldrm", "url": BASE}}])
+    page = ctx.new_page()
+    errors = []
+    page.on("pageerror", lambda e: errors.append(str(e)))
+    page.route(lambda u: not u.startswith(BASE) and not u.startswith("data:"), lambda r: r.abort())
+    page.goto(BASE + "/", wait_until="domcontentloaded")
+    note = page.locator("#oldExampleCompetitorsNote")
+    note.wait_for(state="visible", timeout=20000)
+    button = note.get_by_role("button", name="Remove these 3 examples")
+    assert button.is_visible()
+    assert note.locator("a").get_attribute("href") == "/welcome?step=3"
+    assert not page.evaluate("document.documentElement.scrollWidth > window.innerWidth")
+    page.wait_for_function(
+        "document.querySelectorAll('#sellerList .sm-comp-role-wrap').length === 4", timeout=10000
+    )
+    button.click()
+    note.wait_for(state="detached", timeout=10000)
+    page.wait_for_function(
+        "document.querySelectorAll('#sellerList .jr-seller').length === 1", timeout=10000
+    )
+    toast = page.locator(".ms-toast", has_text="from your watchlist").first
+    toast.wait_for(timeout=5000)
+    assert "Clutch B2B Marketing Directory, Upwork Fractional Marketing Talent and Toptal" in (
+        toast.inner_text()), toast.inner_text()
+    assert "Demand Curve" in page.locator("#sellerList").inner_text()
+    assert "1 competitor on your watchlist" in page.locator("#loop-research .jr-watch").inner_text()
+
+    # Saved: a new visit shows no note and one row, still with the seller's note.
+    page.reload(wait_until="domcontentloaded")
+    page.wait_for_function(
+        "document.querySelectorAll('#sellerList .sm-comp-role-wrap').length === 1", timeout=20000
+    )
+    assert not page.locator("#oldExampleCompetitorsNote").count()
+    assert "Their founder newsletter" in page.locator("#sellerList").inner_text()
+    ws = page.evaluate("fetch('/api/v1/account/workspace', {{credentials: 'same-origin'}})"
+                       ".then((r) => r.json())")
+    doc = ws["workspace"]["document"] if "workspace" in ws else ws["document"]
+    assert [c["url"] for c in doc["onboarding"]["competitors"]] == ["https://demandcurve.test"]
+    entries = doc["preferences"]["competitor_entries"]
+    assert [(e["url"], e["rationale"]) for e in entries] == [
+        ("https://demandcurve.test", "Their founder newsletter")], entries
+    assert doc["preferences"]["watch"]["competitor_urls"] == ["https://demandcurve.test"]
+    assert not errors, errors
+    browser.close()
+print("REMOVE_EXAMPLES_OK")
+"""
+    proc = subprocess.run(
+        [python_bin, "-c", script], capture_output=True, text=True, timeout=180, check=False
+    )
+    assert proc.returncode == 0 and "REMOVE_EXAMPLES_OK" in proc.stdout, (
+        f"STDOUT:\n{proc.stdout}\nSTDERR:\n{proc.stderr}"
+    )
+
+
+def test_editing_setup_keeps_what_the_home_saved_on_each_competitor_e2e(
+    any_business_server: str,
+) -> None:
+    """Nov 28: saving setup rebuilt the watchlist from setup's own copy. A kept competitor lost its
+    linked Ad Library page, its saved analysis, the seller's note and role; a competitor added in
+    seller memory disappeared; and step 4 put back the weekly time from the first setup."""
+    python_bin = _find_playwright_python()
+    if not python_bin:
+        pytest.skip("Playwright runtime not installed")
+    script = f"""
+from playwright.sync_api import sync_playwright
+
+BASE = {any_business_server!r}
+with sync_playwright() as p:
+    browser = p.chromium.launch()
+    ctx = browser.new_context(viewport={{"width": 1440, "height": 900}})
+    ctx.add_cookies([{{"name": "muse_e2e_user", "value": "keep", "url": BASE}}])
+    page = ctx.new_page()
+    errors = []
+    page.on("pageerror", lambda e: errors.append(str(e)))
+    page.route(lambda u: not u.startswith(BASE) and not u.startswith("data:"), lambda r: r.abort())
+    page.goto(BASE + "/welcome?step=3", wait_until="domcontentloaded")
+    page.wait_for_selector("#wkStep3:not([hidden])", timeout=20000)
+    notes = page.locator("#wkStep3 .sm-comp-rationale")
+    page.wait_for_function(
+        "document.querySelectorAll('#wkStep3 .sm-comp-rationale').length === 3", timeout=10000
+    )
+    assert [notes.nth(i).input_value() for i in range(3)] == [
+        "They undercut us on retainers", "Similar offer", "Great webinars"]
+    assert page.locator("#wkStep3 .sm-comp-role").first.input_value() == "price_reference"
+    page.click("#wkStep3NextBtn")
+    page.wait_for_selector("#wkStep4:not([hidden])", timeout=10000)
+    assert page.locator("#wkPrefMinutes").input_value() == "60"
+    page.click("#wkStep4FinishBtn")
+    page.wait_for_selector("#wkStepDone:not([hidden])", timeout=10000)
+    ws = page.evaluate("fetch('/api/v1/account/workspace', {{credentials: 'same-origin'}})"
+                       ".then((r) => r.json())")
+    doc = ws["workspace"]["document"] if "workspace" in ws else ws["document"]
+    entries = {{e["url"]: e for e in doc["preferences"]["competitor_entries"]}}
+    first = entries["https://brightpath.test"]
+    assert first["ad_library_page_id"] == "104958162837", first
+    assert first["analysis_takeaway"] == "They lead with a free growth audit.", first
+    assert first["analyzed_at"] == "2026-11-25T08:00:00Z", first
+    assert (first["role"], first["rationale"]) == (
+        "price_reference", "They undercut us on retainers"), first
+    assert entries["https://lumenlabs.test"]["rationale"] == "Great webinars"
+    assert doc["preferences"]["access"]["minutes_per_week"] == 60
+    assert not errors, errors
+    browser.close()
+print("SETUP_KEEPS_CONTEXT_OK")
+"""
+    proc = subprocess.run(
+        [python_bin, "-c", script], capture_output=True, text=True, timeout=180, check=False
+    )
+    assert proc.returncode == 0 and "SETUP_KEEPS_CONTEXT_OK" in proc.stdout, (
         f"STDOUT:\n{proc.stdout}\nSTDERR:\n{proc.stderr}"
     )

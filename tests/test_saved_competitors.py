@@ -18,6 +18,7 @@ from fastapi.testclient import TestClient
 
 from src.api import intel
 from src.api.main import app
+from src.api.onboarding import OnboardingBuildRequest, _merged_preferences
 from src.models.intel import CompetitorBrief
 from src.services.accounts import AccountSession
 from src.services.saved_competitors import (
@@ -27,6 +28,7 @@ from src.services.saved_competitors import (
     analysis_takeaway,
     merge_saved_competitor,
     parse_ad_library_page_id,
+    remove_saved_competitors,
 )
 from src.services.seller_memory import rank_seller_recommendations
 
@@ -268,3 +270,99 @@ def test_route_links_a_page_and_refuses_a_keyword_search(saved_route: _Store) ->
     assert "view_all_page_id=104958162837" in ok.json()["competitor"]["ad_library_url"]
     bad = _put({"competitor_url": "https://clutch.co/", "ad_library_url": KEYWORD_LINK})
     assert bad.status_code == 422 and bad.json()["detail"] == AD_LIBRARY_KEYWORD_LINK
+
+
+def _analyzed_doc(competitor_brief: CompetitorBrief) -> dict[str, Any]:
+    """Demand Curve linked to its Ad Library page, analyzed, with the seller's own note and role."""
+    doc, _, _ = merge_saved_competitor(
+        _doc(),
+        url="https://www.demandcurve.com",
+        brief=_brief(competitor_brief, "They sell a growth program to seed-stage founders."),
+        ad_library_page_id="104958162837",
+        now_iso=NOW,
+    )
+    entry = doc["preferences"]["competitor_entries"][1]
+    entry.update(rationale="Same founders we pitch", role="price_reference")
+    return doc
+
+
+def test_editing_setup_keeps_each_competitors_page_and_analysis(
+    competitor_brief: CompetitorBrief,
+) -> None:
+    """Nov 28: saving setup rebuilt the watchlist from setup's copy and dropped every saved page,
+    analysis, note and role, which is what the seller adds on the home after setup."""
+    doc = _analyzed_doc(competitor_brief)
+    # What setup posts after loading the saved note and role (welcome.js `withSavedContext`);
+    # the seller unticked nothing and removed Clutch.
+    posted = [
+        {**doc["onboarding"]["competitors"][1], "role": "price_reference",
+         "rationale": "Same founders we pitch"},
+    ]  # fmt: skip
+    body = OnboardingBuildRequest(edit=True, competitors=posted)
+    entries = _merged_preferences(body, doc, keep_existing=True)["competitor_entries"]
+    assert [e["url"] for e in entries] == ["https://www.demandcurve.com"]
+    kept = entries[0]
+    assert kept["ad_library_page_id"] == "104958162837"
+    assert kept["analysis_takeaway"].startswith("They sell a growth program")
+    assert kept["analyzed_at"] == NOW and kept["analysis_summary"]
+    assert kept["rationale"] == "Same founders we pitch" and kept["role"] == "price_reference"
+    # A first build has nothing to keep; an edit never revives a competitor setup removed.
+    first = _merged_preferences(OnboardingBuildRequest(competitors=posted), {}, keep_existing=False)
+    assert "analysis_takeaway" not in first["competitor_entries"][0]
+    # A page ID that isn't 5 to 20 digits is never copied from setup's answers.
+    junk = OnboardingBuildRequest(
+        competitors=[{"url": "https://x.test", "ad_library_page_id": "1"}]
+    )
+    assert "ad_library_page_id" not in _merged_preferences(junk, {})["competitor_entries"][0]
+
+
+def test_removing_takes_competitors_off_both_lists_and_keeps_their_analysis(
+    competitor_brief: CompetitorBrief,
+) -> None:
+    doc = _analyzed_doc(competitor_brief)
+    doc["preferences"]["watch"] = {
+        "competitor_urls": ["https://clutch.co/", "https://www.demandcurve.com"]
+    }
+    doc["onboarding"]["preferences"] = {"watch": {"competitor_urls": ["https://clutch.co"]}}
+    before = json.loads(json.dumps(doc))
+    out, removed = remove_saved_competitors(doc, ["https://www.demandcurve.com/", "https://x.test"])
+    assert removed == ["Demand Curve"]
+    assert [c["url"] for c in out["onboarding"]["competitors"]] == ["https://clutch.co/"]
+    assert [e["url"] for e in out["preferences"]["competitor_entries"]] == ["https://clutch.co/"]
+    assert out["preferences"]["watch"]["competitor_urls"] == ["https://clutch.co/"]
+    assert "https://www.demandcurve.com" in out["briefs"]  # "View analysis" if they come back
+    assert doc == before  # the input document is never changed
+    out, removed = remove_saved_competitors(out, ["clutch.co"])
+    assert removed == ["Clutch B2B Marketing Directory"]
+    assert out["onboarding"]["competitors"] == [] and out["preferences"]["competitor_entries"] == []
+    assert out["onboarding"]["preferences"]["watch"]["competitor_urls"] == []
+    assert remove_saved_competitors({}, ["https://clutch.co"]) == ({}, [])
+
+
+def _remove(urls: list[str], **headers: str):
+    return TestClient(app).post(
+        "/api/v1/competitors/saved/remove",
+        json={"urls": urls},
+        headers={"X-Muse-Owner": "u1", **headers},
+    )
+
+
+def test_route_removes_competitors_and_returns_the_setup_rows(saved_route: _Store) -> None:
+    signed_out = _remove(["https://clutch.co/"], **{"x-test-signed-out": "1"})
+    assert signed_out.status_code == 401
+    assert _remove(["https://clutch.co/"], **{"X-Muse-Owner": "someone-else"}).status_code == 409
+    assert _remove([]).status_code == 422
+    nothing = _remove(["https://not-watched.test"])
+    assert nothing.status_code == 200 and nothing.json()["removed"] == []
+    assert saved_route.saves == []  # nothing to remove, nothing saved
+    saved_route.conflicts = 1
+    ok = _remove(["https://clutch.co/"])
+    assert ok.status_code == 200, ok.text
+    assert "no-store" in ok.headers["cache-control"]
+    data = ok.json()
+    assert data["removed"] == ["Clutch B2B Marketing Directory"]
+    assert [c["name"] for c in data["onboarding"]["competitors"]] == ["Demand Curve"]
+    assert saved_route.saves == [3, 4]  # reloaded and removed again after the conflict
+    assert [c["url"] for c in saved_route.slot["document"]["onboarding"]["competitors"]] == [
+        "https://www.demandcurve.com"
+    ]

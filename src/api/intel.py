@@ -60,6 +60,7 @@ from src.services.saved_competitors import (
     ad_library_page_url,
     merge_saved_competitor,
     parse_ad_library_page_id,
+    remove_saved_competitors,
 )
 from src.services.seller_audit import (
     analyze_social_screenshots,
@@ -204,6 +205,52 @@ async def save_competitor_to_workspace(
                     else None
                 ),
             },
+        }
+    raise HTTPException(status_code=409, detail="Your workspace changed. Reload and try again.")
+
+
+class RemoveCompetitorsRequest(BaseModel):
+    urls: list[str] = Field(min_length=1, max_length=12)
+
+
+@router.post("/competitors/saved/remove")
+async def remove_competitors_from_workspace(
+    body: RemoveCompetitorsRequest,
+    http_request: Request,
+    response: Response,
+    x_muse_owner: Annotated[str | None, Header()] = None,
+) -> dict[str, Any]:
+    """Take competitors off the seller's watchlist, in both lists the app reads. No runs.
+
+    Returns the saved setup record so the home can redraw its rows without another read.
+    """
+    never_cache(response)
+    account = await resolve_account(http_request, response, require_verified=True)
+    assert account is not None
+    verify_workspace_owner(account, x_muse_owner, require_binding=True)
+    urls = [str(u or "").strip()[:500] for u in body.urls]
+    for attempt in (1, 2):
+        ws = await load_workspace(account)
+        version = int(ws.get("version") or 0)
+        doc, removed = remove_saved_competitors(ws.get("document") or {}, urls)
+        if not removed:
+            return {
+                "removed": [],
+                "version": version,
+                "onboarding": (ws.get("document") or {}).get("onboarding"),
+            }
+        try:
+            saved = await save_workspace(
+                account, doc, expected_version=version, expected_owner=account.user_id
+            )
+        except HTTPException as err:
+            if err.status_code == 409 and attempt == 1:
+                continue
+            raise
+        return {
+            "removed": removed,
+            "version": int(saved.get("version") or version + 1),
+            "onboarding": doc.get("onboarding"),
         }
     raise HTTPException(status_code=409, detail="Your workspace changed. Reload and try again.")
 

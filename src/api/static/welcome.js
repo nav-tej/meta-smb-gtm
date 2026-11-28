@@ -99,6 +99,51 @@
     box.append(link, toggle, form);
     return box;
   }
+  // Setup keeps its own copy of the answers from the last time it was saved. The home and seller
+  // memory save newer notes, roles and Ad Library pages on each competitor, and newer step 4
+  // answers, in the workspace preferences. An edit starts from those, so saving setup never puts
+  // older answers back.
+  function compKey(url) {
+    return String(url || '').trim().toLowerCase()
+      .replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/[?#].*$/, '').replace(/\/+$/, '');
+  }
+  function withSavedContext(onboarding, doc) {
+    const prefs = doc && doc.preferences && typeof doc.preferences === 'object' ? doc.preferences : {};
+    const entries = Array.isArray(prefs.competitor_entries)
+      ? prefs.competitor_entries.filter((e) => e && typeof e === 'object' && e.url)
+      : [];
+    const roles = ['similar_audience', 'price_reference', 'inspiration'];
+    const competitors = (Array.isArray(onboarding.competitors) ? onboarding.competitors : [])
+      .filter((c) => c && typeof c === 'object')
+      .map((c) => ({ ...c }));
+    const byKey = new Map(competitors.map((c) => [compKey(c.url), c]));
+    entries.forEach((e) => {
+      let c = byKey.get(compKey(e.url));
+      if (!c) {
+        c = { name: e.name || '', url: e.url, reason: e.reason || '', selected: e.selected !== false };
+        competitors.push(c);
+        byKey.set(compKey(e.url), c);
+      }
+      if (roles.includes(e.role)) c.role = e.role;
+      if (typeof e.rationale === 'string' && e.rationale.trim()) c.rationale = e.rationale.trim();
+      if (!c.ad_library_page_id && AD_PAGE_ID_RE.test(String(e.ad_library_page_id || ''))) {
+        c.ad_library_page_id = String(e.ad_library_page_id);
+      }
+    });
+    const setupPrefs = onboarding.preferences && typeof onboarding.preferences === 'object' ? onboarding.preferences : null;
+    let preferences = setupPrefs;
+    if (setupPrefs || prefs.access || prefs.taste) {
+      preferences = { ...(setupPrefs || {}) };
+      if (prefs.experience) preferences.experience = prefs.experience;
+      if (typeof prefs.research_focus === 'string') preferences.research_focus = prefs.research_focus;
+      ['access', 'taste'].forEach((k) => {
+        if (prefs[k] && typeof prefs[k] === 'object') {
+          preferences[k] = { ...((setupPrefs && setupPrefs[k]) || {}), ...prefs[k] };
+        }
+      });
+    }
+    return { ...onboarding, competitors, preferences };
+  }
   function isOldExampleCompetitor(comp) {
     try {
       const host = new URL(String(comp?.url || '')).hostname.replace(/^www\./i, '');
@@ -516,6 +561,7 @@
 
     if (server.doc && server.doc.onboarding && typeof server.doc.onboarding === 'object') {
       state = { ...defaultOnboardingState(), ...server.doc.onboarding };
+      if (currentUser && state.completed_at) state = withSavedContext(state, server.doc);
       writeLocalOnboarding(state, currentUser);
     }
 
@@ -1706,11 +1752,38 @@
         const names = examples.map((c) => adLibraryQuery(c.name, c.url));
         st.textContent = `${names.join(', ').replace(/, ([^,]*)$/, ' and $1')} came from an example, not from your business.`;
         const sp = document.createElement('span');
-        sp.textContent = ' They are directories and talent marketplaces that setup used to fill in. Swap them for businesses your customers compare you with. Changing setup uses no runs. ';
+        sp.textContent = ' They are directories and talent marketplaces that setup used to fill in. Remove them, then add businesses your customers compare you with. Neither uses a run. ';
+        // Every example on either list goes, watched or not; the rest of the watchlist stays.
+        const exampleUrls = asList(onboarding?.competitors).filter(isOldExampleCompetitor).map((c) => c.url);
+        const label = examples.length === 1 ? 'Remove this example' : `Remove these ${examples.length} examples`;
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'jr-mini';
+        remove.id = 'removeOldExamplesBtn';
+        remove.textContent = label;
+        const status = document.createElement('span');
+        status.className = 'jr-example-status';
+        status.setAttribute('role', 'status');
+        remove.addEventListener('click', async () => {
+          if (!window.museCompetitors?.removeSaved) { status.textContent = ' Removing is not available on this page.'; return; }
+          remove.disabled = true;
+          remove.textContent = 'Removing…';
+          status.textContent = '';
+          const result = await window.museCompetitors.removeSaved(exampleUrls);
+          if (result?.ok && result.onboarding && typeof result.onboarding === 'object') {
+            renderSignedInHomeWorkspace(result.onboarding, user);
+            const gone = (result.removed || []).join(', ').replace(/, ([^,]*)$/, ' and $1');
+            window.museShell?.toast?.(gone ? `Removed ${gone} from your watchlist.` : 'Those examples were already gone.');
+            return;
+          }
+          remove.disabled = false;
+          remove.textContent = label;
+          status.textContent = ` ${result?.detail || 'Muse could not remove them. Try again.'}`;
+        });
         const a = document.createElement('a');
         a.href = '/welcome?step=3';
-        a.textContent = 'Change competitors →';
-        note.append(st, sp, a);
+        a.textContent = 'Change competitors in setup →';
+        note.append(st, sp, remove, ' ', a, status);
         sellerListEl.parentNode?.insertBefore(note, sellerListEl);
       }
       if (competitors.length === 0) {
@@ -1720,7 +1793,9 @@
         const st = document.createElement('strong');
         st.textContent = 'Your competitor watchlist is empty';
         const sp = document.createElement('span');
-        sp.textContent = 'Add 1 to 6 similar sellers to compare prices and catalog gaps.';
+        sp.textContent = services
+          ? 'Add 1 to 6 businesses your customers compare you with, to see their offers and new pages.'
+          : 'Add 1 to 6 similar sellers to compare prices and catalog gaps.';
         d.append(st, sp);
         const a = document.createElement('a');
         a.className = 'jr-mini primary';

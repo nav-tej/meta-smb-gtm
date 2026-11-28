@@ -104,6 +104,89 @@ def _display_name(name: str, url: str) -> str:
     return host[4:] if host.startswith("www.") else host
 
 
+# What setup shows and rewrites for each competitor. Everything else on a competitor (its Ad
+# Library page, its saved analysis) is written by the home and seller memory.
+_SETUP_COMPETITOR_KEYS = frozenset({"name", "url", "role", "rationale", "reason", "selected"})
+
+
+def _url_key(item: dict[str, Any]) -> str:
+    return normalize_competitor_url(str(item.get("url") or ""))
+
+
+def keep_saved_context(entries: list[dict[str, Any]], previous: Any) -> list[dict[str, Any]]:
+    """Setup's rebuilt watchlist, each competitor keeping what was saved for it before.
+
+    A setup edit rewrites `preferences.competitor_entries` from its own answers. Without this,
+    saving setup dropped every linked Ad Library page and saved analysis on the kept competitors.
+    """
+    by_url: dict[str, dict[str, Any]] = {}
+    for old in previous if isinstance(previous, list) else []:
+        if isinstance(old, dict) and _url_key(old):
+            by_url.setdefault(_url_key(old), old)
+    kept: list[dict[str, Any]] = []
+    for entry in entries:
+        merged = dict(entry)
+        for key, value in by_url.get(_url_key(entry), {}).items():
+            if key not in _SETUP_COMPETITOR_KEYS and key not in merged:
+                merged[key] = value
+        kept.append(merged)
+    return kept
+
+
+def _without_urls(value: Any, keys: set[str]) -> Any:
+    if not isinstance(value, list):
+        return value
+    return [u for u in value if normalize_competitor_url(str(u or "")) not in keys]
+
+
+def remove_saved_competitors(
+    document: dict[str, Any], urls: list[str]
+) -> tuple[dict[str, Any], list[str]]:
+    """Return `(new_document, removed_names)` with these competitors off the watchlist.
+
+    They leave both lists and the saved watch addresses. Their analyses stay under `briefs`, so
+    adding one back later still opens "View analysis".
+    """
+    keys = {normalize_competitor_url(str(u or "")) for u in urls} - {""}
+    doc = dict(document or {})
+    removed: dict[str, str] = {}
+
+    def strip(raw: Any) -> Any:
+        if not isinstance(raw, list):
+            return raw
+        kept = []
+        for item in raw:
+            if isinstance(item, dict) and _url_key(item) in keys:
+                name = _display_name(str(item.get("name") or ""), str(item["url"]))
+                removed.setdefault(_url_key(item), name)
+            else:
+                kept.append(item)
+        return kept
+
+    prefs_raw = doc.get("preferences")
+    if isinstance(prefs_raw, dict):
+        prefs = dict(prefs_raw)
+        if "competitor_entries" in prefs:
+            prefs["competitor_entries"] = strip(prefs["competitor_entries"])
+        if isinstance(prefs.get("watch"), dict):
+            watch = dict(prefs["watch"])
+            watch["competitor_urls"] = _without_urls(watch.get("competitor_urls"), keys)
+            prefs["watch"] = watch
+        doc["preferences"] = prefs
+    onboarding_raw = doc.get("onboarding")
+    if isinstance(onboarding_raw, dict):
+        onboarding = dict(onboarding_raw)
+        if "competitors" in onboarding:
+            onboarding["competitors"] = strip(onboarding["competitors"])
+        setup_prefs = onboarding.get("preferences")
+        if isinstance(setup_prefs, dict) and isinstance(setup_prefs.get("watch"), dict):
+            watch = dict(setup_prefs["watch"])
+            watch["competitor_urls"] = _without_urls(watch.get("competitor_urls"), keys)
+            onboarding["preferences"] = {**setup_prefs, "watch": watch}
+        doc["onboarding"] = onboarding
+    return doc, list(removed.values())
+
+
 def _brief_json(brief: CompetitorBrief) -> dict[str, Any] | None:
     data = brief.model_dump(mode="json")
     if len(json.dumps(data)) <= MAX_BRIEF_JSON_BYTES:

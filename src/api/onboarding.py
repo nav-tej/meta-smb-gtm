@@ -7,6 +7,7 @@ idempotently charging zero runs on retry or re-entry.
 
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime
 from typing import Annotated, Any, Literal
 
@@ -22,8 +23,11 @@ from src.services.accounts import (
     snapshot,
     verify_workspace_owner,
 )
+from src.services.saved_competitors import keep_saved_context
 
 router = APIRouter(prefix="/onboarding", tags=["onboarding"])
+
+_AD_PAGE_ID_RE = re.compile(r"[0-9]{5,20}")
 
 
 class OnboardingBuildRequest(BaseModel):
@@ -61,7 +65,7 @@ def _merged_preferences(
     if body.memory_entries:
         merged_pref["memory_entries"] = body.memory_entries
     if body.competitors:
-        merged_pref["competitor_entries"] = [
+        entries = [
             {
                 "name": str(c.get("name") or "")[:140],
                 "url": str(c.get("url") or "")[:500],
@@ -74,9 +78,20 @@ def _merged_preferences(
                 "reason": str(c.get("reason") or c.get("rationale") or "")[:280],
                 "selected": c.get("selected", True) is not False,
             }
+            | (
+                {"ad_library_page_id": str(c["ad_library_page_id"])}
+                if _AD_PAGE_ID_RE.fullmatch(str(c.get("ad_library_page_id") or ""))
+                else {}
+            )
             for c in body.competitors
             if isinstance(c, dict) and c.get("url")
         ]
+        # An edit keeps each kept competitor's Ad Library page and saved analysis.
+        merged_pref["competitor_entries"] = (
+            keep_saved_context(entries, existing.get("competitor_entries"))
+            if keep_existing
+            else entries
+        )
     return merged_pref
 
 
