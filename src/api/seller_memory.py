@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import binascii
 import contextlib
+import logging
 from datetime import UTC, datetime
 from typing import Annotated, Any, Literal
 from urllib.parse import urlparse
@@ -59,6 +60,8 @@ from src.services.youtube_videos import (
     parse_video_id,
 )
 from src.utils.sitemap import SitemapError
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/seller-memory", tags=["seller-memory"])
 
@@ -282,12 +285,13 @@ async def save_seller_memory(
     ws_version = int(ws.get("version") or 0)
 
     if body.expected_version is None or body.expected_version != ws_version:
+        logger.warning("Business details save refused (workspace version mismatch)")
         return JSONResponse(
             status_code=409,
             content={
                 "detail": (
-                    "Your seller memory changed in another tab or requires an explicit version "
-                    "before replacing saved settings."
+                    "Muse couldn't replace your saved business details. "
+                    "Reload them before saving these changes."
                 ),
                 "server_version": ws_version,
                 "server_preferences": cur_pref.model_dump(mode="json"),

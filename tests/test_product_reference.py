@@ -189,7 +189,10 @@ def test_route_returns_validated_reference_and_typed_page_failure(
         assert response.json()["image_data_url"] is None
         failure = client.post("/api/v1/product-reference", json={"url": f"{ORIGIN}/missing"})
         assert failure.status_code == 422
-        assert "404" in failure.json()["detail"]
+        assert failure.json()["detail"] == (
+            "That product page couldn't be found. Check the address, try another product page, "
+            "or add the details and upload its photo yourself."
+        )
         assert client.post("/api/v1/product-reference", json={"url": ""}).status_code == 422
         assert (
             client.post(

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -12,6 +13,8 @@ from src.services.product_reference import (
     ProductReferenceError,
     ProductReferenceService,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["products"])
 
@@ -33,4 +36,5 @@ async def product_reference(
     try:
         return await service.read(request.url)
     except ProductReferenceError as err:
-        raise HTTPException(status_code=422, detail=str(err)) from err
+        logger.warning("Product import failed (%s)", type(err.__cause__ or err).__name__)
+        raise HTTPException(status_code=422, detail=err.user_message) from err

@@ -286,9 +286,13 @@ def _resolve_date_range(
     resolved_end = end_date or today
     resolved_start = start_date or (resolved_end - timedelta(days=13))
     if resolved_end < resolved_start:
+        logger.warning("Ad insights request has reversed date range")
         raise HTTPException(
             status_code=422,
-            detail="end_date must be on or after start_date.",
+            detail=(
+                "The end date is before the start date. "
+                "Choose an end date on or after the start date."
+            ),
         )
     if (resolved_end - resolved_start).days > 90:
         raise HTTPException(
@@ -428,7 +432,10 @@ async def disconnect_connected_meta_account(
     account = await require_verified_seller(request, response)
     target_account_id = (body.account_id if body is not None else account_id) or ""
     if not target_account_id.strip():
-        raise HTTPException(status_code=422, detail="Provide an account_id to disconnect.")
+        logger.warning("Ad disconnect requested without account selection")
+        raise HTTPException(
+            status_code=422, detail="Choose the Meta ad account you want to disconnect."
+        )
     try:
         normalized_id = normalize_meta_account_id(target_account_id)
         await disconnect_meta_connection(account.user_id, normalized_id)

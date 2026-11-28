@@ -32,6 +32,7 @@ CHECKS = {
     "ad_library",
     "watchlist",
     "saved_competitor",
+    "remove_competitor",
 }
 SECRET_STATE = "fixture-private-oauth-state"
 SECRET_CHALLENGE = "fixture-private-code-challenge"
@@ -139,6 +140,10 @@ def release_server(
         async def mutate(request: Request, call_next: Any) -> Response:
             path = request.url.path
             requests.append(f"{request.method} {path}")
+            if mutation.startswith("remove_") and path == "/api/v1/competitors/saved/remove":
+                assert request.method == "POST"
+                assert await request.json() == {"urls": ["https://example.com"]}
+                return Response(status_code=int(mutation.removeprefix("remove_")))
             if mutation.startswith("saved_") and path == "/api/v1/competitors/saved":
                 assert request.method == "PUT"
                 return Response(status_code=int(mutation.removeprefix("saved_")))
@@ -256,6 +261,7 @@ def test_release_check_passes_real_app(release_server: Callable[..., Any]) -> No
     assert result.returncode == 0, result.stdout + result.stderr
     assert "skipped" in checks["oauth"]["detail"].lower()
     assert "GET /api/v1/account/oauth/google" not in requests
+    assert "POST /api/v1/competitors/saved/remove" in requests
     assert "POST /api/v1/analyze-competitors" in requests
     assert "GET /api/v1/watchlist/run" in requests
     for page in ("/progress", "/today", "/create", "/portal", "/api/v1/health"):
@@ -274,6 +280,8 @@ def test_release_check_passes_real_app(release_server: Callable[..., Any]) -> No
         ("auth_user", "account"),
         ("saved_200", "saved_competitor"),
         ("saved_500", "saved_competitor"),
+        ("remove_200", "remove_competitor"),
+        ("remove_500", "remove_competitor"),
     ],
 )
 def test_release_mutations_fail_correct_check(

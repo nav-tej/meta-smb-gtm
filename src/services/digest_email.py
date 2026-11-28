@@ -128,7 +128,25 @@ async def _rpc(name: str, params: dict[str, Any]) -> dict[str, Any]:
         status = (
             result.get("status_code") if result.get("status_code") in {404, 409, 422, 429} else 503
         )
-        raise DigestError(status, str(result.get("message") or "Request refused.")[:200])
+        messages = {
+            "invalid_subscription": (
+                "Enter an email address and 1 to 3 public shop links, then try again."
+            ),
+            "subscribe_rate_limit": (
+                "Too many sign-ups from this network today. Try again tomorrow."
+            ),
+            "not_found": "This link is no longer valid.",
+            "unsubscribed": "This address unsubscribed. Sign up again to restart.",
+        }
+        detail = messages.get(
+            str(result.get("code") or ""),
+            (
+                "Muse couldn't update your email digest. "
+                "Check your settings and try again in a minute."
+            ),
+        )
+        logger.warning("Email digest storage refused request (HTTP %s)", status)
+        raise DigestError(status, detail)
     return result
 
 

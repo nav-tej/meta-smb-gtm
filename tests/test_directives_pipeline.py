@@ -449,4 +449,7 @@ def test_confirm_directive_rate_limit_exceeded(
     # 11th request triggers 429
     r11 = client.post("/api/v1/directives/confirm", json=req_body, headers=headers)
     assert r11.status_code == 429
-    assert "rate limit exceeded" in r11.json()["detail"].lower()
+    assert (
+        r11.json()["detail"]
+        == "You can save up to 10 research requests an hour. Try again in an hour."
+    )

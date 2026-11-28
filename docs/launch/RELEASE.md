@@ -21,7 +21,10 @@ These are steps for Nav, not actions authorized for this checker assignment.
    `CRON_SECRET` in Vercel; release; set `WATCHLIST_AUTO_CHECK_ENABLED=true`; then run the
    checker with `--watchlist on` (expects signed-out 401). The default `--watchlist off`
    expects 404. Neither mode accepts 200 or 5xx. The checker also requires signed-out
-   `PUT /api/v1/competitors/saved` to return 401 before workspace reads/writes.
+   `PUT /api/v1/competitors/saved` and
+   `POST /api/v1/competitors/saved/remove` (body `{"urls":["https://example.com"]}`)
+   to return 401 before workspace reads/writes. Both fail on any other status, including
+   200 and all 5xx responses.
 
 ## 1. Pick and verify the exact commit
 

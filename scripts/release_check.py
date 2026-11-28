@@ -246,7 +246,14 @@ def check_oauth(transport: Transport) -> Check:
 
 def check_api(transport: Transport, watchlist: str, skip_oauth: bool) -> list[Check]:
     checks = []
-    for name in ("account", "oauth", "ad_library", "watchlist", "saved_competitor"):
+    for name in (
+        "account",
+        "oauth",
+        "ad_library",
+        "watchlist",
+        "saved_competitor",
+        "remove_competitor",
+    ):
         try:
             if name == "account":
                 reply = transport.request("/api/v1/account/me")
@@ -289,7 +296,7 @@ def check_api(transport: Transport, watchlist: str, skip_oauth: bool) -> list[Ch
                 check = Check(
                     name, status == expected, f"HTTP {status}; expected {expected} ({watchlist})"
                 )
-            else:
+            elif name == "saved_competitor":
                 status = transport.request(
                     "/api/v1/competitors/saved",
                     "PUT",
@@ -297,6 +304,11 @@ def check_api(transport: Transport, watchlist: str, skip_oauth: bool) -> list[Ch
                         "competitor_url": "https://example.com",
                         "name": "Example",
                     },
+                ).status
+                check = Check(name, status == 401, f"HTTP {status}; expected signed-out 401")
+            else:
+                status = transport.request(
+                    "/api/v1/competitors/saved/remove", "POST", {"urls": ["https://example.com"]}
                 ).status
                 check = Check(name, status == 401, f"HTTP {status}; expected signed-out 401")
         except Exception:
@@ -370,6 +382,7 @@ def check_logs() -> Check:
                     "/api/v1/analyze-competitors",
                     "/api/v1/watchlist/run",
                     "/api/v1/competitors/saved",
+                    "/api/v1/competitors/saved/remove",
                 }
                 if path not in known_paths:
                     path = "/[redacted]"

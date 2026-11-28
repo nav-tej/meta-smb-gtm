@@ -56,8 +56,29 @@ _PRODUCT_LD_TYPES = {
 }
 
 
+PRODUCT_UNREADABLE = (
+    "Muse couldn't read that product page. Check the address, try another public product page, "
+    "or add the product details and upload its photo yourself."
+)
+PRODUCT_BLOCKED = (
+    "That site doesn't allow automated reading, so Muse can't import this product. "
+    "Try another public product page, or add the details and upload its photo yourself."
+)
+PRODUCT_MISSING = (
+    "That product page couldn't be found. Check the address, try another product page, "
+    "or add the details and upload its photo yourself."
+)
+PRODUCT_ADDRESS = (
+    "Muse couldn't use that address. Enter a public product page starting with https://."
+)
+
+
 class ProductReferenceError(Exception):
-    """The product page cannot be read safely or does not allow this crawler."""
+    """Keep diagnostic context separate from the sentence returned to the seller."""
+
+    def __init__(self, message: str, *, user_message: str = PRODUCT_UNREADABLE) -> None:
+        super().__init__(message)
+        self.user_message = user_message
 
 
 class ProductImageCandidate(BaseModel):
@@ -318,7 +339,7 @@ class ProductReferenceService:
         try:
             url = normalize_competitor_url(raw_url)
         except (SitemapError, ValueError) as err:
-            raise ProductReferenceError(str(err)) from err
+            raise ProductReferenceError(str(err), user_message=PRODUCT_ADDRESS) from err
 
         policies: dict[str, RobotsPolicy] = {}
         loading_robots = False
@@ -371,7 +392,14 @@ class ProductReferenceService:
                 if status != 200 or not body:
                     raise SitemapError(f"The product page could not be read (HTTP {status}).")
             except (SitemapError, httpx.InvalidURL, ValueError) as err:
-                raise ProductReferenceError(str(err)) from err
+                messages = {
+                    "This page is blocked by the site's robots.txt rules.": PRODUCT_BLOCKED,
+                    "The product page could not be read (HTTP 404).": PRODUCT_MISSING,
+                    "The product page could not be read (HTTP 410).": PRODUCT_MISSING,
+                }
+                raise ProductReferenceError(
+                    str(err), user_message=messages.get(str(err), PRODUCT_UNREADABLE)
+                ) from err
 
             page = body.decode("utf-8", errors="replace")
             metadata = extract_page_metadata(page)
