@@ -40,3 +40,8 @@
 - Parser/tests committed and pushed as `cb832f4`. Final-source full gate is active in exec session **7540**, log `/tmp/release-check-gate-final.log`; lint and format have passed. Earlier gate session **11501** remains active; neither result is claimed complete yet.
 - RELEASE.md evidence wording now distinguishes authorized task-branch pushes from deployment actions and links this report. No executable source changes after `cb832f4`. Both audits and all eight Node contracts remain passing on unchanged application source.
 - Next executable step: poll sessions 11501/7540, inspect exit codes and pytest summaries, record skipped tests and warnings, then publish final evidence/release scope. No deployments or hosted target requests.
+
+## First full gate result — November 28, 2026 (PT)
+- Session 11501 completed exit 0: exact gate command above; Ruff passed, 349 files format-clean; **892 passed, 3 skipped, 1 warning in 411.48s**. Log `/tmp/release-check-gate.log`. It collected tests before the five final log-schema cases were added, so final-source gate session 7540 remains authoritative/pending.
+- Three skipped tests require unset `BILLING_PGLITE_DIR`: `tests/test_auto_watchlist.py::test_watchlist_sql_on_local_postgres`, `tests/test_billing.py::test_billing_sql_regressions_on_local_postgres`, `tests/test_digest_email.py::test_digest_sql_on_local_postgres`. No SQL tests claimed executed. Warning: expected Pillow DecompressionBombWarning in `test_excessive_dimension_image_is_rejected_preserving_listing`. Pytest also emits its existing asyncio fixture-loop-scope deprecation at startup.
+- Next: wait for session 7540, record final 900-test collection outcome, commit/push report and release own assignment scope. No runtime changes or active audit processes.
