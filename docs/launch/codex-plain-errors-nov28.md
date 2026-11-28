@@ -41,6 +41,31 @@ Claude added `POST /api/v1/competitors/saved/remove` (merged Nov 28). Add a chec
 Add a test in `tests/test_release_check.py`, plus a mutation check showing the test fails when
 the check accepts 200. Update the check list in `docs/launch/RELEASE.md`.
 
+## Part 3: the log check reads the whole window (added Nov 28, after the release)
+
+On the `69b3561` release, `--logs` failed with "Request logs unavailable or schema
+unrecognized". The CLI returns 100 records per page by default, the 15-minute window after a
+release holds more, and the summary says `hasMore: true`, so the check failed closed. That is
+the right refusal, but it means `--logs` can never pass after a real release. Claude verified the
+window by hand: 0 server errors.
+
+Fix it in `check_logs`:
+1. Ask the server for errors only: `--query 'httpStatus >= 500' --limit 1000`. With that
+   filter, an empty summary (`recordsReturned: 0`, `hasMore: false`, no `excludedIntervals`)
+   means the window is clean. Claude checked on Nov 28 that the filter works (the same query
+   with `>= 400` returned the 8 expected 4xx).
+2. If `hasMore` is still true, follow `--next <cursor>` (the summary's `pagination.next`) until
+   it is false, with a cap of 10 pages. Past the cap, fail closed as now.
+3. Keep the output rules: method and known path only, nothing else from the records.
+
+Test it with the mocked CLI:
+- a filtered, empty window passes;
+- a 5xx on page 2 fails;
+- `hasMore` past the cap fails;
+- the command line includes the filter.
+
+Add a mutation check: drop the filter, and the paged test fails. Update `RELEASE.md`.
+
 ## Do not touch
 
 - **Claude:**
